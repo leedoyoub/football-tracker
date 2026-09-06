@@ -1,0 +1,10 @@
+import { useState } from 'react'
+import { useStore } from '../store'
+import type { MatchEvent, View } from '../types'
+
+export function EditMatchScreen({ matchId, onNavigate }: { matchId: string; onNavigate: (view: View) => void }) {
+  const { matches, updateMatch } = useStore(); const match = matches.find((item) => item.id === matchId)
+  const [date, setDate] = useState(match?.date ?? ''); const [day, setDay] = useState(match?.matchDay ?? 1); const [events, setEvents] = useState(match ? JSON.stringify(match.events, null, 2) : '[]'); const [error, setError] = useState('')
+  if (!match) return <div className="p-6">Match not found.</div>
+  return <div className="px-4 pb-8 pt-6"><button type="button" onClick={() => onNavigate({ name: 'match', id: matchId })} className="mb-3 text-xs text-emerald-400">Cancel</button><h1 className="mb-1 text-2xl font-semibold">Edit Match Day</h1><p className="mb-4 text-xs text-zinc-400">Correct the saved date, Match Day, or event records. Statistics and MOM are recalculated when saved.</p><div className="space-y-3"><label className="block text-xs">Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 w-full rounded-xl bg-zinc-900 p-2" /></label><label className="block text-xs">Match Day<input type="number" min="1" value={day} onChange={(e) => setDay(Number(e.target.value))} className="mt-1 w-full rounded-xl bg-zinc-900 p-2" /></label><label className="block text-xs">Events<input value={events} onChange={(e) => setEvents(e.target.value)} className="mt-1 h-52 w-full rounded-xl bg-zinc-900 p-2 font-mono text-[10px]" /></label>{error && <p className="text-xs text-red-400">{error}</p>}<button type="button" onClick={() => { try { const parsed = JSON.parse(events) as MatchEvent[]; if (!Array.isArray(parsed)) throw new Error('Events must be an array.'); updateMatch(matchId, { ...match, date, matchDay: day, events: parsed }); onNavigate({ name: 'match', id: matchId }) } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid event data.') } }} className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-black text-black">SAVE MATCH DAY</button></div></div>
+}

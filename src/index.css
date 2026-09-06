@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: #09090b;
+}
+
+body {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.pitch-grass {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      #15803d 0 12.5%,
+      #166534 12.5% 25%
+    );
+}
