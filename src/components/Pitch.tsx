@@ -1,5 +1,5 @@
 import type { Best11Slot, Player, Position, Team } from '../types'
-import { TeamIcon, jerseyColor } from './TeamIcon'
+import { PlayerIcon } from './PlayerIcon'
 import { playerDisplayName, Badge } from './ui'
 import { useRef } from 'react'
 import { DndContext, PointerSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type CollisionDetection, type DragEndEvent } from '@dnd-kit/core'
@@ -41,13 +41,6 @@ function GoalIcon() {
 
 function AssistIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-2.5 w-2.5 fill-none stroke-current stroke-2"><path d="M4 15.5c2.5-2.8 5.2-4.6 8.1-5.4l3.2.8 3.1 3.1-1.9 2.7-4.1.2-2.2 2.3-4.8-.4L4 15.5Z" /><path d="m12.1 10.1 1.1-3 2.2.5 1.1 3.3M7.4 14.5l1.8 1.1" /></svg>
-}
-
-function PlayerMarker({ player, team, badges }: { player: Player; team?: Team; badges: React.ReactNode }) {
-  const contents = <><span className="absolute inset-0 overflow-hidden rounded-full">{player.image && <img src={player.image} alt="" className="h-full w-full object-cover" />}</span><span className="relative z-10" style={team ? { color: jerseyColor(team) } : undefined}>{player.number}</span>{badges}</>
-  return team
-    ? <TeamIcon team={team} className="relative h-10 w-10 text-[11px] font-black shadow-lg">{contents}</TeamIcon>
-    : <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-[11px] font-black text-white shadow-lg">{contents}</div>
 }
 
 export function Pitch({ slots, players, teams, statsByPlayer, badgeMode = 'rating', motmPlayerId, onSlotClick, layout = 'tactical', draggable = false, externalDnd = false, onSlotDrop }: { slots: Best11Slot[]; players: Player[]; teams?: Team[]; statsByPlayer?: Record<string, { goals: number; assists: number }>; badgeMode?: 'rating' | 'position'; motmPlayerId?: string; onSlotClick?: (slot: Best11Slot) => void; layout?: 'tactical' | 'free'; draggable?: boolean; externalDnd?: boolean; onSlotDrop?: (activeSlot: string, targetSlot: string) => void }) {
@@ -93,9 +86,7 @@ export function Pitch({ slots, players, teams, statsByPlayer, badgeMode = 'ratin
         }}
       >
         <PitchSlotDrop slot={slot} draggable={draggable}>
-          <div className="relative">
-            <PlayerMarker player={player} team={representativeTeam} badges={badges} />
-          </div>
+          <PlayerIcon player={player} team={representativeTeam} badges={badges} className="h-10 w-10 text-[11px]" />
         </PitchSlotDrop>
         <div className="relative z-10 -mt-1 grid h-3.5 w-16 grid-cols-2 items-center text-[8px] font-bold leading-none text-white">
           <span className="justify-self-start">{(stats?.assists ?? 0) > 0 && <span className="flex items-center gap-0.5 rounded-full bg-black/80 px-1 py-0.5"><AssistIcon />{stats?.assists}</span>}</span>
