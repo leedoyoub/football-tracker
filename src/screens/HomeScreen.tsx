@@ -118,7 +118,7 @@ export function HomeScreen({
           <h2 className="text-lg font-semibold">Team of the Week</h2>
           <p className="text-xs text-zinc-400">Recent 3 Match Average Rating · 4-3-3</p>
         </div>
-        <Pitch slots={teamOfWeek.slots} players={players} teams={teams} statsByPlayer={teamOfWeek.statsByPlayer} layout="free" />
+        <Pitch slots={teamOfWeek.slots} players={players} teams={teams} statsByPlayer={teamOfWeek.statsByPlayer} layout="free" showPositionBadge={false} />
       </section>
 
       <section className="mt-7">
@@ -126,7 +126,7 @@ export function HomeScreen({
           <h2 className="text-lg font-semibold">Team of the Year</h2>
           <p className="text-xs text-zinc-400">Season Average Rating · 4-3-3</p>
         </div>
-        <Pitch slots={tots.slots} players={players} teams={teams} statsByPlayer={tots.statsByPlayer} layout="free" />
+        <Pitch slots={tots.slots} players={players} teams={teams} statsByPlayer={tots.statsByPlayer} layout="free" showPositionBadge={false} />
       </section>
     </div>
   )

@@ -1,7 +1,7 @@
 import type { Player } from '../types'
 
 export function Badge({ children, className = '', colorClass }: { children: React.ReactNode, className?: string, colorClass: string }) {
-  return <span className={`flex h-5 min-w-[32px] items-center justify-center rounded-md px-1 text-[9px] font-black ${colorClass} ${className}`}>{children}</span>
+  return <span className={`flex h-4 min-w-[25px] items-center justify-center rounded-[4px] px-0.5 text-[7px] font-black ${colorClass} ${className}`}>{children}</span>
 }
 
 export function playerDisplayName(player?: Player): string {

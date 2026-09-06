@@ -46,7 +46,7 @@ export function PlayerDetailScreen({ playerId, season, onNavigate }: { playerId:
   const mom = rated.filter((item) => item.match.manOfMatchPlayerId === player.id).length
 
   return <div className="px-4 pb-8 pt-6">
-    <button type="button" onClick={() => onNavigate({ name: 'players' })} className="mb-3 text-xs font-semibold text-emerald-400">← Players</button>
+    <button type="button" onClick={() => window.history.back()} className="mb-3 text-xs font-semibold text-emerald-400">← Back</button>
     <div className="mb-4">
       <p className="text-xs text-zinc-400">{teams.find((team) => team.id === player.teamId)?.name} · #{player.number} · {player.position}</p>
       <h1 className="text-2xl font-semibold">{player.fullName ?? player.name}</h1>
