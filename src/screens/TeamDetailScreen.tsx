@@ -1,7 +1,6 @@
 import { Pitch } from '../components/Pitch'
-import { PlayerIcon } from '../components/PlayerIcon'
 import { TeamIcon } from '../components/TeamIcon'
-import { formatDate, playerDisplayName, StatIcons } from '../components/ui'
+import { formatDate, SubstitutePlayerCard } from '../components/ui'
 import { matchScore, ratePlayerMatch } from '../engine/rating'
 import { playerSeasonStats, seasonsFromMatches, teamBestEleven, teamMatches } from '../engine/stats'
 import { useStore } from '../store'
@@ -48,7 +47,7 @@ export function TeamDetailScreen({ teamId, season, onNavigate }: { teamId: strin
     <section className="mt-6">
       <h2 className="mb-2 text-sm font-semibold">Substitutes</h2>
       {latestBench.length > 0 ? (
-        <div className="grid gap-1.5">
+        <div className="grid grid-cols-4 gap-2">
           {latestBench.map((appearance) => {
             const player = players.find((item) => item.id === appearance.playerId)
             const stat = statsByPlayer[appearance.playerId]
@@ -56,19 +55,14 @@ export function TeamDetailScreen({ teamId, season, onNavigate }: { teamId: strin
             const rating = ratingBreakdown?.rating ?? 0
             if (!player) return null
             return (
-              <button
+              <SubstitutePlayerCard
                 key={player.id}
-                type="button"
+                player={player}
+                team={team}
+                rating={rating}
+                stats={stat}
                 onClick={() => onNavigate({ name: 'player', id: player.id })}
-                className="flex items-center gap-2 rounded-xl bg-zinc-900 px-3 py-2 text-left"
-              >
-                <span className={`w-8 text-[10px] font-black ${rating ? 'text-emerald-400' : 'text-zinc-500'}`}>
-                  {rating?.toFixed(1) ?? '—'}
-                </span>
-                <PlayerIcon player={player} team={team} className="h-8 w-8 text-[10px]" />
-                <span className="min-w-0 flex-1 truncate text-xs font-semibold">{playerDisplayName(player)}</span>
-                <StatIcons goals={stat?.goals ?? 0} assists={stat?.assists ?? 0} className="text-[10px] text-zinc-400" />
-              </button>
+              />
             )
           })}
         </div>

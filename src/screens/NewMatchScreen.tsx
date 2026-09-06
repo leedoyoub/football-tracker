@@ -534,15 +534,45 @@ function LiveMatchStep(props: {
   }
   const selectSwap = (slotId?: string, benchId?: string) => {
     if (!draftAssignments || !draftBench) return
+    
+    // If we have a selection already, check if we're completing a swap
+    if (selectedSlot && benchId) {
+      // Slot -> Bench (Slot was clicked, now clicking bench)
+      const playerId = draftAssignments[selectedSlot]
+      if (playerId) {
+        // Swap or Move? Existing logic expects a specific swap flow
+      }
+    }
+    
+    // Fallback to original logic but ensure it uses the state
     const nextSlot = slotId ?? selectedSlot
     const nextBench = benchId ?? selectedBenchId
-    if (!nextSlot || !nextBench) { if (slotId) setSelectedSlot(slotId); if (benchId) setSelectedBenchId(benchId); return }
-    const outgoing = draftAssignments[nextSlot]
-    const index = draftBench.indexOf(nextBench)
-    if (index < 0) return
-    setDraftAssignments({ ...draftAssignments, [nextSlot]: nextBench })
-    const updatedBench = [...draftBench]; if (outgoing) updatedBench[index] = outgoing; else updatedBench.splice(index, 1); setDraftBench(updatedBench)
-    setSelectedSlot(null); setSelectedBenchId(null)
+    
+    if (!nextSlot && !nextBench) {
+      if (slotId) setSelectedSlot(slotId)
+      if (benchId) setSelectedBenchId(benchId)
+      return
+    }
+
+    // Toggle/Swap logic
+    if (nextSlot && nextBench) {
+        // perform swap
+        const outgoing = draftAssignments[nextSlot]
+        const index = draftBench.indexOf(nextBench)
+        
+        setDraftAssignments({ ...draftAssignments, [nextSlot]: nextBench })
+        const updatedBench = [...draftBench];
+        if (outgoing) updatedBench[index] = outgoing;
+        else updatedBench.splice(index, 1);
+        setDraftBench(updatedBench)
+        
+        setSelectedSlot(null)
+        setSelectedBenchId(null)
+    } else {
+        // Just selecting
+        if (slotId) setSelectedSlot(slotId)
+        if (benchId) setSelectedBenchId(benchId)
+    }
   }
   return <DndContext collisionDetection={closestCenter} onDragEnd={handleSubDragEnd}><div className="space-y-5">
     <div className="grid grid-cols-4 gap-2">{([['goal', 'GOAL'], ['conceded', 'CONCEDED'], ['substitution', 'SUBSTITUTION'], ['save', 'SAVE']] as const).map(([type, label]) => <button key={type} type="button" onClick={() => open(type)} className={`rounded-xl py-3 text-[10px] font-black ${props.liveEvent === type ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-white'}`}>{label}</button>)}</div>

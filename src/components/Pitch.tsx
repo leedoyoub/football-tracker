@@ -58,6 +58,11 @@ export function Pitch({ slots, players, teams, statsByPlayer, badgeMode = 'ratin
   const content = <div className="relative mx-auto aspect-[3/4] w-full overflow-hidden rounded-lg border border-emerald-700/50 pitch-grass"><div className="pointer-events-none absolute inset-2 border border-white/40"><div className="absolute left-1/2 top-0 h-14 w-24 -translate-x-1/2 border border-t-0 border-white/40" /><div className="absolute bottom-0 left-1/2 h-14 w-24 -translate-x-1/2 border border-b-0 border-white/40" /><div className="absolute left-0 right-0 top-1/2 border-t border-white/40" /><div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/40" /></div>{slots.map((slot) => {
     const tactical = grid[slot.slot] ?? grid.CM; const point = layout === 'free' ? homePositions[slot.slot] ?? tactical : tactical; const player = slot.playerId ? byId[slot.playerId] : undefined; if (!player) return draggable ? <EmptyPitchSlotDrop key={slot.slot} slot={slot} point={point} /> : null; const stats = statsByPlayer?.[player.id]; const matchPosition = (slot.matchPosition ?? tactical.matchPosition) as Position
     const representativeTeam = teamById[slot.teamId ?? '']
+// ... (imports remain)
+// Ensure showPositionBadge is used correctly. 
+// Use large size for rating badge: size="large"
+
+// Inside Pitch component, mapping slots:
     const badges = (
       <>
         {showPositionBadge && (
@@ -72,6 +77,7 @@ export function Pitch({ slots, players, teams, statsByPlayer, badgeMode = 'ratin
           <Badge
             colorClass={player.id === motmPlayerId ? 'bg-blue-500 text-white' : ratingColor(slot.avgRating)}
             className="absolute -right-3 -top-3 z-30 shadow-lg"
+            size="large"
           >
             {slot.avgRating.toFixed(1)}{player.id === motmPlayerId ? ' ★' : ''}
           </Badge>

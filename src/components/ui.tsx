@@ -1,7 +1,26 @@
-import type { Player } from '../types'
+import type { Player, Team } from '../types'
+import { PlayerIcon } from './PlayerIcon'
 
-export function Badge({ children, className = '', colorClass }: { children: React.ReactNode, className?: string, colorClass: string }) {
-  return <span className={`flex h-4 min-w-[25px] items-center justify-center rounded-[4px] px-0.5 text-[7px] font-black ${colorClass} ${className}`}>{children}</span>
+export function Badge({ children, className = '', colorClass, size = 'default' }: { children: React.ReactNode, className?: string, colorClass: string, size?: 'default' | 'large' }) {
+  const sizeClasses = size === 'large' ? 'h-5 min-w-[28px] px-1 text-[8px]' : 'h-4 min-w-[25px] px-0.5 text-[7px]'
+  return <span className={`flex items-center justify-center rounded-[4px] font-black ${sizeClasses} ${colorClass} ${className}`}>{children}</span>
+}
+
+export function SubstitutePlayerCard({ player, team, rating, stats, onClick }: { player: Player, team?: Team, rating?: number, stats?: { goals: number, assists: number }, onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="flex min-w-0 flex-col items-center rounded-lg bg-zinc-900 p-1 text-center">
+      <div className="relative flex h-10 w-10 items-center justify-center">
+        <PlayerIcon player={player} team={team} className="h-10 w-10 text-[10px]" />
+        {rating !== undefined && (
+          <Badge colorClass={ratingTone(rating)} className="absolute -right-1 -top-1 z-30 shadow-lg" size="large">
+            {rating.toFixed(1)}
+          </Badge>
+        )}
+      </div>
+      <span className="mt-1 w-full truncate text-[9px] font-semibold">{playerDisplayName(player)}</span>
+      <StatIcons goals={stats?.goals ?? 0} assists={stats?.assists ?? 0} className="text-[8px] text-zinc-400" />
+    </button>
+  )
 }
 
 export function playerDisplayName(player?: Player): string {
