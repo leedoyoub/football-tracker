@@ -77,9 +77,16 @@ export function globalRankings(
   season: string,
   sort: RankSort = 'rating',
 ): PlayerSeasonStats[] {
+  const seasonMatches = matches.filter((m) => m.season === season)
   const rows = players
     .map((player) => playerSeasonStats(player, matches, season))
     .filter((row) => row.matches > 0)
+    .filter((row) => {
+      if (sort !== 'rating') return true
+      const teamId = row.teamId
+      const teamMatchesCount = seasonMatches.filter((match) => matchRecordedForTeam(match, teamId)).length
+      return row.matches >= Math.ceil(teamMatchesCount * 0.5)
+    })
 
   rows.sort((a, b) => {
     if (sort === 'goals') return b.goals - a.goals || b.avgRating - a.avgRating

@@ -65,8 +65,42 @@ export function Pitch({ slots, players, teams, statsByPlayer, badgeMode = 'ratin
   const content = <div className="relative mx-auto aspect-[3/4] w-full overflow-hidden rounded-lg border border-emerald-700/50 pitch-grass"><div className="pointer-events-none absolute inset-2 border border-white/40"><div className="absolute left-1/2 top-0 h-14 w-24 -translate-x-1/2 border border-t-0 border-white/40" /><div className="absolute bottom-0 left-1/2 h-14 w-24 -translate-x-1/2 border border-b-0 border-white/40" /><div className="absolute left-0 right-0 top-1/2 border-t border-white/40" /><div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/40" /></div>{slots.map((slot) => {
     const tactical = grid[slot.slot] ?? grid.CM; const point = layout === 'free' ? homePositions[slot.slot] ?? tactical : tactical; const player = slot.playerId ? byId[slot.playerId] : undefined; if (!player) return draggable ? <EmptyPitchSlotDrop key={slot.slot} slot={slot} point={point} /> : null; const stats = statsByPlayer?.[player.id]; const matchPosition = (slot.matchPosition ?? tactical.matchPosition) as Position
     const representativeTeam = teamById[slot.teamId ?? '']
-    const badge = <span className={`absolute -right-4 -top-2 z-20 rounded px-1 py-0.5 text-[8px] font-black shadow ${badgeMode === 'position' ? getPositionColor(matchPosition) : player.id === motmPlayerId ? 'bg-blue-500 text-white' : ratingColor(slot.avgRating)}`}>{badgeMode === 'position' ? matchPosition : `${slot.avgRating.toFixed(1)}${player.id === motmPlayerId ? ' ★' : ''}`}</span>
-    return <div key={slot.slot} className="absolute flex w-20 max-w-[23%] -translate-x-1/2 -translate-y-1/2 flex-col items-center" style={{ left: `${point.x}%`, top: `${point.y}%` }} onClick={() => { if (!suppressClick.current) onSlotClick?.(slot) }}><PitchSlotDrop slot={slot} draggable={draggable}><PlayerMarker player={player} team={representativeTeam} badge={badge} /></PitchSlotDrop><div className="relative z-10 -mt-1 grid h-3.5 w-16 grid-cols-2 items-center text-[8px] font-bold leading-none text-white"><span className="justify-self-start">{(stats?.assists ?? 0) > 0 && <span className="flex items-center gap-0.5 rounded-full bg-black/80 px-1 py-0.5"><AssistIcon />{stats?.assists}</span>}</span><span className="justify-self-end">{(stats?.goals ?? 0) > 0 && <span className="flex items-center gap-0.5 rounded-full bg-black/80 px-1 py-0.5"><GoalIcon />{stats?.goals}</span>}</span></div><div className="relative z-10 -mt-0.5 h-4 max-w-full truncate rounded-full bg-black/70 px-1.5 py-0.5 text-center text-[9px] font-semibold leading-tight">{playerDisplayName(player)}</div></div>
+    const badge = (
+      <span
+        className={`absolute -right-3 -top-3 z-30 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[9px] font-black shadow-lg ${
+          badgeMode === 'position'
+            ? getPositionColor(matchPosition)
+            : player.id === motmPlayerId
+              ? 'bg-blue-500 text-white'
+              : ratingColor(slot.avgRating)
+        }`}
+      >
+        {badgeMode === 'position'
+          ? matchPosition
+          : `${slot.avgRating.toFixed(1)}${player.id === motmPlayerId ? ' ★' : ''}`}
+      </span>
+    )
+    return (
+      <div
+        key={slot.slot}
+        className="absolute flex w-20 max-w-[23%] -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+        style={{ left: `${point.x}%`, top: `${point.y}%` }}
+        onClick={() => {
+          if (!suppressClick.current) onSlotClick?.(slot)
+        }}
+      >
+        <PitchSlotDrop slot={slot} draggable={draggable}>
+          <div className="relative">
+            <PlayerMarker player={player} team={representativeTeam} badge={badge} />
+          </div>
+        </PitchSlotDrop>
+        <div className="relative z-10 -mt-1 grid h-3.5 w-16 grid-cols-2 items-center text-[8px] font-bold leading-none text-white">
+          <span className="justify-self-start">{(stats?.assists ?? 0) > 0 && <span className="flex items-center gap-0.5 rounded-full bg-black/80 px-1 py-0.5"><AssistIcon />{stats?.assists}</span>}</span>
+          <span className="justify-self-end">{(stats?.goals ?? 0) > 0 && <span className="flex items-center gap-0.5 rounded-full bg-black/80 px-1 py-0.5"><GoalIcon />{stats?.goals}</span>}</span>
+        </div>
+        <div className="relative z-10 -mt-0.5 h-4 max-w-full truncate rounded-full bg-black/70 px-1.5 py-0.5 text-center text-[9px] font-semibold leading-tight">{playerDisplayName(player)}</div>
+      </div>
+    )
   })}</div>
   return draggable && !externalDnd ? <DndContext sensors={sensors} collisionDetection={nearest} onDragStart={() => { suppressClick.current = true }} onDragCancel={() => { suppressClick.current = false }} onDragEnd={endDrag}>{content}</DndContext> : content
 }
