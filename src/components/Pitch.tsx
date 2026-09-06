@@ -1,6 +1,6 @@
 import type { Best11Slot, Player, Position, Team } from '../types'
 import { TeamIcon, jerseyColor } from './TeamIcon'
-import { playerDisplayName } from './ui'
+import { playerDisplayName, Badge } from './ui'
 import { useRef } from 'react'
 import { DndContext, PointerSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type CollisionDetection, type DragEndEvent } from '@dnd-kit/core'
 
@@ -43,11 +43,11 @@ function AssistIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-2.5 w-2.5 fill-none stroke-current stroke-2"><path d="M4 15.5c2.5-2.8 5.2-4.6 8.1-5.4l3.2.8 3.1 3.1-1.9 2.7-4.1.2-2.2 2.3-4.8-.4L4 15.5Z" /><path d="m12.1 10.1 1.1-3 2.2.5 1.1 3.3M7.4 14.5l1.8 1.1" /></svg>
 }
 
-function PlayerMarker({ player, team, badge }: { player: Player; team?: Team; badge: React.ReactNode }) {
-  const contents = <><span className="absolute inset-0 overflow-hidden rounded-full">{player.image && <img src={player.image} alt="" className="h-full w-full object-cover" />}</span><span className="relative z-10" style={team ? { color: jerseyColor(team) } : undefined}>{player.number}</span>{badge}</>
+function PlayerMarker({ player, team, badges }: { player: Player; team?: Team; badges: React.ReactNode }) {
+  const contents = <><span className="absolute inset-0 overflow-hidden rounded-full">{player.image && <img src={player.image} alt="" className="h-full w-full object-cover" />}</span><span className="relative z-10" style={team ? { color: jerseyColor(team) } : undefined}>{player.number}</span>{badges}</>
   return team
     ? <TeamIcon team={team} className="relative h-10 w-10 text-[11px] font-black shadow-lg">{contents}</TeamIcon>
-    : <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white text-[11px] font-black text-black shadow-lg">{contents}</div>
+    : <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-[11px] font-black text-white shadow-lg">{contents}</div>
 }
 
 export function Pitch({ slots, players, teams, statsByPlayer, badgeMode = 'rating', motmPlayerId, onSlotClick, layout = 'tactical', draggable = false, externalDnd = false, onSlotDrop }: { slots: Best11Slot[]; players: Player[]; teams?: Team[]; statsByPlayer?: Record<string, { goals: number; assists: number }>; badgeMode?: 'rating' | 'position'; motmPlayerId?: string; onSlotClick?: (slot: Best11Slot) => void; layout?: 'tactical' | 'free'; draggable?: boolean; externalDnd?: boolean; onSlotDrop?: (activeSlot: string, targetSlot: string) => void }) {
@@ -65,20 +65,23 @@ export function Pitch({ slots, players, teams, statsByPlayer, badgeMode = 'ratin
   const content = <div className="relative mx-auto aspect-[3/4] w-full overflow-hidden rounded-lg border border-emerald-700/50 pitch-grass"><div className="pointer-events-none absolute inset-2 border border-white/40"><div className="absolute left-1/2 top-0 h-14 w-24 -translate-x-1/2 border border-t-0 border-white/40" /><div className="absolute bottom-0 left-1/2 h-14 w-24 -translate-x-1/2 border border-b-0 border-white/40" /><div className="absolute left-0 right-0 top-1/2 border-t border-white/40" /><div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/40" /></div>{slots.map((slot) => {
     const tactical = grid[slot.slot] ?? grid.CM; const point = layout === 'free' ? homePositions[slot.slot] ?? tactical : tactical; const player = slot.playerId ? byId[slot.playerId] : undefined; if (!player) return draggable ? <EmptyPitchSlotDrop key={slot.slot} slot={slot} point={point} /> : null; const stats = statsByPlayer?.[player.id]; const matchPosition = (slot.matchPosition ?? tactical.matchPosition) as Position
     const representativeTeam = teamById[slot.teamId ?? '']
-    const badge = (
-      <span
-        className={`absolute -right-3 -top-3 z-30 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[9px] font-black shadow-lg ${
-          badgeMode === 'position'
-            ? getPositionColor(matchPosition)
-            : player.id === motmPlayerId
-              ? 'bg-blue-500 text-white'
-              : ratingColor(slot.avgRating)
-        }`}
-      >
-        {badgeMode === 'position'
-          ? matchPosition
-          : `${slot.avgRating.toFixed(1)}${player.id === motmPlayerId ? ' ★' : ''}`}
-      </span>
+    const badges = (
+      <>
+        <Badge
+          colorClass={getPositionColor(matchPosition)}
+          className="absolute -left-3 -top-3 z-30 shadow-lg"
+        >
+          {matchPosition}
+        </Badge>
+        {badgeMode === 'rating' && (
+          <Badge
+            colorClass={player.id === motmPlayerId ? 'bg-blue-500 text-white' : ratingColor(slot.avgRating)}
+            className="absolute -right-3 -top-3 z-30 shadow-lg"
+          >
+            {slot.avgRating.toFixed(1)}{player.id === motmPlayerId ? ' ★' : ''}
+          </Badge>
+        )}
+      </>
     )
     return (
       <div
@@ -91,7 +94,7 @@ export function Pitch({ slots, players, teams, statsByPlayer, badgeMode = 'ratin
       >
         <PitchSlotDrop slot={slot} draggable={draggable}>
           <div className="relative">
-            <PlayerMarker player={player} team={representativeTeam} badge={badge} />
+            <PlayerMarker player={player} team={representativeTeam} badges={badges} />
           </div>
         </PitchSlotDrop>
         <div className="relative z-10 -mt-1 grid h-3.5 w-16 grid-cols-2 items-center text-[8px] font-bold leading-none text-white">
