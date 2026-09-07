@@ -5,7 +5,7 @@ import type { View } from '../types'
 export function NewTeamScreen({ onNavigate }: { onNavigate: (view: View) => void }) {
   const { addTeam } = useStore()
   const [name, setName] = useState('')
-  const [shortName, setShortName] = useState('')
+  const [abbreviation, setAbbreviation] = useState('')
   const [color, setColor] = useState('#16a34a')
 
   return (
@@ -26,8 +26,8 @@ export function NewTeamScreen({ onNavigate }: { onNavigate: (view: View) => void
           className="w-full rounded-xl bg-zinc-900 px-3 py-2.5 text-sm"
         />
         <input
-          value={shortName}
-          onChange={(e) => setShortName(e.target.value.toUpperCase().slice(0, 3))}
+          value={abbreviation}
+          onChange={(e) => setAbbreviation(e.target.value.toUpperCase().slice(0, 3))}
           placeholder="ABC"
           className="w-full rounded-xl bg-zinc-900 px-3 py-2.5 text-sm"
         />
@@ -37,9 +37,9 @@ export function NewTeamScreen({ onNavigate }: { onNavigate: (view: View) => void
         </label>
         <button
           type="button"
-          disabled={!name.trim() || shortName.length < 2}
+          disabled={!name.trim() || abbreviation.length !== 3}
           onClick={() => {
-            const id = addTeam({ name: name.trim(), shortName, color })
+            const id = addTeam({ name: name.trim(), abbreviation, color: color, shortName: abbreviation })
             onNavigate({ name: 'team', id })
           }}
           className="w-full rounded-xl bg-emerald-500 py-2.5 text-sm font-bold text-black disabled:opacity-40"

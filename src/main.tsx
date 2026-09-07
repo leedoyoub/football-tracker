@@ -10,10 +10,14 @@ if ('serviceWorker' in navigator) {
   })
 }
 
+import { AuthProvider } from './lib/auth'
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <StoreProvider>
-      <App />
-    </StoreProvider>
+    <AuthProvider>
+      <StoreProvider>
+        <App />
+      </StoreProvider>
+    </AuthProvider>
   </StrictMode>,
 )

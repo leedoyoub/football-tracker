@@ -2,40 +2,14 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react'
-import { seedMatches, seedPlayers, seedTeams } from './data/seed'
 import { rateMatch } from './engine/rating'
 import type { AppState, Match, Player, Team } from './types'
-
-const STORAGE_KEY = 'football-tracker-v1'
-
-function loadState(): AppState {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as AppState
-      if (parsed.teams?.length) return {
-        ...parsed,
-        players: (parsed.players ?? []).map((player) => ({
-          ...player,
-          fullName: player.fullName || player.name,
-          displayName: player.displayName || player.name,
-          teamIds: player.teamIds ?? (player.teamId ? [player.teamId] : []),
-        })),
-      }
-    }
-  } catch {
-    /* use seed */
-  }
-  return { teams: seedTeams, players: seedPlayers, matches: seedMatches }
-}
-
-function persist(state: AppState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-}
+import { LocalRepository } from './lib/repository'
 
 interface StoreValue extends AppState {
   addTeam: (team: Omit<Team, 'id'> & { id?: string }) => string
@@ -47,18 +21,25 @@ interface StoreValue extends AppState {
   saveDraftMatch: (match: Match) => void
   clearDraftMatch: () => void
   deleteMatch: (id: string) => void
-  resetSeed: () => void
 }
 
 const StoreContext = createContext<StoreValue | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AppState>(loadState)
+  const [state, setState] = useState<AppState>({ teams: [], players: [], matches: [] })
+  const [isLoaded, setIsLoaded] = useState(false)
+
+  useEffect(() => {
+    LocalRepository.getAppState().then((saved) => {
+      if (saved) setState(saved)
+      setIsLoaded(true)
+    })
+  }, [])
 
   const update = useCallback((fn: (prev: AppState) => AppState) => {
     setState((prev) => {
       const next = fn(prev)
-      persist(next)
+      LocalRepository.saveAppState(next)
       return next
     })
   }, [])
@@ -106,14 +87,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       deleteMatch: (id) => {
         update((prev) => ({ ...prev, matches: prev.matches.filter((m) => m.id !== id) }))
       },
-      resetSeed: () => {
-        const seeded = { teams: seedTeams, players: seedPlayers, matches: seedMatches }
-        persist(seeded)
-        setState(seeded)
-      },
     }),
     [state, update, saveDraftMatch, clearDraftMatch],
   )
+
+  if (!isLoaded) return null // Or a loading spinner
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

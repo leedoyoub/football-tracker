@@ -13,12 +13,13 @@ import { PlayersScreen } from './screens/PlayersScreen'
 import { RankingsScreen } from './screens/RankingsScreen'
 import { TeamDetailScreen } from './screens/TeamDetailScreen'
 import { TeamsScreen } from './screens/TeamsScreen'
+import { DataManagementScreen } from './screens/DataManagementScreen'
 import { useStore } from './store'
 import type { RankSort, Tab, View } from './types'
 import { seasonsFromMatches } from './engine/stats'
 
 export default function App() {
-  const { matches, resetSeed } = useStore()
+  const { matches } = useStore()
   const seasons = seasonsFromMatches(matches)
   const [season, setSeason] = useState(seasons[0] ?? 'Season 1')
   const [view, setView] = useState<View>({ name: 'home' })
@@ -44,9 +45,9 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950">
-      <div className="relative mx-auto h-screen max-w-md overflow-hidden bg-black text-white shadow-2xl">
-        <div className="no-scrollbar h-full overflow-y-auto pb-20">
+    <div className="min-h-[100dvh] bg-zinc-950">
+      <div className="relative mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-black text-white shadow-2xl">
+        <div className="no-scrollbar flex-1 overflow-y-auto">
           {view.name === 'home' && (
             <HomeScreen season={season} onSeason={setSeason} onNavigate={onNavigate} />
           )}
@@ -75,17 +76,8 @@ export default function App() {
             <NewPlayerScreen teamId={view.teamId} onNavigate={onNavigate} />
           )}
           {view.name === 'edit-player' && <EditPlayerScreen playerId={view.id} onNavigate={onNavigate} />}
-          {view.name === 'home' && (
-            <div className="px-4 pb-6">
-              <button
-                type="button"
-                onClick={resetSeed}
-                className="w-full text-[11px] text-zinc-600"
-              >
-                Reset demo data
-              </button>
-            </div>
-          )}
+          {view.name === 'data-management' && <DataManagementScreen onNavigate={onNavigate} />}
+          {/* Removed Reset demo data button */}
         </div>
         <BottomNav tab={tab} onChange={onTab} />
       </div>

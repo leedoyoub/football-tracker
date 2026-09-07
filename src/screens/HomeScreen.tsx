@@ -74,14 +74,12 @@ export function HomeScreen({
             const player = byId[row.playerId]
             const team = teamForSeasonPlayer(row.playerId, row.teamId)
             return (
-              <button
+              <div
                 key={row.playerId}
-                type="button"
-                onClick={() => onNavigate({ name: 'player', id: row.playerId })}
                 className="flex w-full items-center gap-3 rounded-2xl bg-zinc-900 px-3 py-3 text-left"
               >
                 <span className="w-6 text-center text-sm font-bold text-zinc-500">{i + 1}</span>
-                <PlayerIcon player={player} team={team} />
+                <PlayerIcon player={player} team={team} onClick={() => onNavigate({ name: 'player', id: row.playerId })} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">{playerDisplayName(player)}</span>
                   <span className="text-[11px] text-zinc-400">
@@ -91,7 +89,8 @@ export function HomeScreen({
                 <span className={`text-lg font-bold ${ratingTone(row.avgRating)}`}>
                   {row.avgRating.toFixed(1)}
                 </span>
-              </button>
+              </div>
+
             )
           })}
         </div>

@@ -24,7 +24,12 @@ export const POSITIONS = [
   'ST',
 ] as const
 
+export const REGISTRATION_POSITIONS = [
+  'ST', 'SS', 'LW', 'RW', 'CAM', 'LM', 'RM', 'CM', 'CDM', 'LB', 'RB', 'CB', 'GK'
+] as const
+
 export type Position = (typeof POSITIONS)[number]
+export type RegistrationPosition = (typeof REGISTRATION_POSITIONS)[number]
 
 export type Tab = 'home' | 'teams' | 'players'
 
@@ -32,6 +37,7 @@ export interface Team {
   id: string
   name: string
   shortName: string
+  abbreviation: string
   color: string
   visualStyle?: 'solid' | 'striped'
   primaryColor?: TeamColor
@@ -147,6 +153,7 @@ export type View =
   | { name: 'edit-team'; id: string }
   | { name: 'new-player'; teamId?: string }
   | { name: 'edit-player'; id: string }
+  | { name: 'data-management' }
 
 export type RankSort = 'rating' | 'goals' | 'assists' | 'minutes'
 

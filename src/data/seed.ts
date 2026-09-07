@@ -3,8 +3,8 @@ import type { Appearance, Match, MatchEvent, Player, Position, Team } from '../t
 const SEASON = 'Season 1'
 
 export const seedTeams: Team[] = [
-  { id: 'northside', name: 'Northside FC', shortName: 'NSH', color: '#2563eb' },
-  { id: 'harbor', name: 'Harbor United', shortName: 'HBR', color: '#dc2626' },
+  { id: 'northside', name: 'Northside FC', shortName: 'NSH', abbreviation: 'NSH', color: '#2563eb' },
+  { id: 'harbor', name: 'Harbor United', shortName: 'HBR', abbreviation: 'HBR', color: '#dc2626' },
 ]
 
 function p(

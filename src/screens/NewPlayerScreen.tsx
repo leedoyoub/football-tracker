@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { POSITIONS, type Position, type View } from '../types'
+import { REGISTRATION_POSITIONS, type RegistrationPosition, type View } from '../types'
 import { useStore } from '../store'
 
 export function NewPlayerScreen({
@@ -13,7 +13,7 @@ export function NewPlayerScreen({
   const [fullName, setFullName] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [number, setNumber] = useState(10)
-  const [position, setPosition] = useState<Position>('CM')
+  const [position, setPosition] = useState<RegistrationPosition>('CM')
   const [selectedTeam, setSelectedTeam] = useState(teamId ?? teams[0]?.id ?? '')
   const [showSuggestions, setShowSuggestions] = useState(false)
 
@@ -86,10 +86,10 @@ export function NewPlayerScreen({
         />
         <select
           value={position}
-          onChange={(e) => setPosition(e.target.value as Position)}
+          onChange={(e) => setPosition(e.target.value as RegistrationPosition)}
           className="w-full rounded-xl bg-zinc-900 px-3 py-2.5 text-sm"
         >
-          {POSITIONS.map((pos) => (
+          {REGISTRATION_POSITIONS.map((pos) => (
             <option key={pos} value={pos}>
               {pos}
             </option>
