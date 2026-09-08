@@ -46,7 +46,7 @@ export function HomeScreen({
       </div>
       <div className="mb-5 flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Match Center</h1>
-        <select
+        <div className="flex items-center gap-2"><button type="button" onClick={() => onNavigate({ name: 'data-management' })} className="rounded-full bg-zinc-900 px-2.5 py-1.5 text-[10px] font-semibold text-zinc-300">Account</button><select
           value={season}
           onChange={(e) => onSeason(e.target.value)}
           className="rounded-full border border-white/10 bg-zinc-900 px-3 py-1.5 text-xs"
@@ -56,7 +56,7 @@ export function HomeScreen({
               {s}
             </option>
           ))}
-        </select>
+        </select></div>
       </div>
 
       {(stories.length > 0 || seasonComplete) && <section className="mb-6">

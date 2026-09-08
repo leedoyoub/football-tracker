@@ -27,7 +27,9 @@ export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamI
   const context = JSON.stringify([teamId, activeSeason])
   const showAll = expandedContext === context
   const visibleMatches = showAll ? recent : recent.slice(0, 5)
-  const latestBench = best.match?.appearances.filter((appearance) => appearance.teamId === teamId && appearance.role === 'bench') ?? []
+  const starterIds = new Set(best.slots.flatMap(slot => slot.playerId ? [slot.playerId] : []))
+  const latestBench = (best.match?.appearances.filter((appearance) => appearance.teamId === teamId && appearance.role === 'bench' && !starterIds.has(appearance.playerId)) ?? [])
+    .filter((appearance, index, list) => list.findIndex(item => item.playerId === appearance.playerId) === index)
   const record = recent.reduce((acc, match) => {
     const score = matchScore(match)
     const won = match.homeTeamId === teamId ? score.home > score.away : score.away > score.home
@@ -50,8 +52,8 @@ export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamI
     <div className="mb-5 grid grid-cols-4 gap-2 text-center">
       {[['Position', standing ? `${standing.rank}${standing.rank === 1 ? 'st' : standing.rank === 2 ? 'nd' : standing.rank === 3 ? 'rd' : 'th'}` : '—'], ['Matches', recent.length], ['W-D-L', `${record.wins}-${record.draws}-${record.losses}`], ['Pts', standing?.points ?? 0]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{value}</div><div className="text-[9px] uppercase text-zinc-500">{label}</div></div>)}
     </div>
-    <div className="mb-3 flex items-end justify-between"><div><h2 className="text-lg font-semibold">Starting XI</h2><p className="text-xs text-zinc-400">Last starting XI shape · {best.formation ?? 'No recent match'}</p></div><span className="text-[10px] text-zinc-500">season average rating</span></div>
-    {best.match ? <Pitch slots={best.slots} players={players} teams={teams} statsByPlayer={statsByPlayer} showPositionBadge={false} onSlotClick={(slot) => { if (slot.playerId) onNavigate({ name: 'player', id: slot.playerId }) }} /> : <div className="rounded-2xl bg-zinc-900 p-6 text-center text-sm text-zinc-500">No recent match</div>}
+    <div className="mb-3 flex items-end justify-between"><div><h2 className="text-lg font-semibold">Starting XI</h2><p className="text-xs text-zinc-400">Latest match kickoff XI · {best.formation ?? 'Saved formation unavailable'}</p></div><span className="text-[10px] text-zinc-500">match rating</span></div>
+    {best.match && best.slots.length ? <Pitch slots={best.slots} players={players} teams={teams} statsByPlayer={statsByPlayer} showPositionBadge={false} onSlotClick={(slot) => { if (slot.playerId) onNavigate({ name: 'player', id: slot.playerId }) }} /> : <div className="rounded-2xl bg-zinc-900 p-6 text-center text-sm text-zinc-500">No match data yet</div>}
     <section className="mt-6">
       <h2 className="mb-2 text-sm font-semibold">Substitutes</h2>
       {latestBench.length > 0 ? (

@@ -6,12 +6,16 @@ for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module
 const { STATIC_TEAMS, withStaticTeams } = require('../src/data/teams.ts')
 const { selectedPlayerPhoto } = require('../src/lib/playerPhoto.ts')
 
-test('static teams keep canonical IDs and preserve legacy historical teams', () => {
-  assert.deepEqual(STATIC_TEAMS.map(team => team.id), ['northside', 'harbor'])
+test('static catalog has exactly the intended API-Football mapped teams', () => {
+  assert.equal(STATIC_TEAMS.length, 14)
+  assert.deepEqual(STATIC_TEAMS.map(team => team.name), ['Real Madrid', 'Barcelona', 'Atlético Madrid', 'Arsenal', 'Manchester City', 'Liverpool', 'Manchester United', 'Tottenham Hotspur', 'Chelsea', 'Bayern Munich', 'AC Milan', 'Inter Milan', 'Juventus', 'Paris Saint-Germain'])
+  assert.equal(new Set(STATIC_TEAMS.map(team => team.id)).size, 14)
+  assert.equal(new Set(STATIC_TEAMS.map(team => team.externalTeamId)).size, 14)
+  assert(STATIC_TEAMS.every(team => team.abbreviation && team.logo && team.logo.includes(String(team.externalTeamId))))
   const legacy = { id: 'historic-opponent', name: 'Historic', shortName: 'HIS', abbreviation: 'HIS', visualStyle: 'solid', primaryColor: 'black', jerseyNumberColor: 'white' }
   const teams = withStaticTeams([legacy])
-  assert(teams.some(team => team.id === 'northside'))
-  assert(teams.some(team => team.id === legacy.id))
+  assert.equal(teams.length, 14)
+  assert(!teams.some(team => team.id === legacy.id))
 })
 
 test('photo selection is explicit and never replaces player.id', () => {

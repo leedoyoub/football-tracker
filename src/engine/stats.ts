@@ -10,6 +10,7 @@ import type {
   PartnershipStats,
 } from '../types'
 import { ratePlayerMatch, getMatchManOfTheMatch, matchScore, pitchWindow, matchPositionAt, matchPositionSegments } from './rating'
+import { FORMATION_SLOTS } from '../components/Pitch'
 
 
 export function seasonsFromMatches(matches: Match[]): string[] {
@@ -510,20 +511,6 @@ export function formationForMatch(match: Match | undefined): string | null {
   return match?.formation || (match ? '4-3-3' : null)
 }
 
-const TEAM_BEST_XI: { slot: string; position: Position; pool: Position[] }[] = [
-  { slot: 'GK', position: 'GK', pool: ['GK'] },
-  { slot: 'LB', position: 'LB', pool: ['LB', 'LM', 'CB'] },
-  { slot: 'LCB', position: 'CB', pool: ['CB', 'LB', 'RB'] },
-  { slot: 'RCB', position: 'CB', pool: ['CB', 'LB', 'RB'] },
-  { slot: 'RB', position: 'RB', pool: ['RB', 'RM', 'CB'] },
-  { slot: 'LCM', position: 'CM', pool: ['CM', 'CDM', 'CAM', 'LM'] },
-  { slot: 'CM', position: 'CM', pool: ['CM', 'CDM', 'CAM', 'LM', 'RM'] },
-  { slot: 'RCM', position: 'CAM', pool: ['CAM', 'CM', 'CDM', 'LM', 'RM'] },
-  { slot: 'LW', position: 'LW', pool: ['LW', 'LM', 'CAM', 'ST'] },
-  { slot: 'ST', position: 'ST', pool: ['ST', 'LW', 'RW', 'CAM'] },
-  { slot: 'RW', position: 'RW', pool: ['RW', 'RM', 'CAM', 'ST'] },
-]
-
 export function teamBestEleven(
   players: Player[],
   matches: Match[],
@@ -531,16 +518,19 @@ export function teamBestEleven(
   season: string,
 ): { formation: string | null; slots: Best11Slot[]; match: Match | undefined } {
   const match = latestTeamMatch(matches, teamId, season)
-  const candidates = players
-    .map((player) => ({ player, stats: playerSeasonStats(player, players, matches, season, teamId) }))
-    .filter((row) => row.stats.matches > 0)
-    .sort((a, b) => b.stats.avgRating - a.stats.avgRating || b.stats.minutes - a.stats.minutes)
-  const used = new Set<string>()
-  const slots = TEAM_BEST_XI.map((role) => {
-    const pick = candidates.find((row) => !used.has(row.player.id) && role.pool.includes(row.player.position))
-    if (!pick) return { slot: role.slot, position: role.position, playerId: null, avgRating: 0, matches: 0 }
-    used.add(pick.player.id)
-    return { slot: role.slot, position: role.position, playerId: pick.player.id, teamId, avgRating: pick.stats.avgRating, matches: pick.stats.matches }
+  if (!match) return { formation: null, slots: [], match }
+  // Team Main is a historical match view: never manufacture an XI from roster/base positions.
+  const starters = match.appearances.filter(item => item.teamId === teamId && item.role === 'starter')
+  const unique = starters.filter((item, index) => starters.findIndex(other => other.playerId === item.playerId) === index)
+  const tacticalSlots = match.formation ? FORMATION_SLOTS[match.formation] : undefined
+  const remaining = [...unique]
+  const slots = (tacticalSlots ?? []).flatMap(tactical => {
+    const index = remaining.findIndex(item => (item.matchPosition ?? item.position) === tactical.matchPosition)
+    if (index < 0) return []
+    const appearance = remaining.splice(index, 1)[0]; const player = players.find(item => item.id === appearance.playerId); const rating = player ? ratePlayerMatch(match, player) : null
+    return [{ slot: tactical.slot, position: tactical.position, matchPosition: appearance.matchPosition ?? appearance.position, playerId: appearance.playerId, teamId, avgRating: rating?.raw ?? 0, matches: 1 }]
   })
-  return { formation: formationForMatch(match), slots, match }
+  // Unknown/malformed formations retain valid historical starters without filling from the roster.
+  remaining.forEach((appearance, index) => { const player = players.find(item => item.id === appearance.playerId); const rating = player ? ratePlayerMatch(match, player) : null; const position = (appearance.matchPosition ?? appearance.position) as Position; slots.push({ slot: `${position}-${index}`, position, matchPosition: position, playerId: appearance.playerId, teamId, avgRating: rating?.raw ?? 0, matches: 1 }) })
+  return { formation: match.formation ?? null, slots, match }
 }

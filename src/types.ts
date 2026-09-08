@@ -27,6 +27,7 @@ export interface Team {
   abbreviation: string
   /** Static catalog logo; legacy color fields remain for persisted historical records. */
   logo?: string
+  externalTeamId?: number
   visualStyle: 'solid' | 'striped'
   primaryColor: TeamColor
   secondaryColor?: TeamColor | null

@@ -1,5 +1,5 @@
 import type { AppState, Player } from '../types';
-import { getFromIndexedDB, saveToIndexedDB } from './db';
+import { getFromIndexedDB, openDB, saveToIndexedDB } from './db';
 import { validateState } from './validation';
 import { withStaticTeams } from '../data/teams';
 
@@ -7,9 +7,26 @@ const STORAGE_KEY = 'football-tracker-v1';
 const BACKUP_KEY = 'football-tracker-v1-backup';
 const EMERGENCY_PREFIX = 'football-tracker-emergency-';
 const MAX_SNAPSHOTS = 5;
+const CATALOG_RESET_KEY = 'football-tracker-catalog-reset-v1';
+
+async function resetCatalogOnce(): Promise<AppState | null> {
+  if (localStorage.getItem(CATALOG_RESET_KEY)) return null;
+  const clean: AppState = { teams: withStaticTeams(), players: [], matches: [] };
+  // This marker makes the intentional development reset non-repeating.
+  localStorage.setItem(CATALOG_RESET_KEY, 'done');
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+  localStorage.removeItem(BACKUP_KEY);
+  for (let index = 1; index <= MAX_SNAPSHOTS; index++) localStorage.removeItem(`${EMERGENCY_PREFIX}${index}`);
+  await saveToIndexedDB(STORAGE_KEY, clean);
+  const db = await openDB();
+  await new Promise<void>((resolve, reject) => { const tx = db.transaction('sync_queue', 'readwrite'); const queue = tx.objectStore('sync_queue'); queue.clear(); for (const team of clean.teams) queue.put({ id: crypto.randomUUID(), entityType: 'team', entityId: team.id, operation: 'upsert', payload: team, timestamp: Date.now(), status: 'pending' }); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); });
+  return clean;
+}
 
 export const LocalRepository = {
   async getAppState(): Promise<AppState | null> {
+    const reset = await resetCatalogOnce();
+    if (reset) return reset;
     const sources = [
       () => getFromIndexedDB(STORAGE_KEY),
       () => Promise.resolve(localStorage.getItem(STORAGE_KEY)),
