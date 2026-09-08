@@ -36,13 +36,12 @@ test('player search is authenticated server-side, globally searches profiles, an
   assert(helper.includes('fetchApiFootballPlayer') && helper.includes('externalPlayerId'))
 })
 
-test('Player Detail avatar is display-only and keeps only exact-ID name refresh', () => {
+test('Player Detail is display-only and sends all player changes through Edit Player', () => {
   const detail = read('src/screens/PlayerDetailScreen.tsx')
   assert(!detail.includes('aria-label="Change player photo"'))
   assert(!detail.includes('Change Photo') && !detail.includes('Remove Photo') && !detail.includes('Use This Photo'))
   assert(detail.includes('<PlayerAvatar photoUrl={player.photoUrl || player.image} number={player.number} className="h-14 w-14 text-sm" />'))
-  assert(detail.includes('Refresh API Name') && detail.includes('fetchApiFootballPlayer(player.externalPlayerId)'))
-  assert(detail.includes('updatePlayer(player.id, { fullName: names.fullName, displayName: names.displayName })'))
+  assert(!detail.includes('Refresh API Name') && !detail.includes('fetchApiFootballPlayer') && !detail.includes('updatePlayer'))
 })
 
 test('Edit Player owns the pending, photo-only search flow and commits it through Save', () => {
@@ -56,6 +55,17 @@ test('Edit Player owns the pending, photo-only search flow and commits it throug
   const usePhoto = edit.slice(edit.indexOf('const usePhoto'), edit.indexOf('const removePhoto'))
   assert(!usePhoto.includes('updatePlayer'), 'selecting a photo must not persist before Save')
   assert(!usePhoto.includes('externalPlayerId') && !usePhoto.includes('fullName') && !usePhoto.includes('displayName'))
+})
+
+test('Edit Player refreshes only pending names using the linked exact API ID', () => {
+  const edit = read('src/screens/EditPlayerScreen.tsx')
+  assert(edit.includes("player.externalPlayerId !== undefined &&") && edit.includes('Refresh API Name'))
+  assert(edit.includes('fetchApiFootballPlayer(player.externalPlayerId)') && edit.includes('deriveApiPlayerNames(candidate)'))
+  assert(edit.includes('setFullName(names.fullName); setDisplayName(names.displayName)'))
+  const refresh = edit.slice(edit.indexOf('const refreshApiName'), edit.indexOf('return ('))
+  assert(!refresh.includes('updatePlayer'), 'API name refresh must stay pending until Save')
+  assert(!refresh.includes('searchApiFootballPlayers'), 'name refresh must not fuzzy-search')
+  assert(!refresh.includes('photoUrl') && !refresh.includes('externalPlayerId:'), 'name refresh must not alter identity or photo state')
 })
 
 test('standings team identity uses a dedicated link, while TeamIcon remains visual only', () => {

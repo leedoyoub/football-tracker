@@ -3,8 +3,9 @@ import { useStore } from '../store'
 import { REGISTRATION_POSITIONS, type RegistrationPosition, type View } from '../types'
 import { TEAM_ROSTER_LIMIT, rosterCount } from '../lib/roster'
 import { PlayerAvatar } from '../components/PlayerAvatar'
-import { searchApiFootballPlayers, type ApiFootballPlayerSearchResult } from '../lib/apiFootball'
+import { fetchApiFootballPlayer, searchApiFootballPlayers, type ApiFootballPlayerSearchResult } from '../lib/apiFootball'
 import { useAuth } from '../lib/auth'
+import { deriveApiPlayerNames } from '../lib/playerNames'
 
 export function EditPlayerScreen({ playerId, onNavigate }: { playerId: string; onNavigate: (view: View) => void }) {
   const { players, teams, updatePlayer } = useStore()
@@ -23,6 +24,8 @@ export function EditPlayerScreen({ playerId, onNavigate }: { playerId: string; o
   const [photoSelected, setPhotoSelected] = useState<ApiFootballPlayerSearchResult | null>(null)
   const [photoLoading, setPhotoLoading] = useState(false)
   const [photoError, setPhotoError] = useState('')
+  const [nameLoading, setNameLoading] = useState(false)
+  const [nameMessage, setNameMessage] = useState('')
 
   if (!player) return <div className="p-6">Player not found.</div>
 
@@ -31,6 +34,7 @@ export function EditPlayerScreen({ playerId, onNavigate }: { playerId: string; o
   const searchPhotos = async () => { const query = photoQuery.trim(); if (!user) { setPhotoError('Google sign-in is required for API player search.'); return }; if (query.length < 3) { setPhotoError('Enter at least 3 characters to search.'); return }; setPhotoLoading(true); setPhotoError(''); setPhotoResults([]); try { const results = await searchApiFootballPlayers(query); setPhotoResults(results); if (!results.length) setPhotoError('No matching API players found.') } catch (error) { setPhotoError(error instanceof Error ? error.message : 'Could not search players. Try again later.') } finally { setPhotoLoading(false) } }
   const usePhoto = () => { if (!photoSelected?.photo) return; setPendingPhotoUrl(photoSelected.photo); setPhotoChanged(true); closePhoto() }
   const removePhoto = () => { setPendingPhotoUrl(undefined); setPhotoChanged(true) }
+  const refreshApiName = async () => { if (player.externalPlayerId === undefined) return; setNameLoading(true); setNameMessage(''); try { const candidate = await fetchApiFootballPlayer(player.externalPlayerId); const names = deriveApiPlayerNames(candidate); setFullName(names.fullName); setDisplayName(names.displayName); setNameMessage('API names loaded. Review them, then save to apply changes.') } catch (error) { setNameMessage(error instanceof Error ? error.message : 'Could not refresh API name.') } finally { setNameLoading(false) } }
   
   return (
     <div className="px-4 pb-8 pt-6">
@@ -43,6 +47,7 @@ export function EditPlayerScreen({ playerId, onNavigate }: { playerId: string; o
         </section>
         <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Full name" className="w-full rounded-xl bg-zinc-900 px-3 py-2.5" />
         <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Display name" className="w-full rounded-xl bg-zinc-900 px-3 py-2.5" />
+        {player.externalPlayerId !== undefined && <div className="flex items-center gap-2"><button type="button" disabled={nameLoading} onClick={() => void refreshApiName()} className="rounded-lg bg-zinc-800 px-3 py-2 text-xs font-bold disabled:opacity-40">{nameLoading ? 'Refreshing…' : 'Refresh API Name'}</button>{nameMessage && <p role="status" className="text-xs text-zinc-400">{nameMessage}</p>}</div>}
         <input type="number" value={number} onChange={(e) => setNumber(Number(e.target.value))} className="w-full rounded-xl bg-zinc-900 px-3 py-2.5" />
         <select
           value={position}
