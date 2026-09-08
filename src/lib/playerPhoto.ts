@@ -8,7 +8,7 @@ export type PlayerPhotoSearchResult = {
   photoUrl: string
 }
 
-/** Only an explicitly selected result may connect an external identity to a player. */
-export function selectedPlayerPhoto(result: PlayerPhotoSearchResult): Pick<Player, 'externalPlayerId' | 'photoUrl'> {
-  return { externalPlayerId: result.externalPlayerId, photoUrl: result.photoUrl }
+/** A photo search result is deliberately photo-only: app and external identities stay unchanged. */
+export function selectedPlayerPhoto(result: PlayerPhotoSearchResult): Pick<Player, 'photoUrl'> {
+  return { photoUrl: result.photoUrl }
 }

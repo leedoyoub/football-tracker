@@ -36,15 +36,26 @@ test('player search is authenticated server-side, globally searches profiles, an
   assert(helper.includes('fetchApiFootballPlayer') && helper.includes('externalPlayerId'))
 })
 
-test('Player Detail keeps photo replacement and exact-ID name refresh as separate patches', () => {
+test('Player Detail avatar is display-only and keeps only exact-ID name refresh', () => {
   const detail = read('src/screens/PlayerDetailScreen.tsx')
-  assert(detail.includes('aria-label="Change player photo"') && detail.includes('onClick={() => setPhotoOpen(true)}') && detail.includes('Change Photo'))
-  assert(!detail.includes('>Change</span>'), 'the avatar has no visible Change badge')
-  assert(detail.includes('Use This Photo') && detail.includes('Remove Photo') && detail.includes('onClick={closePhoto}'))
-  assert(detail.includes("updatePlayer(player.id, { photoUrl: photoSelected.photo })"))
-  assert(detail.includes("updatePlayer(player.id, { photoUrl: undefined })"))
+  assert(!detail.includes('aria-label="Change player photo"'))
+  assert(!detail.includes('Change Photo') && !detail.includes('Remove Photo') && !detail.includes('Use This Photo'))
+  assert(detail.includes('<PlayerAvatar photoUrl={player.photoUrl || player.image} number={player.number} className="h-14 w-14 text-sm" />'))
   assert(detail.includes('Refresh API Name') && detail.includes('fetchApiFootballPlayer(player.externalPlayerId)'))
   assert(detail.includes('updatePlayer(player.id, { fullName: names.fullName, displayName: names.displayName })'))
+})
+
+test('Edit Player owns the pending, photo-only search flow and commits it through Save', () => {
+  const edit = read('src/screens/EditPlayerScreen.tsx')
+  assert(edit.includes('Player Photo') && edit.includes('Change Photo') && edit.includes('Remove Photo'))
+  assert(edit.includes("searchApiFootballPlayers(query)") && edit.includes('aria-label="Search API player for photo"'))
+  assert(edit.includes('setPendingPhotoUrl(photoSelected.photo); setPhotoChanged(true); closePhoto()'))
+  assert(edit.includes('setPendingPhotoUrl(undefined); setPhotoChanged(true)'))
+  assert(edit.includes('const previewPhotoUrl = photoChanged ? pendingPhotoUrl : player.photoUrl || player.image'))
+  assert(edit.includes('...(photoChanged ? { photoUrl: pendingPhotoUrl } : {})'))
+  const usePhoto = edit.slice(edit.indexOf('const usePhoto'), edit.indexOf('const removePhoto'))
+  assert(!usePhoto.includes('updatePlayer'), 'selecting a photo must not persist before Save')
+  assert(!usePhoto.includes('externalPlayerId') && !usePhoto.includes('fullName') && !usePhoto.includes('displayName'))
 })
 
 test('standings team identity uses a dedicated link, while TeamIcon remains visual only', () => {

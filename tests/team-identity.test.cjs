@@ -18,8 +18,8 @@ test('static catalog has exactly the intended API-Football mapped teams', () => 
   assert(!teams.some(team => team.id === legacy.id))
 })
 
-test('photo selection is explicit and never replaces player.id', () => {
-  assert.deepEqual(selectedPlayerPhoto({ externalPlayerId: 44, name: 'Same Name', photoUrl: 'https://photo.example/44.jpg' }), { externalPlayerId: 44, photoUrl: 'https://photo.example/44.jpg' })
+test('photo selection is explicit and changes only photoUrl', () => {
+  assert.deepEqual(selectedPlayerPhoto({ externalPlayerId: 44, name: 'Same Name', photoUrl: 'https://photo.example/44.jpg' }), { photoUrl: 'https://photo.example/44.jpg' })
   const icon = fs.readFileSync(require.resolve('../src/components/PlayerIcon.tsx'), 'utf8')
   assert(icon.includes('loading="lazy"') && icon.includes('onError') && icon.includes('photoUrl || player?.image'))
   const migration = fs.readFileSync(require.resolve('../supabase/migrations/20260908090000_add_player_photo_fields.sql'), 'utf8')
