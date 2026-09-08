@@ -213,7 +213,7 @@ export function ratePlayerMatch(
     const position = positionAt(event.minute)
     const rules = POSITION_RULES[position]
     let base = rules.goal
-    if (isStarter && (position === 'ST' || position === 'SS')) {
+    if (isStarter && position === 'SS') {
       base = index === 0 ? .70 : rules.goal
     }
     if (position !== 'GK') goalPoints += base
@@ -228,7 +228,7 @@ export function ratePlayerMatch(
     if (position === 'GK') continue
     const rules = POSITION_RULES[position]
     let base = rules.assist
-    if (isStarter && (position === 'ST' || position === 'SS')) {
+    if (isStarter && position === 'SS') {
       base = index === 0 ? .40 : rules.assist
     }
     assistPoints += base

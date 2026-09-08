@@ -1,11 +1,9 @@
 import type { Appearance, Match, MatchEvent, Player, Position, Team } from '../types'
+import { STATIC_TEAMS } from './teams'
 
 const SEASON = 'Season 1'
 
-export const seedTeams: Team[] = [
-  { id: 'northside', name: 'Northside FC', shortName: 'NSH', abbreviation: 'NSH', visualStyle: 'solid', primaryColor: 'blue', jerseyNumberColor: 'white' },
-  { id: 'harbor', name: 'Harbor United', shortName: 'HBR', abbreviation: 'HBR', visualStyle: 'solid', primaryColor: 'red', jerseyNumberColor: 'white' },
-]
+export const seedTeams: Team[] = STATIC_TEAMS
 
 function p(
   id: string,

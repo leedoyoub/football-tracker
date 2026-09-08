@@ -1,6 +1,6 @@
 import type { Best11Slot, Player, Position, Team } from '../types'
 import { PlayerIcon } from './PlayerIcon'
-import { playerDisplayName, Badge, SubstitutionMarker, SubstitutionSelection, ratingBadgeColor } from './ui'
+import { playerCompactName, playerDisplayName, Badge, SubstitutionMarker, SubstitutionSelection, ratingBadgeColor } from './ui'
 import { useRef } from 'react'
 import { DndContext, PointerSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type CollisionDetection, type DragEndEvent } from '@dnd-kit/core'
 
@@ -38,7 +38,7 @@ function AssistIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-2.5 w-2.5 fill-none stroke-current stroke-2"><path d="M4 15.5c2.5-2.8 5.2-4.6 8.1-5.4l3.2.8 3.1 3.1-1.9 2.7-4.1.2-2.2 2.3-4.8-.4L4 15.5Z" /><path d="m12.1 10.1 1.1-3 2.2.5 1.1 3.3M7.4 14.5l1.8 1.1" /></svg>
 }
 
-export function Pitch({ slots, players, teams, statsByPlayer, outMinutesByPlayer, substitutionSelection, goalSelection, disabledPlayerIds, badgeMode = 'rating', showPositionBadge = true, motmPlayerId, onSlotClick, onEmptySlotClick, layout = 'tactical', draggable = false, externalDnd = false, onSlotDrop }: { slots: Best11Slot[]; players: Player[]; teams?: Team[]; statsByPlayer?: Record<string, { goals: number; assists: number }>; outMinutesByPlayer?: Record<string, number>; substitutionSelection?: Record<string, 'in' | 'out'>; goalSelection?: Record<string, 'scorer' | 'assist'>; disabledPlayerIds?: string[]; badgeMode?: 'rating' | 'position'; showPositionBadge?: boolean; motmPlayerId?: string; onSlotClick?: (slot: Best11Slot) => void; onEmptySlotClick?: (slot: Best11Slot) => void; layout?: 'tactical' | 'free'; draggable?: boolean; externalDnd?: boolean; onSlotDrop?: (activeSlot: string, targetSlot: string) => void }) {
+export function Pitch({ compact = false, slots, players, teams, statsByPlayer, outMinutesByPlayer, substitutionSelection, goalSelection, disabledPlayerIds, badgeMode = 'rating', showPositionBadge = true, motmPlayerId, onSlotClick, onEmptySlotClick, layout = 'tactical', draggable = false, externalDnd = false, onSlotDrop }: { compact?: boolean; slots: Best11Slot[]; players: Player[]; teams?: Team[]; statsByPlayer?: Record<string, { goals: number; assists: number }>; outMinutesByPlayer?: Record<string, number>; substitutionSelection?: Record<string, 'in' | 'out'>; goalSelection?: Record<string, 'scorer' | 'assist' | 'fault'>; disabledPlayerIds?: string[]; badgeMode?: 'rating' | 'position'; showPositionBadge?: boolean; motmPlayerId?: string; onSlotClick?: (slot: Best11Slot) => void; onEmptySlotClick?: (slot: Best11Slot) => void; layout?: 'tactical' | 'free'; draggable?: boolean; externalDnd?: boolean; onSlotDrop?: (activeSlot: string, targetSlot: string) => void }) {
   const byId = Object.fromEntries(players.map((player) => [player.id, player]))
   const teamById = Object.fromEntries((teams ?? []).map((team) => [team.id, team]))
   const suppressClick = useRef(false)
@@ -50,7 +50,7 @@ export function Pitch({ slots, players, teams, statsByPlayer, outMinutesByPlayer
     return closest ? [{ id: closest.id }] : []
   }
   const endDrag = (event: DragEndEvent) => { const active = String(event.active.id).replace('player:', ''); const target = String(event.over?.id ?? '').replace('target:', ''); if (event.over && active !== target) onSlotDrop?.(active, target); window.setTimeout(() => { suppressClick.current = false }, 0) }
-  const content = <div className="relative mx-auto aspect-[3/4] w-full overflow-hidden rounded-lg border border-emerald-700/50 pitch-grass"><div className="pointer-events-none absolute inset-2 border border-white/40"><div className="absolute left-1/2 top-0 h-14 w-24 -translate-x-1/2 border border-t-0 border-white/40" /><div className="absolute bottom-0 left-1/2 h-14 w-24 -translate-x-1/2 border border-b-0 border-white/40" /><div className="absolute left-0 right-0 top-1/2 border-t border-white/40" /><div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/40" /></div>{slots.map((slot) => {
+  const content = <div className={`relative mx-auto w-full overflow-hidden rounded-lg border border-emerald-700/50 pitch-grass ${compact ? 'aspect-square' : 'aspect-[3/4]'}`}><div className="pointer-events-none absolute inset-2 border border-white/40"><div className="absolute left-1/2 top-0 h-14 w-24 -translate-x-1/2 border border-t-0 border-white/40" /><div className="absolute bottom-0 left-1/2 h-14 w-24 -translate-x-1/2 border border-b-0 border-white/40" /><div className="absolute left-0 right-0 top-1/2 border-t border-white/40" /><div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/40" /></div>{slots.map((slot) => {
     const tactical = grid[slot.slot] ?? grid.CM; const point = layout === 'free' ? homePositions[slot.slot] ?? tactical : tactical; const player = slot.playerId ? byId[slot.playerId] : undefined; if (!player) return draggable ? <EmptyPitchSlotDrop key={slot.slot} slot={slot} point={point} onClick={onEmptySlotClick ? () => onEmptySlotClick(slot) : undefined} /> : null; const stats = statsByPlayer?.[player.id]; const matchPosition = (slot.matchPosition ?? tactical.matchPosition) as Position
     const representativeTeam = teamById[slot.teamId ?? '']
     const badges = (
@@ -71,7 +71,7 @@ export function Pitch({ slots, players, teams, statsByPlayer, outMinutesByPlayer
       <SlotContainer
         {...(SlotContainer === 'button' ? { type: 'button' as const, 'aria-label': playerDisplayName(player), disabled: disabledPlayerIds?.includes(player.id) } : {})}
         key={slot.slot}
-        className={`absolute flex w-20 max-w-[23%] -translate-x-1/2 -translate-y-1/2 flex-col items-center transition-transform ${substitutionSelection?.[player.id] || goalSelection?.[player.id] ? 'z-20 scale-110' : ''} ${disabledPlayerIds?.includes(player.id) ? 'opacity-40' : ''}`}
+        className={`absolute flex w-20 max-w-[23%] -translate-x-1/2 -translate-y-1/2 flex-col items-center transition-transform ${substitutionSelection?.[player.id] || goalSelection?.[player.id] ? 'z-20 scale-110' : ''} ${disabledPlayerIds?.includes(player.id) && !goalSelection?.[player.id] ? 'opacity-40' : (Object.keys(goalSelection ?? {}).length || Object.keys(substitutionSelection ?? {}).length) && !goalSelection?.[player.id] && !substitutionSelection?.[player.id] ? 'opacity-70' : ''}`}
         style={{ left: `${point.x}%`, top: `${point.y}%` }}
         onClick={() => {
           if (!suppressClick.current && !disabledPlayerIds?.includes(player.id)) onSlotClick?.(slot)
@@ -80,12 +80,12 @@ export function Pitch({ slots, players, teams, statsByPlayer, outMinutesByPlayer
         {draggable ? <PitchSlotDrop slot={slot} draggable={draggable}>
           <PlayerIcon player={player} team={representativeTeam} position={showPositionBadge ? matchPosition : undefined} badges={badges} className="h-10 w-10 text-[11px]" />
         </PitchSlotDrop> : <PlayerIcon player={player} team={representativeTeam} position={showPositionBadge ? matchPosition : undefined} badges={badges} className="h-10 w-10 text-[11px]" />}
-        <div className="relative z-10 -mt-1 grid h-3.5 w-16 grid-cols-2 items-center text-[8px] font-bold leading-none text-white">
+        {((stats?.goals ?? 0) > 0 || (stats?.assists ?? 0) > 0) && <div className="relative z-10 -mt-1 grid h-3.5 w-16 grid-cols-2 items-center text-[8px] font-bold leading-none text-white">
           <span className="justify-self-start">{(stats?.assists ?? 0) > 0 && <span className="flex items-center gap-0.5 rounded-full bg-black/80 px-1 py-0.5"><AssistIcon />{stats?.assists}</span>}</span>
           <span className="justify-self-end">{(stats?.goals ?? 0) > 0 && <span className="flex items-center gap-0.5 rounded-full bg-black/80 px-1 py-0.5"><GoalIcon />{stats?.goals}</span>}</span>
-        </div>
-        <div className="relative z-10 -mt-0.5 h-4 max-w-full truncate rounded-full bg-black/70 px-1.5 py-0.5 text-center text-[9px] font-semibold leading-tight">{playerDisplayName(player)}</div>
-        {goalSelection?.[player.id] && <span className="pointer-events-none rounded bg-black/80 px-1 text-[9px] font-bold text-emerald-300">{goalSelection[player.id] === 'scorer' ? '? SCORER' : '?? ASSIST'}</span>}
+        </div>}
+        <div className="relative z-10 -mt-0.5 h-4 max-w-full truncate rounded-full bg-black/70 px-1.5 py-0.5 text-center text-[9px] font-semibold leading-tight">{playerCompactName(player)}</div>
+        {goalSelection?.[player.id] && <span className="pointer-events-none flex items-center gap-1 rounded bg-black/80 px-1 text-[9px] font-bold text-emerald-300">{goalSelection[player.id] === 'scorer' ? <><GoalIcon /> SCORER</> : goalSelection[player.id] === 'assist' ? <><AssistIcon /> ASSIST</> : 'FAULT'}</span>}
         {substitutionSelection?.[player.id] && <span className="rounded bg-black/80 px-1 leading-none"><SubstitutionSelection direction={substitutionSelection[player.id]} /></span>}
         {outMinutesByPlayer?.[player.id] !== undefined && <span className="rounded bg-black/80 px-1 leading-none"><SubstitutionMarker direction="out" minute={outMinutesByPlayer[player.id]} /></span>}
       </SlotContainer>

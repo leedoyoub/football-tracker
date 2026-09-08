@@ -349,10 +349,10 @@ const FORMATION_433: { slot: string; position: Position; pool: Position[] }[] = 
 
 const UNIFIED_433: { slot: string; position: Position; group: Position[]; fallback?: Position[] }[] = [
   { slot: 'GK', position: 'GK', group: ['GK'] },
-  { slot: 'LB', position: 'LB', group: ['LB'], fallback: ['CB', 'RB'] },
-  { slot: 'LCB', position: 'CB', group: ['CB'], fallback: ['LB', 'RB'] },
-  { slot: 'RCB', position: 'CB', group: ['CB'], fallback: ['LB', 'RB'] },
-  { slot: 'RB', position: 'RB', group: ['RB'], fallback: ['CB', 'LB'] },
+  { slot: 'LB', position: 'LB', group: ['LB'] },
+  { slot: 'LCB', position: 'CB', group: ['CB', 'LCB', 'RCB'] },
+  { slot: 'RCB', position: 'CB', group: ['CB', 'LCB', 'RCB'] },
+  { slot: 'RB', position: 'RB', group: ['RB'] },
   { slot: 'LCM', position: 'CM', group: ['CDM', 'CM', 'CAM', 'LM', 'RM'] },
   { slot: 'CM', position: 'CM', group: ['CDM', 'CM', 'CAM', 'LM', 'RM'] },
   { slot: 'RCM', position: 'CM', group: ['CDM', 'CM', 'CAM', 'LM', 'RM'] },

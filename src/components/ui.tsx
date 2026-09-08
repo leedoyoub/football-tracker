@@ -2,16 +2,16 @@ import type { Player, Team } from '../types'
 import { PlayerIcon } from './PlayerIcon'
 
 export function Badge({ children, className = '', colorClass, size = 'default' }: { children: React.ReactNode, className?: string, colorClass: string, size?: 'default' | 'large' }) {
-  const sizeClasses = size === 'large' ? 'h-5 min-w-[28px] px-1 text-[8px]' : 'h-4 min-w-[25px] px-0.5 text-[7px]'
+  const sizeClasses = size === 'large' ? 'h-[18px] min-w-[25px] px-0.5 text-[8px]' : 'h-[15px] min-w-[23px] px-0.5 text-[7px]'
   return <span className={`flex items-center justify-center rounded-[4px] font-black ${sizeClasses} ${colorClass} ${className}`}>{children}</span>
 }
 
 export function SubstitutionMarker({ direction, minute }: { direction: 'in' | 'out'; minute: number }) {
-  return <span aria-label={`Substitution ${direction} at ${minute} minutes`} className={`whitespace-nowrap text-[9px] font-bold ${direction === 'in' ? 'text-emerald-400' : 'text-red-400'}`}>{direction === 'in' ? `${minute}' →` : `← ${minute}'`}</span>
+  return <span aria-label={`Substitution ${direction} at ${minute} minutes`} className={`whitespace-nowrap text-[9px] font-bold ${direction === 'in' ? 'text-emerald-400' : 'text-red-400'}`}>{direction === 'in' ? `\u2192 IN ${minute}'` : `\u2190 OUT ${minute}'`}</span>
 }
 
 export function SubstitutionSelection({ direction }: { direction: 'in' | 'out' }) {
-  return <span className={`pointer-events-none whitespace-nowrap text-[9px] font-bold ${direction === 'out' ? 'text-red-400' : 'text-emerald-400'}`}>{direction === 'out' ? '? OUT' : 'IN ?'}</span>
+  return <span className={`pointer-events-none whitespace-nowrap text-[9px] font-bold ${direction === 'out' ? 'text-red-400' : 'text-emerald-400'}`}>{direction === 'out' ? '\u2190 OUT' : '\u2192 IN'}</span>
 }
 
 export const ratingBadgeColor = (rating: number) => rating >= 7.3 ? 'bg-emerald-500 text-white' : rating >= 6 ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'
@@ -27,11 +27,8 @@ export function SubstitutePlayerCard({ player, team, rating, stats, position, in
           </Badge>
         )}
       </div>
-      <div className="relative z-10 -mt-1 grid h-3.5 w-16 max-w-full grid-cols-2 items-center text-[8px] font-bold leading-none text-white">
-        <span className="flex items-center gap-0.5 justify-self-start rounded-full bg-black/80 px-1 py-0.5"><AssistIcon className="h-2.5 w-2.5" />{stats?.assists ?? 0}</span>
-        <span className="flex items-center gap-0.5 justify-self-end rounded-full bg-black/80 px-1 py-0.5"><GoalIcon className="h-2.5 w-2.5" />{stats?.goals ?? 0}</span>
-      </div>
-      <span className="relative z-10 -mt-0.5 h-4 max-w-full truncate rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold leading-tight">{playerDisplayName(player)}</span>
+      {stats && <StatIcons goals={stats.goals} assists={stats.assists} className="relative z-10 rounded-full bg-black/80 px-1 text-[8px] text-white" />}
+      <span className="relative z-10 -mt-0.5 h-4 max-w-full truncate rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold leading-tight">{playerCompactName(player)}</span>
       {selection && <SubstitutionSelection direction={selection} />}
       {inMinute !== undefined && <SubstitutionMarker direction="in" minute={inMinute} />}
       {outMinute !== undefined && <SubstitutionMarker direction="out" minute={outMinute} />}
@@ -39,8 +36,18 @@ export function SubstitutePlayerCard({ player, team, rating, stats, position, in
   )
 }
 
+export function playerFullName(player?: Player): string {
+  return player?.fullName?.trim() || player?.name || ''
+}
+
 export function playerDisplayName(player?: Player): string {
   return player?.displayName?.trim() || player?.name || ''
+}
+
+/** Display Name stays compact, while the jersey number remains available for match identification. */
+export function playerCompactName(player?: Player): string {
+  const name = playerDisplayName(player)
+  return player?.number === undefined || player?.number === null ? name : `${player.number} ${name}`
 }
 
 export function GoalIcon({ className = 'h-3 w-3' }: { className?: string }) {

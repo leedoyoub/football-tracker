@@ -1,113 +1,46 @@
 import { useState } from 'react'
 import { recentMatches, recentMatchPositions } from './recentMatches'
-import { AssistIcon, formatDate, GoalIcon, ratingTone } from '../components/ui'
+import { playerFullName, AssistIcon, formatDate, GoalIcon, ratingTone } from '../components/ui'
 import { TeamIcon } from '../components/TeamIcon'
+import { PlayerIcon } from '../components/PlayerIcon'
 import { matchScore, ratePlayerMatch, getMatchManOfTheMatch } from '../engine/rating'
 import { playerSeasonStats, seasonsFromMatches } from '../engine/stats'
+import { onPitchStats, positionSplits, starterSubstituteSplits } from '../engine/analytics'
+import { playerForm, playerStreaks } from '../engine/seasonInsights'
 import { useStore } from '../store'
 import type { Match, View } from '../types'
 
 function ResultPill({ match, teamId }: { match: Match; teamId: string }) {
-  const score = matchScore(match)
-  const ours = match.homeTeamId === teamId ? score.home : score.away
-  const theirs = match.homeTeamId === teamId ? score.away : score.home
+  const score = matchScore(match); const ours = match.homeTeamId === teamId ? score.home : score.away; const theirs = match.homeTeamId === teamId ? score.away : score.home
   const result = ours > theirs ? 'WIN' : ours === theirs ? 'DRAW' : 'LOSS'
   return <span className={`text-[10px] font-black ${result === 'WIN' ? 'text-emerald-400' : result === 'DRAW' ? 'text-yellow-400' : 'text-red-400'}`}>{result}</span>
 }
 
 export function PlayerDetailScreen({ playerId, season, onNavigate, onBack }: { playerId: string; season: string; onNavigate: (view: View) => void; onBack: () => void }) {
-  const { players, teams, matches } = useStore()
-  const player = players.find((item) => item.id === playerId)
-  const seasons = seasonsFromMatches(matches)
-  const active = seasons.includes(season) ? season : seasons[0] ?? season
+  const { players, teams, matches } = useStore(); const player = players.find(item => item.id === playerId)
+  const seasons = seasonsFromMatches(matches); const active = seasons.includes(season) ? season : seasons[0] ?? season
+  const recordedTeamIds = [...new Set(matches.filter(match => match.season === active).flatMap(match => match.appearances.filter(appearance => appearance.playerId === player?.id).map(appearance => appearance.teamId)))]
+  const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>(recordedTeamIds)
   const statsBase = player ? playerSeasonStats(player, players, matches, active) : null
   if (!player || !statsBase) return <div className="p-6 text-sm text-zinc-400">Player not found.</div>
-
-  const recordedTeamIds = [...new Set(matches.filter((match) => match.season === active).flatMap((match) => match.appearances.filter((appearance) => appearance.playerId === player.id).map((appearance) => appearance.teamId)))]
-  
-  // 기본 선택 로직: 진입 Context가 있는 경우 해당 팀 우선, 없으면 모든 기록 팀 선택
-  const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>(
-    recordedTeamIds.length > 0 ? recordedTeamIds : (player.teamIds?.filter(id => recordedTeamIds.includes(id)) ?? (player.teamId ? [player.teamId] : []))
-  )
-
-  const records = recentMatches(matches.filter((match) => match.season === active && match.appearances.some((appearance) => appearance.playerId === player.id && selectedTeamIds.includes(appearance.teamId))))
-  const rated = records.flatMap((match) => { const rating = ratePlayerMatch(match, player); return rating ? [{ match, rating, appearance: match.appearances.find((item) => item.playerId === player.id)! }] : [] })
-  
-  const goals = records.reduce((total, match) => total + match.events.filter((event) => event.type === 'goal' && !event.ownGoal && event.playerId === player.id).length, 0)
-  const assists = records.reduce((total, match) => total + match.events.filter((event) => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id).length, 0)
-  const minutes = rated.reduce((total, item) => total + item.rating.minutes, 0)
-  const starts = rated.filter((item) => item.rating.starter).length
-  const subApps = rated.length - starts
+  const selected = selectedTeamIds.length ? selectedTeamIds : recordedTeamIds
+  const records = recentMatches(matches.filter(match => match.season === active && match.appearances.some(appearance => appearance.playerId === player.id && selected.includes(appearance.teamId))))
+  const rated = records.flatMap(match => { const rating = ratePlayerMatch(match, player); const appearance = match.appearances.find(item => item.playerId === player.id); return rating && appearance ? [{ match, rating, appearance }] : [] })
+  const goals = records.reduce((total, match) => total + match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.playerId === player.id).length, 0)
+  const assists = records.reduce((total, match) => total + match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id).length, 0)
   const average = rated.length ? rated.reduce((total, item) => total + item.rating.raw, 0) / rated.length : 0
-  const results = rated.reduce((total, item) => {
-    const score = matchScore(item.match)
-    const ours = item.match.homeTeamId === item.appearance.teamId ? score.home : score.away
-    const theirs = item.match.homeTeamId === item.appearance.teamId ? score.away : score.home
-    if (ours > theirs) total.wins += 1
-    else if (ours === theirs) total.draws += 1
-    else total.losses += 1
-    return total
-  }, { wins: 0, draws: 0, losses: 0 })
-  const mom = records.filter((match) => getMatchManOfTheMatch(match, players) === player.id).length
-
+  const form = playerForm(player, records); const streaks = playerStreaks(player, records)
+  const splitFilter = { season: active }; const positions = positionSplits(player, records, splitFilter); const roles = starterSubstituteSplits(player, records, splitFilter)
+  const onPitch = onPitchStats([player], records, splitFilter).reduce((total, row) => ({ goalsFor: total.goalsFor + row.goalsFor, goalsAgainst: total.goalsAgainst + row.goalsAgainst, plusMinus: total.plusMinus + row.plusMinus }), { goalsFor: 0, goalsAgainst: 0, plusMinus: 0 })
   return <div className="px-4 pb-8 pt-6">
-    <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">← Back</button>
-    <div className="mb-4">
-      <p className="text-xs text-zinc-400">{player.teamId ? teams.find((team) => team.id === player.teamId)?.name : 'No Team'} · #{player.number} · {player.position}</p>
-      <h1 className="text-2xl font-semibold">{player.fullName ?? player.name}</h1>
-      <button type="button" onClick={() => onNavigate({ name: 'edit-player', id: player.id })} className="mt-2 rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-bold">Edit player</button>
-    </div>
-
-    <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
-      {recordedTeamIds.map((teamId) => {
-        const team = teams.find((item) => item.id === teamId)
-        const selected = selectedTeamIds.includes(teamId)
-        return <button
-          key={teamId}
-          type="button"
-          onClick={() => setSelectedTeamIds((ids) => selected ? ids.filter((id) => id !== teamId) : [...ids, teamId])}
-          className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black transition-all ${selected ? '' : 'bg-zinc-800 text-zinc-500'}`}
-        >
-          {selected ? <TeamIcon team={team} className="h-4 w-12 text-[8px] uppercase">{team?.shortName}</TeamIcon> : team?.shortName}
-        </button>
-      })}
-    </div>
-
-    <div className="mb-3 grid grid-cols-4 gap-2">{[['Avg', average > 0 ? average.toFixed(2) : '—'], ['Apps', String(rated.length)], ['G', String(goals)], ['A', String(assists)]].map(([label, value]) => <div key={label} className="rounded-2xl bg-zinc-900 px-2 py-3 text-center"><div className="text-lg font-bold">{value}</div><div className="text-[10px] uppercase tracking-wide text-zinc-500">{label}</div></div>)}</div>
-    <div className="mb-5 grid grid-cols-4 gap-2">{[['Starts', starts], ['Subs', subApps], ['Min', minutes], ['MOM', mom], ['G/90', minutes > 0 ? (goals / minutes * 90).toFixed(2) : '0.00'], ['A/90', minutes > 0 ? (assists / minutes * 90).toFixed(2) : '0.00'], ['G+A/90', minutes > 0 ? ((goals + assists) / minutes * 90).toFixed(2) : '0.00'], ['W-D-L', `${results.wins}-${results.draws}-${results.losses}`]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-zinc-900 px-1 py-2 text-center"><div className="text-sm font-bold">{value}</div><div className="text-[9px] uppercase tracking-wide text-zinc-500">{label}</div></div>)}</div>
-    
-    <h2 className="mb-2 text-sm font-semibold">Previous matches · {active}</h2>
-    <div className="space-y-3">
-      {records.length === 0 && <p className="text-xs text-zinc-500">No match records this season for selected teams.</p>}
-      {records.map((match) => {
-        const appearance = match.appearances.find((item) => item.playerId === player.id)!
-        const rating = ratePlayerMatch(match, player)
-        const team = teams.find(t => t.id === appearance.teamId)
-        const matchGoals = match.events.filter((event) => event.type === 'goal' && !event.ownGoal && event.playerId === player.id).length
-        const matchAssists = match.events.filter((event) => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id).length
-        const score = matchScore(match); const home = teams.find((team) => team.id === match.homeTeamId); const away = teams.find((team) => team.id === match.awayTeamId)
-        const isMom = getMatchManOfTheMatch(match, players) === player.id
-        return <button key={match.id} type="button" onClick={() => onNavigate({ name: 'match', id: match.id })} className="w-full rounded-2xl bg-zinc-900 p-3 text-left">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="flex items-center gap-2 text-xs text-zinc-400">
-              <TeamIcon team={team} className="h-4 w-4 text-[6px]" />
-              MD {match.matchDay} · {formatDate(match.date)} · {rating ? `${rating.minutes}' ${rating.starter ? 'XI' : 'Sub'}` : 'Unused substitute'}
-            </span>
-            <span className={`text-lg font-bold ${isMom ? 'text-blue-400' : rating ? ratingTone(rating.rating) : 'text-zinc-500'}`}>
-              {rating ? rating.raw.toFixed(1) : '—'}
-            </span>
-          </div>
-          <div className="mb-2 flex items-center justify-between text-sm font-semibold">
-            <span>{home?.shortName} {score.home}–{score.away} {away?.shortName}</span>
-            <ResultPill match={match} teamId={appearance.teamId} />
-          </div>
-          <div className="mb-2 text-xs font-semibold text-zinc-300" aria-label="Match positions">{recentMatchPositions(match, appearance)}</div>
-          {rating && <div className="flex items-center gap-1 text-zinc-300">
-            {Array.from({ length: matchGoals }).map((_, index) => <GoalIcon key={`g${index}`} />)}
-            {Array.from({ length: matchAssists }).map((_, index) => <AssistIcon key={`a${index}`} />)}
-          </div>}
-        </button>
-      })}
-    </div>
+    <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">Back</button>
+    <div className="mb-4 flex items-start gap-3"><PlayerIcon player={player} team={teams.find(team => team.id === player.teamId)} className="h-14 w-14 text-sm" /><div className="min-w-0 flex-1"><p className="text-xs text-zinc-400">{player.teamId ? teams.find(team => team.id === player.teamId)?.name : 'No Team'} · #{player.number} · {player.position}</p><h1 className="break-words text-2xl font-semibold">{playerFullName(player)}</h1><button type="button" onClick={() => onNavigate({ name: 'edit-player', id: player.id })} className="mt-2 rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-bold">Edit player</button></div></div>
+    <div className="mb-4 flex gap-2 overflow-x-auto pb-1">{recordedTeamIds.map(teamId => { const team = teams.find(item => item.id === teamId); const included = selectedTeamIds.includes(teamId); return <button key={teamId} type="button" onClick={() => setSelectedTeamIds(ids => included ? ids.filter(id => id !== teamId) : [...ids, teamId])} className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black ${included ? 'bg-emerald-500/15 text-emerald-300' : 'bg-zinc-800 text-zinc-500'}`}>{included ? <TeamIcon team={team} className="h-4 w-12 text-[8px] uppercase">{team?.shortName}</TeamIcon> : team?.shortName}</button> })}</div>
+    <section className="mb-4 rounded-2xl border border-white/5 bg-zinc-900 p-3"><div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-semibold">Player form</h2><p className="text-[10px] text-zinc-500">Unused bench ratings are excluded</p></div><span className="max-w-40 truncate text-[10px] text-zinc-400">{form.ratings.slice(-5).map(item => item.rating.toFixed(1)).join(' · ') || '—'}</span></div><div className="grid grid-cols-3 gap-2">{[['Season Avg', form.seasonAverage], ['Last 5', form.last5Average], ['Last 3', form.last3Average]].map(([label, value], index) => <div key={String(label)} className="rounded-xl bg-black/20 px-2 py-2 text-center"><p className={`text-base font-black ${index > 0 && Number(value) > form.seasonAverage ? 'text-emerald-400' : ''}`}>{Number(value) ? `${Number(value).toFixed(2)}${index > 0 && Number(value) > form.seasonAverage ? ' ↑' : ''}` : '—'}</p><p className="text-[9px] uppercase text-zinc-500">{label}</p></div>)}</div></section>
+    <section className="mb-4"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-semibold">Streaks</h2><span className="text-[10px] text-zinc-500">Current / best</span></div><div className="grid grid-cols-2 gap-1.5">{streaks.map(streak => <div key={streak.key} className="flex items-center justify-between rounded-xl bg-zinc-900 px-3 py-2 text-xs"><span className="text-zinc-400">{streak.label}</span><b>{streak.current}<span className="text-zinc-600"> / </span>{streak.best}</b></div>)}</div></section>
+    <div className="mb-4 grid grid-cols-4 gap-2">{[['Avg', average ? average.toFixed(2) : '—'], ['Apps', rated.length], ['G', goals], ['A', assists]].map(([label, value]) => <div key={String(label)} className="rounded-2xl bg-zinc-900 px-2 py-3 text-center"><div className="text-lg font-bold">{value}</div><div className="text-[10px] uppercase text-zinc-500">{label}</div></div>)}</div>
+    <section className="mb-5"><h2 className="mb-2 text-sm font-semibold">Position splits</h2><div className="space-y-1.5">{positions.map(row => <div key={row.position} className="grid grid-cols-[34px_1fr_auto] items-center gap-2 rounded-xl bg-zinc-900 px-3 py-2 text-xs"><b>{row.position}</b><span className="text-zinc-400">{row.matches} apps · {row.minutes}' · G+A {row.combinedGA}</span><span className="font-black">{row.averageRating.toFixed(2)}</span></div>)}</div></section>
+    <section className="mb-5"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-semibold">Starter / Substitute</h2><span className="text-xs font-black text-zinc-400">On-pitch {onPitch.plusMinus > 0 ? '+' : ''}{onPitch.plusMinus}</span></div><div className="grid grid-cols-2 gap-2">{([['As Starter', roles.starter], ['As Substitute', roles.substitute]] as const).map(([label, row]) => <div key={label} className="rounded-xl bg-zinc-900 p-3"><p className="mb-1 text-xs font-bold">{label}</p><p className="text-[11px] text-zinc-400">Apps {row.apps} · {row.minutes}'</p><p className="text-[11px] text-zinc-400">Rating {row.averageRating ? row.averageRating.toFixed(2) : '—'} · G+A {row.combinedGA}</p></div>)}</div></section>
+    <h2 className="mb-2 text-sm font-semibold">Previous matches · {active}</h2><div className="space-y-3">{records.length === 0 && <p className="text-xs text-zinc-500">No match records this season for selected teams.</p>}{records.map(match => { const appearance = match.appearances.find(item => item.playerId === player.id)!; const rating = ratePlayerMatch(match, player); const matchGoals = match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.playerId === player.id).length; const matchAssists = match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id).length; const score = matchScore(match); const home = teams.find(team => team.id === match.homeTeamId); const away = teams.find(team => team.id === match.awayTeamId); const isMom = getMatchManOfTheMatch(match, players) === player.id; return <button key={match.id} type="button" onClick={() => onNavigate({ name: 'match', id: match.id })} className="w-full rounded-2xl bg-zinc-900 p-3 text-left"><div className="mb-2 flex items-center justify-between"><span className="text-xs text-zinc-400">MD {match.matchDay} · {formatDate(match.date)} · {rating ? `${rating.minutes}' ${rating.starter ? 'XI' : 'Sub'}` : 'Bench'}</span><span className={`text-lg font-bold ${isMom ? 'text-blue-400' : rating ? ratingTone(rating.rating) : 'text-zinc-500'}`}>{rating ? rating.raw.toFixed(1) : '-'}</span></div><div className="mb-2 flex items-center justify-between text-sm font-semibold"><span>{home?.shortName} {score.home}-{score.away} {away?.shortName}</span><ResultPill match={match} teamId={appearance.teamId} /></div><div className="mb-2 text-xs font-semibold text-zinc-300" aria-label="Match positions">{rating ? recentMatchPositions(match, appearance) : 'Bench'}</div>{rating && <div className="flex items-center gap-1 text-zinc-300">{Array.from({ length: matchGoals }).map((_, index) => <GoalIcon key={`g${index}`} />)}{Array.from({ length: matchAssists }).map((_, index) => <AssistIcon key={`a${index}`} />)}</div>}</button> })}</div>
   </div>
 }

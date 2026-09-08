@@ -6,16 +6,7 @@ export function TeamsScreen({ onNavigate }: { onNavigate: (view: View) => void }
   const { teams, players, matches } = useStore()
   return (
     <div className="px-4 pb-8 pt-6">
-      <div className="relative z-20 mb-5 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Teams</h1>
-        <button
-          type="button"
-          onClick={() => onNavigate({ name: 'new-team' })}
-          className="pointer-events-auto min-h-11 shrink-0 cursor-pointer rounded-full bg-emerald-500 px-4 py-2 text-xs font-bold text-black"
-        >
-          New Team
-        </button>
-      </div>
+      <div className="mb-5"><h1 className="text-2xl font-semibold">Teams</h1><p className="mt-1 text-xs text-zinc-500">Official team directory</p></div>
       <div className="space-y-3">
         {teams.map((team) => {
           const squad = players.filter((p) => (p.teamIds ?? [p.teamId]).includes(team.id)).length

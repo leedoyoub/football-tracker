@@ -8,7 +8,9 @@ import { canConfirmSubstitution, lineupTarget, moveLineup, moveSubstitution, typ
 import { getNextMatchDayForTeam } from '../engine/match'
 import type { Appearance, Best11Slot, MatchEvent, Player, Position, PositionChange, Team, View } from '../types'
 import { useStore } from '../store'
-import { playerDisplayName, StatIcons, SubstitutePlayerCard, SubstitutionSelection } from '../components/ui'
+import { playerDisplayName, GoalIcon, AssistIcon, StatIcons, SubstitutePlayerCard, SubstitutionSelection } from '../components/ui'
+
+import { rebuildLiveHistory } from './liveHistory'
 
 type FormationSlotConfig = TacticalSlot
 
@@ -79,10 +81,16 @@ export function NewMatchScreen({
   const [substitutionDraft, setSubstitutionDraft] = useState<SubstitutionDraft | null>(null)
   const [subSelection, setSubSelection] = useState<LineupTarget | null>(null)
   const [substitutionError, setSubstitutionError] = useState('')
+  const pendingMoves = useRef<{ source: LineupTarget; target: LineupTarget }[]>([])
+  const pendingBase = useRef<SubstitutionDraft | null>(null)
+  const [historyError, setHistoryError] = useState('')
+  const [subEdit, setSubEdit] = useState<Extract<MatchEvent, { type: 'sub' }> | null>(null)
+  const [subEditMinute, setSubEditMinute] = useState('')
   const suppressDragClick = useRef(false)
   const [activePlayer, setActivePlayer] = useState<{ group: 'starting' | 'substitute' | 'squad'; id: string; slotId?: string } | null>(null)
   const [focusedPlayerId, setFocusedPlayerId] = useState<string | null>(null)
   const [startingSnapshot, setStartingSnapshot] = useState<Record<string, string>>({})
+  const [startingBenchSnapshot, setStartingBenchSnapshot] = useState<string[]>([])
   const initializedTeam = useRef<string | null>(null)
   const lineupLocked = matchDraft.events.length > 0
   
@@ -161,6 +169,8 @@ export function NewMatchScreen({
   const minuteIsValid = /^\d{1,2}$/.test(minuteInput) && liveMinute >= 0 && liveMinute <= (liveEvent === 'substitution' ? 89 : 90)
 
   function openLiveEvent(type: NonNullable<typeof liveEvent>) {
+    pendingMoves.current = []; pendingBase.current = null
+    setHistoryError('')
     setEditingEventId(null)
     setLiveEvent(type)
     setMinuteInput('')
@@ -171,7 +181,7 @@ export function NewMatchScreen({
     setLiveScorerId('')
     setLiveAssistId('')
     setLiveCauseId('')
-    setLivePicker(type === 'conceded' ? 'cause' : 'scorer')
+    setLivePicker(type === 'conceded' ? 'minute' : 'scorer')
     if (type === 'substitution') {
       setSubstitutionDraft({ slotAssignments: { ...matchDraft.slotAssignments }, homeBench: [...matchDraft.homeBench], events: [...matchDraft.events], positionHistories: { ...matchDraft.positionHistories }, checkpoint: { slotAssignments: matchDraft.slotAssignments, homeBench: matchDraft.homeBench } })
     }
@@ -185,11 +195,14 @@ export function NewMatchScreen({
       if (!liveScorerId || !assistChosen || !eligibleGoalIds.includes(liveScorerId) || (liveAssistId && (!eligibleGoalIds.includes(liveAssistId) || liveScorerId === liveAssistId))) return
       writeEvent({ id: editingEventId ?? id, type: 'goal', minute: liveMinute, teamId: selectedTeamId, playerId: liveScorerId || undefined, assistPlayerId: liveScorerId ? liveAssistId || undefined : undefined, goalType: 'normal' })
     } else if (liveEvent === 'conceded') {
+      if (liveCauseId && !eligibleGoalIds.includes(liveCauseId)) return
       writeEvent({ id: editingEventId ?? id, type: 'goal', minute: liveMinute, teamId: opponentId, playerId: undefined, concededGoalCausePlayerId: liveCauseId || undefined })
     } else if (substitutionDraft) {
-      if (!canConfirmSubstitution(substitutionDraft, matchDraft)) return
+      if (substitutionError || !canConfirmSubstitution(substitutionDraft, matchDraft)) return
       setMatchDraft(prev => ({ ...prev, slotAssignments: substitutionDraft.slotAssignments, homeBench: substitutionDraft.homeBench, events: substitutionDraft.events, positionHistories: substitutionDraft.positionHistories }))
     }
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    setMinuteInput(''); setLiveScorerId(''); setLiveAssistId(''); setLiveCauseId(''); setAssistChosen(false)
     setLiveEvent(null)
     setEditingEventId(null)
     setSubstitutionDraft(null)
@@ -209,26 +222,53 @@ export function NewMatchScreen({
   }
 
   function editLiveEvent(event: MatchEvent) {
-    if (event.type === 'sub') return
+    if (event.type === 'sub') { setSubEdit(event); setSubEditMinute(String(event.minute)); setHistoryError(''); return }
+    cancelLiveEvent()
     setEditingEventId(event.id)
     if (event.type === 'save') return
     setMinuteInput(String(event.minute))
     if (event.teamId === selectedTeamId) {
       setLiveEvent('goal'); setLiveScorerId(event.playerId ?? ''); setLiveAssistId(event.assistPlayerId ?? ''); setAssistChosen(true); setLivePicker('minute')
     } else {
-      setLiveEvent('conceded'); setLiveCauseId(event.concededGoalCausePlayerId ?? ''); setLivePicker('cause')
+      setLiveEvent('conceded'); setLiveCauseId(event.concededGoalCausePlayerId ?? ''); setLivePicker('minute')
     }
   }
 
+  function correctEvents(events: MatchEvent[], histories = matchDraft.positionHistories) {
+    try {
+      const roster = [...new Set([...Object.values(startingSnapshot), ...Object.values(matchDraft.slotAssignments), ...matchDraft.homeBench])].filter(Boolean)
+      setMatchDraft(rebuildLiveHistory(startingSnapshot, roster, events, histories, slotPositions))
+      setHistoryError('')
+      return true
+    } catch (error) { setHistoryError((error as Error).message); return false }
+  }
   function deleteLiveEvent(event: MatchEvent) {
-    if (!window.confirm('Delete this event?')) return
-    setMatchDraft(prev => ({ ...prev, events: prev.events.filter((e) => e.id !== event.id) }))
+    if (liveEvent) return
+    if (event.type === 'sub') correctEvents(matchDraft.events.filter(e => e.id !== event.id))
+    else setMatchDraft(prev => ({ ...prev, events: prev.events.filter(e => e.id !== event.id) }))
+  }
+  function saveSubEdit() {
+    if (!subEdit || !/^\d{1,2}$/.test(subEditMinute) || Number(subEditMinute) >= 90) return
+    const original = matchDraft.events.find(e => e.id === subEdit.id)!
+    const minute = Number(subEditMinute)
+    const histories = Object.fromEntries(Object.entries(matchDraft.positionHistories).map(([id, changes]) => [id, changes.map(c => c.minute === original.minute && !matchDraft.events.some(e => e.type === 'sub' && e.id !== original.id && e.minute === original.minute) ? { ...c, minute } : c)]))
+    if (correctEvents(matchDraft.events.map(e => e.id === subEdit.id ? { ...subEdit, minute } : e), histories)) setSubEdit(null)
   }
 
   const slotPositions = Object.fromEntries(UNIVERSAL_TACTICAL_SLOTS.map(slot => [slot.slot, slot.matchPosition]))
 
   function applyLiveMove(source: LineupTarget, target: LineupTarget) {
     if (!substitutionDraft) return
+    if (minuteInput === '' || pendingMoves.current.length) {
+      const preview = moveLineup(substitutionDraft, source, target)
+      if (preview === substitutionDraft) return
+      if (!pendingBase.current) pendingBase.current = substitutionDraft
+      pendingMoves.current.push({ source, target })
+      setSubstitutionDraft({ ...substitutionDraft, ...preview })
+      setSubSelection(null)
+      if (minuteInput !== '') replayPendingMoves(liveMinute)
+      return
+    }
     const next = moveSubstitution(substitutionDraft, source, target, startingSnapshot, slotPositions, liveMinute, selectedTeamId, () => crypto.randomUUID())
     if (next === substitutionDraft) {
       setSubstitutionError('Invalid substitution or time.')
@@ -238,6 +278,17 @@ export function NewMatchScreen({
     setSubstitutionDraft(next)
     setSubSelection(null)
     setSubstitutionError('')
+  }
+
+  function replayPendingMoves(minute: number) {
+    if (!pendingBase.current || !Number.isInteger(minute) || minute < 0 || minute >= 90) return
+    let draft = pendingBase.current
+    for (const move of pendingMoves.current) {
+      const next = moveSubstitution(draft, move.source, move.target, startingSnapshot, slotPositions, minute, selectedTeamId, () => crypto.randomUUID())
+      if (next === draft) { setSubstitutionError('Invalid substitution or time.'); return }
+      draft = next
+    }
+    setSubstitutionDraft(draft); setSubstitutionError('')
   }
 
   function selectSubstitutionTarget(target: LineupTarget) {
@@ -295,10 +346,16 @@ export function NewMatchScreen({
       const player = players.find(item => item.id === event.playerInId)
       if (player) res.push({ playerId: player.id, teamId: selectedTeamId, position: player.position, matchPosition: event.position, role: 'bench' })
     }
+    // Preserve the match-day bench without assigning minutes or ratings.
+    for (const id of startingBenchSnapshot) {
+      if (res.some(a => a.playerId === id)) continue
+      const player = players.find(p => p.id === id)
+      if (player) res.push({ playerId: id, teamId: selectedTeamId, position: player.position, role: 'bench' })
+    }
     return res.map(appearance => matchDraft.positionHistories[appearance.playerId]?.length
       ? { ...appearance, positionHistory: matchDraft.positionHistories[appearance.playerId] }
       : appearance)
-  }, [selectedTeamId, players, matchDraft, startingSnapshot, lineupLocked])
+  }, [selectedTeamId, players, matchDraft, startingSnapshot, startingBenchSnapshot, lineupLocked])
 
   const eventMatch = { id: draftId, season, matchDay, date, duration: 90, homeTeamId, awayTeamId, appearances, events: matchDraft.events }
   function eligibleAt(minute: number) {
@@ -310,11 +367,17 @@ export function NewMatchScreen({
   }
   const eligibleAppearances = Number.isFinite(liveMinute) ? eligibleAt(liveMinute) : appearances.filter(a => liveSlots.some(slot => slot.playerId === a.playerId))
   const eligibleGoalIds = eligibleAppearances.map(a => a.playerId)
+  const occupiedGoalSlots = new Set<string>()
   const goalSlots: Best11Slot[] = Number.isFinite(liveMinute) ? eligibleAppearances.map(a => {
     const on = matchDraft.events.find(event => event.type === 'sub' && event.playerInId === a.playerId)
     const history = [...(a.positionHistory ?? [])].filter(change => change.minute <= liveMinute).sort((a, b) => a.minute - b.minute)
     const position = history.at(-1)?.position ?? (a.role === 'bench' && on?.type === 'sub' ? on.position : a.matchPosition ?? a.position)
-    return { slot: position, position: a.position, matchPosition: position, playerId: a.playerId, teamId: a.teamId, avgRating: 0, matches: 0 }
+    const originalSlot = Object.keys(startingSnapshot).find(slot => startingSnapshot[slot] === a.playerId)
+    const candidates = UNIVERSAL_TACTICAL_SLOTS.filter(slot => slot.matchPosition === position && !occupiedGoalSlots.has(slot.slot))
+    const tactical = candidates.find(slot => slot.slot === originalSlot) ?? candidates.find(slot => slot.slot === position) ?? candidates[0]
+    const slotId = tactical?.slot ?? position
+    occupiedGoalSlots.add(slotId)
+    return { slot: slotId, position: a.position, matchPosition: position, playerId: a.playerId, teamId: a.teamId, avgRating: 0, matches: 0 }
   }) : liveSlots
   function chooseScorer(id: string) {
     if (!eligibleGoalIds.includes(id)) return
@@ -328,6 +391,8 @@ export function NewMatchScreen({
     const input = String(value)
     if (!/^\d{0,2}$/.test(input)) return
     setMinuteInput(input)
+    if (liveEvent === 'substitution' && input !== '') replayPendingMoves(Number(input))
+    if (liveCauseId && input !== '' && !eligibleAt(Number(input)).some(a => a.playerId === liveCauseId)) setLiveCauseId('')
     if (liveEvent === 'goal' && input !== '') {
       const ids = eligibleAt(Number(input)).map(a => a.playerId)
       if (liveScorerId && !ids.includes(liveScorerId)) {
@@ -370,17 +435,18 @@ export function NewMatchScreen({
 
   return (
     <StarterPositionContext.Provider value={{ positions: starterPositionByPlayer, highlightPosition: focusedPlayer?.position }}>
-    <div className="flex h-full flex-col bg-black text-white">
-      <div className="px-4 pt-6">
+    <div className="flex h-full min-h-0 flex-col bg-black text-white">
+      <div className="px-4 pt-3">
         <button onClick={() => onNavigate(teamId ? { name: 'team', id: teamId } : { name: 'teams' })} className="mb-3 text-xs font-semibold text-emerald-400">← Cancel</button>
         <h1 className="text-2xl font-bold">Log Match</h1>
-        <div className="mb-4 rounded-xl bg-zinc-900 p-3">
+        <div className="mb-2 rounded-xl bg-zinc-900 px-3 py-1">
           <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Next Match Day</p>
           <p className="text-sm font-black text-emerald-400">{season} · MD {matchDay}</p>
         </div>
       </div>
 
-      <div className="no-scrollbar flex-1 overflow-y-auto px-4 pb-24">
+      {historyError && <p role="alert" className="px-4 text-xs text-red-400">{historyError}</p>}
+      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-4">
         {step === 0 && (
           <DndContext sensors={lineupSensors} collisionDetection={lineupCollision} onDragStart={handleLineupDragStart} onDragEnd={handleLineupDragEnd} onDragCancel={() => { suppressDragClick.current = false }}>
           <div className="space-y-6">
@@ -391,7 +457,7 @@ export function NewMatchScreen({
             <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Starting XI</h2><Pitch slots={universalPitchSlots} players={draftPlayers} teams={teams} statsByPlayer={seasonStats} badgeMode="position" draggable={!lineupLocked} externalDnd onSlotDrop={moveStartingSlot} onSlotClick={(slot) => { if (!lineupLocked && !suppressDragClick.current && slot.playerId) { setFocusedPlayerId(slot.playerId); setActivePlayer({ group: 'starting', id: slot.playerId, slotId: slot.slot }) } }} /></section>
             <DragPlayerGroup title="Substitutes" group="substitute" team={teams.find(team => team.id === selectedTeamId)} players={matchDraft.homeBench.filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is NonNullable<typeof player> => Boolean(player))} statsByPlayer={seasonStats} onClick={(id) => { if (lineupLocked || suppressDragClick.current) return; setFocusedPlayerId(id); setActivePlayer({ group: 'substitute', id }) }} />
             <DragPlayerGroup title="Squad" group="squad" players={squadPlayers} statsByPlayer={seasonStats} onClick={(id) => { if (lineupLocked || suppressDragClick.current) return; setFocusedPlayerId(id); setActivePlayer({ group: 'squad', id }) }} />
-            <button disabled={startingIds.length !== 11} onClick={() => { if (!lineupLocked) setStartingSnapshot({ ...matchDraft.slotAssignments }); setStep(1) }} className="w-full rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl disabled:opacity-40">CONTINUE</button>
+            <button disabled={startingIds.length !== 11} onClick={() => { if (!lineupLocked) { setStartingSnapshot({ ...matchDraft.slotAssignments }); setStartingBenchSnapshot([...matchDraft.homeBench]) } setStep(1) }} className="w-full rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl disabled:opacity-40">CONTINUE</button>
             {activePlayer && <div className="fixed inset-0 z-40 flex items-end bg-black/70 p-4" onClick={() => setActivePlayer(null)}><div className="max-h-[75vh] w-full overflow-y-auto rounded-2xl bg-zinc-950 p-4" onClick={(event) => event.stopPropagation()}><div className="mb-4 flex items-center justify-between"><h2 className="text-sm font-black uppercase">Change Player</h2><button type="button" onClick={() => setActivePlayer(null)} className="text-zinc-500">×</button></div>{activePlayer.group !== 'starting' && <PlayerGroup title="Starting XI" players={UNIVERSAL_TACTICAL_SLOTS.map(s => matchDraft.slotAssignments[s.slot]).filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is NonNullable<typeof player> => Boolean(player))} onClick={(id) => swapDraft('starting', id)} />}{activePlayer.group !== 'substitute' && <PlayerGroup title="Substitutes" players={matchDraft.homeBench.filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is NonNullable<typeof player> => Boolean(player))} onClick={(id) => swapDraft('substitute', id)} />}{activePlayer.group !== 'squad' && <PlayerGroup title="Squad" players={squadPlayers} onClick={(id) => swapDraft('squad', id)} />}<button type="button" onClick={() => setActivePlayer(null)} className="mt-4 w-full rounded-xl bg-zinc-900 py-3 text-xs font-bold">CANCEL</button></div></div>}
           </div>
           </DndContext>
@@ -400,7 +466,7 @@ export function NewMatchScreen({
         {step === 1 && <LiveMatchStep
           teams={teams} substitutionSelection={substitutionSelection} pendingSubs={pendingSubs}
           goalReady={!!liveScorerId && assistChosen && eligibleGoalIds.includes(liveScorerId) && (!liveAssistId || eligibleGoalIds.includes(liveAssistId))} assistChosen={assistChosen}
-          slots={liveEvent === 'goal' ? goalSlots : liveSlots} players={draftPlayers} benchPlayers={liveBenchPlayers} stats={liveStats} events={activeDraft.events}
+          slots={liveEvent === 'goal' || liveEvent === 'conceded' ? goalSlots : liveSlots} players={draftPlayers} benchPlayers={liveBenchPlayers} stats={liveStats} events={activeDraft.events}
           totalSaves={totalSaves} onTotalSaves={changeTotalSaves} hasStartingGoalkeeper={!!startingGoalkeeperId} subOutId={subSelection ? (subSelection.group === 'starting' ? activeDraft.slotAssignments[subSelection.id] : subSelection.id) : ''} substitutionError={substitutionError}
           onSubSlot={(id) => selectSubstitutionTarget({ group: 'starting', id })}
           onSubBench={() => selectSubstitutionTarget({ group: 'substitute', id: '' })}
@@ -409,18 +475,20 @@ export function NewMatchScreen({
           onSubDragEnd={handleSubstitutionDragEnd}
           onDragStart={() => { suppressDragClick.current = true; setSubSelection(null) }}
           onDragCancel={() => { suppressDragClick.current = false }}
-          canConfirmSubstitutions={!!substitutionDraft && canConfirmSubstitution(substitutionDraft, matchDraft)}
+          canConfirmSubstitutions={!substitutionError && !!substitutionDraft && canConfirmSubstitution(substitutionDraft, matchDraft)}
           liveEvent={liveEvent} liveMinute={minuteInput} liveScorerId={liveScorerId} liveAssistId={liveAssistId} liveCauseId={liveCauseId} livePicker={livePicker}
           onOpen={openLiveEvent} onSave={saveLiveEvent} onCancel={cancelLiveEvent} onMinute={changeMinute} onScorer={chooseScorer} onAssist={chooseAssist} onCause={setLiveCauseId} onPicker={setLivePicker}
-          validMinute={minuteIsValid} onPitchClick={(id) => { if (liveEvent === 'goal') { if (livePicker === 'scorer') chooseScorer(id); else if (livePicker === 'assist') chooseAssist(id) }  else if (livePicker === 'cause') setLiveCauseId(id) }}
-          onBack={() => { cancelLiveEvent(); setStep(0) }} onFinish={save} selectedTeamId={selectedTeamId} onEditEvent={editLiveEvent} onDeleteEvent={deleteLiveEvent} />}
+          validMinute={minuteIsValid} onPitchClick={(id) => { if (liveEvent === 'goal') { if (livePicker === 'scorer') chooseScorer(id); else if (livePicker === 'assist') chooseAssist(id) }  else if (liveEvent === 'conceded' && livePicker === 'cause' && eligibleGoalIds.includes(id)) { setLiveCauseId(id === liveCauseId ? '' : id); setLivePicker('minute') } }}
+          onBack={() => { cancelLiveEvent(); setStep(0) }} onFinish={save} startingGoalkeeperName={playerDisplayName(players.find(p => p.id === startingGoalkeeperId))} selectedTeamId={selectedTeamId} onEditEvent={editLiveEvent} onDeleteEvent={deleteLiveEvent} />}
       </div>
     </div>
+    {subEdit && <div role="dialog" aria-modal="true" aria-label="Edit substitution" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="w-full max-w-sm space-y-3 rounded-xl bg-zinc-900 p-4 text-white"><h2>Edit substitution</h2>{historyError && <p role="alert" className="text-xs text-red-400">{historyError}</p>}<label className="block">OUT<select aria-label="OUT player" value={subEdit.playerOutId} onChange={e => setSubEdit({ ...subEdit, playerOutId: e.target.value })} className="w-full bg-black p-2">{draftPlayers.map(p => <option key={p.id} value={p.id}>{playerDisplayName(p)}</option>)}</select></label><label className="block">IN<select aria-label="IN player" value={subEdit.playerInId} onChange={e => setSubEdit({ ...subEdit, playerInId: e.target.value })} className="w-full bg-black p-2">{draftPlayers.map(p => <option key={p.id} value={p.id}>{playerDisplayName(p)}</option>)}</select></label><MinuteInput value={subEditMinute} onChange={setSubEditMinute} label="Substitution Time" /><button disabled={!/^\d{1,2}$/.test(subEditMinute) || Number(subEditMinute) >= 90} onClick={saveSubEdit} className="w-full rounded-lg bg-emerald-500 p-2 font-bold text-black disabled:opacity-40">SAVE</button><button onClick={() => { setSubEdit(null); setHistoryError('') }} className="w-full p-2">CANCEL</button></div></div>}
     </StarterPositionContext.Provider>
   )
 }
 
 function LiveMatchStep(props: {
+  startingGoalkeeperName: string;
   goalReady: boolean; assistChosen: boolean; teams: Team[]; substitutionSelection: Record<string, 'in' | 'out'>; pendingSubs: Extract<MatchEvent, { type: 'sub' }>[]
   totalSaves: string; onTotalSaves: (value: string) => void; hasStartingGoalkeeper: boolean; subOutId: string; substitutionError: string; canConfirmSubstitutions: boolean
   onSubOut: (id: string) => void; onSubIn: (id: string) => void; onSubSlot: (id: string) => void; onSubBench: () => void
@@ -433,39 +501,48 @@ function LiveMatchStep(props: {
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } }),
   )
+  const [finishStage, setFinishStage] = useState<'saves' | 'review' | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<MatchEvent | null>(null)
   const eventName = props.liveEvent === 'conceded' ? 'Conceded Goal' : 'Goal'
   const playerName = (id: string) => playerDisplayName(props.players.find((player) => player.id === id))
-  return <DndContext sensors={sensors} collisionDetection={lineupCollision} onDragStart={props.onDragStart} onDragEnd={props.onSubDragEnd} onDragCancel={props.onDragCancel}><div className="space-y-5">
-    <div className="grid grid-cols-4 gap-2">{([['goal', 'GOAL'], ['conceded', 'CONCEDED'], ['substitution', 'SUBSTITUTION']] as const).map(([type, label]) => <button key={type} type="button" disabled={!!props.liveEvent} onClick={() => props.onOpen(type)} className={`rounded-xl py-3 text-[10px] font-black ${props.liveEvent === type ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-white'}`}>{label}</button>)}</div>
-    <label className="flex items-center gap-3 rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold">Saves<input aria-label="Total saves" type="text" inputMode="numeric" pattern="[0-9]*" value={props.totalSaves} disabled={!props.hasStartingGoalkeeper || props.liveEvent === 'substitution'} onChange={event => props.onTotalSaves(event.target.value)} className="w-20 rounded-lg bg-black px-3 py-2 text-sm text-white disabled:opacity-40" /></label>
-    <section>{props.liveEvent === 'goal' && <p className="mb-3 text-sm font-bold text-emerald-300">{props.livePicker === 'scorer' ? '1. Select scorer on the pitch' : props.livePicker === 'assist' ? '2. Select assist on the pitch or No Assist' : '3. Enter minute and save'}</p>}<h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Starting XI</h2><Pitch goalSelection={props.liveEvent === 'goal' ? { ...(props.liveScorerId ? { [props.liveScorerId]: 'scorer' as const } : {}), ...(props.liveAssistId ? { [props.liveAssistId]: 'assist' as const } : {}) } : undefined} disabledPlayerIds={props.liveEvent === 'goal' && props.livePicker === 'assist' ? [props.liveScorerId] : undefined} slots={props.slots} players={props.players} teams={props.teams} substitutionSelection={props.substitutionSelection} statsByPlayer={props.stats} badgeMode="position" draggable={props.liveEvent === 'substitution'} externalDnd onEmptySlotClick={props.liveEvent === 'substitution' ? slot => props.onSubSlot(slot.slot) : undefined} onSlotClick={(slot) => { if (!slot.playerId) return; if (props.liveEvent === 'substitution') props.onSubOut(slot.playerId); else props.onPitchClick(slot.playerId) }} /></section>
-    {props.liveEvent === 'substitution' && <><DragPlayerGroup title="Substitutes" group="substitute" team={props.teams.find(team => team.id === props.selectedTeamId)} selection={props.substitutionSelection} players={props.benchPlayers} statsByPlayer={props.stats} onClick={props.onSubIn} /><BenchDropTarget onClick={props.onSubBench} /></>}
-    {props.liveEvent && props.liveEvent !== 'substitution' && <div className="space-y-3 rounded-2xl bg-zinc-900 p-4">{props.liveEvent !== 'goal' && <MinuteInput value={props.liveMinute} onChange={props.onMinute} label={`${eventName} Time`} />}
+  return <DndContext sensors={sensors} collisionDetection={lineupCollision} onDragStart={props.onDragStart} onDragEnd={props.onSubDragEnd} onDragCancel={props.onDragCancel}><div className="space-y-3">
+    <div className="sticky top-0 z-30 space-y-2 bg-black/95 py-2">
+    <div className="grid grid-cols-3 gap-2">{([['goal', 'GOAL'], ['conceded', 'CONCEDED'], ['substitution', 'SUBSTITUTION']] as const).map(([type, label]) => <button key={type} type="button" disabled={!!props.liveEvent} onClick={() => props.onOpen(type)} className={`rounded-xl py-3 text-[10px] font-black ${props.liveEvent === type ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-white'}`}>{label}</button>)}</div>
+    {props.liveEvent && props.liveEvent !== 'substitution' && <div className="space-y-2 rounded-xl bg-zinc-900 p-2">{props.liveEvent !== 'goal' && <MinuteInput value={props.liveMinute} onChange={props.onMinute} label={`${eventName} Time`} />}
       {props.liveEvent === 'goal' && <div className="space-y-3">
         <div aria-live="polite" className="grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => props.onPicker('scorer')} className="rounded-xl bg-black p-3 text-left text-xs font-bold">? {props.liveScorerId ? playerName(props.liveScorerId) : 'Select scorer'}</button>
-          <button type="button" disabled={!props.liveScorerId} onClick={() => props.onPicker('assist')} className="rounded-xl bg-black p-3 text-left text-xs font-bold disabled:opacity-40">?? {props.liveAssistId ? playerName(props.liveAssistId) : props.assistChosen ? 'No Assist' : 'Select assist'}</button>
+          <button type="button" onClick={() => props.onPicker('scorer')} className="rounded-xl bg-black p-2 text-left text-xs font-bold"><GoalIcon className="inline h-3 w-3" /> {props.liveScorerId ? playerName(props.liveScorerId) : 'Select scorer'}</button>
+          <button type="button" disabled={!props.liveScorerId} onClick={() => props.onPicker('assist')} className="rounded-xl bg-black p-3 text-left text-xs font-bold disabled:opacity-40"><AssistIcon className="inline h-3 w-3" /> {props.liveAssistId ? playerName(props.liveAssistId) : props.assistChosen ? 'No Assist' : 'Select assist'}</button>
         </div>
         {props.liveScorerId && props.livePicker === 'assist' && <button type="button" onClick={() => props.onAssist('')} className="w-full rounded-xl bg-black p-3 text-xs font-bold">No Assist</button>}
         <MinuteInput value={props.liveMinute} onChange={props.onMinute} label="Goal Time" autoFocus={props.livePicker === 'minute'} />
       </div>}
-      {props.liveEvent === 'conceded' && <><button type="button" onClick={() => props.onPicker('cause')} className={`w-full rounded-xl p-2 text-left text-[10px] font-bold ${props.livePicker === 'cause' ? 'bg-emerald-500 text-black' : 'bg-black'}`}>Conceded Goal Cause: {props.liveCauseId ? playerName(props.liveCauseId) : 'No cause'}</button><button type="button" onClick={() => props.onCause('')} className="w-full rounded-xl bg-black p-2 text-[10px] font-bold">NO CAUSE</button></>}
-      <div className="flex gap-2"><button type="button" onClick={props.onCancel} className="flex-1 rounded-xl bg-black py-3 text-xs font-black">CANCEL</button><button type="button" disabled={!props.validMinute || (props.liveEvent === 'goal' && !props.goalReady)} onClick={props.onSave} className="flex-1 rounded-xl bg-emerald-500 py-3 text-xs font-black text-black disabled:opacity-40">SAVE {eventName.toUpperCase()}</button></div></div>}
-    {props.liveEvent === 'substitution' && <div className="space-y-3 rounded-2xl bg-zinc-900 p-4">
+      {props.liveEvent === 'conceded' && <><button type="button" onClick={() => props.onPicker(props.livePicker === 'cause' ? 'minute' : 'cause')} className={`w-full rounded-xl p-2 text-left text-[10px] font-bold ${props.livePicker === 'cause' ? 'bg-emerald-500 text-black' : 'bg-black'}`}>{props.liveCauseId ? 'Fault: ' + playerName(props.liveCauseId) : 'ADD FAULT PLAYER / No Fault'}</button>{(props.liveCauseId || props.livePicker === 'cause') && <button type="button" onClick={() => { props.onCause(''); props.onPicker('minute') }} className="w-full rounded-xl bg-black p-2 text-[10px] font-bold">NO FAULT</button>}</>}
+      <div className="flex gap-2"><button type="button" onClick={props.onCancel} className="flex-1 rounded-xl bg-black py-2 text-xs font-black">CANCEL</button><button type="button" disabled={!props.validMinute || (props.liveEvent === 'goal' && !props.goalReady)} onClick={props.onSave} className="flex-1 rounded-xl bg-emerald-500 py-2 text-xs font-black text-black disabled:opacity-40">SAVE {eventName.toUpperCase()}</button></div></div>}
+    {props.liveEvent === 'substitution' && <div className="space-y-2 rounded-xl bg-zinc-900 p-2">
       <MinuteInput value={props.liveMinute} onChange={props.onMinute} label="Substitution Time" />
       <div aria-live="polite" className="space-y-1 text-xs font-semibold">
         {props.subOutId && <p>{props.players.find(player => player.id === props.subOutId)?.number} {playerName(props.subOutId)} <SubstitutionSelection direction={props.substitutionSelection[props.subOutId] ?? 'out'} /></p>}
-        {props.pendingSubs.map(event => <p key={event.id}><span className="text-red-400">{props.players.find(player => player.id === event.playerOutId)?.number} {playerName(event.playerOutId)} OUT</span> ? <span className="text-emerald-400">{props.players.find(player => player.id === event.playerInId)?.number} {playerName(event.playerInId)} IN</span></p>)}
+        {props.pendingSubs.length === 0 && Object.entries(props.substitutionSelection).map(([id, direction]) => <span key={id} className="mr-2 inline-flex items-center gap-1">{props.players.find(p => p.id === id)?.number} {playerName(id)} <SubstitutionSelection direction={direction} /></span>)}
+        {props.pendingSubs.map(event => <p key={event.id}><span className="text-red-400">{props.players.find(player => player.id === event.playerOutId)?.number} {playerName(event.playerOutId)} OUT</span> &rarr; <span className="text-emerald-400">{props.players.find(player => player.id === event.playerInId)?.number} {playerName(event.playerInId)} IN</span></p>)}
       </div>
       <p className="text-xs text-zinc-400">On pitch: {props.slots.filter(slot => slot.playerId).length} / 11</p>
       {props.substitutionError && <p role="alert" className="text-xs text-red-400">{props.substitutionError}</p>}
       <div className="flex gap-2">
-        <button type="button" onClick={props.onCancel} className="flex-1 rounded-xl bg-black py-3 text-xs font-black">CANCEL</button>
-        <button type="button" disabled={!props.validMinute || !props.canConfirmSubstitutions} onClick={props.onSave} className="flex-1 rounded-xl bg-emerald-500 py-3 text-xs font-black text-black disabled:opacity-40">CONFIRM SUBSTITUTIONS</button>
+        <button type="button" onClick={props.onCancel} className="flex-1 rounded-xl bg-black py-2 text-xs font-black">CANCEL</button>
+        <button type="button" disabled={!props.validMinute || !props.canConfirmSubstitutions} onClick={props.onSave} className="flex-1 rounded-xl bg-emerald-500 py-2 text-xs font-black text-black disabled:opacity-40">CONFIRM SUBSTITUTIONS</button>
       </div>
     </div>}
-    <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Event History</h2><div className="space-y-1.5">{props.events.slice().sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0)).map((event) => <div key={event.id} className="rounded-xl bg-zinc-900 px-3 py-2 text-[11px]">{event.type !== 'save' && `${event.minute}' `}{event.type === 'goal' ? event.teamId === props.selectedTeamId ? `Goal${event.playerId ? `: ${playerName(event.playerId)}` : ' · Opponent own goal'}${event.assistPlayerId ? ` · Assist: ${playerName(event.assistPlayerId)}` : ''}` : `Conceded${event.concededGoalCausePlayerId ? ` · Cause: ${playerName(event.concededGoalCausePlayerId)}` : ''}` : event.type === 'sub' ? `Substitution: ${playerName(event.playerOutId)} → ${playerName(event.playerInId)}` : `Save: ${playerName(event.playerId)} × ${event.count ?? 1}`}</div>)}</div></section>
-    <div className="flex gap-2"><button type="button" onClick={props.onBack} className="flex-1 rounded-2xl bg-zinc-900 py-4 text-sm font-black">BACK</button><button type="button" disabled={!!props.liveEvent} onClick={props.onFinish} className="flex-2 rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl">FINISH & SAVE</button></div>
+    </div>
+    <section>{props.liveEvent === 'goal' && <p className="mb-3 text-sm font-bold text-emerald-300">{props.livePicker === 'scorer' ? '1. Select scorer on the pitch' : props.livePicker === 'assist' ? '2. Select assist on the pitch or No Assist' : '3. Enter minute and save'}</p>}<h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Starting XI</h2><Pitch compact goalSelection={props.liveEvent === 'goal' ? { ...(props.liveScorerId ? { [props.liveScorerId]: 'scorer' as const } : {}), ...(props.liveAssistId ? { [props.liveAssistId]: 'assist' as const } : {}) } : props.liveEvent === 'conceded' && props.liveCauseId ? { [props.liveCauseId]: 'fault' } : undefined} disabledPlayerIds={props.liveEvent === 'goal' && props.livePicker === 'assist' ? [props.liveScorerId] : undefined} slots={props.slots} players={props.players} teams={props.teams} substitutionSelection={props.substitutionSelection} statsByPlayer={props.stats} badgeMode="position" draggable={props.liveEvent === 'substitution'} externalDnd onEmptySlotClick={props.liveEvent === 'substitution' ? slot => props.onSubSlot(slot.slot) : undefined} onSlotClick={(slot) => { if (!slot.playerId) return; if (props.liveEvent === 'substitution') props.onSubOut(slot.playerId); else props.onPitchClick(slot.playerId) }} /></section>
+    {props.liveEvent === 'substitution' && <><DragPlayerGroup title="Substitutes" group="substitute" team={props.teams.find(team => team.id === props.selectedTeamId)} selection={props.substitutionSelection} players={props.benchPlayers} statsByPlayer={props.stats} onClick={props.onSubIn} /><BenchDropTarget onClick={props.onSubBench} /></>}
+    <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Event History</h2><button type="button" disabled={!!props.liveEvent || !props.events.some(e => e.type !== 'save')} onClick={() => { const event = props.events.filter(e => e.type !== 'save').at(-1); if (event) props.onDeleteEvent(event) }} className="mb-2 text-xs font-bold text-emerald-400 disabled:opacity-40">UNDO LAST</button><div className="space-y-1.5">{props.events.slice().sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0)).map((event) => <button type="button" disabled={!!props.liveEvent} onClick={() => event.type === 'save' ? setFinishStage('saves') : setSelectedEvent(event)} key={event.id} className="block w-full rounded-xl bg-zinc-900 px-3 py-2 text-left text-[11px]">{event.type !== 'save' && `${event.minute}' `}{event.type === 'goal' ? event.teamId === props.selectedTeamId ? `Goal${event.playerId ? `: ${playerName(event.playerId)}` : ' · Opponent own goal'}${event.assistPlayerId ? ` · Assist: ${playerName(event.assistPlayerId)}` : ''}` : `Conceded${event.concededGoalCausePlayerId ? ` · Cause: ${playerName(event.concededGoalCausePlayerId)}` : ''}` : event.type === 'sub' ? `Substitution: ${playerName(event.playerOutId)} → ${playerName(event.playerInId)}` : `Save: ${playerName(event.playerId)} × ${event.count ?? 1}`}</button>)}</div></section>
+    <div className="flex gap-2"><button type="button" onClick={props.onBack} className="flex-1 rounded-2xl bg-zinc-900 py-4 text-sm font-black">BACK</button><button type="button" disabled={!!props.liveEvent} onClick={() => setFinishStage('saves')} className="flex-2 rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl">END MATCH</button></div>
+    {finishStage && <div role="dialog" aria-modal="true" aria-label="End match" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="w-full max-w-sm space-y-3 rounded-xl bg-zinc-900 p-4">
+      {finishStage === 'saves' ? <><p className="font-bold">{props.startingGoalkeeperName || 'No starting goalkeeper'}</p><label className="flex items-center justify-between">Saves<input aria-label="Total saves" type="text" inputMode="numeric" pattern="[0-9]*" value={props.totalSaves} disabled={!props.hasStartingGoalkeeper} onChange={event => props.onTotalSaves(event.target.value)} className="w-20 rounded-lg bg-black p-2 text-base" /></label><button disabled={props.hasStartingGoalkeeper && props.totalSaves === ''} onClick={() => setFinishStage('review')} className="w-full rounded-lg bg-emerald-500 p-3 text-xs font-black text-black disabled:opacity-40">SAVE & FINISH MATCH</button></> : <><p className="font-bold">Final Result: {props.events.filter(e => e.type === 'goal' && e.teamId === props.selectedTeamId).length} - {props.events.filter(e => e.type === 'goal' && e.teamId !== props.selectedTeamId).length}</p><p className="text-sm">{props.startingGoalkeeperName} / Saves {props.totalSaves || '0'}</p><button onClick={props.onFinish} className="w-full rounded-lg bg-emerald-500 p-3 text-xs font-black text-black">FINISH & SAVE</button><button onClick={() => setFinishStage('saves')} className="w-full p-2 text-xs">EDIT SAVES</button></>}
+      <button onClick={() => setFinishStage(null)} className="w-full p-2 text-xs">CANCEL</button>
+    </div></div>}
+    {selectedEvent && <div role="dialog" aria-modal="true" aria-label="Event actions" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="flex w-full max-w-sm gap-2 rounded-xl bg-zinc-900 p-4"><button className="flex-1 p-3" onClick={() => { props.onEditEvent(selectedEvent); setSelectedEvent(null) }}>EDIT</button><button className="flex-1 p-3 text-red-400" onClick={() => { props.onDeleteEvent(selectedEvent); setSelectedEvent(null) }}>DELETE</button><button className="flex-1 p-3" onClick={() => setSelectedEvent(null)}>CANCEL</button></div></div>}
   </div></DndContext>
 }
 
@@ -492,5 +569,5 @@ function PlayerGroup({ title, players, onClick }: { title: string; players: { id
 function MinuteInput({ value, onChange, label, autoFocus = false }: { value: string; onChange: (value: string) => void; label: string; autoFocus?: boolean }) {
   const input = useRef<HTMLInputElement>(null)
   useEffect(() => { if (autoFocus) input.current?.focus() }, [autoFocus])
-  return <label className="flex items-center gap-2 text-[10px] font-black uppercase text-zinc-500">{label}<input ref={input} aria-label={label} type="text" inputMode="numeric" pattern="[0-9]{1,2}" maxLength={2} value={value} onChange={event => { if (/^\d{0,2}$/.test(event.target.value)) onChange(event.target.value) }} className="ml-auto w-16 rounded-xl bg-black px-3 py-2 text-sm text-white" /></label>
+  return <label className="flex items-center gap-2 text-[10px] font-black uppercase text-zinc-500">{label}<input ref={input} aria-label={label} type="text" inputMode="numeric" pattern="[0-9]{1,2}" maxLength={2} value={value} onChange={event => { if (/^\d{0,2}$/.test(event.target.value)) onChange(event.target.value) }} onFocus={event => event.currentTarget.scrollIntoView?.({ block: 'nearest' })} className="ml-auto w-16 rounded-xl bg-black px-3 py-2 text-base text-white" /></label>
 }

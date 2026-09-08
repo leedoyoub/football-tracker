@@ -18,13 +18,15 @@ export const POSITIONS = [
 
 export type Position = (typeof POSITIONS)[number]
 
-export type Tab = 'home' | 'teams' | 'players'
+export type Tab = 'home' | 'teams' | 'players' | 'chemistry'
 
 export interface Team {
   id: string
   name: string
   shortName: string
   abbreviation: string
+  /** Static catalog logo; legacy color fields remain for persisted historical records. */
+  logo?: string
   visualStyle: 'solid' | 'striped'
   primaryColor: TeamColor
   secondaryColor?: TeamColor | null
@@ -55,6 +57,11 @@ export interface Player {
   position: Position
   number: number
   rating?: number
+  /** Optional external reference. player.id remains the permanent app identity. */
+  externalPlayerId?: string | number
+  /** Remote photo URL selected from a future provider; safe to omit offline. */
+  photoUrl?: string
+  /** Legacy local image field retained for backwards compatibility. */
   image?: string
 }
 
@@ -134,6 +141,10 @@ export interface AppState {
 export type View =
   | { name: 'home' }
   | { name: 'rankings'; sort: RankSort }
+  | { name: 'standings' }
+  | { name: 'season-recap'; season: string }
+  | { name: 'chemistry' }
+  | { name: 'comparison' }
   | { name: 'teams' }
   | { name: 'team'; id: string }
   | { name: 'players' }

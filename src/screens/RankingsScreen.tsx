@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
-import { playerDisplayName } from '../components/ui'
+import { playerFullName } from '../components/ui'
+import { PlayerIcon } from '../components/PlayerIcon'
 import { getLeaderboard, seasonsFromMatches, type LeaderboardMetric } from '../engine/stats'
 import { useStore } from '../store'
 import { emptyFilters, matchesForPlayer, RankingFilterButton } from './RankingFilters'
@@ -42,7 +43,7 @@ export function RankingsScreen({
   const teamById = Object.fromEntries(teams.map((t) => [t.id, t]))
 
   return (
-    <div className="px-4 pb-8 pt-6 max-w-md mx-auto h-screen relative bg-black text-white shadow-2xl overflow-hidden flex flex-col">
+    <div className="px-4 pb-8 pt-6 max-w-md mx-auto h-full min-h-0 relative bg-black text-white shadow-2xl overflow-hidden flex flex-col">
       <button
         type="button"
         onClick={() => onNavigate({ name: 'home' })}
@@ -103,8 +104,9 @@ export function RankingsScreen({
               className="flex w-full items-center gap-3 rounded-2xl bg-zinc-900 px-3 py-2.5 text-left"
             >
               <span className="w-5 text-center text-xs font-bold text-zinc-500">{i + 1}</span>
+              <PlayerIcon player={player} team={team} className="h-9 w-9 text-[9px]" />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{playerDisplayName(player)}</span>
+                <span className="block truncate text-sm font-semibold">{playerFullName(player)}</span>
                 <span className="text-[11px] text-zinc-400">
                   {team?.shortName} · {player?.position}
                 </span>

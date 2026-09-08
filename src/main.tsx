@@ -12,6 +12,12 @@ if ('serviceWorker' in navigator) {
 
 import { AuthProvider } from './lib/auth'
 
+// Safari's non-standard gesture events cover installed-PWA pinch gestures that
+// are not consistently governed by the viewport meta tag alone.
+for (const eventName of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(eventName, event => event.preventDefault(), { passive: false })
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>

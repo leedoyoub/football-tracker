@@ -95,12 +95,13 @@ function harness() {
   }
   h.act = fn => { active = h; fn(); h.render() }
   h.live = () => nodes(h.tree, node => node.type?.name === 'LiveMatchStep')[0]
-  h.liveTree = () => h.live().type(h.live().props)
+  h.liveOwner = { hooks: [], cursor: 0, effects: [], dirty: false }
+  h.liveTree = () => { const parent = active; active = h.liveOwner; active.cursor = 0; active.effects = []; const tree = h.live().type(h.live().props); active = parent; return tree }
   h.props = () => h.live().props
   h.call = (name, ...args) => h.act(() => h.props()[name](...args))
   h.pitch = () => nodes(h.live() ? h.liveTree() : h.tree, node => node.type === Pitch)[0]
   h.button = name => nodes(h.live() ? h.liveTree() : h.tree, node => node.type === 'button' && content(node) === name)[0]
-  h.clickButton = name => { const button = h.button(name); assert(button, name); assert(!button.props.disabled, name); h.act(button.props.onClick) }
+  h.clickButton = name => { if (name === 'FINISH & SAVE' && !h.button(name)) { if (!nodes(h.liveTree(), n => n.props?.['aria-label'] === 'End match').length) h.clickButton('END MATCH'); if (h.props().totalSaves === '') h.call('onTotalSaves', '0'); h.clickButton('SAVE & FINISH MATCH') } const button = h.button(name); assert(button, name); assert(!button.props.disabled, name); h.act(button.props.onClick) }
   h.clickOut = slotId => h.act(() => { const pitch = h.pitch(); pitch.props.onSlotClick(pitch.props.slots.find(slot => slot.slot === slotId)) })
   h.clickIn = id => h.act(() => nodes(h.liveTree(), node => node.type?.name === 'DragPlayerGroup')[0].props.onClick(id))
   h.drag = (source, target) => {
@@ -145,7 +146,7 @@ test('click and both drag directions share one draft; same-minute changes synchr
   assert.equal(match.appearances.find(row => row.playerId === 'ST').role, 'starter')
   const entered = match.appearances.find(row => row.playerId === 'b1')
   assert.deepEqual(entered, { playerId: 'b1', teamId: 'A', position: 'CM', matchPosition: 'ST', role: 'bench' })
-  assert(!match.appearances.some(row => row.playerId === 'unused'))
+  assert.equal(match.appearances.find(row => row.playerId === 'unused').role, 'bench')
   assert.equal(ratePlayerMatch(match, h.store.players.find(player => player.id === 'unused')), null)
   assert.equal(aggregatePlayerStats(h.store.players.find(player => player.id === 'b1'), h.store.players, [match]).minutes, 30)
   assert.equal(h.store.players.find(player => player.id === 'b1').position, 'CM')
@@ -154,8 +155,8 @@ test('click and both drag directions share one draft; same-minute changes synchr
   assert(result)
   const teamMain = TeamDetailScreen({ teamId: 'A', season: match.season, onNavigate: () => {}, onBack: () => {} })
   const cards = nodes(teamMain, node => node.type === SubstitutePlayerCard)
-  assert.deepEqual(cards.map(card => card.props.player.id).sort(), ['b1', 'b2', 'bGK'].sort())
-  for (const card of cards) assert.equal(card.props.rating, ratePlayerMatch(match, card.props.player).raw)
+  assert.deepEqual(cards.map(card => card.props.player.id).sort(), ['b1', 'b2', 'b3', 'bGK', 'unused'].sort())
+  for (const card of cards) assert.equal(card.props.rating, ratePlayerMatch(match, card.props.player)?.raw)
 })
 
 test('reject duplicates, re-entry, unknown players, and invalid chronology; allow later replacement of entered player', () => {
@@ -167,7 +168,7 @@ test('reject duplicates, re-entry, unknown players, and invalid chronology; allo
   h.drag('player:LW', 'roster:substitute:other-team')
   assert.equal(h.props().events.length, 1)
   for (const minute of [-1, 59, 60.5, 90, NaN]) {
-    h.call('onMinute', ''); h.call('onMinute', minute); h.clickOut('LW'); h.clickIn('b2')
+    h.call('onMinute', '90'); h.call('onMinute', minute); h.clickOut('LW'); h.clickIn('b2')
     assert.equal(h.props().events.length, 1)
   }
   h.call('onMinute', 75); h.clickOut('ST'); h.clickIn('b2')
@@ -204,14 +205,14 @@ test('Page 1 occupied/empty tactical slot dragging remains available and does no
   h.drag('player:CAM', 'target:LW')
   assert.equal(h.slot('CAM'), 'LW'); assert.equal(h.slot('LW'), 'ST')
   h.enter(); h.clickButton('FINISH & SAVE')
-  assert.equal(h.saved[0].events.length, 0)
+  assert.equal(h.saved[0].events.filter(e => e.type !== 'save').length, 0)
   assert.equal(h.saved[0].appearances.find(row => row.playerId === 'ST').matchPosition, 'LW')
   assert.equal(h.store.players.find(player => player.id === 'ST').position, 'ST')
 })
 
 test('draft survives roster reference refresh; pending events cannot finish and cancelled drags do not swap players', () => {
   const h = harness(); h.enter(); h.openSub(); h.clickOut('ST'); h.clickIn('b1')
-  assert(h.button('FINISH & SAVE').props.disabled)
+  assert(h.button('END MATCH').props.disabled)
   h.call('onFinish'); assert.equal(h.saved.length, 0)
   h.store.players = [...h.store.players]; h.render()
   assert.equal(h.slot('ST'), 'b1'); assert.equal(h.props().events.length, 1)
@@ -331,8 +332,9 @@ test('shared PlayerIcon renders plain position text and retains jersey, rating, 
   assert.equal(nodes(card, node => node.type === PlayerIcon)[0].props.position, 'CM')
   assert(content(card).includes('Display'))
   assert(content(card).includes('7.5'))
-  assert.equal(nodes(card, node => node.type?.name === 'GoalIcon').length, 1)
-  assert.equal(nodes(card, node => node.type?.name === 'AssistIcon').length, 1)
+  const statsNode = nodes(card, node => node.type?.name === 'StatIcons')[0]; const statsTree = statsNode.type(statsNode.props)
+  assert.equal(nodes(statsTree, node => node.type?.name === 'GoalIcon').length, 1)
+  assert.equal(nodes(statsTree, node => node.type?.name === 'AssistIcon').length, 1)
   card.props.onClick()
   assert.equal(clicked, 2)
 })
@@ -352,32 +354,13 @@ test('Log Match has no special goal selector and saves normal goals with scorer 
   assert.equal(h.saved[0].homeAway, 'home')
 })
 
-test('Teams New Team action opens existing form and form saves with existing fields', () => {
+test('Teams are a static directory and expose no creation control', () => {
   const h = harness()
   const { TeamsScreen } = require('../src/screens/TeamsScreen.tsx')
-  const { NewTeamScreen } = require('../src/screens/NewTeamScreen.tsx')
   const tree = TeamsScreen({ onNavigate: view => h.navigation.push(view) })
-  const button = nodes(tree, node => node.type === 'button' && content(node) === 'New Team')[0]
-  assert(button)
-  assert(!button.props.disabled)
-  assert.equal(button.props.type, 'button')
-  button.props.onClick()
-  assert.deepEqual(h.navigation.at(-1), { name: 'new-team' })
-  const savedTeams = []
-  h.store.addTeam = team => { savedTeams.push(team); return 'created-team' }
-  h.hooks = []
-  const form = () => { h.cursor = 0; return NewTeamScreen({ onNavigate: view => h.navigation.push(view) }) }
-  let screen = form()
-  const input = placeholder => nodes(screen, node => node.type === 'input' && node.props.placeholder === placeholder)[0]
-  input('Club name').props.onChange({ target: { value: 'New Club' } })
-  input('ABC').props.onChange({ target: { value: 'new' } })
-  screen = form()
-  const create = nodes(screen, node => node.type === 'button' && content(node) === 'Create team')[0]
-  assert(!create.props.disabled)
-  create.props.onClick()
-  assert.equal(savedTeams[0].name, 'New Club')
-  assert.equal(savedTeams[0].abbreviation, 'NEW')
-  assert.deepEqual(h.navigation.at(-1), { name: 'team', id: 'created-team' })
+  assert.equal(nodes(tree, node => node.type === 'button' && /New Team|Create Team/.test(content(node))).length, 0)
+  const app = fs.readFileSync(require.resolve('../src/App.tsx'), 'utf8')
+  assert(!app.includes('NewTeamScreen') && !app.includes('EditTeamScreen'))
 })
 
 
@@ -436,8 +419,8 @@ test('shared substitute card hides only rating and selection arrows have the cor
   assert(content(log).includes('Kim'))
   const out = SubstitutionSelection({ direction: 'out' })
   const incoming = SubstitutionSelection({ direction: 'in' })
-  assert.equal(content(out), '? OUT'); assert(out.props.className.includes('text-red-400'))
-  assert.equal(content(incoming), 'IN ?'); assert(incoming.props.className.includes('text-emerald-400'))
+  assert.equal(content(out), '\u2190 OUT'); assert(out.props.className.includes('text-red-400'))
+  assert.equal(content(incoming), '\u2192 IN'); assert(incoming.props.className.includes('text-emerald-400'))
   assert(SubstitutePlayerCard({ ...props, selection: 'in' }).props.className.includes('scale-105'))
 })
 
@@ -454,8 +437,8 @@ test('goal pitch flow selects scorer then assist, highlights both, shows summary
   h.call('onPitchClick', 'CM')
   assert.equal(h.props().livePicker, 'minute')
   assert.equal(h.pitch().props.goalSelection.CM, 'assist')
-  assert(content(h.liveTree()).includes('? ST'))
-  assert(content(h.liveTree()).includes('?? CM'))
+  assert(content(h.liveTree()).includes(' ST'))
+  assert(content(h.liveTree()).includes(' CM'))
   assert(h.button('SAVE GOAL').props.disabled)
   h.call('onSave'); assert.equal(h.props().events.length, 0)
   h.call('onMinute', '7'); h.clickButton('SAVE GOAL')
@@ -470,7 +453,7 @@ test('No Assist is explicit and unused bench cannot be selected; Cancel resets a
   h.call('onPitchClick', 'b1'); assert.equal(h.props().liveAssistId, '')
   h.clickButton('No Assist')
   assert(h.props().assistChosen)
-  assert(content(h.liveTree()).includes('?? No Assist'))
+  assert(content(h.liveTree()).includes(' No Assist'))
   h.call('onMinute', '45'); h.clickButton('SAVE GOAL')
   assert.equal(h.props().events[0].assistPlayerId, undefined)
   h.call('onOpen', 'goal'); assert.equal(h.props().liveMinute, '')
@@ -526,9 +509,11 @@ test('all event minutes start blank, accept at most two digits, preserve numeric
 })
 
 
-test('inline saves starts blank, has no picker or minute, updates one stable event and rejects non-digits', () => {
+test('end match saves popup starts blank, has no picker or minute, updates one stable event and rejects non-digits', () => {
   const h = harness(); h.enter()
   assert.equal(h.props().totalSaves, '')
+  assert.equal(nodes(h.liveTree(), node => node.props?.['aria-label'] === 'Total saves').length, 0)
+  h.clickButton('END MATCH')
   const input = nodes(h.liveTree(), node => node.type === 'input' && node.props['aria-label'] === 'Total saves')[0]
   assert(input); assert.equal(input.props.inputMode, 'numeric')
   assert.equal(h.button('SAVE'), undefined)
@@ -584,4 +569,104 @@ test('total saves rank and aggregate by season and historical team without chang
   assert.equal(ranking(['Season 2'], []), 2)
   assert.equal(ranking(['Season 1'], []), 5)
   assert.equal(JSON.stringify(historical), before)
+})
+
+test('quick substitution selects OUT and IN before a minute, then validates and commits at the entered time', () => {
+  const h = harness(); h.enter(); h.call('onOpen', 'substitution')
+  h.clickOut('ST'); h.clickIn('b1')
+  assert.equal(h.props().liveMinute, '')
+  assert.equal(h.slot('ST'), 'b1')
+  assert(h.button('CONFIRM SUBSTITUTIONS').props.disabled)
+  assert.equal(h.drafts.at(-1).events.length, 0)
+  h.call('onMinute', '67')
+  assert(!h.button('CONFIRM SUBSTITUTIONS').props.disabled)
+  h.call('onMinute', '68')
+  h.clickButton('CONFIRM SUBSTITUTIONS')
+  assert.deepEqual(h.props().events.map(e => [e.playerOutId, e.playerInId, e.minute]), [['ST', 'b1', 68]])
+  assert.equal(h.props().liveMinute, '')
+})
+
+test('conceded defaults to No Fault; fault selection is optional and respects substitution boundaries', () => {
+  const h = harness(); h.enter(); h.call('onOpen', 'conceded')
+  assert.equal(h.props().livePicker, 'minute')
+  h.call('onPitchClick', 'ST'); assert.equal(h.props().liveCauseId, '')
+  h.call('onMinute', '7'); h.call('onSave')
+  assert.equal(h.props().events[0].concededGoalCausePlayerId, undefined)
+  h.openSub(60); h.clickOut('ST'); h.clickIn('b1'); h.call('onSave')
+  h.call('onOpen', 'conceded'); h.call('onPicker', 'cause'); h.call('onPitchClick', 'b1')
+  assert.equal(h.pitch().props.goalSelection.b1, 'fault')
+  h.call('onMinute', '59'); assert.equal(h.props().liveCauseId, '')
+  h.call('onPicker', 'cause'); h.call('onPitchClick', 'ST')
+  h.call('onSave'); assert.equal(h.props().events.at(-1).concededGoalCausePlayerId, 'ST')
+})
+
+test('undo uses recording order and restores pitch, bench and position history after substitutions', () => {
+  const h = harness(); h.enter(); h.call('onOpen', 'conceded'); h.call('onMinute', '80'); h.call('onSave')
+  h.call('onOpen', 'goal'); h.call('onPitchClick', 'ST'); h.call('onAssist', ''); h.call('onMinute', '7'); h.call('onSave')
+  h.clickButton('UNDO LAST'); assert.equal(h.props().events.length, 1); assert.equal(h.props().events[0].minute, 80)
+  h.openSub(60); h.clickOut('ST'); h.clickIn('b1'); h.call('onSave')
+  h.clickButton('UNDO LAST'); assert.equal(h.slot('ST'), 'ST'); assert(h.props().benchPlayers.some(p => p.id === 'b1'))
+  assert.equal(h.drafts.at(-1).appearances.find(a => a.playerId === 'b1').role, 'bench')
+  assert.equal(ratePlayerMatch(h.drafts.at(-1), h.store.players.find(p => p.id === 'b1')), null)
+})
+
+test('history sheet edits goals in place and deletes without losing unrelated records', () => {
+  const h = harness(); h.enter(); h.call('onOpen', 'goal'); h.call('onPitchClick', 'ST'); h.call('onAssist', ''); h.call('onMinute', '7'); h.call('onSave')
+  const id = h.props().events[0].id
+  const eventButton = nodes(h.liveTree(), n => n.type === 'button' && content(n).startsWith("7' Goal"))[0]
+  h.act(eventButton.props.onClick); assert(h.button('EDIT')); assert(h.button('DELETE')); assert(h.button('CANCEL'))
+  h.clickButton('EDIT'); h.call('onMinute', '45'); h.call('onScorer', 'CM'); h.call('onAssist', 'ST'); h.call('onSave')
+  assert.equal(h.props().events.length, 1)
+  assert.deepEqual([h.props().events[0].id, h.props().events[0].minute, h.props().events[0].playerId], [id, 45, 'CM'])
+  h.call('onDeleteEvent', h.props().events[0]); assert.equal(h.props().events.length, 0)
+})
+
+test('substitution edit retimes appearances and rejects changes that orphan later goals', () => {
+  const h = harness(); h.enter(); h.openSub(60); h.clickOut('ST'); h.clickIn('b1'); h.call('onSave')
+  const sub = h.props().events[0]
+  h.call('onOpen', 'goal'); h.call('onPitchClick', 'b1'); h.call('onAssist', ''); h.call('onMinute', '70'); h.call('onSave')
+  h.call('onDeleteEvent', sub); assert.equal(h.props().events.length, 2)
+  h.call('onEditEvent', sub)
+  const modal = () => nodes(h.tree, n => n.props?.['aria-label'] === 'Edit substitution')[0]
+  const minute = () => nodes(modal(), n => n.type?.name === 'MinuteInput')[0]
+  const save = () => nodes(modal(), n => n.type === 'button' && content(n) === 'SAVE')[0]
+  h.act(() => minute().props.onChange('75')); h.act(save().props.onClick)
+  assert(modal()); assert.equal(h.props().events[0].minute, 60)
+  h.act(() => minute().props.onChange('65')); h.act(save().props.onClick)
+  assert.equal(modal(), undefined); assert.equal(h.props().events[0].minute, 65)
+  assert.equal(ratePlayerMatch(h.drafts.at(-1), h.store.players.find(p => p.id === 'b1')).minutes, 25)
+})
+
+test('shared cards hide zero stats and retain only positive goal or assist icons', () => {
+  const { StatIcons } = require('../src/components/ui.tsx')
+  assert.equal(StatIcons({ goals: 0, assists: 0 }), null)
+  assert.equal(nodes(StatIcons({ goals: 2, assists: 0 }), n => n.type?.name === 'AssistIcon').length, 0)
+  assert.equal(nodes(StatIcons({ goals: 0, assists: 1 }), n => n.type?.name === 'GoalIcon').length, 0)
+  const h = harness(); h.enter(); const pitch = h.pitch()
+  const tree = Pitch(pitch.props)
+  assert.equal(nodes(tree, n => n.props?.className?.includes('grid h-3.5')).length, 0)
+})
+
+test('quick multiple substitutions and empty tactical moves retain timeline and undo cleanly', () => {
+  const h = harness(); h.enter(); h.call('onOpen', 'substitution')
+  h.drag('player:CM', 'target:CAM')
+  h.drag('player:ST', 'roster:substitute:b1')
+  h.drag('player:LW', 'roster:substitute:b2')
+  assert.equal(h.drafts.at(-1).events.length, 0)
+  h.call('onMinute', '67'); h.call('onSave')
+  assert.equal(h.slot('CAM'), 'CM')
+  assert.deepEqual(h.drafts.at(-1).appearances.find(a => a.playerId === 'CM').positionHistory, [{ minute: 67, position: 'CAM' }])
+  h.clickButton('UNDO LAST'); assert.equal(h.slot('LW'), 'LW'); assert.equal(h.slot('CAM'), 'CM')
+  h.clickButton('UNDO LAST'); assert.equal(h.slot('ST'), 'ST'); assert.equal(h.slot('CM'), 'CM')
+  assert.equal(h.drafts.at(-1).appearances.find(a => a.playerId === 'CM').positionHistory, undefined)
+})
+
+test('end match review can return to saves without appending duplicate totals', () => {
+  const h = harness(); h.enter(); h.clickButton('END MATCH')
+  assert(h.button('SAVE & FINISH MATCH').props.disabled)
+  h.call('onTotalSaves', '5'); const id = h.props().events[0].id
+  h.clickButton('SAVE & FINISH MATCH'); assert.equal(h.saved.length, 0)
+  assert(content(h.liveTree()).includes('Final Result: 0 - 0'))
+  h.clickButton('EDIT SAVES'); h.call('onTotalSaves', '6'); h.clickButton('SAVE & FINISH MATCH'); h.clickButton('FINISH & SAVE')
+  assert.deepEqual(h.saved[0].events.map(e => [e.id, e.count]), [[id, 6]])
 })

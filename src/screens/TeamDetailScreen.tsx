@@ -5,6 +5,7 @@ import { TeamIcon } from '../components/TeamIcon'
 import { formatDate, SubstitutePlayerCard } from '../components/ui'
 import { matchScore, ratePlayerMatch } from '../engine/rating'
 import { aggregatePlayerStats, playerSeasonStats, seasonsFromMatches, teamBestEleven } from '../engine/stats'
+import { seasonStandings, standingForTeam } from '../engine/standings'
 import { useStore } from '../store'
 import type { View } from '../types'
 
@@ -17,6 +18,7 @@ export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamI
   if (!team) return <div className="p-6 text-sm text-zinc-400">Team not found.</div>
 
   const best = teamBestEleven(players, matches, teamId, activeSeason)
+  const standing = standingForTeam(seasonStandings(teams, matches, activeSeason), teamId)
   const statsByPlayer = Object.fromEntries(players.filter((player) => (player.teamIds ?? [player.teamId]).includes(teamId)).map((player) => {
     const stats = playerSeasonStats(player, players, matches, activeSeason, teamId)
     return [player.id, { goals: stats.goals, assists: stats.assists }]
@@ -43,10 +45,10 @@ export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamI
     <header className="mb-5 flex items-center gap-3">
       <TeamIcon team={team} className="h-12 w-12 text-sm font-black">{team.shortName}</TeamIcon>
       <div><h1 className="text-xl font-bold">{team.name}</h1><p className="text-[10px] uppercase tracking-widest text-zinc-500">{activeSeason} · Season stats</p></div>
-      <div className="ml-auto flex gap-2"><button type="button" onClick={() => onNavigate({ name: 'edit-team', id: teamId })} className="rounded-full bg-zinc-800 px-3 py-2 text-xs font-bold">Edit</button><button type="button" onClick={() => onNavigate({ name: 'new-match', teamId })} className="rounded-full bg-emerald-500 px-3 py-2 text-xs font-bold text-black">Log match</button></div>
+      <div className="ml-auto"><button type="button" onClick={() => onNavigate({ name: 'new-match', teamId })} className="rounded-full bg-emerald-500 px-3 py-2 text-xs font-bold text-black">Log match</button></div>
     </header>
     <div className="mb-5 grid grid-cols-4 gap-2 text-center">
-      {[['Matches', recent.length], ['W-D-L', `${record.wins}-${record.draws}-${record.losses}`], ['GF', record.for], ['GA', record.against]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{value}</div><div className="text-[9px] uppercase text-zinc-500">{label}</div></div>)}
+      {[['Position', standing ? `${standing.rank}${standing.rank === 1 ? 'st' : standing.rank === 2 ? 'nd' : standing.rank === 3 ? 'rd' : 'th'}` : '—'], ['Matches', recent.length], ['W-D-L', `${record.wins}-${record.draws}-${record.losses}`], ['Pts', standing?.points ?? 0]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{value}</div><div className="text-[9px] uppercase text-zinc-500">{label}</div></div>)}
     </div>
     <div className="mb-3 flex items-end justify-between"><div><h2 className="text-lg font-semibold">Starting XI</h2><p className="text-xs text-zinc-400">Last starting XI shape · {best.formation ?? 'No recent match'}</p></div><span className="text-[10px] text-zinc-500">season average rating</span></div>
     {best.match ? <Pitch slots={best.slots} players={players} teams={teams} statsByPlayer={statsByPlayer} showPositionBadge={false} onSlotClick={(slot) => { if (slot.playerId) onNavigate({ name: 'player', id: slot.playerId }) }} /> : <div className="rounded-2xl bg-zinc-900 p-6 text-center text-sm text-zinc-500">No recent match</div>}

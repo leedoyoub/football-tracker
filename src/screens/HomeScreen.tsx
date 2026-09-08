@@ -1,8 +1,12 @@
 import { useState } from 'react'
+import { APP_VERSION } from '../config'
 import { Pitch } from '../components/Pitch'
 import { PlayerIcon } from '../components/PlayerIcon'
-import { playerDisplayName, ratingTone } from '../components/ui'
+import { playerFullName, ratingTone } from '../components/ui'
 import { globalRankings, seasonsFromMatches, unifiedBestEleven } from '../engine/stats'
+import { seasonStandings } from '../engine/standings'
+import { homeDataStories, isSeasonComplete } from '../engine/seasonInsights'
+import { StandingsTable } from '../components/StandingsTable'
 import { useStore } from '../store'
 import type { RankSort, View } from '../types'
 
@@ -22,6 +26,9 @@ export function HomeScreen({
   const top3 = ranking.slice(0, 3)
   const tots = unifiedBestEleven(players, matches, season)
   const teamOfWeek = unifiedBestEleven(players, matches, season, true)
+  const standings = seasonStandings(teams, matches, season)
+  const stories = homeDataStories(players, matches, season)
+  const seasonComplete = isSeasonComplete(matches, season)
   const byId = Object.fromEntries(players.map((p) => [p.id, p]))
   const teamById = Object.fromEntries(teams.map((t) => [t.id, t]))
   const teamForSeasonPlayer = (playerId: string, fallback?: string) => {
@@ -51,6 +58,11 @@ export function HomeScreen({
           ))}
         </select>
       </div>
+
+      {(stories.length > 0 || seasonComplete) && <section className="mb-6">
+        <div className="mb-2 flex items-center justify-between"><div><h2 className="text-lg font-semibold">Season stories</h2><p className="text-xs text-zinc-400">The signals that matter right now</p></div>{seasonComplete && <button type="button" onClick={() => onNavigate({ name: 'season-recap', season })} className="rounded-full bg-emerald-500 px-3 py-1.5 text-[10px] font-black text-black">RECAP</button>}</div>
+        <div className="space-y-1.5">{stories.map(story => <button key={story.id} type="button" onClick={() => story.playerIds[0] && onNavigate({ name: 'player', id: story.playerIds[0] })} className="flex w-full items-center justify-between gap-3 rounded-xl border border-white/5 bg-zinc-900 px-3 py-2.5 text-left"><span className="min-w-0"><span className="block text-[10px] font-bold uppercase tracking-wide text-emerald-400">{story.eyebrow}</span><span className="block truncate text-sm font-semibold">{story.title}</span></span><span className="max-w-40 text-right text-[11px] text-zinc-400">{story.detail}</span></button>)}</div>
+      </section>}
 
       <section className="mb-6">
         <div className="mb-3 flex items-end justify-between">
@@ -106,7 +118,7 @@ export function HomeScreen({
                 <span className="w-6 text-center text-sm font-bold text-zinc-500">{i + 1}</span>
                 <PlayerIcon player={player} team={team} onClick={() => onNavigate({ name: 'player', id: row.playerId })} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{playerDisplayName(player)}</span>
+                  <span className="block truncate text-sm font-semibold">{playerFullName(player)}</span>
                   <span className="text-[11px] text-zinc-400">
                     {team?.shortName} · {player?.position}
                   </span>
@@ -123,6 +135,13 @@ export function HomeScreen({
         </div>
       </section>
 
+      <section className="mb-7">
+        <div className="mb-3 flex items-end justify-between"><div><h2 className="text-lg font-semibold">Standings</h2><p className="text-xs text-zinc-400">{season}</p></div>{standings.length > 7 && <button type="button" onClick={() => onNavigate({ name: 'standings' })} className="text-xs font-semibold text-emerald-400">View All</button>}</div>
+        <StandingsTable standings={standings.slice(0, 7)} teams={teams} compact />
+      </section>
+
+      <section className="mb-7 rounded-xl bg-zinc-900 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold">Combinations</h2><p className="text-xs text-zinc-400">Chemistry, partnerships and on-pitch impact</p></div><button type="button" onClick={() => onNavigate({ name: 'chemistry' })} className="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black text-black">OPEN</button></div></section>
+
       <section>
         <div className="mb-3">
           <h2 className="text-lg font-semibold">Team of the Week</h2>
@@ -138,6 +157,7 @@ export function HomeScreen({
         </div>
         <Pitch slots={tots.slots} players={players} teams={teams} statsByPlayer={tots.statsByPlayer} layout="free" showPositionBadge={false} onSlotClick={(slot) => onNavigate({ name: 'player', id: slot.playerId! })} />
       </section>
+      <footer className="mt-8 text-center text-[10px] text-zinc-600">Football Tracker · v{APP_VERSION}</footer>
     </div>
   )
 }

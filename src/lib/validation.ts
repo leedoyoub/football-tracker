@@ -14,7 +14,7 @@ export function validateState(state: any): state is AppState {
 
   // 3. Validate Players
   for (const player of state.players) {
-    if (typeof player.id !== 'string' || !player.id || typeof player.name !== 'string' || !Array.isArray(player.teamIds)) return false;
+    if (typeof player.id !== 'string' || !player.id || typeof player.name !== 'string' || (player.teamIds !== undefined && !Array.isArray(player.teamIds))) return false;
   }
 
   // 4. Validate Matches & Historical Relationships

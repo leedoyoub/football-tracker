@@ -9,6 +9,8 @@ import {
 } from 'react'
 import type { AppState, Match, Player, Team } from './types'
 import { LocalRepository } from './lib/repository'
+import { STATIC_TEAMS } from './data/teams'
+import { assertRosterCapacity, currentTeamIds } from './lib/roster'
 
 interface StoreValue extends AppState {
   addTeam: (team: Omit<Team, 'id'> & { id?: string }) => string
@@ -25,7 +27,7 @@ interface StoreValue extends AppState {
 const StoreContext = createContext<StoreValue | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AppState>({ teams: [], players: [], matches: [] })
+  const [state, setState] = useState<AppState>({ teams: STATIC_TEAMS, players: [], matches: [] })
   const [isLoaded, setIsLoaded] = useState(false)
 
   useEffect(() => {
@@ -60,13 +62,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateTeam: (id, team) => update((prev) => ({ ...prev, teams: prev.teams.map((item) => item.id === id ? { ...item, ...team, id } : item) })),
       addPlayer: (player) => {
         const id = player.id ?? crypto.randomUUID()
-        update((prev) => ({ ...prev, players: [...prev.players, { ...player, fullName: player.fullName ?? player.name, displayName: player.displayName ?? player.name, teamIds: player.teamIds ?? (player.teamId ? [player.teamId] : []), id }] }))
+        const teamIds = currentTeamIds(player)
+        update((prev) => {
+          assertRosterCapacity(prev.players, id, [], teamIds)
+          return { ...prev, players: [...prev.players, { ...player, fullName: player.fullName ?? player.name, displayName: player.displayName ?? player.name, teamIds, teamId: teamIds[0] ?? '', id }] }
+        })
         return id
       },
       updatePlayer: (id, player) => {
         update((prev) => ({
           ...prev,
-          players: prev.players.map((p) => (p.id === id ? { ...p, ...player, fullName: player.fullName ?? p.fullName ?? p.name, displayName: player.displayName ?? p.displayName ?? p.name } : p)),
+          players: prev.players.map((p) => {
+            if (p.id !== id) return p
+            const previousIds = currentTeamIds(p)
+            const teamIds = player.teamIds === undefined && player.teamId === undefined ? previousIds : currentTeamIds({ ...p, ...player })
+            assertRosterCapacity(prev.players, id, previousIds, teamIds)
+            return { ...p, ...player, teamIds, teamId: teamIds[0] ?? '', fullName: player.fullName ?? p.fullName ?? p.name, displayName: player.displayName ?? p.displayName ?? p.name }
+          }),
         }))
       },
       addMatch: (match) => {

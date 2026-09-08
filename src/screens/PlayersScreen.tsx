@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { playerDisplayName, ratingTone } from '../components/ui'
+import { playerFullName, ratingTone } from '../components/ui'
+import { PlayerIcon } from '../components/PlayerIcon'
 import { aggregatePlayerStats, seasonsFromMatches } from '../engine/stats'
 import { useStore } from '../store'
 import { emptyFilters, matchesForPlayer, RankingFilterButton } from './RankingFilters'
@@ -33,7 +34,7 @@ export function PlayersScreen({
         }
       })
       .filter(row => row.matchesFilter)
-      .sort((a, b) => b.stats.avgRating - a.stats.avgRating || playerDisplayName(a.player).localeCompare(playerDisplayName(b.player)))
+      .sort((a, b) => b.stats.avgRating - a.stats.avgRating || playerFullName(a.player).localeCompare(playerFullName(b.player)))
   }, [players, teams, matches, appliedFilters, search])
 
   return (
@@ -63,9 +64,9 @@ export function PlayersScreen({
             onClick={() => onNavigate({ name: 'player', id: player.id })}
             className="flex w-full items-center gap-3 rounded-2xl bg-zinc-900 px-3 py-2.5 text-left"
           >
-            <span className="w-8 text-center text-xs font-bold text-zinc-500">{player.number}</span>
+            <PlayerIcon player={player} team={team} className="h-10 w-10 text-[10px]" />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold">{playerDisplayName(player)}</span>
+              <span className="block truncate text-sm font-semibold">{playerFullName(player)}</span>
               <span className="text-[11px] text-zinc-400">
                 {team?.shortName} · {player.position}
               </span>

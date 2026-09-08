@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+:root {
+  --nav-safe-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  --nav-height: calc(56px + var(--nav-safe-bottom));
+}
+
+.app-content {
+  padding-bottom: calc(var(--nav-height) + 8px);
+  scroll-padding-bottom: calc(var(--nav-height) + 8px);
+}
+
+.app-bottom-nav {
+  height: var(--nav-height);
+}
+
 html,
 body,
 #root {
@@ -7,6 +21,22 @@ body,
   height: 100dvh;
   overflow: hidden;
   background: #09090b;
+}
+
+/* Fixed-scale iPhone PWA: retains normal pans/scrolling, blocks pinch and double-tap zoom. */
+html {
+  touch-action: pan-x pan-y;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* iOS only suppresses focus zoom when the computed size is at least 16px. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 body {

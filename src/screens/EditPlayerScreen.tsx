@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../store'
 import { REGISTRATION_POSITIONS, type RegistrationPosition, type View } from '../types'
+import { TEAM_ROSTER_LIMIT, rosterCount } from '../lib/roster'
 
 export function EditPlayerScreen({ playerId, onNavigate }: { playerId: string; onNavigate: (view: View) => void }) {
   const { players, teams, updatePlayer } = useStore()
@@ -35,9 +36,9 @@ export function EditPlayerScreen({ playerId, onNavigate }: { playerId: string; o
         <div className="rounded-xl bg-zinc-900 p-3">
           <p className="mb-2 text-xs font-bold text-zinc-400">Assigned teams</p>
           {teams.map((team) => {
-            const rosterCount = players.filter(p => p.teamIds?.includes(team.id)).length
             const isAssigned = teamIds.includes(team.id)
-            const canAdd = rosterCount < 23 || isAssigned
+            const count = rosterCount(players, team.id)
+            const canAdd = count < TEAM_ROSTER_LIMIT || isAssigned
             return (
               <label key={team.id} className={`mb-2 flex items-center gap-2 text-sm ${canAdd ? '' : 'opacity-40'}`}>
                 <input 
@@ -46,7 +47,7 @@ export function EditPlayerScreen({ playerId, onNavigate }: { playerId: string; o
                     disabled={!canAdd}
                     onChange={() => setTeamIds((ids) => ids.includes(team.id) ? ids.filter((id) => id !== team.id) : [...ids, team.id])} 
                 />
-                {team.name} ({rosterCount}/23)
+                {team.name} {canAdd ? `(${count}/${TEAM_ROSTER_LIMIT})` : `— Full (${TEAM_ROSTER_LIMIT}/${TEAM_ROSTER_LIMIT})`}
               </label>
             )
           })}

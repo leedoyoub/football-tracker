@@ -4,6 +4,7 @@ const ITEMS: { id: Tab; label: string; icon: string }[] = [
   { id: 'home', label: 'Home', icon: '⌂' },
   { id: 'teams', label: 'Teams', icon: '▣' },
   { id: 'players', label: 'Players', icon: '◉' },
+  { id: 'chemistry', label: 'Combos', icon: '⌘' },
 ]
 
 export function BottomNav({
@@ -14,8 +15,8 @@ export function BottomNav({
   onChange: (tab: Tab) => void
 }) {
   return (
-    <nav className="absolute bottom-0 w-full border-t border-white/10 bg-zinc-950/95 backdrop-blur-md">
-      <div className="grid grid-cols-3 px-2 pb-[max(8px,env(safe-area-inset-bottom))] pt-2">
+    <nav className="app-bottom-nav absolute bottom-0 z-30 w-full border-t border-white/10 bg-zinc-950/95 backdrop-blur-md">
+      <div className="grid h-full grid-cols-4 px-2 pb-[var(--nav-safe-bottom)] pt-2">
         {ITEMS.map((item) => {
           const active = tab === item.id
           return (

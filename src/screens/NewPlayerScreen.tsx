@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { REGISTRATION_POSITIONS, type RegistrationPosition, type View } from '../types'
 import { useStore } from '../store'
 import { playerDisplayName } from '../components/ui'
+import { RosterCapacityError, rosterCount, TEAM_ROSTER_LIMIT } from '../lib/roster'
 
 export function NewPlayerScreen({
   teamId,
@@ -15,7 +16,8 @@ export function NewPlayerScreen({
   const [displayName, setDisplayName] = useState('')
   const [number, setNumber] = useState(10)
   const [position, setPosition] = useState<RegistrationPosition>('CM')
-  const [selectedTeam, setSelectedTeam] = useState(teamId ?? teams[0]?.id ?? '')
+  const [selectedTeam, setSelectedTeam] = useState(() => teamId && rosterCount(players, teamId) < TEAM_ROSTER_LIMIT ? teamId : '')
+  const [saveError, setSaveError] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [searchField, setSearchField] = useState<'fullName' | 'displayName'>('displayName')
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
@@ -41,12 +43,13 @@ export function NewPlayerScreen({
       <div className="space-y-3">
         <select
           value={selectedTeam}
-          onChange={(e) => setSelectedTeam(e.target.value)}
+          onChange={(e) => { setSelectedTeam(e.target.value); setSaveError('') }}
           className="w-full rounded-xl bg-zinc-900 px-3 py-2.5 text-sm"
         >
+          <option value="">No Team</option>
           {teams.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
+            <option key={t.id} value={t.id} disabled={rosterCount(players, t.id) >= TEAM_ROSTER_LIMIT}>
+              {t.name} — {rosterCount(players, t.id) >= TEAM_ROSTER_LIMIT ? `Full (${TEAM_ROSTER_LIMIT}/${TEAM_ROSTER_LIMIT})` : `${rosterCount(players, t.id)}/${TEAM_ROSTER_LIMIT}`}
             </option>
           ))}
         </select>
@@ -109,29 +112,25 @@ export function NewPlayerScreen({
         </select>
         <button
           type="button"
-          disabled={!displayName.trim() || !selectedTeam}
+          disabled={!displayName.trim()}
           onClick={() => {
-            if (selectedPlayer) {
-              updatePlayer(selectedPlayer.id, {
-                teamIds: [...new Set([selectedPlayer.teamId, ...(selectedPlayer.teamIds ?? []), selectedTeam].filter(Boolean))],
-              })
-              onNavigate({ name: 'player', id: selectedPlayer.id })
-              return
+            try {
+              if (selectedPlayer) {
+                updatePlayer(selectedPlayer.id, { teamIds: [...new Set([selectedPlayer.teamId, ...(selectedPlayer.teamIds ?? []), selectedTeam].filter(Boolean))] })
+                onNavigate({ name: 'player', id: selectedPlayer.id })
+                return
+              }
+              const id = addPlayer({ name: displayName.trim(), fullName: fullName.trim() || displayName.trim(), displayName: displayName.trim(), number, position, teamId: selectedTeam })
+              onNavigate({ name: 'player', id })
+            } catch (error) {
+              setSaveError(error instanceof RosterCapacityError ? 'That team is full (23/23). Choose another team or No Team.' : 'Could not save player.')
             }
-            const id = addPlayer({
-              name: displayName.trim(),
-              fullName: fullName.trim() || displayName.trim(),
-              displayName: displayName.trim(),
-              number,
-              position,
-              teamId: selectedTeam,
-            })
-            onNavigate({ name: 'player', id })
           }}
           className="w-full rounded-xl bg-emerald-500 py-2.5 text-sm font-bold text-black disabled:opacity-40"
         >
           {selectedPlayer ? 'Add to team' : 'Create player'}
         </button>
+        {saveError && <p role="alert" className="text-xs font-semibold text-red-400">{saveError}</p>}
       </div>
     </div>
   )
