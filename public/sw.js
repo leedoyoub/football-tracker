@@ -1,9 +1,11 @@
-const CACHE_NAME = 'football-tracker-v2';
+// Bump after the OAuth callback fix so installed PWAs discard stale bundles.
+const CACHE_NAME = 'football-tracker-v3';
+const BASE_PATH = '/football-tracker/';
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/favicon.svg',
-  '/manifest.json'
+  BASE_PATH,
+  `${BASE_PATH}index.html`,
+  `${BASE_PATH}favicon.svg`,
+  `${BASE_PATH}manifest.json`
 ];
 
 self.addEventListener('install', (event) => {
