@@ -6,7 +6,7 @@ import { playerSeasonStats } from '../engine/stats'
 import { pitchWindow } from '../engine/rating'
 import { canConfirmSubstitution, lineupTarget, moveLineup, moveSubstitution, type LineupTarget, type SubstitutionDraft } from './matchLineup'
 import { getNextMatchDayForTeam } from '../engine/match'
-import type { Appearance, Best11Slot, MatchEvent, Player, Position, PositionChange, Team, View } from '../types'
+import type { Appearance, Best11Slot, Match, MatchEvent, Player, Position, PositionChange, Team, View } from '../types'
 import { useStore } from '../store'
 import { playerDisplayName, GoalIcon, AssistIcon, StatIcons, SubstitutePlayerCard, SubstitutionSelection } from '../components/ui'
 import { PlayerAvatar } from '../components/PlayerAvatar'
@@ -14,6 +14,30 @@ import { PlayerAvatar } from '../components/PlayerAvatar'
 import { rebuildLiveHistory } from './liveHistory'
 
 type FormationSlotConfig = TacticalSlot
+type MatchDraftState = { slotAssignments: Record<string, string>; homeBench: string[]; events: MatchEvent[]; positionHistories: Record<string, PositionChange[]> }
+
+function restoreDraft(match: Match | undefined, players: Player[]): { draft: MatchDraftState; starters: Record<string, string>; bench: string[] } | null {
+  if (!match || !Array.isArray(match.appearances) || !Array.isArray(match.events)) return null
+  try {
+    const playerIds = new Set(players.map(player => player.id))
+    const starters: Record<string, string> = {}
+    for (const appearance of match.appearances.filter(item => item.role === 'starter' && playerIds.has(item.playerId))) {
+      const slot = UNIVERSAL_TACTICAL_SLOTS.find(item => item.matchPosition === appearance.matchPosition && !starters[item.slot])
+        ?? UNIVERSAL_TACTICAL_SLOTS.find(item => item.matchPosition === appearance.position && !starters[item.slot])
+      if (slot) starters[slot.slot] = appearance.playerId
+    }
+    if (!Object.keys(starters).length) return null
+    const bench = [...new Set(match.appearances.filter(item => item.role === 'bench' && playerIds.has(item.playerId) && !Object.values(starters).includes(item.playerId)).map(item => item.playerId))]
+    const histories = Object.fromEntries(match.appearances.filter(item => item.positionHistory?.length).map(item => [item.playerId, item.positionHistory!])) as Record<string, PositionChange[]>
+    const positions = Object.fromEntries(UNIVERSAL_TACTICAL_SLOTS.map(slot => [slot.slot, slot.matchPosition]))
+    const roster = [...new Set([...Object.values(starters), ...bench])]
+    const draft = match.events.length ? rebuildLiveHistory(starters, roster, match.events, histories, positions) : { slotAssignments: starters, homeBench: bench, events: match.events, positionHistories: histories }
+    return { draft, starters, bench }
+  } catch {
+    // A malformed old draft is ignored; it must never prevent the editor starting.
+    return null
+  }
+}
 
 const lineupCollision: CollisionDetection = args => {
   return args.pointerCoordinates ? pointerWithin(args) : closestCenter(args)
@@ -47,18 +71,20 @@ export function NewMatchScreen({
   teamId?: string
   onNavigate: (view: View) => void
 }) {
-  const { teams, players, matches, addMatch, saveDraftMatch, clearDraftMatch } = useStore()
-  const [draftId] = useState(() => crypto.randomUUID())
+  const { teams, players, matches, draftMatch, addMatch, saveDraftMatch, clearDraftMatch } = useStore()
+  const selectedTeamId = teamId ?? draftMatch?.teamId ?? draftMatch?.homeTeamId ?? teams[0]?.id ?? ''
+  const restored = useMemo(() => draftMatch && (draftMatch.teamId ?? draftMatch.homeTeamId) === selectedTeamId ? restoreDraft(draftMatch, players) : null, [draftMatch, players, selectedTeamId])
+  const [draftId] = useState(() => restored ? draftMatch!.id : crypto.randomUUID())
   const savingRef = useRef(false)
-  const selectedTeamId = teamId ?? teams[0]?.id ?? ''
+  const nextMatch = useMemo(() => getNextMatchDayForTeam(selectedTeamId, matches), [selectedTeamId, matches])
+  const season = restored ? draftMatch!.season : nextMatch.season
+  const matchDay = restored ? draftMatch!.matchDay : nextMatch.matchDay
+  const date = restored ? draftMatch!.date : new Date().toISOString().split('T')[0]
   
-  const { season, matchDay } = useMemo(() => getNextMatchDayForTeam(selectedTeamId, matches), [selectedTeamId, matches])
-  const date = new Date().toISOString().split('T')[0]
-  
-  const [step, setStep] = useState(0) // 0: Lineups, 1: Events
+  const [step, setStep] = useState(() => restored?.draft.events.length ? 1 : 0) // 0: Lineups, 1: Events
   
   // 통합된 matchDraft 상태
-  const [matchDraft, setMatchDraft] = useState({
+  const [matchDraft, setMatchDraft] = useState<MatchDraftState>(() => restored?.draft ?? {
       slotAssignments: {} as Record<string, string>,
       homeBench: [] as string[],
       events: [] as MatchEvent[],
@@ -78,7 +104,7 @@ export function NewMatchScreen({
   const [liveAssistId, setLiveAssistId] = useState('')
   const [liveCauseId, setLiveCauseId] = useState('')
   const [livePicker, setLivePicker] = useState<'scorer' | 'assist' | 'cause' | 'minute'>('scorer')
-  const totalSavesEventId = useRef<string | null>(null)
+  const totalSavesEventId = useRef<string | null>(matchDraft.events.find(event => event.type === 'save')?.id ?? null)
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
   const [substitutionDraft, setSubstitutionDraft] = useState<SubstitutionDraft | null>(null)
   const [subSelection, setSubSelection] = useState<LineupTarget | null>(null)
@@ -91,9 +117,10 @@ export function NewMatchScreen({
   const suppressDragClick = useRef(false)
   const [activePlayer, setActivePlayer] = useState<{ group: 'starting' | 'substitute' | 'squad'; id: string; slotId?: string } | null>(null)
   const [focusedPlayerId, setFocusedPlayerId] = useState<string | null>(null)
-  const [startingSnapshot, setStartingSnapshot] = useState<Record<string, string>>({})
-  const [startingBenchSnapshot, setStartingBenchSnapshot] = useState<string[]>([])
-  const initializedTeam = useRef<string | null>(null)
+  const [startingSnapshot, setStartingSnapshot] = useState<Record<string, string>>(() => restored?.starters ?? {})
+  const [startingBenchSnapshot, setStartingBenchSnapshot] = useState<string[]>(() => restored?.bench ?? [])
+  const initializedTeam = useRef<string | null>(restored ? selectedTeamId : null)
+  const [draftReady, setDraftReady] = useState(Boolean(restored))
   const lineupLocked = matchDraft.events.length > 0
   
   const lineupSensors = useSensors(
@@ -130,6 +157,7 @@ export function NewMatchScreen({
     const starterIds = new Set(initial.filter(Boolean))
     const b = squad.filter((player) => !starterIds.has(player.id)).slice(0, 12).map((player) => player.id)
     setMatchDraft(prev => ({ ...prev, slotAssignments, homeBench: b }))
+    setDraftReady(true)
   }, [selectedTeamId, players])
 
   const homeSquad = players.filter((p) => (p.teamIds ?? [p.teamId]).includes(selectedTeamId))
@@ -348,8 +376,9 @@ export function NewMatchScreen({
       const player = players.find(item => item.id === event.playerInId)
       if (player) res.push({ playerId: player.id, teamId: selectedTeamId, position: player.position, matchPosition: event.position, role: 'bench' })
     }
-    // Preserve the match-day bench without assigning minutes or ratings.
-    for (const id of startingBenchSnapshot) {
+    // Before kickoff the editable bench is the match-day bench; after kickoff
+    // retain the original bench so restored substitutions keep their history.
+    for (const id of (lineupLocked ? startingBenchSnapshot : matchDraft.homeBench)) {
       if (res.some(a => a.playerId === id)) continue
       const player = players.find(p => p.id === id)
       if (player) res.push({ playerId: id, teamId: selectedTeamId, position: player.position, role: 'bench' })
@@ -422,9 +451,9 @@ export function NewMatchScreen({
   }
 
   useEffect(() => {
-    if (step !== 1) return
+    if (!draftReady) return
     saveDraftMatch({ id: draftId, season, matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName: 'OPP', duration: 90, appearances, events: matchDraft.events })
-  }, [step, draftId, season, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, appearances, saveDraftMatch])
+  }, [draftReady, draftId, season, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, appearances, saveDraftMatch])
 
   function save() {
     if (savingRef.current || liveEvent || startingIds.length !== 11) return
@@ -571,8 +600,8 @@ function DraggableRosterPlayer({ player, group, onClick, stats, team, selection 
   return <button ref={drop.setNodeRef} type="button" onClick={() => onClick(player.id)} className={`flex min-w-0 flex-col items-center rounded-lg bg-zinc-900 p-1 text-center ${drop.isOver ? 'ring-2 ring-white/80' : ''}`}><span ref={drag.setNodeRef} {...drag.listeners} {...drag.attributes} className="relative flex h-8 w-8 items-center justify-center overflow-visible" style={{ opacity: drag.isDragging ? 0.45 : 1, touchAction: 'none' }}><PlayerAvatar photoUrl={player.photoUrl || player.image} number={player.number} className="h-8 w-8 text-[10px]" /><span className="absolute -left-1 -top-1 rounded bg-zinc-800 px-0.5 text-[6px] font-black text-zinc-300">{player.position}</span></span><span className="w-full truncate text-[8px] font-semibold">{player.displayName ?? player.name}</span>{stats && <StatIcons goals={stats.goals} assists={stats.assists} className="text-[7px] text-zinc-400" />}</button>
 }
 
-function PlayerGroup({ title, players, onClick }: { title: string; players: { id: string; name: string; number: number; position: Position; image?: string }[]; onClick: (id: string) => void }) {
-  return <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">{title}</h2><div className="grid grid-cols-4 gap-2">{players.map((player) => <button key={player.id} type="button" onClick={() => onClick(player.id)} className="flex min-w-0 flex-col items-center rounded-lg bg-zinc-900 p-1 text-center"><span className="relative flex h-8 w-8 items-center justify-center overflow-visible"><PlayerAvatar photoUrl={player.image} number={player.number} className="h-8 w-8 text-[10px]" /><span className="absolute -left-1 -top-1 rounded bg-zinc-800 px-0.5 text-[6px] font-black text-zinc-300">{player.position}</span></span><span className="w-full truncate text-[8px] font-semibold">{player.name}</span></button>)}</div></section>
+function PlayerGroup({ title, players, onClick }: { title: string; players: { id: string; name: string; number: number; position: Position; photoUrl?: string; image?: string }[]; onClick: (id: string) => void }) {
+  return <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">{title}</h2><div className="grid grid-cols-4 gap-2">{players.map((player) => <button key={player.id} type="button" onClick={() => onClick(player.id)} className="flex min-w-0 flex-col items-center rounded-lg bg-zinc-900 p-1 text-center"><span className="relative flex h-8 w-8 items-center justify-center overflow-visible"><PlayerAvatar photoUrl={player.photoUrl || player.image} number={player.number} className="h-8 w-8 text-[10px]" /><span className="absolute -left-1 -top-1 rounded bg-zinc-800 px-0.5 text-[6px] font-black text-zinc-300">{player.position}</span></span><span className="w-full truncate text-[8px] font-semibold">{player.name}</span></button>)}</div></section>
 }
 
 function MinuteInput({ value, onChange, label, autoFocus = false }: { value: string; onChange: (value: string) => void; label: string; autoFocus?: boolean }) {

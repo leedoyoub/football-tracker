@@ -27,9 +27,12 @@ export const LocalRepository = {
   async getAppState(): Promise<AppState | null> {
     const reset = await resetCatalogOnce();
     if (reset) return reset;
+    // localStorage is written synchronously before IndexedDB. Prefer it on a
+    // cold restart so the last user action also survives an iOS/PWA kill while
+    // an IndexedDB transaction was still settling.
     const sources = [
-      () => getFromIndexedDB(STORAGE_KEY),
       () => Promise.resolve(localStorage.getItem(STORAGE_KEY)),
+      () => getFromIndexedDB(STORAGE_KEY),
       () => Promise.resolve(localStorage.getItem(BACKUP_KEY)),
       ...Array.from({ length: MAX_SNAPSHOTS }, (_, i) => () => Promise.resolve(localStorage.getItem(`${EMERGENCY_PREFIX}${i + 1}`)))
     ];

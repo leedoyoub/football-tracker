@@ -26,18 +26,34 @@ import { seasonsFromMatches } from './engine/stats'
 import { useAuth } from './lib/auth'
 import { isSupabaseConfigured } from './lib/supabase'
 import { AuthEntryScreen } from './screens/AuthEntryScreen'
+import { loadLastRoute, saveLastRoute } from './lib/lastRoute'
 
 export default function App() {
   const { user, loading, signInWithGoogle } = useAuth()
-  const { matches } = useStore()
+  const store = useStore()
+  const { matches } = store
   const seasons = seasonsFromMatches(matches)
   const [season, setSeason] = useState(seasons[0] ?? 'Season 1')
   const [history, setHistory] = useState<View[]>([{ name: 'home' }])
   const [localOnly, setLocalOnly] = useState(false)
+  const [routeRestored, setRouteRestored] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const scrollPositions = useRef<Record<number, number>>({})
   const navigation = useRef<'forward' | 'back' | 'tab'>('forward')
   const view = history[history.length - 1]
+
+  // StoreProvider only renders App after its local repository is ready.  Waiting
+  // for auth as well prevents an old route from bypassing the normal entry gate.
+  useEffect(() => {
+    if (routeRestored || loading || (isSupabaseConfigured && !user && !localOnly)) return
+    setHistory([loadLastRoute(store)])
+    setRouteRestored(true)
+  }, [routeRestored, loading, user, localOnly, store])
+
+  useEffect(() => {
+    if (!routeRestored || loading || (isSupabaseConfigured && !user && !localOnly)) return
+    saveLastRoute(view, store.draftMatch)
+  }, [routeRestored, loading, user, localOnly, view, store.draftMatch])
 
   useEffect(() => {
     const container = scrollRef.current
@@ -75,10 +91,10 @@ export default function App() {
 
   function onBack() {
     navigation.current = 'back'
-    setHistory((prev) => prev.slice(0, -1))
+    setHistory((prev) => prev.length > 1 ? prev.slice(0, -1) : [{ name: 'home' }])
   }
 
-  if (isSupabaseConfigured && loading) return <div className="min-h-[100dvh] bg-zinc-950" />
+  if (loading || !routeRestored && (!isSupabaseConfigured || user || localOnly)) return <div className="min-h-[100dvh] bg-zinc-950" />
   if (isSupabaseConfigured && !user && !localOnly) return <AuthEntryScreen onSignIn={() => { void signInWithGoogle() }} onContinue={() => setLocalOnly(true)} />
 
   return (

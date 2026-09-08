@@ -16,6 +16,8 @@ const load = Module._load
 Module._load = function(name, parent, main) {
   if (name === 'react') return hooks
   if (name === '../store' || name === './store') return { useStore: () => owner.store }
+  if (name === '../lib/auth') return { useAuth: () => ({ user: null }) }
+  if (name === '../lib/apiFootball') return { searchApiFootballPlayers: async () => [], fetchApiFootballPlayer: async () => ({}) }
   return load.call(this, name, parent, main)
 }
 const { ratePlayerMatch, POSITION_RULES } = require('../src/engine/rating.ts')

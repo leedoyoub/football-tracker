@@ -8,6 +8,7 @@ test('shared player avatar preserves uncropped photos and fallback behavior', ()
   assert(avatar.includes('object-contain object-center'))
   assert(avatar.includes('inset-[8%]'))
   assert(avatar.includes('loading="lazy"') && avatar.includes('onError'))
+  assert(avatar.includes("showPhoto ? 'bg-white' : 'bg-zinc-700 text-white'"))
   assert(avatar.includes("number ?? '—'"))
 })
 
@@ -17,6 +18,7 @@ test('New Player search is explicit, optional, and cannot override the chosen ap
   assert(screen.includes("if (!user) { setApiError('Google sign-in is required"))
   assert(screen.includes("query.length < 3"))
   assert(screen.includes('externalPlayerId: apiSelected.id') && screen.includes('photoUrl: apiSelected.photo'))
+  assert(screen.includes('deriveApiPlayerNames(candidate)'))
   assert(screen.includes('teamIds: [...new Set([selectedPlayer.teamId'))
   assert(!screen.includes('currentTeamId'))
 })
@@ -29,6 +31,19 @@ test('player search is authenticated server-side, globally searches profiles, an
   assert(edge.indexOf("request.method === 'OPTIONS'") < edge.indexOf("request.headers.get('Authorization')"))
   assert(edge.includes("'Access-Control-Allow-Origin'") && edge.includes("'Access-Control-Allow-Methods': 'POST, OPTIONS'"))
   assert(edge.includes("Deno.env.get('API_FOOTBALL_KEY')"))
+  assert(edge.includes('firstname: player.firstname') && edge.includes('lastname: player.lastname'))
+  assert(edge.includes("url.searchParams.set('player', String(externalPlayerId))"))
+  assert(helper.includes('fetchApiFootballPlayer') && helper.includes('externalPlayerId'))
+})
+
+test('Player Detail keeps photo replacement and exact-ID name refresh as separate patches', () => {
+  const detail = read('src/screens/PlayerDetailScreen.tsx')
+  assert(detail.includes('aria-label="Change photo"') && detail.includes('Change Photo'))
+  assert(detail.includes('Use This Photo') && detail.includes('Remove Photo') && detail.includes('onClick={closePhoto}'))
+  assert(detail.includes("updatePlayer(player.id, { photoUrl: photoSelected.photo })"))
+  assert(detail.includes("updatePlayer(player.id, { photoUrl: undefined })"))
+  assert(detail.includes('Refresh API Name') && detail.includes('fetchApiFootballPlayer(player.externalPlayerId)'))
+  assert(detail.includes('updatePlayer(player.id, { fullName: names.fullName, displayName: names.displayName })'))
 })
 
 test('standings team identity uses a dedicated link, while TeamIcon remains visual only', () => {

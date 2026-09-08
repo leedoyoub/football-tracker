@@ -69,10 +69,10 @@ function freeze(value) {
   if (value && typeof value === 'object') { Object.values(value).forEach(freeze); Object.freeze(value) }
   return value
 }
-function harness() {
+function harness(options = {}) {
   const h = { hooks: [], cursor: 0, effects: [], timers: [], dirty: false, saved: [], drafts: [], navigation: [] }
   h.store = {
-    teams: [{ id: 'A', name: 'Team A' }], matches: [],
+    teams: [{ id: 'A', name: 'Team A' }], matches: [], draftMatch: options.draftMatch,
     players: freeze([
       ...FORMATION_SLOTS['4-3-3'].map((slot, index) => ({ id: slot.slot, name: slot.slot, position: slot.position, number: index + 1, teamId: 'A' })),
       ...['b1', 'b2', 'b3', 'bGK', 'unused'].map(id => ({ id, name: id, position: 'CM', number: 20, teamId: 'B', teamIds: ['B', 'A'] })),
@@ -659,6 +659,19 @@ test('quick multiple substitutions and empty tactical moves retain timeline and 
   h.clickButton('UNDO LAST'); assert.equal(h.slot('LW'), 'LW'); assert.equal(h.slot('CAM'), 'CM')
   h.clickButton('UNDO LAST'); assert.equal(h.slot('ST'), 'ST'); assert.equal(h.slot('CM'), 'CM')
   assert.equal(h.drafts.at(-1).appearances.find(a => a.playerId === 'CM').positionHistory, undefined)
+})
+
+test('a durable in-progress draft restores its lineup, bench, event history, and live workflow', () => {
+  const appearances = [
+    ...FORMATION_SLOTS['4-3-3'].map((slot, index) => ({ playerId: slot.slot, teamId: 'A', position: slot.position, matchPosition: slot.position, role: 'starter' })),
+    { playerId: 'b1', teamId: 'A', position: 'CM', role: 'bench' },
+  ]
+  const draftMatch = { id: 'durable-draft', teamId: 'A', homeTeamId: 'A', awayTeamId: 'opponent:durable-draft', season: 'Season 1', matchDay: 1, date: '2026-09-01', duration: 90, appearances, events: [{ id: 'goal-1', type: 'goal', minute: 22, teamId: 'A', playerId: 'ST', goalType: 'normal' }] }
+  const h = harness({ draftMatch })
+  assert.equal(h.props().events[0].id, 'goal-1')
+  assert.equal(h.slot('ST'), 'ST')
+  assert(h.props().benchPlayers.some(player => player.id === 'b1'))
+  assert.equal(h.drafts.at(-1).id, 'durable-draft')
 })
 
 test('Save & Finish Match is the only final action and cannot duplicate a match', () => {

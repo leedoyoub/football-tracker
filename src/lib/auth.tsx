@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from './supabase'
 import { oauthRedirectUrl } from './oauthRedirect'
+import { clearLastRoute } from './lastRoute'
 import type { Session, User } from '@supabase/supabase-js'
 
 interface AuthContextType {
@@ -54,6 +55,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     if (!supabase) return
+    // A route is device UI state, but it must not reopen a private screen after logout.
+    clearLastRoute()
     await supabase.auth.signOut()
   }
 
