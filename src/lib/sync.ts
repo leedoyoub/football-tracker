@@ -9,7 +9,7 @@ const QUEUE_STORE = 'sync_queue'
 const META_STORE = 'sync_metadata'
 export type SyncEntity = 'team' | 'player' | 'match'
 export type SyncItem = { id: string; entityType: SyncEntity; entityId: string; operation: 'upsert' | 'delete'; payload?: Team | Player | Match; timestamp: number; status: 'pending' | 'failed' }
-export type SyncMetadata = { lastSyncedUserId: string | null; lastSyncAt: number; retryAt: number; entityUpdatedAt: Record<string, number> }
+export type SyncMetadata = { lastSyncedUserId: string | null; lastSyncAt: number; retryAt: number; entityUpdatedAt: Record<string, number>; lastError?: string }
 export const TABLE_FOR: Record<SyncEntity, 'teams' | 'players' | 'matches'> = { team: 'teams', player: 'players', match: 'matches' }
 const emptyMeta = (): SyncMetadata => ({ lastSyncedUserId: null, lastSyncAt: 0, retryAt: 0, entityUpdatedAt: {} })
 const key = (type: SyncEntity, id: string) => `${type}:${id}`
@@ -23,14 +23,13 @@ function scheduleRetry(delay: number) {
 async function allQueue(): Promise<SyncItem[]> { const db = await openDB(); return new Promise((resolve, reject) => { const req = db.transaction(QUEUE_STORE, 'readonly').objectStore(QUEUE_STORE).getAll(); req.onsuccess = () => resolve(req.result ?? []); req.onerror = () => reject(req.error) }) }
 async function metadata(): Promise<SyncMetadata> { const db = await openDB(); return new Promise((resolve, reject) => { const req = db.transaction(META_STORE, 'readonly').objectStore(META_STORE).get('meta'); req.onsuccess = () => resolve(req.result ?? emptyMeta()); req.onerror = () => reject(req.error) }) }
 async function putMetadata(value: SyncMetadata) { const db = await openDB(); await new Promise<void>((resolve, reject) => { const tx = db.transaction(META_STORE, 'readwrite'); tx.objectStore(META_STORE).put(value, 'meta'); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error) }) }
-const serialize = (entity: Team | Player | Match) => ({ ...entity })
+export const serializeCloudEntity = (entity: Team | Player | Match) => ({ ...entity })
 const deserialize = <T extends Team | Player | Match>(row: T & { user_id?: string; created_at?: string; updated_at?: string }) => { const { user_id: _user, created_at: _created, updated_at: _updated, ...entity } = row; return entity as T }
 
 export const SyncManager = {
   async queueOperation(item: Omit<SyncItem, 'id' | 'timestamp' | 'status'>) {
-    const db = await openDB(); const now = Date.now(); const tx = db.transaction(QUEUE_STORE, 'readwrite'); const store = tx.objectStore(QUEUE_STORE)
+    const existing = await allQueue(); const db = await openDB(); const now = Date.now(); const tx = db.transaction(QUEUE_STORE, 'readwrite'); const store = tx.objectStore(QUEUE_STORE)
     // Coalesce a pending entity into one latest, idempotent operation.
-    const existing = await new Promise<SyncItem[]>((resolve, reject) => { const req = store.getAll(); req.onsuccess = () => resolve(req.result ?? []); req.onerror = () => reject(req.error) })
     existing.filter(row => row.entityType === item.entityType && row.entityId === item.entityId).forEach(row => store.delete(row.id))
     store.put({ ...item, id: crypto.randomUUID(), timestamp: now, status: 'pending' } satisfies SyncItem)
     await new Promise<void>((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error) })
@@ -63,11 +62,11 @@ export const SyncManager = {
       for (const type of ['team', 'player', 'match'] as const) { const remoteIds = new Set(entities(cloud, type).map(row => row.id)); for (const entity of entities(merged, type)) if (!remoteIds.has(entity.id) && !pendingKeys.has(key(type, entity.id))) await this.queueOperation({ entityType: type, entityId: entity.id, operation: 'upsert', payload: entity }) }
       for (const item of await allQueue()) {
         const table = TABLE_FOR[item.entityType]
-        const result = item.operation === 'delete' ? await supabase.from(table).delete().eq('id', item.entityId).eq('user_id', user.id) : await supabase.from(table).upsert({ ...serialize(item.payload!), user_id: user.id })
+        const result = item.operation === 'delete' ? await supabase.from(table).delete().eq('id', item.entityId).eq('user_id', user.id) : await supabase.from(table).upsert({ ...serializeCloudEntity(item.payload!), user_id: user.id })
         if (result.error) throw result.error
         const db = await openDB(); await new Promise<void>((resolve, reject) => { const tx = db.transaction(QUEUE_STORE, 'readwrite'); tx.objectStore(QUEUE_STORE).delete(item.id); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error) })
       }
-      await putMetadata({ ...meta, lastSyncedUserId: user.id, lastSyncAt: Date.now(), retryAt: 0 }); return { status: 'synced', message: 'Cloud backup is up to date.' }
-    } catch (error) { const delay = Math.min(300000, 5000 * 2 ** Math.min(6, pending.length)); const next = Date.now() + delay; await putMetadata({ ...meta, retryAt: next }); scheduleRetry(delay); return { status: 'pending', message: 'Cloud sync pending; local data is safe.' } }
+      await putMetadata({ ...meta, lastSyncedUserId: user.id, lastSyncAt: Date.now(), retryAt: 0, lastError: undefined }); return { status: 'synced', message: 'Cloud backup is up to date.' }
+    } catch (error) { const delay = Math.min(300000, 5000 * 2 ** Math.min(6, pending.length)); const next = Date.now() + delay; const message = error instanceof Error ? error.message : String(error); console.error('[Football Tracker sync] Cloud operation failed; queue retained for retry.', error); await putMetadata({ ...meta, retryAt: next, lastError: message }); scheduleRetry(delay); return { status: 'pending', message: `Cloud sync pending: ${message}` } }
   },
 }
