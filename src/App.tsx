@@ -27,9 +27,10 @@ import { useAuth } from './lib/auth'
 import { isSupabaseConfigured } from './lib/supabase'
 import { AuthEntryScreen } from './screens/AuthEntryScreen'
 import { loadLastRoute, saveLastRoute } from './lib/lastRoute'
+import { canUseApp, shouldRestoreLastRoute, startupScreen } from './lib/startup'
 
 export default function App() {
-  const { user, loading, signInWithGoogle } = useAuth()
+  const { user, loading, startupError, signInWithGoogle, retryStartup } = useAuth()
   const store = useStore()
   const { matches } = store
   const seasons = seasonsFromMatches(matches)
@@ -41,19 +42,32 @@ export default function App() {
   const scrollPositions = useRef<Record<number, number>>({})
   const navigation = useRef<'forward' | 'back' | 'tab'>('forward')
   const view = history[history.length - 1]
+  const startup = useMemo(
+    () => ({ authLoading: loading, authError: startupError, isSupabaseConfigured, hasUser: Boolean(user), localOnly, routeRestored }),
+    [loading, startupError, user, localOnly, routeRestored],
+  )
 
-  // StoreProvider only renders App after its local repository is ready.  Waiting
-  // for auth as well prevents an old route from bypassing the normal entry gate.
+  // StoreProvider only renders App after its local repository is ready. Waiting
+  // for a resolved auth state prevents an old route from racing an OAuth return.
   useEffect(() => {
-    if (routeRestored || loading || (isSupabaseConfigured && !user && !localOnly)) return
+    if (!shouldRestoreLastRoute(startup)) return
     setHistory([loadLastRoute(store)])
     setRouteRestored(true)
-  }, [routeRestored, loading, user, localOnly, store])
+  }, [startup, store])
 
   useEffect(() => {
-    if (!routeRestored || loading || (isSupabaseConfigured && !user && !localOnly)) return
+    if (!routeRestored || loading || !canUseApp(startup)) return
     saveLastRoute(view, store.draftMatch)
-  }, [routeRestored, loading, user, localOnly, view, store.draftMatch])
+  }, [routeRestored, loading, startup, view, store.draftMatch])
+
+  // Logging out must not leave a previously authenticated in-memory route ready
+  // to reappear after the next sign-in. Persistent route state is cleared by
+  // AuthProvider; this clears the current React navigation stack as well.
+  useEffect(() => {
+    if (loading || !isSupabaseConfigured || user || localOnly || !routeRestored) return
+    setHistory([{ name: 'home' }])
+    setRouteRestored(false)
+  }, [loading, user, localOnly, routeRestored])
 
   useEffect(() => {
     const container = scrollRef.current
@@ -94,8 +108,10 @@ export default function App() {
     setHistory((prev) => prev.length > 1 ? prev.slice(0, -1) : [{ name: 'home' }])
   }
 
-  if (loading || !routeRestored && (!isSupabaseConfigured || user || localOnly)) return <div className="min-h-[100dvh] bg-zinc-950" />
-  if (isSupabaseConfigured && !user && !localOnly) return <AuthEntryScreen onSignIn={() => { void signInWithGoogle() }} onContinue={() => setLocalOnly(true)} />
+  const screen = startupScreen(startup)
+  if (screen === 'loading') return <StartupLoading />
+  if (screen === 'error') return <StartupError onRetry={retryStartup} />
+  if (screen === 'auth-entry') return <AuthEntryScreen onSignIn={() => { void signInWithGoogle() }} onContinue={() => setLocalOnly(true)} />
 
   return (
     <div className="min-h-[100dvh] bg-zinc-950">
@@ -141,4 +157,12 @@ export default function App() {
       </div>
     </div>
   )
+}
+
+function StartupLoading() {
+  return <div className="flex min-h-[100dvh] items-center justify-center bg-zinc-950 px-6 text-sm text-zinc-400">Loading your tracker…</div>
+}
+
+function StartupError({ onRetry }: { onRetry: () => void }) {
+  return <div className="flex min-h-[100dvh] items-center justify-center bg-zinc-950 px-6 text-white"><div className="w-full max-w-sm rounded-3xl border border-white/10 bg-zinc-900 p-6 text-center"><h1 className="text-lg font-bold">Unable to start securely</h1><p className="mt-2 text-sm leading-6 text-zinc-400">Please retry. Your local data has not been changed.</p><button type="button" onClick={onRetry} className="mt-6 w-full rounded-xl bg-white px-4 py-3 text-sm font-bold text-black">Retry</button><button type="button" onClick={() => window.location.reload()} className="mt-3 w-full rounded-xl bg-zinc-800 px-4 py-3 text-sm font-semibold text-zinc-200">Reload app</button></div></div>
 }

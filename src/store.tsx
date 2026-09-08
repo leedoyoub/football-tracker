@@ -36,10 +36,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false)
 
   useEffect(() => {
-    LocalRepository.getAppState().then((saved) => {
-      if (saved) setState(saved)
-      setIsLoaded(true)
-    })
+    let active = true
+    const load = async () => {
+      try {
+        const saved = await LocalRepository.getAppState()
+        if (active && saved) setState(saved)
+      } catch {
+        // A storage failure must not hide the app (or an OAuth callback) behind
+        // a permanently empty provider. The in-memory, local-first state is safe.
+        console.error('[Football Tracker storage] Unable to load local app state; using an in-memory state.')
+      } finally {
+        if (active) setIsLoaded(true)
+      }
+    }
+    void load()
+    return () => { active = false }
   }, [])
 
   useEffect(() => {
@@ -123,7 +134,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [state, update, saveDraftMatch, clearDraftMatch],
   )
 
-  if (!isLoaded) return null // Or a loading spinner
+  if (!isLoaded) {
+    return <div className="flex min-h-[100dvh] items-center justify-center bg-zinc-950 px-6 text-sm text-zinc-400">Loading your tracker…</div>
+  }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }
