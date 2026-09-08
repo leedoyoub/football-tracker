@@ -142,6 +142,7 @@ export interface AppState {
 export type View =
   | { name: 'home' }
   | { name: 'news'; kind?: 'player' | 'match' | 'team' }
+  | { name: 'results' }
   | { name: 'records' }
   | { name: 'rankings'; sort: RankSort }
   | { name: 'standings' }

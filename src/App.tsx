@@ -18,6 +18,7 @@ import { DataManagementScreen } from './screens/DataManagementScreen'
 import { SeasonRecapScreen } from './screens/SeasonRecapScreen'
 import { NewsScreen } from './screens/NewsScreen'
 import { RecordsScreen } from './screens/RecordsScreen'
+import { ResultsScreen } from './screens/ResultsScreen'
 import { SquadImportScreen } from './screens/SquadImportScreen'
 import { useStore } from './store'
 import type { Tab, View } from './types'
@@ -52,7 +53,7 @@ export default function App() {
     if (view.name === 'players' || view.name === 'player' || view.name === 'new-player' || view.name === 'edit-player') {
       return 'players'
     }
-    if (view.name === 'news') return 'news'
+    if (view.name === 'news' || view.name === 'results') return 'news'
     if (view.name === 'records' || view.name === 'chemistry' || view.name === 'comparison') return 'records'
     return 'home'
   }, [view])
@@ -88,6 +89,7 @@ export default function App() {
             <HomeScreen season={season} onSeason={setSeason} onNavigate={onNavigate} />
           )}
           {view.name === 'news' && <NewsScreen season={season} kind={view.kind} onNavigate={onNavigate} />}
+          {view.name === 'results' && <ResultsScreen onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'records' && <RecordsScreen season={season} onNavigate={onNavigate} />}
           {view.name === 'rankings' && (
             <RankingsScreen
