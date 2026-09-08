@@ -64,3 +64,18 @@ test('Team Main renders five matches, hides View All at five, and expands all si
     assert(render().includes('Show Less'))
   } finally { React.useState = original }
 })
+
+test('Team Detail always renders an Import Squad action and routes the selected team ID', () => {
+  const React = require('react')
+  const { renderToStaticMarkup } = require('react-dom/server')
+  const state = { teams: [{ id: 'arsenal', name: 'Arsenal', shortName: 'ARS', abbreviation: 'ARS', externalTeamId: 42 }], players: [], matches: [] }
+  const storePath = require.resolve('../src/store.tsx')
+  require.cache[storePath] = { id: storePath, filename: storePath, loaded: true, exports: { useStore: () => state } }
+  delete require.cache[require.resolve('../src/screens/TeamDetailScreen.tsx')]
+  const { TeamDetailScreen } = require('../src/screens/TeamDetailScreen.tsx')
+  const markup = renderToStaticMarkup(React.createElement(TeamDetailScreen, { teamId: 'arsenal', season: 'S1', onNavigate() {}, onBack() {} }))
+  const source = fs.readFileSync(require.resolve('../src/screens/TeamDetailScreen.tsx'), 'utf8')
+  assert(markup.includes('Roster management') && markup.includes('Import Squad'))
+  assert(source.includes("onNavigate({ name: 'import-squad', teamId })"))
+  assert(!source.includes('useAuth'))
+})

@@ -25,3 +25,13 @@ test('photo selection is explicit and never replaces player.id', () => {
   const migration = fs.readFileSync(require.resolve('../supabase/migrations/20260908090000_add_player_photo_fields.sql'), 'utf8')
   assert(migration.includes('add column if not exists external_player_id') && migration.includes('photo_url'))
 })
+
+test('all static crest shapes use the shared circular safe-area renderer', () => {
+  const icon = fs.readFileSync(require.resolve('../src/components/TeamIcon.tsx'), 'utf8')
+  const ids = ['arsenal', 'barcelona', 'atletico-madrid', 'liverpool', 'tottenham-hotspur']
+  assert(ids.every(id => STATIC_TEAMS.some(team => team.id === id && team.logo)))
+  assert(icon.includes('inset-[15%]'))
+  assert(icon.includes('object-contain object-center'))
+  assert(icon.includes('max-h-full max-w-full'))
+  assert(!icon.includes('p-1 object-contain'))
+})

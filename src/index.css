@@ -52,9 +52,16 @@ body {
   display: none;
 }
 
-/* Compact shared treatment used by the existing green View All text links. */
-button.text-xs.font-semibold.text-emerald-400 {
-  font-size: 0.6875rem;
+/* Secondary links stay comfortably tappable without competing with section titles or CTAs. */
+.secondary-view-all {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  padding: 4px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: #34d399;
 }
 
 .pitch-grass {
