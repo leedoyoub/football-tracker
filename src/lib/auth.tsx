@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from './supabase'
+import { oauthRedirectUrl } from './oauthRedirect'
 import type { Session, User } from '@supabase/supabase-js'
 
 interface AuthContextType {
@@ -47,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!supabase) return
     await supabase.auth.signInWithOAuth({
       provider: 'google',
+      options: { redirectTo: oauthRedirectUrl(window.location.origin, import.meta.env.BASE_URL) },
     })
   }
 
