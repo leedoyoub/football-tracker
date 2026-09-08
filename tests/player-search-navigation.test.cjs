@@ -38,7 +38,8 @@ test('player search is authenticated server-side, globally searches profiles, an
 
 test('Player Detail keeps photo replacement and exact-ID name refresh as separate patches', () => {
   const detail = read('src/screens/PlayerDetailScreen.tsx')
-  assert(detail.includes('aria-label="Change photo"') && detail.includes('Change Photo'))
+  assert(detail.includes('aria-label="Change player photo"') && detail.includes('onClick={() => setPhotoOpen(true)}') && detail.includes('Change Photo'))
+  assert(!detail.includes('>Change</span>'), 'the avatar has no visible Change badge')
   assert(detail.includes('Use This Photo') && detail.includes('Remove Photo') && detail.includes('onClick={closePhoto}'))
   assert(detail.includes("updatePlayer(player.id, { photoUrl: photoSelected.photo })"))
   assert(detail.includes("updatePlayer(player.id, { photoUrl: undefined })"))
