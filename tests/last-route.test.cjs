@@ -40,6 +40,7 @@ test('corrupt, unknown, and missing-reference routes safely return Home', () => 
   assert.equal(validRestoredView({ name: 'team', id: 'missing' }, state), null)
   assert.equal(validRestoredView({ name: 'player', id: 'missing' }, state), null)
   assert.equal(validRestoredView({ name: 'match', id: 'missing' }, state), null)
+  assert.deepEqual(loadLastRoute(state, { getItem: () => { throw new Error('Storage denied') }, setItem: () => {}, removeItem: () => {} }), { name: 'home' })
 })
 
 test('logout cleanup removes device-only navigation state', () => {

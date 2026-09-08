@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { getSupabase } from './supabase'
 import { getFromIndexedDB, openDB } from './db'
 import { LocalRepository } from './repository'
 import { validateState } from './validation'
@@ -53,6 +53,7 @@ export const SyncManager = {
     }
   },
   async syncNow(): Promise<{ status: 'local-only' | 'synced' | 'pending' | 'error'; message: string }> {
+    const supabase = getSupabase()
     if (!supabase || !navigator.onLine) { scheduleRetry(30000); return { status: 'local-only', message: 'Cloud unavailable; local data is safe.' } }
     const { data: { user } } = await supabase.auth.getUser(); if (!user) return { status: 'local-only', message: 'Signed out; using local storage.' }
     const local = await getFromIndexedDB(DATA_KEY); if (!local) return { status: 'error', message: 'No local state to sync.' }

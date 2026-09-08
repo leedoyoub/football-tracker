@@ -9,7 +9,13 @@ const newsKinds = ['player', 'match', 'team'] as const
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
 function storage(): StorageLike | null {
-  return typeof window === 'undefined' ? null : window.localStorage
+  if (typeof window === 'undefined') return null
+  try {
+    return window.localStorage
+  } catch {
+    // Safari privacy modes can throw merely when accessing the property.
+    return null
+  }
 }
 
 /** New Match needs an explicit team to be a useful cold-start destination. */

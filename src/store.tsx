@@ -14,6 +14,7 @@ import { assertRosterCapacity, currentTeamIds } from './lib/roster'
 import { applySquadImport, type SquadImportItem } from './lib/squadImport'
 import { SyncManager } from './lib/sync'
 import { useAuth } from './lib/auth'
+import { BootstrapShell, StartupRecovery } from './components/StartupBoundary'
 
 interface StoreValue extends AppState {
   addTeam: (team: Omit<Team, 'id'> & { id?: string }) => string
@@ -33,45 +34,54 @@ const StoreContext = createContext<StoreValue | null>(null)
 export function StoreProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [state, setState] = useState<AppState>({ teams: STATIC_TEAMS, players: [], matches: [] })
-  const [isLoaded, setIsLoaded] = useState(false)
+  const [hydration, setHydration] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let active = true
     const load = async () => {
+      setHydration('loading')
       try {
         const saved = await LocalRepository.getAppState()
         if (active && saved) setState(saved)
       } catch {
-        // A storage failure must not hide the app (or an OAuth callback) behind
-        // a permanently empty provider. The in-memory, local-first state is safe.
-        console.error('[Football Tracker storage] Unable to load local app state; using an in-memory state.')
+        // Do not replace potentially recoverable durable data with an empty
+        // snapshot after a browser storage/privacy failure.
+        if (active) setHydration('error')
+        console.error('[Football Tracker storage] Local hydration failed.')
+        return
       } finally {
-        if (active) setIsLoaded(true)
+        if (active) setHydration(current => current === 'loading' ? 'ready' : current)
       }
     }
     void load()
     return () => { active = false }
-  }, [])
+  }, [attempt])
 
   useEffect(() => {
-    if (!isLoaded || !user) return
+    if (hydration !== 'ready' || !user) return
     const sync = async () => {
-      await SyncManager.syncNow()
-      const restored = await LocalRepository.getAppState()
-      if (restored) setState(restored)
+      try {
+        await SyncManager.syncNow()
+        const restored = await LocalRepository.getAppState()
+        if (restored) setState(restored)
+      } catch {
+        // Cloud backup is non-critical to local startup.
+        console.error('[Football Tracker sync] Post-auth sync deferred.')
+      }
     }
     void sync()
     const onOnline = () => { void sync() }
     window.addEventListener('online', onOnline)
     return () => window.removeEventListener('online', onOnline)
-  }, [isLoaded, user?.id])
+  }, [hydration, user?.id])
 
   const update = useCallback((fn: (prev: AppState) => AppState) => {
     setState((prev) => {
       const next = fn(prev)
       // Local persistence is always first. Cloud queueing is deliberately
       // detached so offline/auth/network failures never affect match recording.
-      void LocalRepository.saveAppState(next).then(() => SyncManager.queueStateChange(prev, next)).then(() => SyncManager.syncNow())
+      void LocalRepository.saveAppState(next).then(() => SyncManager.queueStateChange(prev, next)).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker storage] Local save deferred.'))
       return next
     })
   }, [])
@@ -134,9 +144,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [state, update, saveDraftMatch, clearDraftMatch],
   )
 
-  if (!isLoaded) {
-    return <div className="flex min-h-[100dvh] items-center justify-center bg-zinc-950 px-6 text-sm text-zinc-400">Loading your tracker…</div>
-  }
+  if (hydration === 'loading') return <BootstrapShell />
+  if (hydration === 'error') return <StartupRecovery onRetry={() => setAttempt(value => value + 1)} />
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

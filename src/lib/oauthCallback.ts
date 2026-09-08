@@ -17,6 +17,12 @@ export function clearSupabaseAuthCallbackHash(
 ): boolean {
   if (!hasSupabaseAuthCallbackHash(location.hash)) return false
   // Preserve the GitHub Pages pathname and any non-auth query parameters.
-  browserHistory.replaceState(browserHistory.state, '', `${location.pathname}${location.search}`)
-  return true
+  try {
+    browserHistory.replaceState(browserHistory.state, '', `${location.pathname}${location.search}`)
+    return true
+  } catch {
+    // Hash cleanup is security hygiene after session confirmation, never a
+    // reason to interrupt a successfully authenticated Safari startup.
+    return false
+  }
 }

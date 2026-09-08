@@ -28,6 +28,7 @@ import { isSupabaseConfigured } from './lib/supabase'
 import { AuthEntryScreen } from './screens/AuthEntryScreen'
 import { loadLastRoute, saveLastRoute } from './lib/lastRoute'
 import { canUseApp, shouldRestoreLastRoute, startupScreen } from './lib/startup'
+import { BootstrapShell, StartupRecovery } from './components/StartupBoundary'
 
 export default function App() {
   const { user, loading, startupError, signInWithGoogle, retryStartup } = useAuth()
@@ -160,9 +161,9 @@ export default function App() {
 }
 
 function StartupLoading() {
-  return <div className="flex min-h-[100dvh] items-center justify-center bg-zinc-950 px-6 text-sm text-zinc-400">Loading your tracker…</div>
+  return <BootstrapShell />
 }
 
 function StartupError({ onRetry }: { onRetry: () => void }) {
-  return <div className="flex min-h-[100dvh] items-center justify-center bg-zinc-950 px-6 text-white"><div className="w-full max-w-sm rounded-3xl border border-white/10 bg-zinc-900 p-6 text-center"><h1 className="text-lg font-bold">Unable to start securely</h1><p className="mt-2 text-sm leading-6 text-zinc-400">Please retry. Your local data has not been changed.</p><button type="button" onClick={onRetry} className="mt-6 w-full rounded-xl bg-white px-4 py-3 text-sm font-bold text-black">Retry</button><button type="button" onClick={() => window.location.reload()} className="mt-3 w-full rounded-xl bg-zinc-800 px-4 py-3 text-sm font-semibold text-zinc-200">Reload app</button></div></div>
+  return <StartupRecovery onRetry={onRetry} />
 }

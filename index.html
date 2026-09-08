@@ -13,7 +13,25 @@
     <title>Football Tracker</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root" role="status" aria-live="polite"><div style="min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:#09090b;color:#a1a1aa;font:14px system-ui,-apple-system,sans-serif;text-align:center">Loading your tracker…</div></div>
+    <script>
+      // This runs before the module graph. If a stale chunk or module-level
+      // browser-storage exception prevents React from loading, Safari still
+      // gets a visible recovery surface and never a white document.
+      (function () {
+        var mounted = false;
+        function showBootError() {
+          if (mounted) return;
+          var root = document.getElementById('root');
+          if (!root) return;
+          root.innerHTML = '<div style="min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:#09090b;color:#fff;font:14px system-ui,-apple-system,sans-serif;text-align:center"><div style="max-width:360px;padding:24px;border:1px solid #27272a;border-radius:24px;background:#18181b"><strong style="font-size:18px">Something went wrong while starting Football Tracker.</strong><p style="line-height:1.5;color:#a1a1aa">Your local data has not been changed.</p><button type="button" onclick="location.reload()" style="width:100%;padding:12px;border:0;border-radius:12px;background:#fff;color:#000;font-weight:700">Reload app</button></div></div>';
+        }
+        window.__footballTrackerBootError = showBootError;
+        window.__footballTrackerMarkMounted = function () { mounted = true; };
+        window.addEventListener('error', showBootError);
+        window.addEventListener('unhandledrejection', showBootError);
+      }());
+    </script>
     <script type="module" src="src/main.tsx"></script>
   </body>
 </html>

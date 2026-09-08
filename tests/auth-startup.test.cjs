@@ -34,6 +34,7 @@ test('OAuth cleanup removes only a confirmed auth callback fragment and preserve
   const changed = clearSupabaseAuthCallbackHash({ hash: '#access_token=secret&expires_at=1', pathname: '/football-tracker/', search: '?from=google' }, history)
   assert.equal(changed, true)
   assert.deepEqual(calls, [[{ route: 'safe' }, '', '/football-tracker/?from=google']])
+  assert.equal(clearSupabaseAuthCallbackHash({ hash: '#access_token=secret', pathname: '/football-tracker/', search: '' }, { state: null, replaceState: () => { throw new Error('Safari history unavailable') } }), false)
 })
 
 test('startup failures show an in-app error instead of a blank root', () => {
@@ -41,8 +42,8 @@ test('startup failures show an in-app error instead of a blank root', () => {
   assert.equal(startupScreen({ ...base, authLoading: false, authError: true, hasUser: true }), 'error')
   const app = fs.readFileSync(require.resolve('../src/App.tsx'), 'utf8')
   const store = fs.readFileSync(require.resolve('../src/store.tsx'), 'utf8')
-  assert(app.includes('Loading your tracker…') && app.includes('Unable to start securely'))
-  assert(store.includes('Loading your tracker…') && !store.includes('if (!isLoaded) return null'))
+  assert(app.includes('BootstrapShell') && app.includes('StartupRecovery'))
+  assert(store.includes('BootstrapShell') && !store.includes('if (!isLoaded) return null'))
 })
 
 test('Supabase browser auth owns URL detection and no callback token values are logged', () => {
@@ -50,6 +51,7 @@ test('Supabase browser auth owns URL detection and no callback token values are 
   const auth = fs.readFileSync(require.resolve('../src/lib/auth.tsx'), 'utf8')
   assert(client.includes('detectSessionInUrl: true'))
   assert(auth.includes('await client.auth.getSession()'))
+  assert(auth.includes('initialSessionResolved'))
   assert(!auth.includes('console.error(\'[Football Tracker auth]\', error)'))
   assert(!auth.includes('console.log('))
 })

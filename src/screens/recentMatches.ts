@@ -40,7 +40,7 @@ export function recentMatchPositions(match: Match, appearance: Appearance): stri
   }
   const positions = position ? [position] : []
   for (const [minute, next] of changes) {
-    if (minute > window.enter && positions.at(-1) !== next) positions.push(next)
+    if (minute > window.enter && positions[positions.length - 1] !== next) positions.push(next)
   }
   return positions.join(' → ') || '-'
 }
