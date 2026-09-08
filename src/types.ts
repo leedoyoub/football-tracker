@@ -1,35 +1,22 @@
-export const POSITIONS = [
-  'GK',
-  'CB',
-  'LCB',
-  'RCB',
-  'LB',
-  'LWB',
-  'RB',
-  'RWB',
-  'LDM',
-  'CDM',
-  'RDM',
-  'LCM',
-  'CM',
-  'RCM',
-  'CAM',
-  'LM',
-  'RM',
-  'LW',
-  'LST',
-  'RW',
-  'RST',
-  'SS',
-  'ST',
-] as const
-
 export const REGISTRATION_POSITIONS = [
   'ST', 'SS', 'LW', 'RW', 'CAM', 'LM', 'RM', 'CM', 'CDM', 'LB', 'RB', 'CB', 'GK'
 ] as const
 
-export type Position = (typeof POSITIONS)[number]
 export type RegistrationPosition = (typeof REGISTRATION_POSITIONS)[number]
+
+export const POSITION_GROUPS = {
+  ATTACKERS: ['ST', 'SS', 'LW', 'RW'] as const,
+  MIDFIELDERS: ['CAM', 'LM', 'RM', 'CM', 'CDM'] as const,
+  DEFENDERS: ['LB', 'RB', 'CB'] as const,
+  GOALKEEPERS: ['GK'] as const,
+} as const
+
+// Keep existing POSITIONS for compatibility with legacy data
+export const POSITIONS = [
+  'GK', 'CB', 'LCB', 'RCB', 'LB', 'LWB', 'RB', 'RWB', 'LDM', 'CDM', 'RDM', 'LCM', 'CM', 'RCM', 'CAM', 'LM', 'RM', 'LW', 'LST', 'RW', 'RST', 'SS', 'ST',
+] as const
+
+export type Position = (typeof POSITIONS)[number]
 
 export type Tab = 'home' | 'teams' | 'players'
 
@@ -38,11 +25,10 @@ export interface Team {
   name: string
   shortName: string
   abbreviation: string
-  color: string
-  visualStyle?: 'solid' | 'striped'
-  primaryColor?: TeamColor
+  visualStyle: 'solid' | 'striped'
+  primaryColor: TeamColor
   secondaryColor?: TeamColor | null
-  jerseyNumberColor?: TeamColor
+  jerseyNumberColor: TeamColor
 }
 
 export type TeamColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'purple' | 'black' | 'white'
@@ -72,11 +58,17 @@ export interface Player {
   image?: string
 }
 
+export interface PositionChange {
+  minute: number
+  position: Position
+}
+
 export interface Appearance {
   playerId: string
   teamId: string
   position: Position
   matchPosition?: string
+  positionHistory?: PositionChange[]
   role: 'starter' | 'bench'
 }
 
@@ -197,10 +189,40 @@ export interface PlayerSeasonStats {
   teamId: string
   season: string
   matches: number
+  starts: number
+  subs: number
   minutes: number
   goals: number
   assists: number
   avgRating: number
   mom: number
+  saves: number
+  wins: number
+  draws: number
+  losses: number
+  recentForm: ('W' | 'D' | 'L')[]
   ratings: RatingBreakdown[]
+}
+
+export interface TeamSeasonStats {
+  teamId: string
+  season: string
+  matches: number
+  wins: number
+  draws: number
+  losses: number
+  goalsFor: number
+  goalsAgainst: number
+  cleanSheets: number
+  recentForm: ('W' | 'D' | 'L')[]
+}
+
+export interface PartnershipStats {
+  playerAId: string
+  playerBId: string
+  matchesTogether: number
+  winsTogether: number
+  goalsTogether: number
+  assistsAtoB: number
+  assistsBtoA: number
 }

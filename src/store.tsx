@@ -7,7 +7,6 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { rateMatch } from './engine/rating'
 import type { AppState, Match, Player, Team } from './types'
 import { LocalRepository } from './lib/repository'
 
@@ -73,14 +72,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addMatch: (match) => {
         const id = match.id ?? crypto.randomUUID()
         const saved = { ...match, id }
-        const manOfMatchPlayerId = rateMatch(saved, state.players)
-          .sort((a, b) => b.rating - a.rating || b.minutes - a.minutes || a.playerId.localeCompare(b.playerId))[0]?.playerId
-        update((prev) => ({ ...prev, matches: [...prev.matches, { ...saved, manOfMatchPlayerId }] }))
+        update((prev) => ({ ...prev, matches: [...prev.matches, { ...saved }] }))
         return id
       },
       updateMatch: (id, match) => {
-        const manOfMatchPlayerId = rateMatch(match, state.players).sort((a, b) => b.rating - a.rating || b.minutes - a.minutes || a.playerId.localeCompare(b.playerId))[0]?.playerId
-        update((prev) => ({ ...prev, matches: prev.matches.map((item) => item.id === id ? { ...match, id, manOfMatchPlayerId } : item) }))
+        update((prev) => ({ ...prev, matches: prev.matches.map((item) => item.id === id ? { ...match, id } : item) }))
       },
       saveDraftMatch,
       clearDraftMatch,

@@ -1,13 +1,16 @@
+import { useState } from 'react'
+import { recentMatches } from './recentMatches'
 import { Pitch } from '../components/Pitch'
 import { TeamIcon } from '../components/TeamIcon'
 import { formatDate, SubstitutePlayerCard } from '../components/ui'
 import { matchScore, ratePlayerMatch } from '../engine/rating'
-import { playerSeasonStats, seasonsFromMatches, teamBestEleven, teamMatches } from '../engine/stats'
+import { aggregatePlayerStats, playerSeasonStats, seasonsFromMatches, teamBestEleven } from '../engine/stats'
 import { useStore } from '../store'
 import type { View } from '../types'
 
-export function TeamDetailScreen({ teamId, season, onNavigate }: { teamId: string; season: string; onNavigate: (view: View) => void }) {
+export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamId: string; season: string; onNavigate: (view: View) => void; onBack: () => void }) {
   const { teams, players, matches } = useStore()
+  const [expandedContext, setExpandedContext] = useState<string | null>(null)
   const team = teams.find((item) => item.id === teamId)
   const seasons = seasonsFromMatches(matches)
   const activeSeason = seasons.includes(season) ? season : seasons[0] ?? season
@@ -15,10 +18,13 @@ export function TeamDetailScreen({ teamId, season, onNavigate }: { teamId: strin
 
   const best = teamBestEleven(players, matches, teamId, activeSeason)
   const statsByPlayer = Object.fromEntries(players.filter((player) => (player.teamIds ?? [player.teamId]).includes(teamId)).map((player) => {
-    const stats = playerSeasonStats(player, matches, activeSeason, teamId)
+    const stats = playerSeasonStats(player, players, matches, activeSeason, teamId)
     return [player.id, { goals: stats.goals, assists: stats.assists }]
   }))
-  const recent = teamMatches(matches.filter((match) => match.season === activeSeason), teamId)
+  const recent = recentMatches(matches.filter((match) => match.season === activeSeason && (match.homeTeamId === teamId || match.awayTeamId === teamId)))
+  const context = JSON.stringify([teamId, activeSeason])
+  const showAll = expandedContext === context
+  const visibleMatches = showAll ? recent : recent.slice(0, 5)
   const latestBench = best.match?.appearances.filter((appearance) => appearance.teamId === teamId && appearance.role === 'bench') ?? []
   const record = recent.reduce((acc, match) => {
     const score = matchScore(match)
@@ -33,7 +39,7 @@ export function TeamDetailScreen({ teamId, season, onNavigate }: { teamId: strin
   }, { wins: 0, draws: 0, losses: 0, for: 0, against: 0 })
 
   return <div className="px-4 pb-8 pt-6">
-    <button type="button" onClick={() => window.history.back()} className="mb-3 text-xs font-semibold text-emerald-400">← Back</button>
+    <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">← Back</button>
     <header className="mb-5 flex items-center gap-3">
       <TeamIcon team={team} className="h-12 w-12 text-sm font-black">{team.shortName}</TeamIcon>
       <div><h1 className="text-xl font-bold">{team.name}</h1><p className="text-[10px] uppercase tracking-widest text-zinc-500">{activeSeason} · Season stats</p></div>
@@ -43,24 +49,26 @@ export function TeamDetailScreen({ teamId, season, onNavigate }: { teamId: strin
       {[['Matches', recent.length], ['W-D-L', `${record.wins}-${record.draws}-${record.losses}`], ['GF', record.for], ['GA', record.against]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{value}</div><div className="text-[9px] uppercase text-zinc-500">{label}</div></div>)}
     </div>
     <div className="mb-3 flex items-end justify-between"><div><h2 className="text-lg font-semibold">Starting XI</h2><p className="text-xs text-zinc-400">Last starting XI shape · {best.formation ?? 'No recent match'}</p></div><span className="text-[10px] text-zinc-500">season average rating</span></div>
-    {best.match ? <Pitch slots={best.slots} players={players} teams={teams} statsByPlayer={statsByPlayer} showPositionBadge={false} /> : <div className="rounded-2xl bg-zinc-900 p-6 text-center text-sm text-zinc-500">No recent match</div>}
+    {best.match ? <Pitch slots={best.slots} players={players} teams={teams} statsByPlayer={statsByPlayer} showPositionBadge={false} onSlotClick={(slot) => { if (slot.playerId) onNavigate({ name: 'player', id: slot.playerId }) }} /> : <div className="rounded-2xl bg-zinc-900 p-6 text-center text-sm text-zinc-500">No recent match</div>}
     <section className="mt-6">
       <h2 className="mb-2 text-sm font-semibold">Substitutes</h2>
       {latestBench.length > 0 ? (
         <div className="grid grid-cols-4 gap-2">
           {latestBench.map((appearance) => {
             const player = players.find((item) => item.id === appearance.playerId)
-            const stat = statsByPlayer[appearance.playerId]
             const ratingBreakdown = best.match && player ? ratePlayerMatch(best.match, player) : null
-            const rating = ratingBreakdown?.rating ?? 0
+            const entered = best.match?.events.some((event) => event.type === 'sub' && event.teamId === teamId && event.playerInId === appearance.playerId)
+            const rating = entered ? ratingBreakdown?.raw : undefined
             if (!player) return null
+            const stats = ratingBreakdown && best.match ? aggregatePlayerStats(player, players, [best.match]) : undefined
             return (
               <SubstitutePlayerCard
                 key={player.id}
                 player={player}
                 team={team}
                 rating={rating}
-                stats={stat}
+                position={appearance.position}
+                stats={stats}
                 onClick={() => onNavigate({ name: 'player', id: player.id })}
               />
             )
@@ -71,6 +79,6 @@ export function TeamDetailScreen({ teamId, season, onNavigate }: { teamId: strin
       )}
     </section>
 
-    <section className="mt-6"><h2 className="mb-2 text-sm font-semibold">Recent matches</h2>{recent.map((match) => { const score = matchScore(match); const home = teams.find((item) => item.id === match.homeTeamId); const away = teams.find((item) => item.id === match.awayTeamId); return <button key={match.id} type="button" onClick={() => onNavigate({ name: 'match', id: match.id })} className="mb-2 flex w-full items-center justify-between rounded-xl bg-zinc-900 px-3 py-3 text-left"><span className="text-[10px] text-zinc-500">MD{match.matchDay}</span><span className="text-sm font-bold">{home?.shortName} {score.home}–{score.away} {away?.shortName}</span><span className="text-[10px] text-zinc-500">{formatDate(match.date)}</span></button> })}</section>
+    <section className="mt-6"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-semibold">Recent matches</h2>{recent.length > 5 && <button type="button" aria-expanded={showAll} onClick={() => setExpandedContext(showAll ? null : context)} className="text-xs font-semibold text-emerald-400">{showAll ? 'Show Less' : 'View All'}</button>}</div>{visibleMatches.map((match) => { const score = matchScore(match); const home = teams.find((item) => item.id === match.homeTeamId); const away = teams.find((item) => item.id === match.awayTeamId); return <button key={match.id} type="button" onClick={() => onNavigate({ name: 'match', id: match.id })} className="mb-2 flex w-full items-center justify-between rounded-xl bg-zinc-900 px-3 py-3 text-left"><span className="text-[10px] text-zinc-500">MD{match.matchDay}</span><span className="text-sm font-bold">{home?.shortName} {score.home}–{score.away} {away?.shortName}</span><span className="text-[10px] text-zinc-500">{formatDate(match.date)}</span></button> })}</section>
   </div>
 }

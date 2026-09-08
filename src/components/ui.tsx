@@ -6,19 +6,35 @@ export function Badge({ children, className = '', colorClass, size = 'default' }
   return <span className={`flex items-center justify-center rounded-[4px] font-black ${sizeClasses} ${colorClass} ${className}`}>{children}</span>
 }
 
-export function SubstitutePlayerCard({ player, team, rating, stats, onClick }: { player: Player, team?: Team, rating?: number, stats?: { goals: number, assists: number }, onClick: () => void }) {
+export function SubstitutionMarker({ direction, minute }: { direction: 'in' | 'out'; minute: number }) {
+  return <span aria-label={`Substitution ${direction} at ${minute} minutes`} className={`whitespace-nowrap text-[9px] font-bold ${direction === 'in' ? 'text-emerald-400' : 'text-red-400'}`}>{direction === 'in' ? `${minute}' →` : `← ${minute}'`}</span>
+}
+
+export function SubstitutionSelection({ direction }: { direction: 'in' | 'out' }) {
+  return <span className={`pointer-events-none whitespace-nowrap text-[9px] font-bold ${direction === 'out' ? 'text-red-400' : 'text-emerald-400'}`}>{direction === 'out' ? '? OUT' : 'IN ?'}</span>
+}
+
+export const ratingBadgeColor = (rating: number) => rating >= 7.3 ? 'bg-emerald-500 text-white' : rating >= 6 ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'
+
+export function SubstitutePlayerCard({ player, team, rating, stats, position, inMinute, outMinute, showRating = true, selection, onClick }: { player: Player, team?: Team, rating?: number, stats?: { goals: number, assists: number }, position?: string, inMinute?: number, outMinute?: number, showRating?: boolean, selection?: 'in' | 'out', onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="flex min-w-0 flex-col items-center rounded-lg bg-zinc-900 p-1 text-center">
+    <button type="button" onClick={onClick} aria-label={playerDisplayName(player)} className={`flex w-full min-w-0 flex-col items-center rounded-lg bg-zinc-900 px-1 pb-2 pt-5 text-center transition-transform ${selection ? 'relative z-10 scale-105' : ''}`}>
       <div className="relative flex h-10 w-10 items-center justify-center">
-        <PlayerIcon player={player} team={team} className="h-10 w-10 text-[10px]" />
-        {rating !== undefined && (
-          <Badge colorClass={ratingTone(rating)} className="absolute -right-1 -top-1 z-30 shadow-lg" size="large">
-            {rating.toFixed(1)}
+        <PlayerIcon player={player} team={team} position={position ?? player.position} className="h-10 w-10 text-[11px]" />
+        {showRating && (
+          <Badge colorClass={rating === undefined ? 'bg-zinc-700 text-zinc-300' : ratingBadgeColor(rating)} className="absolute -right-3 -top-3 z-30 shadow-lg" size="large">
+            {rating === undefined ? '-' : rating.toFixed(1)}
           </Badge>
         )}
       </div>
-      <span className="mt-1 w-full truncate text-[9px] font-semibold">{playerDisplayName(player)}</span>
-      <StatIcons goals={stats?.goals ?? 0} assists={stats?.assists ?? 0} className="text-[8px] text-zinc-400" />
+      <div className="relative z-10 -mt-1 grid h-3.5 w-16 max-w-full grid-cols-2 items-center text-[8px] font-bold leading-none text-white">
+        <span className="flex items-center gap-0.5 justify-self-start rounded-full bg-black/80 px-1 py-0.5"><AssistIcon className="h-2.5 w-2.5" />{stats?.assists ?? 0}</span>
+        <span className="flex items-center gap-0.5 justify-self-end rounded-full bg-black/80 px-1 py-0.5"><GoalIcon className="h-2.5 w-2.5" />{stats?.goals ?? 0}</span>
+      </div>
+      <span className="relative z-10 -mt-0.5 h-4 max-w-full truncate rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold leading-tight">{playerDisplayName(player)}</span>
+      {selection && <SubstitutionSelection direction={selection} />}
+      {inMinute !== undefined && <SubstitutionMarker direction="in" minute={inMinute} />}
+      {outMinute !== undefined && <SubstitutionMarker direction="out" minute={outMinute} />}
     </button>
   )
 }

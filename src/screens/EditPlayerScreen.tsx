@@ -34,12 +34,22 @@ export function EditPlayerScreen({ playerId, onNavigate }: { playerId: string; o
         </select>
         <div className="rounded-xl bg-zinc-900 p-3">
           <p className="mb-2 text-xs font-bold text-zinc-400">Assigned teams</p>
-          {teams.map((team) => (
-            <label key={team.id} className="mb-2 flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={teamIds.includes(team.id)} onChange={() => setTeamIds((ids) => ids.includes(team.id) ? ids.filter((id) => id !== team.id) : [...ids, team.id])} />
-              {team.name}
-            </label>
-          ))}
+          {teams.map((team) => {
+            const rosterCount = players.filter(p => p.teamIds?.includes(team.id)).length
+            const isAssigned = teamIds.includes(team.id)
+            const canAdd = rosterCount < 23 || isAssigned
+            return (
+              <label key={team.id} className={`mb-2 flex items-center gap-2 text-sm ${canAdd ? '' : 'opacity-40'}`}>
+                <input 
+                    type="checkbox" 
+                    checked={isAssigned} 
+                    disabled={!canAdd}
+                    onChange={() => setTeamIds((ids) => ids.includes(team.id) ? ids.filter((id) => id !== team.id) : [...ids, team.id])} 
+                />
+                {team.name} ({rosterCount}/23)
+              </label>
+            )
+          })}
         </div>
         <button 
             type="button" 

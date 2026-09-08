@@ -1,6 +1,6 @@
 import type { Best11Slot, Player, Position, Team } from '../types'
 import { PlayerIcon } from './PlayerIcon'
-import { playerDisplayName, Badge } from './ui'
+import { playerDisplayName, Badge, SubstitutionMarker, SubstitutionSelection, ratingBadgeColor } from './ui'
 import { useRef } from 'react'
 import { DndContext, PointerSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type CollisionDetection, type DragEndEvent } from '@dnd-kit/core'
 
@@ -24,16 +24,11 @@ export const FORMATION_SLOTS: Record<string, TacticalSlot[]> = {
   '4-4-2': formation('LB', 'LCB', 'RCB', 'RB', 'LM', 'LCM', 'RCM', 'RM', 'LST', 'RST', 'GK'),
 }
 
-export function getPositionColor(position: Position): string {
-  if (['LW', 'LST', 'ST', 'RST', 'SS', 'RW'].includes(position)) return 'bg-red-500 text-white'
-  if (['CAM', 'LDM', 'CDM', 'RDM', 'LM', 'LCM', 'CM', 'RCM', 'RM'].includes(position)) return 'bg-emerald-500 text-white'
-  return position === 'GK' ? 'bg-yellow-400 text-black' : 'bg-blue-500 text-white'
-}
 
 const homePositions: Record<string, { x: number; y: number }> = {
   LW: { x: 20, y: 22 }, ST: { x: 50, y: 22 }, RW: { x: 80, y: 22 }, LCM: { x: 25, y: 46 }, CM: { x: 50, y: 46 }, RCM: { x: 75, y: 46 }, LB: { x: 13, y: 69 }, LCB: { x: 38, y: 69 }, RCB: { x: 62, y: 69 }, RB: { x: 87, y: 69 }, GK: { x: 50, y: 88 },
 }
-const ratingColor = (rating: number) => rating >= 7.3 ? 'bg-emerald-500 text-white' : rating >= 6 ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'
+const ratingColor = ratingBadgeColor
 
 function GoalIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-2.5 w-2.5 fill-none stroke-current stroke-2"><circle cx="12" cy="12" r="9" /><path d="m12 7 3 2.2-1.1 3.5h-3.8L9 9.2 12 7Zm-6 4 3 1m9-1 3 1m-10 8 1-3m2 3-1-3" /></svg>
@@ -43,7 +38,7 @@ function AssistIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-2.5 w-2.5 fill-none stroke-current stroke-2"><path d="M4 15.5c2.5-2.8 5.2-4.6 8.1-5.4l3.2.8 3.1 3.1-1.9 2.7-4.1.2-2.2 2.3-4.8-.4L4 15.5Z" /><path d="m12.1 10.1 1.1-3 2.2.5 1.1 3.3M7.4 14.5l1.8 1.1" /></svg>
 }
 
-export function Pitch({ slots, players, teams, statsByPlayer, badgeMode = 'rating', showPositionBadge = true, motmPlayerId, onSlotClick, layout = 'tactical', draggable = false, externalDnd = false, onSlotDrop }: { slots: Best11Slot[]; players: Player[]; teams?: Team[]; statsByPlayer?: Record<string, { goals: number; assists: number }>; badgeMode?: 'rating' | 'position'; showPositionBadge?: boolean; motmPlayerId?: string; onSlotClick?: (slot: Best11Slot) => void; layout?: 'tactical' | 'free'; draggable?: boolean; externalDnd?: boolean; onSlotDrop?: (activeSlot: string, targetSlot: string) => void }) {
+export function Pitch({ slots, players, teams, statsByPlayer, outMinutesByPlayer, substitutionSelection, goalSelection, disabledPlayerIds, badgeMode = 'rating', showPositionBadge = true, motmPlayerId, onSlotClick, onEmptySlotClick, layout = 'tactical', draggable = false, externalDnd = false, onSlotDrop }: { slots: Best11Slot[]; players: Player[]; teams?: Team[]; statsByPlayer?: Record<string, { goals: number; assists: number }>; outMinutesByPlayer?: Record<string, number>; substitutionSelection?: Record<string, 'in' | 'out'>; goalSelection?: Record<string, 'scorer' | 'assist'>; disabledPlayerIds?: string[]; badgeMode?: 'rating' | 'position'; showPositionBadge?: boolean; motmPlayerId?: string; onSlotClick?: (slot: Best11Slot) => void; onEmptySlotClick?: (slot: Best11Slot) => void; layout?: 'tactical' | 'free'; draggable?: boolean; externalDnd?: boolean; onSlotDrop?: (activeSlot: string, targetSlot: string) => void }) {
   const byId = Object.fromEntries(players.map((player) => [player.id, player]))
   const teamById = Object.fromEntries((teams ?? []).map((team) => [team.id, team]))
   const suppressClick = useRef(false)
@@ -56,23 +51,10 @@ export function Pitch({ slots, players, teams, statsByPlayer, badgeMode = 'ratin
   }
   const endDrag = (event: DragEndEvent) => { const active = String(event.active.id).replace('player:', ''); const target = String(event.over?.id ?? '').replace('target:', ''); if (event.over && active !== target) onSlotDrop?.(active, target); window.setTimeout(() => { suppressClick.current = false }, 0) }
   const content = <div className="relative mx-auto aspect-[3/4] w-full overflow-hidden rounded-lg border border-emerald-700/50 pitch-grass"><div className="pointer-events-none absolute inset-2 border border-white/40"><div className="absolute left-1/2 top-0 h-14 w-24 -translate-x-1/2 border border-t-0 border-white/40" /><div className="absolute bottom-0 left-1/2 h-14 w-24 -translate-x-1/2 border border-b-0 border-white/40" /><div className="absolute left-0 right-0 top-1/2 border-t border-white/40" /><div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/40" /></div>{slots.map((slot) => {
-    const tactical = grid[slot.slot] ?? grid.CM; const point = layout === 'free' ? homePositions[slot.slot] ?? tactical : tactical; const player = slot.playerId ? byId[slot.playerId] : undefined; if (!player) return draggable ? <EmptyPitchSlotDrop key={slot.slot} slot={slot} point={point} /> : null; const stats = statsByPlayer?.[player.id]; const matchPosition = (slot.matchPosition ?? tactical.matchPosition) as Position
+    const tactical = grid[slot.slot] ?? grid.CM; const point = layout === 'free' ? homePositions[slot.slot] ?? tactical : tactical; const player = slot.playerId ? byId[slot.playerId] : undefined; if (!player) return draggable ? <EmptyPitchSlotDrop key={slot.slot} slot={slot} point={point} onClick={onEmptySlotClick ? () => onEmptySlotClick(slot) : undefined} /> : null; const stats = statsByPlayer?.[player.id]; const matchPosition = (slot.matchPosition ?? tactical.matchPosition) as Position
     const representativeTeam = teamById[slot.teamId ?? '']
-// ... (imports remain)
-// Ensure showPositionBadge is used correctly. 
-// Use large size for rating badge: size="large"
-
-// Inside Pitch component, mapping slots:
     const badges = (
       <>
-        {showPositionBadge && (
-          <Badge
-            colorClass={getPositionColor(matchPosition)}
-            className="absolute -left-3 -top-3 z-30 shadow-lg"
-          >
-            {matchPosition}
-          </Badge>
-        )}
         {badgeMode === 'rating' && (
           <Badge
             colorClass={player.id === motmPlayerId ? 'bg-blue-500 text-white' : ratingColor(slot.avgRating)}
@@ -84,24 +66,29 @@ export function Pitch({ slots, players, teams, statsByPlayer, badgeMode = 'ratin
         )}
       </>
     )
+    const SlotContainer = !draggable && onSlotClick ? 'button' : 'div'
     return (
-      <div
+      <SlotContainer
+        {...(SlotContainer === 'button' ? { type: 'button' as const, 'aria-label': playerDisplayName(player), disabled: disabledPlayerIds?.includes(player.id) } : {})}
         key={slot.slot}
-        className="absolute flex w-20 max-w-[23%] -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+        className={`absolute flex w-20 max-w-[23%] -translate-x-1/2 -translate-y-1/2 flex-col items-center transition-transform ${substitutionSelection?.[player.id] || goalSelection?.[player.id] ? 'z-20 scale-110' : ''} ${disabledPlayerIds?.includes(player.id) ? 'opacity-40' : ''}`}
         style={{ left: `${point.x}%`, top: `${point.y}%` }}
         onClick={() => {
-          if (!suppressClick.current) onSlotClick?.(slot)
+          if (!suppressClick.current && !disabledPlayerIds?.includes(player.id)) onSlotClick?.(slot)
         }}
       >
-        <PitchSlotDrop slot={slot} draggable={draggable}>
-          <PlayerIcon player={player} team={representativeTeam} badges={badges} className="h-10 w-10 text-[11px]" />
-        </PitchSlotDrop>
+        {draggable ? <PitchSlotDrop slot={slot} draggable={draggable}>
+          <PlayerIcon player={player} team={representativeTeam} position={showPositionBadge ? matchPosition : undefined} badges={badges} className="h-10 w-10 text-[11px]" />
+        </PitchSlotDrop> : <PlayerIcon player={player} team={representativeTeam} position={showPositionBadge ? matchPosition : undefined} badges={badges} className="h-10 w-10 text-[11px]" />}
         <div className="relative z-10 -mt-1 grid h-3.5 w-16 grid-cols-2 items-center text-[8px] font-bold leading-none text-white">
           <span className="justify-self-start">{(stats?.assists ?? 0) > 0 && <span className="flex items-center gap-0.5 rounded-full bg-black/80 px-1 py-0.5"><AssistIcon />{stats?.assists}</span>}</span>
           <span className="justify-self-end">{(stats?.goals ?? 0) > 0 && <span className="flex items-center gap-0.5 rounded-full bg-black/80 px-1 py-0.5"><GoalIcon />{stats?.goals}</span>}</span>
         </div>
         <div className="relative z-10 -mt-0.5 h-4 max-w-full truncate rounded-full bg-black/70 px-1.5 py-0.5 text-center text-[9px] font-semibold leading-tight">{playerDisplayName(player)}</div>
-      </div>
+        {goalSelection?.[player.id] && <span className="pointer-events-none rounded bg-black/80 px-1 text-[9px] font-bold text-emerald-300">{goalSelection[player.id] === 'scorer' ? '? SCORER' : '?? ASSIST'}</span>}
+        {substitutionSelection?.[player.id] && <span className="rounded bg-black/80 px-1 leading-none"><SubstitutionSelection direction={substitutionSelection[player.id]} /></span>}
+        {outMinutesByPlayer?.[player.id] !== undefined && <span className="rounded bg-black/80 px-1 leading-none"><SubstitutionMarker direction="out" minute={outMinutesByPlayer[player.id]} /></span>}
+      </SlotContainer>
     )
   })}</div>
   return draggable && !externalDnd ? <DndContext sensors={sensors} collisionDetection={nearest} onDragStart={() => { suppressClick.current = true }} onDragCancel={() => { suppressClick.current = false }} onDragEnd={endDrag}>{content}</DndContext> : content
@@ -109,7 +96,8 @@ export function Pitch({ slots, players, teams, statsByPlayer, badgeMode = 'ratin
 
 function PitchSlotDrop({ slot, draggable, children }: { slot: Best11Slot; draggable: boolean; children: React.ReactNode }) { const drop = useDroppable({ id: `target:${slot.slot}` }); const drag = useDraggable({ id: `player:${slot.slot}`, disabled: !draggable || !slot.playerId }); return <div ref={drop.setNodeRef} className={drop.isOver ? 'rounded-full ring-2 ring-white/90' : ''}><div ref={draggable ? drag.setNodeRef : undefined} {...(draggable ? drag.listeners : {})} {...(draggable ? drag.attributes : {})} style={{ opacity: drag.isDragging ? 0.45 : 1, touchAction: draggable ? 'none' : undefined }}>{children}</div></div> }
 
-function EmptyPitchSlotDrop({ slot, point }: { slot: Best11Slot; point: { x: number; y: number } }) {
+function EmptyPitchSlotDrop({ slot, point, onClick }: { slot: Best11Slot; point: { x: number; y: number }; onClick?: () => void }) {
   const drop = useDroppable({ id: `target:${slot.slot}` })
+  if (onClick) return <button ref={drop.setNodeRef} type="button" aria-label={`Empty ${slot.matchPosition ?? slot.position} slot`} onClick={onClick} className="absolute h-12 w-12 -translate-x-1/2 -translate-y-1/2 bg-transparent focus-visible:ring-2 focus-visible:ring-white" style={{ left: `${point.x}%`, top: `${point.y}%` }} />
   return <div ref={drop.setNodeRef} aria-hidden="true" className="pointer-events-none absolute h-12 w-12 -translate-x-1/2 -translate-y-1/2" style={{ left: `${point.x}%`, top: `${point.y}%` }} />
 }

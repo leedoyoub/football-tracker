@@ -37,14 +37,13 @@ export const POSITION_RULES: Record<Position, PositionRules> = {
   LM: RULE(1.05, .75, .10, .30, flatConceded(-.10)), RM: RULE(1.05, .75, .10, .30, flatConceded(-.10)),
   CM: RULE(1.10, .70, .15, .30, tieredConceded(-.20, -.30)), LCM: RULE(1.10, .70, .15, .30, tieredConceded(-.20, -.30)), RCM: RULE(1.10, .70, .15, .30, tieredConceded(-.20, -.30)),
   CDM: RULE(1.25, .80, .15, .50, tieredConceded(-.25, -.35)), LDM: RULE(1.25, .80, .15, .50, tieredConceded(-.25, -.35)), RDM: RULE(1.25, .80, .15, .50, tieredConceded(-.25, -.35)),
-  CB: RULE(1.35, .80, .08, 1.00, tieredConceded(-.35, -.45)), LCB: RULE(1.35, .80, .08, 1.00, tieredConceded(-.35, -.45)), RCB: RULE(1.35, .80, .08, 1.00, tieredConceded(-.35, -.45)),
-  LB: RULE(1.25, .80, .08, .95, tieredConceded(-.35, -.45)), LWB: RULE(1.25, .80, .08, .95, tieredConceded(-.35, -.45)), RB: RULE(1.25, .80, .08, .95, tieredConceded(-.35, -.45)), RWB: RULE(1.25, .80, .08, .95, tieredConceded(-.35, -.45)),
+  CB: RULE(1.35, .80, .05, 1.00, tieredConceded(-.35, -.45)), LCB: RULE(1.35, .80, .05, 1.00, tieredConceded(-.35, -.45)), RCB: RULE(1.35, .80, .05, 1.00, tieredConceded(-.35, -.45)),
+  LB: RULE(1.25, .80, .05, .95, tieredConceded(-.35, -.45)), LWB: RULE(1.25, .80, .05, .95, tieredConceded(-.35, -.45)), RB: RULE(1.25, .80, .05, .95, tieredConceded(-.35, -.45)), RWB: RULE(1.25, .80, .05, .95, tieredConceded(-.35, -.45)),
   GK: RULE(0, 0, 0, .70, tieredConceded(-.35, -.45), .30),
 }
 
 export function clampRating(value: number): number {
-  const rounded = Math.round(value * 10) / 10
-  return Math.min(MAX_RATING, Math.max(MIN_RATING, rounded))
+  return Math.min(MAX_RATING, Math.max(MIN_RATING, value))
 }
 
 export function matchScore(match: Match): { home: number; away: number } {
@@ -103,19 +102,6 @@ function scoringTeamId(match: Match, event: Extract<MatchEvent, { type: 'goal' }
   return event.teamId === match.homeTeamId ? match.awayTeamId : match.homeTeamId
 }
 
-function concededWhileOnPitch(
-  match: Match,
-  teamId: string,
-  enter: number,
-  exit: number,
-): number {
-  return match.events.filter((event) => {
-    if (event.type !== 'goal') return false
-    if (!onPitch(enter, exit, event.minute)) return false
-    return scoringTeamId(match, event) !== teamId
-  }).length
-}
-
 function teamGoalBonus(
   match: Match,
   teamId: string,
@@ -149,6 +135,36 @@ function noConcededBonus(match: Match, teamId: string, enter: number, exit: numb
   }, 0)
 }
 
+
+export function matchPositionSegments(match: Match, appearance: Appearance): { enter: number; exit: number; position: Position }[] {
+  const window = pitchWindow(match, appearance)
+  if (!window || window.exit <= window.enter) return []
+  const subOn = match.events.find((event): event is Extract<MatchEvent, { type: 'sub' }> =>
+    event.type === 'sub' && event.playerInId === appearance.playerId,
+  )
+  let position = appearance.role === 'bench' && subOn
+    ? subOn.position : normalizeMatchPosition(appearance.matchPosition) ?? appearance.position
+  let enter = window.enter
+  const segments: { enter: number; exit: number; position: Position }[] = []
+  const changesByMinute = new Map((appearance.positionHistory ?? []).filter(change =>
+    Number.isInteger(change.minute) && change.minute >= 0 && change.minute < window.exit && normalizeMatchPosition(change.position),
+  ).map(change => [change.minute, change]))
+  const changes = [...changesByMinute.values()].sort((a, b) => a.minute - b.minute)
+  for (const change of changes) {
+    if (normalizeMatchPosition(change.position) === normalizeMatchPosition(position)) continue
+    if (change.minute > enter) segments.push({ enter, exit: change.minute, position })
+    enter = Math.max(window.enter, change.minute)
+    position = change.position
+  }
+  segments.push({ enter, exit: window.exit, position })
+  return segments
+}
+
+export function matchPositionAt(match: Match, appearance: Appearance, minute?: number): Position | undefined {
+  const segments = matchPositionSegments(match, appearance)
+  return minute === undefined ? segments[0]?.position : segments.find(segment => onPitch(segment.enter, segment.exit, minute))?.position
+}
+
 export function ratePlayerMatch(
   match: Match,
   player: Player,
@@ -158,15 +174,9 @@ export function ratePlayerMatch(
   const window = pitchWindow(match, appearance)
   if (!window || window.exit <= window.enter) return null
 
-  const subOn = match.events.find(
-    (e): e is Extract<MatchEvent, { type: 'sub' }> =>
-      e.type === 'sub' && e.playerInId === player.id,
-  )
-  const position =
-    appearance.role === 'bench' && subOn
-      ? subOn.position
-      : normalizeMatchPosition(appearance.matchPosition) ?? appearance.position
-  const rules = POSITION_RULES[position]
+  const segments = matchPositionSegments(match, appearance)
+  const position = segments[0].position
+  const positionAt = (minute: number) => segments.find(segment => onPitch(segment.enter, segment.exit, minute))!.position
   const isStarter = appearance.role === 'starter'
   const teamId = appearance.teamId
   const { enter, exit } = window
@@ -179,24 +189,34 @@ export function ratePlayerMatch(
       e.playerId === player.id &&
       onPitch(enter, exit, e.minute),
   )
-  const saveCount = match.events.reduce((total, event) =>
-    event.type === 'save' && event.playerId === player.id && (event.minute === undefined || onPitch(enter, exit, event.minute))
-      ? total + (event.count ?? 1)
-      : total,
-  0)
+  const saves = match.events.filter((event): event is Extract<MatchEvent, { type: 'save' }> =>
+    event.type === 'save' && event.playerId === player.id && (event.minute === undefined || onPitch(enter, exit, event.minute)),
+  )
+  const savePoints = segments.length === 1
+    ? saves.reduce((total, event) => total + (event.count ?? 1), 0) * POSITION_RULES[position].save
+    : saves.reduce((total, event) => total + (event.count ?? 1) * POSITION_RULES[event.minute === undefined ? position : positionAt(event.minute)].save, 0)
 
-  const teamGoalsPoints = teamGoalBonus(match, teamId, player.id, enter, exit, rules)
-  const concededCount = concededWhileOnPitch(match, teamId, enter, exit)
+  const teamGoalsPoints = segments.reduce((total, segment) => total + teamGoalBonus(match, teamId, player.id, segment.enter, segment.exit, POSITION_RULES[segment.position]), 0)
+  const concessions = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> =>
+    event.type === 'goal' && scoringTeamId(match, event) !== teamId && onPitch(enter, exit, event.minute),
+  ).sort((a, b) => a.minute - b.minute)
+  // Keep the match-wide concession ordinal; moving position must not reset its tier.
+  const concededPoints = segments.length === 1
+    ? POSITION_RULES[position].conceded(concessions.length)
+    : concessions.reduce((total, event, index) => {
+      const rules = POSITION_RULES[positionAt(event.minute)]
+      return total + (rules.conceded(index + 1) - rules.conceded(index))
+    }, 0)
 
   let goalPoints = 0
   for (const [index, event] of goalEvents.entries()) {
-    const goalType = event.goalType ?? (event.wondergoal ? 'wonder' : 'normal')
+    const position = positionAt(event.minute)
+    const rules = POSITION_RULES[position]
     let base = rules.goal
-    if (isStarter && index === 0 && (position === 'ST' || position === 'SS')) {
-      base = .70
+    if (isStarter && (position === 'ST' || position === 'SS')) {
+      base = index === 0 ? .70 : rules.goal
     }
-    const modifier = goalType === 'wonder' ? .15 : goalType === 'assist-led' ? -.15 : 0
-    if (position !== 'GK') goalPoints += base + modifier
+    if (position !== 'GK') goalPoints += base
   }
 
   const assistEvents = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> =>
@@ -204,13 +224,14 @@ export function ratePlayerMatch(
   )
   let assistPoints = 0
   for (const [index, event] of assistEvents.entries()) {
-    const goalType = event.goalType ?? (event.wondergoal ? 'wonder' : 'normal')
+    const position = positionAt(event.minute)
+    if (position === 'GK') continue
+    const rules = POSITION_RULES[position]
     let base = rules.assist
-    if (isStarter && index === 0 && (position === 'ST' || position === 'SS')) {
-      base = .40
+    if (isStarter && (position === 'ST' || position === 'SS')) {
+      base = index === 0 ? .40 : rules.assist
     }
-    const modifier = goalType === 'wonder' ? -.15 : goalType === 'assist-led' ? .15 : 0
-    assistPoints += base + modifier
+    assistPoints += base
   }
 
   const causedConcessionCount = match.events.filter((event) =>
@@ -230,15 +251,15 @@ export function ratePlayerMatch(
     base: BASE_RATING,
     result: resultModifier(match, teamId),
     goals: goalPoints,
-    assists: position === 'GK' ? 0 : assistPoints,
+    assists: assistPoints,
     teamGoals: teamGoalsPoints,
-    conceded: rules.conceded(concededCount),
+    conceded: concededPoints,
     cleanSheet: 0,
-    noConceded: noConcededBonus(match, teamId, enter, exit, rules.noConcededMax),
+    noConceded: segments.reduce((total, segment) => total + noConcededBonus(match, teamId, segment.enter, segment.exit, POSITION_RULES[segment.position].noConcededMax), 0),
     noPoint: 0,
     ownGoals: 0,
     concededCause: causedConcessionCount * -.3,
-    saves: saveCount * rules.save,
+    saves: savePoints,
     raw: 0,
     rating: 0,
   }
@@ -276,4 +297,15 @@ export function rateMatch(match: Match, players: Player[]): RatingBreakdown[] {
   return players
     .map((player) => ratePlayerMatch(match, player))
     .filter((row): row is RatingBreakdown => row !== null)
+}
+
+export function getMatchManOfTheMatch(match: Match, players: Player[]): string | undefined {
+  const ratings = rateMatch(match, players);
+  if (ratings.length === 0) return undefined;
+  
+  return ratings.sort((a, b) => 
+    b.raw - a.raw || 
+    b.minutes - a.minutes || 
+    a.playerId.localeCompare(b.playerId)
+  )[0]?.playerId;
 }

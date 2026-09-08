@@ -6,8 +6,11 @@ import type {
   Position,
   RankSort,
   RatingBreakdown,
+  TeamSeasonStats,
+  PartnershipStats,
 } from '../types'
-import { ratePlayerMatch } from './rating'
+import { ratePlayerMatch, getMatchManOfTheMatch, matchScore, pitchWindow, matchPositionAt, matchPositionSegments } from './rating'
+
 
 export function seasonsFromMatches(matches: Match[]): string[] {
   return [...new Set(matches.map((m) => m.season))].sort((a, b) => {
@@ -17,23 +20,51 @@ export function seasonsFromMatches(matches: Match[]): string[] {
   })
 }
 
-export function playerSeasonStats(
+export function aggregatePlayerStats(
   player: Player,
+  allPlayers: Player[],
   matches: Match[],
-  season: string,
-  teamId?: string,
 ): PlayerSeasonStats {
-  const seasonMatches = matches.filter((m) =>
-    m.season === season && (!teamId || m.appearances.some((appearance) =>
-      appearance.playerId === player.id && appearance.teamId === teamId,
-    )),
-  )
   const ratings: RatingBreakdown[] = []
-  for (const match of seasonMatches) {
-    const row = ratePlayerMatch(match, player)
-    if (row) ratings.push(row)
+  let wins = 0
+  let draws = 0
+  let losses = 0
+  const recentForm: ('W' | 'D' | 'L')[] = []
+  let starts = 0
+  let subs = 0
+  let saves = 0
+
+  for (const match of matches) {
+    const appearance = match.appearances.find((a) => a.playerId === player.id)
+    if (!appearance) continue
+
+    const rating = ratePlayerMatch(match, player)
+    if (!rating) continue // Unused sub (or no rating for some reason)
+    
+    ratings.push(rating)
+    if (actuallyPlayed(match, player.id)) {
+      // Counts are raw events, not the weighted saves contribution in RatingBreakdown.
+      saves += match.events.reduce((total, event) => {
+        if (event.type !== 'save' || event.playerId !== player.id || event.teamId !== appearance.teamId) return total
+        if (matchPositionAt(match, appearance, event.minute) !== 'GK') return total
+        if (event.minute !== undefined && !(event.minute >= rating.enter && event.minute < rating.exit)) return total
+        const count = event.count ?? 1
+        return Number.isInteger(count) && count > 0 ? total + count : total
+      }, 0)
+    }
+    if (appearance.role === 'starter') starts++
+    else subs++
+
+    const score = matchScore(match)
+    const ours = appearance.teamId === match.homeTeamId ? score.home : score.away
+    const theirs = appearance.teamId === match.homeTeamId ? score.away : score.home
+    
+    if (ours > theirs) { wins++; recentForm.push('W') }
+    else if (ours === theirs) { draws++; recentForm.push('D') }
+    else { losses++; recentForm.push('L') }
   }
-  const goals = seasonMatches.reduce((sum, match) => {
+
+  const goals = matches.reduce((sum, match) => {
     return (
       sum +
       match.events.filter(
@@ -41,7 +72,7 @@ export function playerSeasonStats(
       ).length
     )
   }, 0)
-  const assists = seasonMatches.reduce((sum, match) => {
+  const assists = matches.reduce((sum, match) => {
     return (
       sum +
       match.events.filter(
@@ -56,19 +87,218 @@ export function playerSeasonStats(
       : Math.round(
           (ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length) * 10,
         ) / 10
-  const mom = seasonMatches.filter((match) => match.manOfMatchPlayerId === player.id).length
+  const mom = matches.filter((match) => getMatchManOfTheMatch(match, allPlayers) === player.id).length
+  
   return {
     playerId: player.id,
-    teamId: teamId ?? player.teamId,
-    season,
+    teamId: player.teamId, // This might need to be more context-aware
+    season: 'All', // This might need to be more context-aware
     matches: ratings.length,
+    starts,
+    subs,
     minutes,
     goals,
     assists,
     avgRating,
+    saves,
     mom,
+    wins,
+    draws,
+    losses,
+    recentForm: recentForm.slice(-5).reverse(),
     ratings,
   }
+}
+
+export function playerSeasonStats(
+  player: Player,
+  allPlayers: Player[],
+  matches: Match[],
+  season: string,
+  teamId?: string,
+): PlayerSeasonStats {
+  const seasonMatches = matches.filter((m) =>
+    m.season === season && (!teamId || m.appearances.some((appearance) =>
+      appearance.playerId === player.id && appearance.teamId === teamId,
+    )),
+  )
+  return aggregatePlayerStats(player, allPlayers, seasonMatches)
+}
+
+export function teamSeasonStats(
+  teamId: string,
+  matches: Match[],
+  season: string,
+): TeamSeasonStats {
+  const teamMatches = matches.filter((m) =>
+    m.season === season && (m.teamId === teamId || (!m.teamId && (m.homeTeamId === teamId || m.awayTeamId === teamId))),
+  )
+  
+  let wins = 0
+  let draws = 0
+  let losses = 0
+  let goalsFor = 0
+  let goalsAgainst = 0
+  let cleanSheets = 0
+  const recentForm: ('W' | 'D' | 'L')[] = []
+  
+  for (const match of teamMatches) {
+    const score = matchScore(match)
+    const isHome = match.homeTeamId === teamId
+    const ours = isHome ? score.home : score.away
+    const theirs = isHome ? score.away : score.home
+    
+    goalsFor += ours
+    goalsAgainst += theirs
+    if (theirs === 0) cleanSheets++
+
+    if (ours > theirs) { wins++; recentForm.push('W') }
+    else if (ours === theirs) { draws++; recentForm.push('D') }
+    else { losses++; recentForm.push('L') }
+  }
+
+  return {
+    teamId,
+    season,
+    matches: teamMatches.length,
+    wins,
+    draws,
+    losses,
+    goalsFor,
+    goalsAgainst,
+    cleanSheets,
+    recentForm: recentForm.slice(-5).reverse(),
+  }
+}
+
+export function partnershipStats(
+  playerAId: string,
+  playerBId: string,
+  matches: Match[],
+  season: string,
+): PartnershipStats {
+  const sharedMatches = matches.filter((m) =>
+    m.season === season && 
+    m.appearances.some(a => a.playerId === playerAId) &&
+    m.appearances.some(a => a.playerId === playerBId)
+  )
+
+  let matchesTogether = 0
+  let winsTogether = 0
+  let goalsTogether = 0
+  let assistsAtoB = 0
+  let assistsBtoA = 0
+
+  for (const match of sharedMatches) {
+    const appA = match.appearances.find(a => a.playerId === playerAId)!
+    const appB = match.appearances.find(a => a.playerId === playerBId)!
+    
+    const windowA = pitchWindow(match, appA)
+    const windowB = pitchWindow(match, appB)
+
+    // Unused subs check
+    if (!windowA || !windowB) continue
+
+    matchesTogether++
+    
+    const score = matchScore(match)
+    const isHome = appA.teamId === match.homeTeamId
+    const ours = isHome ? score.home : score.away
+    const theirs = isHome ? score.away : score.home
+    if (ours > theirs) winsTogether++
+
+    // Goals together: overlap of windows
+    const enter = Math.max(windowA.enter, windowB.enter)
+    const exit = Math.min(windowA.exit, windowB.exit)
+    if (enter < exit) {
+      goalsTogether += match.events.filter(e => 
+        e.type === 'goal' && 
+        !e.ownGoal && 
+        e.teamId === appA.teamId && 
+        e.minute >= enter && e.minute < exit
+      ).length
+    }
+
+    // Assists
+    assistsAtoB += match.events.filter(e => 
+      e.type === 'goal' && 
+      !e.ownGoal && 
+      e.assistPlayerId === playerAId && 
+      e.playerId === playerBId
+    ).length
+    assistsBtoA += match.events.filter(e => 
+      e.type === 'goal' && 
+      !e.ownGoal && 
+      e.assistPlayerId === playerBId && 
+      e.playerId === playerAId
+    ).length
+  }
+
+  return {
+    playerAId,
+    playerBId,
+    matchesTogether,
+    winsTogether,
+    goalsTogether,
+    assistsAtoB,
+    assistsBtoA,
+  }
+}
+
+export type LeaderboardMetric =
+  | 'rating' | 'goals' | 'assists' | 'g+a' | 'minutes' | 'mom'
+  | 'goals/90' | 'assists/90' | 'g+a/90' | 'ga/90' | 'cleanSheets' | 'saves'
+
+export function getLeaderboard(
+  players: Player[],
+  matches: Match[],
+  filters: { seasons: string[], teams: string[], positions: Position[] },
+  metric: LeaderboardMetric,
+): (PlayerSeasonStats & { value: number })[] {
+  const { seasons, teams, positions } = filters
+  
+  const filteredMatches = matches.filter((m) =>
+    (seasons.length === 0 || seasons.includes(m.season)) &&
+    (teams.length === 0 || teams.includes(m.teamId || m.homeTeamId || m.awayTeamId || ''))
+  )
+
+  const stats = players
+    .filter(p => positions.length === 0 || positions.includes(p.position))
+    .map(p => {
+      const playerMatches = metric === 'saves' ? matches.filter(match =>
+        (!seasons.length || seasons.includes(match.season)) && match.appearances.some(appearance =>
+          appearance.playerId === p.id && (!teams.length || teams.includes(appearance.teamId)),
+        ),
+      ) : filteredMatches
+      const s = aggregatePlayerStats(p, players, playerMatches)
+      let value = 0
+      switch (metric) {
+        case 'rating': value = s.avgRating; break
+        case 'goals': value = s.goals; break
+        case 'assists': value = s.assists; break
+        case 'g+a': value = s.goals + s.assists; break
+        case 'minutes': value = s.minutes; break
+        case 'mom': value = s.mom; break
+        case 'goals/90': value = s.minutes > 0 ? (s.goals / s.minutes * 90) : 0; break
+        case 'assists/90': value = s.minutes > 0 ? (s.assists / s.minutes * 90) : 0; break
+        case 'g+a/90': value = s.minutes > 0 ? ((s.goals + s.assists) / s.minutes * 90) : 0; break
+        case 'ga/90': value = 0; break // TODO
+        case 'cleanSheets': value = 0; break // TODO
+        case 'saves': value = s.saves; break
+      }
+      return { ...s, value }
+    })
+    .filter(s => s.matches > 0)
+    .filter(s => metric !== 'saves' || s.ratings.some(rating => {
+      const match = matches.find(item => item.id === rating.matchId)
+      const appearance = match?.appearances.find(item => item.playerId === s.playerId)
+      return match && appearance && matchPositionSegments(match, appearance).some(segment => segment.position === 'GK')
+    }))
+    .sort((a, b) => {
+      if (metric === 'ga/90') return a.value - b.value // Ascending
+      return b.value - a.value // Descending
+    })
+  return stats
 }
 
 export function globalRankings(
@@ -79,7 +309,7 @@ export function globalRankings(
 ): PlayerSeasonStats[] {
   const seasonMatches = matches.filter((m) => m.season === season)
   const rows = players
-    .map((player) => playerSeasonStats(player, matches, season))
+    .map((player) => playerSeasonStats(player, players, matches, season))
     .filter((row) => row.matches > 0)
     .filter((row) => {
       if (sort !== 'rating') return true
@@ -215,7 +445,7 @@ export function unifiedBestEleven(
     return { slot: role.slot, position: role.position, playerId: candidate.player.id, teamId: candidate.teamId, avgRating: Math.round(candidate.average * 10) / 10, matches: candidate.matches }
   })
   const statsByPlayer = Object.fromEntries(players.map((player) => {
-    const stats = playerSeasonStats(player, matches, season)
+    const stats = playerSeasonStats(player, players, matches, season)
     return [player.id, { goals: stats.goals, assists: stats.assists }]
   }))
   return { slots, statsByPlayer }
@@ -302,7 +532,7 @@ export function teamBestEleven(
 ): { formation: string | null; slots: Best11Slot[]; match: Match | undefined } {
   const match = latestTeamMatch(matches, teamId, season)
   const candidates = players
-    .map((player) => ({ player, stats: playerSeasonStats(player, matches, season, teamId) }))
+    .map((player) => ({ player, stats: playerSeasonStats(player, players, matches, season, teamId) }))
     .filter((row) => row.stats.matches > 0)
     .sort((a, b) => b.stats.avgRating - a.stats.avgRating || b.stats.minutes - a.stats.minutes)
   const used = new Set<string>()

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { REGISTRATION_POSITIONS, type RegistrationPosition, type View } from '../types'
 import { useStore } from '../store'
+import { playerDisplayName } from '../components/ui'
 
 export function NewPlayerScreen({
   teamId,
@@ -9,22 +10,23 @@ export function NewPlayerScreen({
   teamId?: string
   onNavigate: (view: View) => void
 }) {
-  const { teams, players, addPlayer } = useStore()
+  const { teams, players, addPlayer, updatePlayer } = useStore()
   const [fullName, setFullName] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [number, setNumber] = useState(10)
   const [position, setPosition] = useState<RegistrationPosition>('CM')
   const [selectedTeam, setSelectedTeam] = useState(teamId ?? teams[0]?.id ?? '')
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [searchField, setSearchField] = useState<'fullName' | 'displayName'>('displayName')
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
+  const selectedPlayer = players.find(player => player.id === selectedPlayerId)
 
   const suggestions = useMemo(() => {
-    if (!displayName.trim()) return []
-    const q = displayName.toLowerCase()
-    const uniqueNames = [...new Set(players.map((p) => p.displayName ?? p.name))]
-    return uniqueNames
-      .filter((n) => n.toLowerCase().startsWith(q))
-      .slice(0, 5)
-  }, [displayName, players])
+    const q = (searchField === 'fullName' ? fullName : displayName).trim().toLowerCase()
+    if (!q) return []
+    return players.filter(player => [player.displayName, player.fullName, player.name]
+      .some(name => name?.toLowerCase().includes(q)))
+  }, [displayName, fullName, searchField, players])
 
   return (
     <div className="px-4 pb-8 pt-6">
@@ -53,26 +55,33 @@ export function NewPlayerScreen({
             value={fullName}
             onChange={(e) => {
               setFullName(e.target.value)
+              setSelectedPlayerId(null)
+              setSearchField('fullName')
+              setShowSuggestions(true)
             }}
+            onFocus={() => { setSearchField('fullName'); setShowSuggestions(true) }}
             placeholder="Full name"
             className="w-full rounded-xl bg-zinc-900 px-3 py-2.5 text-sm"
           />
         </div>
         <div className="relative">
-          <input value={displayName} onChange={(e) => { setDisplayName(e.target.value); setShowSuggestions(true) }} onFocus={() => setShowSuggestions(true)} placeholder="Display name" className="w-full rounded-xl bg-zinc-900 px-3 py-2.5 text-sm" />
+          <input value={displayName} onChange={(e) => { setDisplayName(e.target.value); setSelectedPlayerId(null); setSearchField('displayName'); setShowSuggestions(true) }} onFocus={() => { setSearchField('displayName'); setShowSuggestions(true) }} placeholder="Display name" className="w-full rounded-xl bg-zinc-900 px-3 py-2.5 text-sm" />
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute left-0 top-full z-10 mt-1 w-full overflow-hidden rounded-xl border border-white/10 bg-zinc-900 shadow-xl">
+            <div className="absolute left-0 top-full z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-white/10 bg-zinc-900 shadow-xl">
               {suggestions.map((s) => (
                 <button
-                  key={s}
+                  key={s.id}
                   type="button"
                   onClick={() => {
-                    setDisplayName(s)
+                    setSelectedPlayerId(s.id)
+                    setDisplayName(playerDisplayName(s))
+                    setFullName(s.fullName || s.name)
                     setShowSuggestions(false)
                   }}
                   className="w-full px-3 py-2 text-left text-sm hover:bg-zinc-800"
                 >
-                  {s}
+                  <span className="block truncate">{playerDisplayName(s)}</span>
+                  <span className="block truncate text-xs text-zinc-400">{s.fullName || s.name} · #{s.number} · {teams.filter(team => [s.teamId, ...(s.teamIds ?? [])].includes(team.id)).map(team => team.shortName).join(', ')}</span>
                 </button>
               ))}
             </div>
@@ -80,15 +89,18 @@ export function NewPlayerScreen({
         </div>
         <input
           type="number"
-          value={number}
+          value={selectedPlayer?.number ?? number}
+          disabled={!!selectedPlayer}
           onChange={(e) => setNumber(Number(e.target.value))}
           className="w-full rounded-xl bg-zinc-900 px-3 py-2.5 text-sm"
         />
         <select
-          value={position}
+          value={selectedPlayer?.position ?? position}
+          disabled={!!selectedPlayer}
           onChange={(e) => setPosition(e.target.value as RegistrationPosition)}
           className="w-full rounded-xl bg-zinc-900 px-3 py-2.5 text-sm"
         >
+          {selectedPlayer && !REGISTRATION_POSITIONS.some(pos => pos === selectedPlayer.position) && <option value={selectedPlayer.position}>{selectedPlayer.position}</option>}
           {REGISTRATION_POSITIONS.map((pos) => (
             <option key={pos} value={pos}>
               {pos}
@@ -99,6 +111,13 @@ export function NewPlayerScreen({
           type="button"
           disabled={!displayName.trim() || !selectedTeam}
           onClick={() => {
+            if (selectedPlayer) {
+              updatePlayer(selectedPlayer.id, {
+                teamIds: [...new Set([selectedPlayer.teamId, ...(selectedPlayer.teamIds ?? []), selectedTeam].filter(Boolean))],
+              })
+              onNavigate({ name: 'player', id: selectedPlayer.id })
+              return
+            }
             const id = addPlayer({
               name: displayName.trim(),
               fullName: fullName.trim() || displayName.trim(),
@@ -111,7 +130,7 @@ export function NewPlayerScreen({
           }}
           className="w-full rounded-xl bg-emerald-500 py-2.5 text-sm font-bold text-black disabled:opacity-40"
         >
-          Create player
+          {selectedPlayer ? 'Add to team' : 'Create player'}
         </button>
       </div>
     </div>

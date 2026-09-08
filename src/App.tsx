@@ -15,14 +15,15 @@ import { TeamDetailScreen } from './screens/TeamDetailScreen'
 import { TeamsScreen } from './screens/TeamsScreen'
 import { DataManagementScreen } from './screens/DataManagementScreen'
 import { useStore } from './store'
-import type { RankSort, Tab, View } from './types'
+import type { Tab, View } from './types'
 import { seasonsFromMatches } from './engine/stats'
 
 export default function App() {
   const { matches } = useStore()
   const seasons = seasonsFromMatches(matches)
   const [season, setSeason] = useState(seasons[0] ?? 'Season 1')
-  const [view, setView] = useState<View>({ name: 'home' })
+  const [history, setHistory] = useState<View[]>([{ name: 'home' }])
+  const view = history[history.length - 1]
 
   const tab: Tab = useMemo(() => {
     if (view.name === 'teams' || view.name === 'team' || view.name === 'new-team' || view.name === 'edit-team' || view.name === 'new-match') {
@@ -35,13 +36,17 @@ export default function App() {
   }, [view])
 
   function onTab(next: Tab) {
-    if (next === 'home') setView({ name: 'home' })
-    if (next === 'teams') setView({ name: 'teams' })
-    if (next === 'players') setView({ name: 'players' })
+    if (next === 'home') setHistory([{ name: 'home' }])
+    if (next === 'teams') setHistory([{ name: 'teams' }])
+    if (next === 'players') setHistory([{ name: 'players' }])
   }
 
   function onNavigate(next: View) {
-    setView(next)
+    setHistory((prev) => [...prev, next])
+  }
+
+  function onBack() {
+    setHistory((prev) => prev.slice(0, -1))
   }
 
   return (
@@ -53,17 +58,16 @@ export default function App() {
           )}
           {view.name === 'rankings' && (
             <RankingsScreen
-              season={season}
-              sort={view.sort}
-              onSort={(sort: RankSort) => setView({ name: 'rankings', sort })}
               onNavigate={onNavigate}
             />
           )}
+
           {view.name === 'teams' && <TeamsScreen onNavigate={onNavigate} />}
-          {view.name === 'team' && <TeamDetailScreen teamId={view.id} season={season} onNavigate={onNavigate} />}
-          {view.name === 'players' && <PlayersScreen season={season} onNavigate={onNavigate} />}
+          {view.name === 'team' && <TeamDetailScreen teamId={view.id} season={season} onNavigate={onNavigate} onBack={onBack} />}
+          {view.name === 'players' && <PlayersScreen onNavigate={onNavigate} />}
+
           {view.name === 'player' && (
-            <PlayerDetailScreen playerId={view.id} season={season} onNavigate={onNavigate} />
+            <PlayerDetailScreen playerId={view.id} season={season} onNavigate={onNavigate} onBack={onBack} />
           )}
           {view.name === 'match' && <MatchDetailScreen matchId={view.id} onNavigate={onNavigate} />}
           {view.name === 'edit-match' && <EditMatchScreen matchId={view.id} onNavigate={onNavigate} />}

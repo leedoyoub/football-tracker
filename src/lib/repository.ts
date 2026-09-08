@@ -1,4 +1,4 @@
-import type { AppState } from '../types';
+import type { AppState, Player } from '../types';
 import { getFromIndexedDB, saveToIndexedDB } from './db';
 import { validateState } from './validation';
 
@@ -22,9 +22,17 @@ export const LocalRepository = {
         if (!raw) continue;
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (validateState(parsed)) {
+          // Migration: Ensure player position is valid
+          const migratedState: AppState = {
+            ...parsed,
+            players: parsed.players.map((player: Player) => ({
+              ...player,
+              position: player.position || 'CM'
+            })),
+          };
           // If recovered from non-IDB, sync to IDB
-          if (typeof raw === 'string') await saveToIndexedDB(STORAGE_KEY, parsed);
-          return parsed;
+          if (typeof raw === 'string') await saveToIndexedDB(STORAGE_KEY, migratedState);
+          return migratedState;
         }
       } catch (e) {
         console.error('Recovery attempt failed for a source', e);

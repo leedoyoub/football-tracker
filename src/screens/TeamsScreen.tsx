@@ -6,14 +6,14 @@ export function TeamsScreen({ onNavigate }: { onNavigate: (view: View) => void }
   const { teams, players, matches } = useStore()
   return (
     <div className="px-4 pb-8 pt-6">
-      <div className="mb-5 flex items-center justify-between">
+      <div className="relative z-20 mb-5 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Teams</h1>
         <button
           type="button"
           onClick={() => onNavigate({ name: 'new-team' })}
-          className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-bold text-black"
+          className="pointer-events-auto min-h-11 shrink-0 cursor-pointer rounded-full bg-emerald-500 px-4 py-2 text-xs font-bold text-black"
         >
-          Add
+          New Team
         </button>
       </div>
       <div className="space-y-3">
@@ -29,7 +29,7 @@ export function TeamsScreen({ onNavigate }: { onNavigate: (view: View) => void }
               onClick={() => onNavigate({ name: 'team', id: team.id })}
               className="flex w-full items-center gap-3 rounded-2xl bg-zinc-900 p-3 text-left"
             >
-              <TeamIcon team={team} className="h-12 w-12 text-sm font-black">{team.shortName.slice(0, 3)}</TeamIcon>
+              <TeamIcon team={team} className="h-12 w-12 text-sm font-black">{(team.shortName || team.abbreviation || team.name).slice(0, 3)}</TeamIcon>
               <span className="flex-1">
                 <span className="block text-sm font-semibold">{team.name}</span>
                 <span className="text-[11px] text-zinc-400">
