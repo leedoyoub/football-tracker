@@ -140,8 +140,6 @@ export function HomeScreen({
         <StandingsTable standings={standings.slice(0, 7)} teams={teams} compact />
       </section>
 
-      <section className="mb-7 rounded-xl bg-zinc-900 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold">Combinations</h2><p className="text-xs text-zinc-400">Chemistry, partnerships and on-pitch impact</p></div><button type="button" onClick={() => onNavigate({ name: 'chemistry' })} className="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black text-black">OPEN</button></div></section>
-
       <section>
         <div className="mb-3">
           <h2 className="text-lg font-semibold">Team of the Week</h2>

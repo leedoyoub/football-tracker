@@ -11,6 +11,8 @@ import type { AppState, Match, Player, Team } from './types'
 import { LocalRepository } from './lib/repository'
 import { STATIC_TEAMS } from './data/teams'
 import { assertRosterCapacity, currentTeamIds } from './lib/roster'
+import { SyncManager } from './lib/sync'
+import { useAuth } from './lib/auth'
 
 interface StoreValue extends AppState {
   addTeam: (team: Omit<Team, 'id'> & { id?: string }) => string
@@ -27,6 +29,7 @@ interface StoreValue extends AppState {
 const StoreContext = createContext<StoreValue | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
   const [state, setState] = useState<AppState>({ teams: STATIC_TEAMS, players: [], matches: [] })
   const [isLoaded, setIsLoaded] = useState(false)
 
@@ -37,10 +40,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  useEffect(() => {
+    if (!isLoaded || !user) return
+    const sync = async () => {
+      await SyncManager.syncNow()
+      const restored = await LocalRepository.getAppState()
+      if (restored) setState(restored)
+    }
+    void sync()
+    const onOnline = () => { void sync() }
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  }, [isLoaded, user?.id])
+
   const update = useCallback((fn: (prev: AppState) => AppState) => {
     setState((prev) => {
       const next = fn(prev)
-      LocalRepository.saveAppState(next)
+      // Local persistence is always first. Cloud queueing is deliberately
+      // detached so offline/auth/network failures never affect match recording.
+      void LocalRepository.saveAppState(next).then(() => SyncManager.queueStateChange(prev, next)).then(() => SyncManager.syncNow())
       return next
     })
   }, [])
@@ -84,7 +102,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addMatch: (match) => {
         const id = match.id ?? crypto.randomUUID()
         const saved = { ...match, id }
-        update((prev) => ({ ...prev, matches: [...prev.matches, { ...saved }] }))
+        update((prev) => prev.matches.some(item => item.id === id) ? prev : ({ ...prev, matches: [...prev.matches, { ...saved }] }))
         return id
       },
       updateMatch: (id, match) => {

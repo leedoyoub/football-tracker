@@ -1,139 +1,73 @@
-import { supabase } from './supabase';
-import { getFromIndexedDB, openDB, saveToIndexedDB } from './db';
-import type { AppState } from '../types';
-import { validateState } from './validation';
+import { supabase } from './supabase'
+import { getFromIndexedDB, openDB } from './db'
+import { LocalRepository } from './repository'
+import { validateState } from './validation'
+import type { AppState, Match, Player, Team } from '../types'
 
-const QUEUE_STORE = 'sync_queue';
-const SYNC_META_STORE = 'sync_metadata';
-
-export interface SyncItem {
-  id: string;
-  entityType: 'match' | 'player' | 'team';
-  entityId: string;
-  operation: 'create' | 'update' | 'delete';
-  timestamp: number;
-  status: 'pending' | 'syncing' | 'failed';
-  payload: any;
+const DATA_KEY = 'football-tracker-v1'
+const QUEUE_STORE = 'sync_queue'
+const META_STORE = 'sync_metadata'
+export type SyncEntity = 'team' | 'player' | 'match'
+export type SyncItem = { id: string; entityType: SyncEntity; entityId: string; operation: 'upsert' | 'delete'; payload?: Team | Player | Match; timestamp: number; status: 'pending' | 'failed' }
+export type SyncMetadata = { lastSyncedUserId: string | null; lastSyncAt: number; retryAt: number; entityUpdatedAt: Record<string, number> }
+export const TABLE_FOR: Record<SyncEntity, 'teams' | 'players' | 'matches'> = { team: 'teams', player: 'players', match: 'matches' }
+const emptyMeta = (): SyncMetadata => ({ lastSyncedUserId: null, lastSyncAt: 0, retryAt: 0, entityUpdatedAt: {} })
+const key = (type: SyncEntity, id: string) => `${type}:${id}`
+const entities = (state: AppState, type: SyncEntity) => type === 'team' ? state.teams : type === 'player' ? state.players : state.matches
+let retryTimer: ReturnType<typeof setTimeout> | undefined
+function scheduleRetry(delay: number) {
+  if (retryTimer) return
+  retryTimer = setTimeout(() => { retryTimer = undefined; void SyncManager.syncNow() }, delay)
 }
 
-export interface SyncMetadata {
-  lastSyncedUserId: string | null;
-  lastSyncAt: number;
-  conflictCount: number;
-}
+async function allQueue(): Promise<SyncItem[]> { const db = await openDB(); return new Promise((resolve, reject) => { const req = db.transaction(QUEUE_STORE, 'readonly').objectStore(QUEUE_STORE).getAll(); req.onsuccess = () => resolve(req.result ?? []); req.onerror = () => reject(req.error) }) }
+async function metadata(): Promise<SyncMetadata> { const db = await openDB(); return new Promise((resolve, reject) => { const req = db.transaction(META_STORE, 'readonly').objectStore(META_STORE).get('meta'); req.onsuccess = () => resolve(req.result ?? emptyMeta()); req.onerror = () => reject(req.error) }) }
+async function putMetadata(value: SyncMetadata) { const db = await openDB(); await new Promise<void>((resolve, reject) => { const tx = db.transaction(META_STORE, 'readwrite'); tx.objectStore(META_STORE).put(value, 'meta'); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error) }) }
+const serialize = (entity: Team | Player | Match) => ({ ...entity })
+const deserialize = <T extends Team | Player | Match>(row: T & { user_id?: string; created_at?: string; updated_at?: string }) => { const { user_id: _user, created_at: _created, updated_at: _updated, ...entity } = row; return entity as T }
 
 export const SyncManager = {
-  async getSyncMetadata(): Promise<SyncMetadata> {
-    const db = await openDB();
-    return new Promise((resolve) => {
-      const tx = db.transaction(SYNC_META_STORE, 'readonly');
-      const req = tx.objectStore(SYNC_META_STORE).get('meta');
-      req.onsuccess = () => resolve(req.result || { lastSyncedUserId: null, lastSyncAt: 0, conflictCount: 0 });
-    });
+  async queueOperation(item: Omit<SyncItem, 'id' | 'timestamp' | 'status'>) {
+    const db = await openDB(); const now = Date.now(); const tx = db.transaction(QUEUE_STORE, 'readwrite'); const store = tx.objectStore(QUEUE_STORE)
+    // Coalesce a pending entity into one latest, idempotent operation.
+    const existing = await new Promise<SyncItem[]>((resolve, reject) => { const req = store.getAll(); req.onsuccess = () => resolve(req.result ?? []); req.onerror = () => reject(req.error) })
+    existing.filter(row => row.entityType === item.entityType && row.entityId === item.entityId).forEach(row => store.delete(row.id))
+    store.put({ ...item, id: crypto.randomUUID(), timestamp: now, status: 'pending' } satisfies SyncItem)
+    await new Promise<void>((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error) })
+    const meta = await metadata(); meta.entityUpdatedAt[key(item.entityType, item.entityId)] = now; await putMetadata(meta)
   },
-
-  async updateSyncMetadata(meta: SyncMetadata): Promise<void> {
-    const db = await openDB();
-    const tx = db.transaction(SYNC_META_STORE, 'readwrite');
-    tx.objectStore(SYNC_META_STORE).put(meta, 'meta');
-  },
-
-  async queueOperation(item: Omit<SyncItem, 'id' | 'timestamp' | 'status'>): Promise<void> {
-    const db = await openDB();
-    const tx = db.transaction(QUEUE_STORE, 'readwrite');
-    tx.objectStore(QUEUE_STORE).put({ 
-        ...item, 
-        id: crypto.randomUUID(), 
-        timestamp: Date.now(), 
-        status: 'pending' 
-    });
-  },
-
-  async syncNow(): Promise<{ status: string; message: string }> {
-    if (!supabase) return { status: 'offline', message: 'No Supabase connection' };
-    
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { status: 'error', message: 'Not signed in' };
-
-    const meta = await this.getSyncMetadata();
-    
-    // Account Mismatch Protection
-    if (meta.lastSyncedUserId && meta.lastSyncedUserId !== user.id) {
-        return { status: 'account_mismatch', message: 'Account mismatch detected. Sync paused to protect data.' };
+  async queueStateChange(previous: AppState, next: AppState) {
+    for (const type of ['team', 'player', 'match'] as const) {
+      const before = new Map(entities(previous, type).map(entity => [entity.id, entity])); const after = new Map(entities(next, type).map(entity => [entity.id, entity]))
+      for (const [id, entity] of after) if (JSON.stringify(before.get(id)) !== JSON.stringify(entity)) await this.queueOperation({ entityType: type, entityId: id, operation: 'upsert', payload: entity })
+      for (const id of before.keys()) if (!after.has(id)) await this.queueOperation({ entityType: type, entityId: id, operation: 'delete' })
     }
-
-    const localState = await getFromIndexedDB('football-tracker-v1');
-    if (!localState) return { status: 'error', message: 'No local data' };
-
-    // 1. Process Queue (Upload)
-    const db = await openDB();
-    const queue = await new Promise<SyncItem[]>((resolve) => {
-        const tx = db.transaction(QUEUE_STORE, 'readonly');
-        const req = tx.objectStore(QUEUE_STORE).getAll();
-        req.onsuccess = () => resolve(req.result);
-    });
-
-    for (const item of queue) {
-        try {
-            const table = item.entityType + 's';
-            if (item.operation === 'create' || item.operation === 'update') {
-                const { error } = await supabase.from(table).upsert({ ...item.payload, user_id: user.id });
-                if (error) throw error;
-            } else if (item.operation === 'delete') {
-                // Using tombstone approach: just update a deleted_at column instead of hard delete if possible
-                // Assuming RLS handles user isolation
-                const { error } = await supabase.from(table).delete().eq('id', item.entityId).eq('user_id', user.id);
-                if (error) throw error;
-            }
-            const tx = db.transaction(QUEUE_STORE, 'readwrite');
-            tx.objectStore(QUEUE_STORE).delete(item.id);
-        } catch (e) {
-            console.error('Failed to sync item:', item, e);
-        }
-    }
-    
-    // 2. Download and Merge
-    await this.downloadAndMerge(user.id, localState);
-    
-    // 3. Update Meta
-    await this.updateSyncMetadata({ lastSyncedUserId: user.id, lastSyncAt: Date.now(), conflictCount: meta.conflictCount });
-
-    return { status: 'synced', message: 'Sync complete' };
   },
-
-  async downloadAndMerge(userId: string, localState: AppState): Promise<void> {
-      if (!supabase) return;
-      // Fetch Cloud Data (Simplified for core entities)
-      const { data: teams } = await supabase.from('teams').select('*').eq('user_id', userId);
-      const { data: players } = await supabase.from('players').select('*').eq('user_id', userId);
-      const { data: matches } = await supabase.from('matches').select('*').eq('user_id', userId);
-      
-      const cloudState = { teams: teams || [], players: players || [], matches: matches || [] };
-
-      // Entity level merge
-      const mergedTeams = this.mergeEntities(localState.teams, cloudState.teams);
-      const mergedPlayers = this.mergeEntities(localState.players, cloudState.players);
-      const mergedMatches = this.mergeEntities(localState.matches, cloudState.matches);
-      
-      const mergedState = { ...localState, teams: mergedTeams, players: mergedPlayers, matches: mergedMatches };
-
-      if (validateState(mergedState)) {
-          await saveToIndexedDB('football-tracker-v1', mergedState);
+  async syncNow(): Promise<{ status: 'local-only' | 'synced' | 'pending' | 'error'; message: string }> {
+    if (!supabase || !navigator.onLine) { scheduleRetry(30000); return { status: 'local-only', message: 'Cloud unavailable; local data is safe.' } }
+    const { data: { user } } = await supabase.auth.getUser(); if (!user) return { status: 'local-only', message: 'Signed out; using local storage.' }
+    const local = await getFromIndexedDB(DATA_KEY); if (!local) return { status: 'error', message: 'No local state to sync.' }
+    const meta = await metadata(); const pending = await allQueue(); const pendingKeys = new Set(pending.map(item => key(item.entityType, item.entityId)))
+    // Never upload one account's durable local queue into a different account.
+    if (meta.lastSyncedUserId && meta.lastSyncedUserId !== user.id) return { status: 'pending', message: 'Account changed; local data was kept and cloud upload is paused.' }
+    try {
+      const [teams, players, matches] = await Promise.all([supabase.from('teams').select('*'), supabase.from('players').select('*'), supabase.from('matches').select('*')])
+      if (teams.error) throw teams.error; if (players.error) throw players.error; if (matches.error) throw matches.error
+      const cloud: AppState = { teams: (teams.data ?? []).map(deserialize), players: (players.data ?? []).map(deserialize), matches: (matches.data ?? []).map(deserialize), draftMatch: local.draftMatch }
+      const merge = <T extends { id: string }>(type: SyncEntity, localRows: T[], cloudRows: T[]) => {
+        const out = new Map(localRows.map(row => [row.id, row])); for (const row of cloudRows) if (!pendingKeys.has(key(type, row.id))) out.set(row.id, row); return [...out.values()]
       }
+      const merged: AppState = { teams: merge('team', local.teams, cloud.teams), players: merge('player', local.players, cloud.players), matches: merge('match', local.matches, cloud.matches), draftMatch: local.draftMatch }
+      if (validateState(merged)) await LocalRepository.saveAppState(merged)
+      // First sign-in / remote-empty safety: every local-only entity gets an upload.
+      for (const type of ['team', 'player', 'match'] as const) { const remoteIds = new Set(entities(cloud, type).map(row => row.id)); for (const entity of entities(merged, type)) if (!remoteIds.has(entity.id) && !pendingKeys.has(key(type, entity.id))) await this.queueOperation({ entityType: type, entityId: entity.id, operation: 'upsert', payload: entity }) }
+      for (const item of await allQueue()) {
+        const table = TABLE_FOR[item.entityType]
+        const result = item.operation === 'delete' ? await supabase.from(table).delete().eq('id', item.entityId).eq('user_id', user.id) : await supabase.from(table).upsert({ ...serialize(item.payload!), user_id: user.id })
+        if (result.error) throw result.error
+        const db = await openDB(); await new Promise<void>((resolve, reject) => { const tx = db.transaction(QUEUE_STORE, 'readwrite'); tx.objectStore(QUEUE_STORE).delete(item.id); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error) })
+      }
+      await putMetadata({ ...meta, lastSyncedUserId: user.id, lastSyncAt: Date.now(), retryAt: 0 }); return { status: 'synced', message: 'Cloud backup is up to date.' }
+    } catch (error) { const delay = Math.min(300000, 5000 * 2 ** Math.min(6, pending.length)); const next = Date.now() + delay; await putMetadata({ ...meta, retryAt: next }); scheduleRetry(delay); return { status: 'pending', message: 'Cloud sync pending; local data is safe.' } }
   },
-
-  mergeEntities<T extends { id: string }>(local: T[], cloud: T[]): T[] {
-      const result = [...local];
-      for (const item of cloud) {
-          const index = result.findIndex(i => i.id === item.id);
-          if (index === -1) {
-              result.push(item);
-          } else {
-              // Simple Conflict Detection: Last Write Wins based on ID identity
-              // In a real production system, use updatedAt timestamps
-              result[index] = item; 
-          }
-      }
-      return result;
-  }
-};
+}

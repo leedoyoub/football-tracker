@@ -1,7 +1,7 @@
 import { matchPositionSegments, matchScore, ratePlayerMatch } from './rating'
 import type { Match, Player, Position } from '../types'
 
-export type AnalyticsFilter = { season: string; teamId?: string }
+export type AnalyticsFilter = { season?: string; teamId?: string }
 export type CombinationKind = 'duo' | 'attack' | 'midfield' | 'cb' | 'backFour'
 export type CombinationStats = {
   key: string; kind: CombinationKind; playerIds: string[]; teamId: string
@@ -26,7 +26,7 @@ const anyRole: RoleCheck = () => true
 const roleFor = (kind: Exclude<CombinationKind, 'backFour'>): RoleCheck => kind === 'attack' ? position => attackers.has(position) : kind === 'midfield' ? position => midfielders.has(position) : kind === 'cb' ? position => centreBacks.has(position) : anyRole
 
 function isScoped(match: Match, filter: AnalyticsFilter, teamId?: string) {
-  if (match.season !== filter.season) return false
+  if (filter.season && match.season !== filter.season) return false
   const selectedTeam = teamId ?? filter.teamId
   return !selectedTeam || match.appearances.some(appearance => appearance.teamId === selectedTeam)
 }

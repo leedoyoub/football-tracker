@@ -101,7 +101,7 @@ function harness() {
   h.call = (name, ...args) => h.act(() => h.props()[name](...args))
   h.pitch = () => nodes(h.live() ? h.liveTree() : h.tree, node => node.type === Pitch)[0]
   h.button = name => nodes(h.live() ? h.liveTree() : h.tree, node => node.type === 'button' && content(node) === name)[0]
-  h.clickButton = name => { if (name === 'FINISH & SAVE' && !h.button(name)) { if (!nodes(h.liveTree(), n => n.props?.['aria-label'] === 'End match').length) h.clickButton('END MATCH'); if (h.props().totalSaves === '') h.call('onTotalSaves', '0'); h.clickButton('SAVE & FINISH MATCH') } const button = h.button(name); assert(button, name); assert(!button.props.disabled, name); h.act(button.props.onClick) }
+  h.clickButton = name => { if (name === 'FINISH & SAVE' && !h.button(name)) { if (!nodes(h.liveTree(), n => n.props?.['aria-label'] === 'End match').length) h.clickButton('END MATCH'); if (h.props().totalSaves === '') h.call('onTotalSaves', '0'); h.clickButton('SAVE & FINISH MATCH'); return } const button = h.button(name); assert(button, name); assert(!button.props.disabled, name); h.act(button.props.onClick) }
   h.clickOut = slotId => h.act(() => { const pitch = h.pitch(); pitch.props.onSlotClick(pitch.props.slots.find(slot => slot.slot === slotId)) })
   h.clickIn = id => h.act(() => nodes(h.liveTree(), node => node.type?.name === 'DragPlayerGroup')[0].props.onClick(id))
   h.drag = (source, target) => {
@@ -661,12 +661,13 @@ test('quick multiple substitutions and empty tactical moves retain timeline and 
   assert.equal(h.drafts.at(-1).appearances.find(a => a.playerId === 'CM').positionHistory, undefined)
 })
 
-test('end match review can return to saves without appending duplicate totals', () => {
+test('Save & Finish Match is the only final action and cannot duplicate a match', () => {
   const h = harness(); h.enter(); h.clickButton('END MATCH')
   assert(h.button('SAVE & FINISH MATCH').props.disabled)
   h.call('onTotalSaves', '5'); const id = h.props().events[0].id
-  h.clickButton('SAVE & FINISH MATCH'); assert.equal(h.saved.length, 0)
-  assert(content(h.liveTree()).includes('Final Result: 0 - 0'))
-  h.clickButton('EDIT SAVES'); h.call('onTotalSaves', '6'); h.clickButton('SAVE & FINISH MATCH'); h.clickButton('FINISH & SAVE')
-  assert.deepEqual(h.saved[0].events.map(e => [e.id, e.count]), [[id, 6]])
+  h.clickButton('SAVE & FINISH MATCH')
+  assert.equal(h.saved.length, 1)
+  assert(!content(h.liveTree()).includes('FINISH & SAVE'))
+  assert(!h.button('SAVE & FINISH MATCH'))
+  assert.deepEqual(h.saved[0].events.map(e => [e.id, e.count]), [[id, 5]])
 })

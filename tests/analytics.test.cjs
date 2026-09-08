@@ -65,5 +65,5 @@ test('analytics source and UI expose season/team filters, comparison and Player 
   assert(comparison.includes('Comparison team filter') && comparison.includes('On-pitch +/-'))
   assert(detail.includes('Position splits') && detail.includes('Starter / Substitute'))
   const nav = fs.readFileSync(require.resolve('../src/components/BottomNav.tsx'), 'utf8')
-  assert(nav.includes("id: 'chemistry'") && nav.includes('grid-cols-4'))
+  assert(nav.includes("id: 'records'") && nav.includes('grid-cols-5'))
 })

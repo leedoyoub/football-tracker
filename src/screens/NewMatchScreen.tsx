@@ -48,6 +48,7 @@ export function NewMatchScreen({
 }) {
   const { teams, players, matches, addMatch, saveDraftMatch, clearDraftMatch } = useStore()
   const [draftId] = useState(() => crypto.randomUUID())
+  const savingRef = useRef(false)
   const selectedTeamId = teamId ?? teams[0]?.id ?? ''
   
   const { season, matchDay } = useMemo(() => getNextMatchDayForTeam(selectedTeamId, matches), [selectedTeamId, matches])
@@ -425,7 +426,8 @@ export function NewMatchScreen({
   }, [step, draftId, season, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, appearances, saveDraftMatch])
 
   function save() {
-    if (liveEvent || startingIds.length !== 11) return
+    if (savingRef.current || liveEvent || startingIds.length !== 11) return
+    savingRef.current = true
     const id = addMatch({ id: draftId,
       season, matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName: 'OPP', duration: 90, appearances, events: matchDraft.events,
     })
@@ -501,8 +503,14 @@ function LiveMatchStep(props: {
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } }),
   )
-  const [finishStage, setFinishStage] = useState<'saves' | 'review' | null>(null)
+  const [finishStage, setFinishStage] = useState<'saves' | null>(null)
+  const [finishing, setFinishing] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<MatchEvent | null>(null)
+  const finishMatch = () => {
+    if (finishing) return
+    setFinishing(true)
+    props.onFinish()
+  }
   const eventName = props.liveEvent === 'conceded' ? 'Conceded Goal' : 'Goal'
   const playerName = (id: string) => playerDisplayName(props.players.find((player) => player.id === id))
   return <DndContext sensors={sensors} collisionDetection={lineupCollision} onDragStart={props.onDragStart} onDragEnd={props.onSubDragEnd} onDragCancel={props.onDragCancel}><div className="space-y-3">
@@ -539,7 +547,7 @@ function LiveMatchStep(props: {
     <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Event History</h2><button type="button" disabled={!!props.liveEvent || !props.events.some(e => e.type !== 'save')} onClick={() => { const event = props.events.filter(e => e.type !== 'save').at(-1); if (event) props.onDeleteEvent(event) }} className="mb-2 text-xs font-bold text-emerald-400 disabled:opacity-40">UNDO LAST</button><div className="space-y-1.5">{props.events.slice().sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0)).map((event) => <button type="button" disabled={!!props.liveEvent} onClick={() => event.type === 'save' ? setFinishStage('saves') : setSelectedEvent(event)} key={event.id} className="block w-full rounded-xl bg-zinc-900 px-3 py-2 text-left text-[11px]">{event.type !== 'save' && `${event.minute}' `}{event.type === 'goal' ? event.teamId === props.selectedTeamId ? `Goal${event.playerId ? `: ${playerName(event.playerId)}` : ' · Opponent own goal'}${event.assistPlayerId ? ` · Assist: ${playerName(event.assistPlayerId)}` : ''}` : `Conceded${event.concededGoalCausePlayerId ? ` · Cause: ${playerName(event.concededGoalCausePlayerId)}` : ''}` : event.type === 'sub' ? `Substitution: ${playerName(event.playerOutId)} → ${playerName(event.playerInId)}` : `Save: ${playerName(event.playerId)} × ${event.count ?? 1}`}</button>)}</div></section>
     <div className="flex gap-2"><button type="button" onClick={props.onBack} className="flex-1 rounded-2xl bg-zinc-900 py-4 text-sm font-black">BACK</button><button type="button" disabled={!!props.liveEvent} onClick={() => setFinishStage('saves')} className="flex-2 rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl">END MATCH</button></div>
     {finishStage && <div role="dialog" aria-modal="true" aria-label="End match" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="w-full max-w-sm space-y-3 rounded-xl bg-zinc-900 p-4">
-      {finishStage === 'saves' ? <><p className="font-bold">{props.startingGoalkeeperName || 'No starting goalkeeper'}</p><label className="flex items-center justify-between">Saves<input aria-label="Total saves" type="text" inputMode="numeric" pattern="[0-9]*" value={props.totalSaves} disabled={!props.hasStartingGoalkeeper} onChange={event => props.onTotalSaves(event.target.value)} className="w-20 rounded-lg bg-black p-2 text-base" /></label><button disabled={props.hasStartingGoalkeeper && props.totalSaves === ''} onClick={() => setFinishStage('review')} className="w-full rounded-lg bg-emerald-500 p-3 text-xs font-black text-black disabled:opacity-40">SAVE & FINISH MATCH</button></> : <><p className="font-bold">Final Result: {props.events.filter(e => e.type === 'goal' && e.teamId === props.selectedTeamId).length} - {props.events.filter(e => e.type === 'goal' && e.teamId !== props.selectedTeamId).length}</p><p className="text-sm">{props.startingGoalkeeperName} / Saves {props.totalSaves || '0'}</p><button onClick={props.onFinish} className="w-full rounded-lg bg-emerald-500 p-3 text-xs font-black text-black">FINISH & SAVE</button><button onClick={() => setFinishStage('saves')} className="w-full p-2 text-xs">EDIT SAVES</button></>}
+      <p className="font-bold">{props.startingGoalkeeperName || 'No starting goalkeeper'}</p><label className="flex items-center justify-between">Saves<input aria-label="Total saves" type="text" inputMode="numeric" pattern="[0-9]*" value={props.totalSaves} disabled={!props.hasStartingGoalkeeper || finishing} onChange={event => props.onTotalSaves(event.target.value)} className="w-20 rounded-lg bg-black p-2 text-base" /></label><button disabled={finishing || (props.hasStartingGoalkeeper && props.totalSaves === '')} onClick={finishMatch} className="w-full rounded-lg bg-emerald-500 p-3 text-xs font-black text-black disabled:opacity-40">{finishing ? 'SAVING…' : 'SAVE & FINISH MATCH'}</button>
       <button onClick={() => setFinishStage(null)} className="w-full p-2 text-xs">CANCEL</button>
     </div></div>}
     {selectedEvent && <div role="dialog" aria-modal="true" aria-label="Event actions" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="flex w-full max-w-sm gap-2 rounded-xl bg-zinc-900 p-4"><button className="flex-1 p-3" onClick={() => { props.onEditEvent(selectedEvent); setSelectedEvent(null) }}>EDIT</button><button className="flex-1 p-3 text-red-400" onClick={() => { props.onDeleteEvent(selectedEvent); setSelectedEvent(null) }}>DELETE</button><button className="flex-1 p-3" onClick={() => setSelectedEvent(null)}>CANCEL</button></div></div>}

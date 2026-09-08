@@ -1,9 +1,10 @@
 import type { AppState } from '../types';
 
 const DB_NAME = 'FootballTrackerDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const DATA_STORE = 'data';
 const QUEUE_STORE = 'sync_queue';
+const METADATA_STORE = 'sync_metadata';
 
 export interface SyncItem {
   id: string;
@@ -21,6 +22,8 @@ export function openDB(): Promise<IDBDatabase> {
       const db = request.result;
       if (!db.objectStoreNames.contains(DATA_STORE)) db.createObjectStore(DATA_STORE);
       if (!db.objectStoreNames.contains(QUEUE_STORE)) db.createObjectStore(QUEUE_STORE, { keyPath: 'id' });
+      // Version 2 is additive: existing local data and the durable queue survive.
+      if (!db.objectStoreNames.contains(METADATA_STORE)) db.createObjectStore(METADATA_STORE);
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);

@@ -18,7 +18,7 @@ export const POSITIONS = [
 
 export type Position = (typeof POSITIONS)[number]
 
-export type Tab = 'home' | 'teams' | 'players' | 'chemistry'
+export type Tab = 'teams' | 'news' | 'home' | 'records' | 'players'
 
 export interface Team {
   id: string
@@ -140,6 +140,8 @@ export interface AppState {
 
 export type View =
   | { name: 'home' }
+  | { name: 'news'; kind?: 'player' | 'match' | 'team' }
+  | { name: 'records' }
   | { name: 'rankings'; sort: RankSort }
   | { name: 'standings' }
   | { name: 'season-recap'; season: string }
