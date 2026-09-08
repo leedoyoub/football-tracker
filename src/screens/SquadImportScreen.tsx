@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth'
 import { RosterCapacityError } from '../lib/roster'
 import { addsNewMembership, availableRosterSlots, importedPosition, validImportedNumber } from '../lib/squadImport'
 import { useStore } from '../store'
+import { PlayerAvatar } from '../components/PlayerAvatar'
 
 export function SquadImportScreen({ teamId, onBack }: { teamId: string; onBack: () => void }) {
   const { teams, players, importPlayers } = useStore()
@@ -88,7 +89,4 @@ export function SquadImportScreen({ teamId, onBack }: { teamId: string; onBack: 
   </div>
 }
 
-function SquadAvatar({ entry }: { entry: ApiFootballSquadPlayer }) {
-  const [failed, setFailed] = useState(false)
-  return <span className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-zinc-700 text-xs font-black">{entry.photo && !failed ? <img src={entry.photo} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} className="absolute inset-0 h-full w-full object-cover object-center" /> : entry.number ?? '—'}</span>
-}
+function SquadAvatar({ entry }: { entry: ApiFootballSquadPlayer }) { return <PlayerAvatar photoUrl={entry.photo} number={entry.number ?? undefined} className="h-11 w-11 text-xs" /> }

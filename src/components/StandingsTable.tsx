@@ -1,8 +1,9 @@
 import type { Team } from '../types'
 import type { Standing } from '../engine/standings'
 import { TeamIcon } from './TeamIcon'
+import { TeamLink } from './TeamLink'
 
-export function StandingsTable({ standings, teams, compact = false }: { standings: Standing[]; teams: Team[]; compact?: boolean }) {
+export function StandingsTable({ standings, teams, compact = false, onTeamNavigate }: { standings: Standing[]; teams: Team[]; compact?: boolean; onTeamNavigate?: (teamId: string) => void }) {
   const byId = Object.fromEntries(teams.map((team) => [team.id, team]))
   return <div className="overflow-hidden rounded-xl bg-zinc-900">
     <table className="w-full table-fixed text-[10px] tabular-nums">
@@ -13,7 +14,7 @@ export function StandingsTable({ standings, teams, compact = false }: { standing
       </tr></thead>
       <tbody>{standings.map((row) => { const team = byId[row.teamId]; return <tr key={row.teamId} className="border-b border-white/[.06] last:border-0">
         <td className="py-2 text-center font-bold text-zinc-500">{row.rank}</td>
-        <td className="min-w-0 py-2"><span className="flex min-w-0 items-center gap-1.5"><TeamIcon team={team} className="h-4 w-4 text-[6px]" /><span className="truncate font-semibold">{compact ? team?.shortName : team?.name}</span></span></td>
+        <td className="min-w-0 py-2">{onTeamNavigate ? <TeamLink team={team} compact={compact} onNavigate={onTeamNavigate} /> : <span className="flex min-w-0 items-center gap-1.5"><TeamIcon team={team} className="h-4 w-4 text-[6px]" /><span className="truncate font-semibold">{compact ? team?.shortName : team?.name}</span></span>}</td>
         <td className="text-center text-zinc-300">{row.played}</td><td className="text-center text-zinc-300">{row.wins}</td><td className="text-center text-zinc-300">{row.draws}</td><td className="text-center text-zinc-300">{row.losses}</td>
         <td className="text-center text-zinc-300">{row.goalsFor}-{row.goalsAgainst}</td><td className={`text-center ${row.goalDifference > 0 ? 'text-emerald-400' : row.goalDifference < 0 ? 'text-red-400' : 'text-zinc-400'}`}>{row.goalDifference > 0 ? '+' : ''}{row.goalDifference}</td><td className="pr-1 text-center font-black text-white">{row.points}</td>
       </tr> })}</tbody>

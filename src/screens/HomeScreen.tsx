@@ -137,7 +137,7 @@ export function HomeScreen({
 
       <section className="mb-7">
         <div className="mb-3 flex items-end justify-between"><div><h2 className="text-lg font-semibold">Standings</h2><p className="text-xs text-zinc-400">{season}</p></div>{standings.length > 7 && <button type="button" onClick={() => onNavigate({ name: 'standings' })} className="secondary-view-all">View All</button>}</div>
-        <StandingsTable standings={standings.slice(0, 7)} teams={teams} compact />
+        <StandingsTable standings={standings.slice(0, 7)} teams={teams} compact onTeamNavigate={(id) => onNavigate({ name: 'team', id })} />
       </section>
 
       <section>
