@@ -150,6 +150,7 @@ export type View =
   | { name: 'comparison' }
   | { name: 'teams' }
   | { name: 'team'; id: string }
+  | { name: 'import-squad'; teamId: string }
   | { name: 'players' }
   | { name: 'player'; id: string }
   | { name: 'match'; id: string }

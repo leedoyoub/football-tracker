@@ -8,7 +8,7 @@ export function TeamIcon({ team, children, className = '', showAbbreviation = tr
   const [failed, setFailed] = useState(false)
   const label = showAbbreviation ? team?.abbreviation : children
   return <span className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-800 ${className}`}>
-    {team?.logo && !failed && <img src={team.logo} alt="" decoding="async" onError={() => setFailed(true)} className="absolute inset-0 h-full w-full object-cover object-center" />}
+    {team?.logo && !failed && <img src={team.logo} alt="" decoding="async" onError={() => setFailed(true)} className="absolute inset-0 h-full w-full p-1 object-contain object-center" />}
     <span className={`relative z-10 text-[10px] font-bold ${showAbbreviation && team?.logo && !failed ? 'sr-only' : ''}`}>{label}</span>
   </span>
 }

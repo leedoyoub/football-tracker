@@ -11,6 +11,7 @@ import type { AppState, Match, Player, Team } from './types'
 import { LocalRepository } from './lib/repository'
 import { STATIC_TEAMS } from './data/teams'
 import { assertRosterCapacity, currentTeamIds } from './lib/roster'
+import { applySquadImport, type SquadImportItem } from './lib/squadImport'
 import { SyncManager } from './lib/sync'
 import { useAuth } from './lib/auth'
 
@@ -19,6 +20,7 @@ interface StoreValue extends AppState {
   updateTeam: (id: string, team: Partial<Team>) => void
   addPlayer: (player: Omit<Player, 'id'> & { id?: string }) => string
   updatePlayer: (id: string, player: Partial<Player>) => void
+  importPlayers: (players: SquadImportItem[]) => void
   addMatch: (match: Omit<Match, 'id'> & { id?: string }) => string
   updateMatch: (id: string, match: Match) => void
   saveDraftMatch: (match: Match) => void
@@ -98,6 +100,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             return { ...p, ...player, teamIds, teamId: teamIds[0] ?? '', fullName: player.fullName ?? p.fullName ?? p.name, displayName: player.displayName ?? p.displayName ?? p.name }
           }),
         }))
+      },
+      importPlayers: (imports) => {
+        const nextPlayers = applySquadImport(state.players, imports, () => crypto.randomUUID())
+        update(() => ({ ...state, players: nextPlayers }))
       },
       addMatch: (match) => {
         const id = match.id ?? crypto.randomUUID()

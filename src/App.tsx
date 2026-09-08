@@ -18,6 +18,7 @@ import { DataManagementScreen } from './screens/DataManagementScreen'
 import { SeasonRecapScreen } from './screens/SeasonRecapScreen'
 import { NewsScreen } from './screens/NewsScreen'
 import { RecordsScreen } from './screens/RecordsScreen'
+import { SquadImportScreen } from './screens/SquadImportScreen'
 import { useStore } from './store'
 import type { Tab, View } from './types'
 import { seasonsFromMatches } from './engine/stats'
@@ -45,7 +46,7 @@ export default function App() {
   }, [view, history.length])
 
   const tab: Tab = useMemo(() => {
-    if (view.name === 'teams' || view.name === 'team' || view.name === 'new-match') {
+    if (view.name === 'teams' || view.name === 'team' || view.name === 'import-squad' || view.name === 'new-match') {
       return 'teams'
     }
     if (view.name === 'players' || view.name === 'player' || view.name === 'new-player' || view.name === 'edit-player') {
@@ -100,6 +101,7 @@ export default function App() {
 
           {view.name === 'teams' && <TeamsScreen onNavigate={onNavigate} />}
           {view.name === 'team' && <TeamDetailScreen teamId={view.id} season={season} onNavigate={onNavigate} onBack={onBack} />}
+          {view.name === 'import-squad' && <SquadImportScreen teamId={view.teamId} onBack={onBack} />}
           {view.name === 'players' && <PlayersScreen onNavigate={onNavigate} />}
 
           {view.name === 'player' && (

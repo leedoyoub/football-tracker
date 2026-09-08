@@ -23,8 +23,18 @@ function scheduleRetry(delay: number) {
 async function allQueue(): Promise<SyncItem[]> { const db = await openDB(); return new Promise((resolve, reject) => { const req = db.transaction(QUEUE_STORE, 'readonly').objectStore(QUEUE_STORE).getAll(); req.onsuccess = () => resolve(req.result ?? []); req.onerror = () => reject(req.error) }) }
 async function metadata(): Promise<SyncMetadata> { const db = await openDB(); return new Promise((resolve, reject) => { const req = db.transaction(META_STORE, 'readonly').objectStore(META_STORE).get('meta'); req.onsuccess = () => resolve(req.result ?? emptyMeta()); req.onerror = () => reject(req.error) }) }
 async function putMetadata(value: SyncMetadata) { const db = await openDB(); await new Promise<void>((resolve, reject) => { const tx = db.transaction(META_STORE, 'readwrite'); tx.objectStore(META_STORE).put(value, 'meta'); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error) }) }
-export const serializeCloudEntity = (entity: Team | Player | Match) => ({ ...entity })
-const deserialize = <T extends Team | Player | Match>(row: T & { user_id?: string; created_at?: string; updated_at?: string }) => { const { user_id: _user, created_at: _created, updated_at: _updated, ...entity } = row; return entity as T }
+export const serializeCloudEntity = (entity: Team | Player | Match) => {
+  if ('position' in entity && 'number' in entity) {
+    const { externalPlayerId, photoUrl, ...player } = entity
+    // Supabase uses snake_case columns; retain the app's camelCase shape locally.
+    return { ...player, external_player_id: externalPlayerId === undefined ? null : String(externalPlayerId), photo_url: photoUrl ?? null }
+  }
+  return { ...entity }
+}
+export const deserializeCloudEntity = <T extends Team | Player | Match>(row: T & { user_id?: string; created_at?: string; updated_at?: string; external_player_id?: string | number | null; photo_url?: string | null }) => {
+  const { user_id: _user, created_at: _created, updated_at: _updated, external_player_id, photo_url, ...entity } = row
+  return { ...entity, ...(external_player_id === undefined || external_player_id === null ? {} : { externalPlayerId: external_player_id }), ...(photo_url === undefined || photo_url === null ? {} : { photoUrl: photo_url }) } as T
+}
 
 export const SyncManager = {
   async queueOperation(item: Omit<SyncItem, 'id' | 'timestamp' | 'status'>) {
@@ -52,7 +62,7 @@ export const SyncManager = {
     try {
       const [teams, players, matches] = await Promise.all([supabase.from('teams').select('*'), supabase.from('players').select('*'), supabase.from('matches').select('*')])
       if (teams.error) throw teams.error; if (players.error) throw players.error; if (matches.error) throw matches.error
-      const cloud: AppState = { teams: (teams.data ?? []).map(deserialize), players: (players.data ?? []).map(deserialize), matches: (matches.data ?? []).map(deserialize), draftMatch: local.draftMatch }
+      const cloud: AppState = { teams: (teams.data ?? []).map(deserializeCloudEntity), players: (players.data ?? []).map(deserializeCloudEntity), matches: (matches.data ?? []).map(deserializeCloudEntity), draftMatch: local.draftMatch }
       const merge = <T extends { id: string }>(type: SyncEntity, localRows: T[], cloudRows: T[]) => {
         const out = new Map(localRows.map(row => [row.id, row])); for (const row of cloudRows) if (!pendingKeys.has(key(type, row.id))) out.set(row.id, row); return [...out.values()]
       }

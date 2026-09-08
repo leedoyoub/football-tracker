@@ -47,7 +47,7 @@ export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamI
     <header className="mb-5 flex items-center gap-3">
       <TeamIcon team={team} className="h-12 w-12 text-sm font-black">{team.shortName}</TeamIcon>
       <div><h1 className="text-xl font-bold">{team.name}</h1><p className="text-[10px] uppercase tracking-widest text-zinc-500">{activeSeason} · Season stats</p></div>
-      <div className="ml-auto"><button type="button" onClick={() => onNavigate({ name: 'new-match', teamId })} className="rounded-full bg-emerald-500 px-3 py-2 text-xs font-bold text-black">Log match</button></div>
+      <div className="ml-auto flex flex-col items-end gap-1"><button type="button" onClick={() => onNavigate({ name: 'new-match', teamId })} className="rounded-full bg-emerald-500 px-3 py-2 text-xs font-bold text-black">Log match</button><button type="button" onClick={() => onNavigate({ name: 'import-squad', teamId })} className="px-2 py-1 text-[11px] font-semibold text-emerald-400">Import Squad</button></div>
     </header>
     <div className="mb-5 grid grid-cols-4 gap-2 text-center">
       {[['Position', standing ? `${standing.rank}${standing.rank === 1 ? 'st' : standing.rank === 2 ? 'nd' : standing.rank === 3 ? 'rd' : 'th'}` : '—'], ['Matches', recent.length], ['W-D-L', `${record.wins}-${record.draws}-${record.losses}`], ['Pts', standing?.points ?? 0]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{value}</div><div className="text-[9px] uppercase text-zinc-500">{label}</div></div>)}
