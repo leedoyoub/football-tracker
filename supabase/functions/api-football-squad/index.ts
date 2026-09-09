@@ -15,10 +15,31 @@ function failure(request: Request, error: ErrorCode, message: string, status: nu
 function logFailure(stage: string, details: Record<string, string | number | undefined> = {}) { console.error('[api-football-squad] failure', { stage, ...details }) }
 function safeErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : 'Unknown error'
-  return message.replace(/https?:\/\/\S+/gi, '[url]').replace(/bearer\s+\S+/gi, 'Bearer [redacted]').slice(0, 160)
+  return sanitizeMessage(message)
+}
+function sanitizeMessage(message: string): string {
+  return message.replace(/https?:\/\/\S+/gi, '[url]').replace(/bearer\s+\S+/gi, 'Bearer [redacted]').replace(/(?:api[_-]?key|token|authorization)\s*[:=]\s*\S+/gi, '[redacted]').slice(0, 160)
+}
+function logProviderFailure(stage: string, upstreamStatus: number, apiErrorType: string, sanitizedMessage: string) {
+  logFailure(stage, { upstreamStatus, apiErrorType, sanitizedMessage })
+}
+function providerErrorDetails(payload: unknown): { apiErrorType: string; sanitizedMessage: string } {
+  const errors = payload && typeof payload === 'object' ? (payload as { errors?: unknown }).errors : undefined
+  if (typeof errors === 'string') return { apiErrorType: 'errors', sanitizedMessage: sanitizeMessage(errors) || 'API-Football reported an error.' }
+  if (Array.isArray(errors)) {
+    const first = errors.find((entry): entry is string => typeof entry === 'string')
+    return { apiErrorType: 'errors', sanitizedMessage: first ? sanitizeMessage(first) : 'API-Football reported an error.' }
+  }
+  if (errors && typeof errors === 'object') {
+    const entry = Object.entries(errors as Record<string, unknown>)[0]
+    const apiErrorType = entry ? entry[0].replace(/[^a-zA-Z0-9_.-]/g, '').slice(0, 64) || 'unknown' : 'unknown'
+    const value = entry?.[1]
+    return { apiErrorType, sanitizedMessage: typeof value === 'string' ? sanitizeMessage(value) : 'API-Football reported an error.' }
+  }
+  return { apiErrorType: 'unknown', sanitizedMessage: 'API-Football reported an error.' }
 }
 function upstreamFailure(request: Request, status: number) {
-  logFailure('api-football-fetch', { upstreamStatus: status })
+  logProviderFailure('api-football-http-error', status, `http-${status}`, 'API-Football returned an HTTP error.')
   if (status === 401) return failure(request, 'UPSTREAM_AUTH_ERROR', 'API-Football could not authorize the squad request.', 502)
   if (status === 403) return failure(request, 'UPSTREAM_ACCESS_DENIED', 'API-Football denied the squad request.', 502)
   if (status === 429) return failure(request, 'API_FOOTBALL_RATE_LIMIT', 'API-Football request limit reached. Try again later.', 429)
@@ -65,11 +86,11 @@ Deno.serve(async request => {
   } finally { clearTimeout(timeout) }
   if (!providerResponse.ok) return upstreamFailure(request, providerResponse.status)
   let payload: unknown
-  try { payload = await providerResponse.json() } catch (error) { logFailure('response-parse', { errorType: error instanceof Error ? error.name : 'UnknownError', errorMessage: safeErrorMessage(error) }); return failure(request, 'INVALID_UPSTREAM_JSON', 'API-Football returned an invalid response.', 502) }
-  if (hasProviderError(payload)) { logFailure('api-football-response-error'); return failure(request, 'UPSTREAM_API_ERROR', 'API-Football could not complete the squad request.', 502) }
+  try { payload = await providerResponse.json() } catch (error) { logProviderFailure('api-football-invalid-json', providerResponse.status, 'invalid-json', safeErrorMessage(error)); return failure(request, 'INVALID_UPSTREAM_JSON', 'API-Football returned an invalid response.', 502) }
+  if (hasProviderError(payload)) { const details = providerErrorDetails(payload); logProviderFailure('api-football-api-error', providerResponse.status, details.apiErrorType, details.sanitizedMessage); return failure(request, 'UPSTREAM_API_ERROR', 'API-Football could not complete the squad request.', 502) }
   const response = payload && typeof payload === 'object' ? (payload as { response?: unknown }).response : undefined
-  if (!Array.isArray(response)) { logFailure('response-shape'); return failure(request, 'INVALID_UPSTREAM_RESPONSE', 'API-Football returned an unexpected squad response.', 502) }
+  if (!Array.isArray(response)) { logProviderFailure('api-football-response-shape', providerResponse.status, 'invalid-response-shape', 'Expected an array response from API-Football.'); return failure(request, 'INVALID_UPSTREAM_RESPONSE', 'API-Football returned an unexpected squad response.', 502) }
   const players = response[0] && typeof response[0] === 'object' ? (response[0] as { players?: unknown }).players : undefined
-  if (!Array.isArray(players)) { logFailure('no-squad-returned'); return failure(request, 'NO_SQUAD_RETURNED', 'No squad was returned for this team.', 404) }
+  if (!Array.isArray(players)) { logProviderFailure('api-football-empty-squad', providerResponse.status, 'empty-squad', 'API-Football returned no squad players.'); return failure(request, 'NO_SQUAD_RETURNED', 'No squad was returned for this team.', 404) }
   return jsonResponse(request, { players: players.map((player: { id?: number; name?: string; age?: number; number?: number | null; position?: string; photo?: string }) => ({ id: player.id, name: player.name, age: player.age, number: player.number ?? null, position: player.position, photo: player.photo })).filter((player: { id?: number; name?: string }) => Number.isInteger(player.id) && Boolean(player.name)) })
 })

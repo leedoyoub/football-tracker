@@ -18,12 +18,23 @@ test('squad function has explicit safe failure paths', () => {
   for (const status of ['status === 401', 'status === 403', 'status === 429', 'status === 404']) assert(edge.includes(status))
 })
 
-test('diagnostic logging never includes credentials or request headers', () => {
+test('provider response failures use safe structured diagnostics', () => {
+  assert(edge.includes("logProviderFailure('api-football-http-error', status, `http-${status}`"))
+  assert(edge.includes("logProviderFailure('api-football-api-error', providerResponse.status, details.apiErrorType, details.sanitizedMessage)"))
+  assert(edge.includes("logProviderFailure('api-football-response-shape', providerResponse.status"))
+  assert(edge.includes("logProviderFailure('api-football-empty-squad', providerResponse.status"))
+  assert(edge.includes('function providerErrorDetails(payload: unknown)'))
+  assert(edge.includes('function logProviderFailure(stage: string, upstreamStatus: number, apiErrorType: string, sanitizedMessage: string)'))
+})
+
+test('diagnostic logging never includes credentials, headers, or entire provider responses', () => {
   assert(edge.includes("logFailure('api-key-check')"))
   assert(!edge.includes('console.error(request'))
   assert(!edge.includes('console.error(apiKey'))
   assert(!edge.includes('console.error(auth'))
   assert(!edge.includes('API_FOOTBALL_KEY:'))
+  assert(!edge.includes('console.error(payload'))
+  assert(!edge.includes('console.error(providerResponse'))
 })
 
 test('frontend turns a structured edge error into a concise safe message', async () => {
