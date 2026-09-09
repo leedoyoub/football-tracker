@@ -20,10 +20,67 @@ export const UNIVERSAL_TACTICAL_SLOTS = Object.values(grid)
 const formation = (...ids: string[]) => ids.map((id) => grid[id])
 export const FORMATION_SLOTS: Record<string, TacticalSlot[]> = {
   '4-3-3': formation('LB', 'LCB', 'RCB', 'RB', 'LCM', 'CM', 'RCM', 'LW', 'ST', 'RW', 'GK'),
+  '4-2-1-3': formation('LB', 'LCB', 'RCB', 'RB', 'LDM', 'RDM', 'CAM', 'LW', 'ST', 'RW', 'GK'),
   '4-2-3-1': formation('LB', 'LCB', 'RCB', 'RB', 'LDM', 'RDM', 'LW', 'CAM', 'RW', 'ST', 'GK'),
   '4-4-2': formation('LB', 'LCB', 'RCB', 'RB', 'LM', 'LCM', 'RCM', 'RM', 'LST', 'RST', 'GK'),
   '3-4-1-2': formation('LCB', 'CB', 'RCB', 'LM', 'LCM', 'RCM', 'RM', 'CAM', 'LST', 'RST', 'GK'),
   '3-5-2': formation('LCB', 'CB', 'RCB', 'LM', 'LCM', 'CM', 'RCM', 'RM', 'LST', 'RST', 'GK'),
+}
+
+const ROW_SLOTS = {
+  defenders: {
+    1: ['CB'],
+    2: ['LCB', 'RCB'],
+    3: ['LCB', 'CB', 'RCB'],
+    4: ['LB', 'LCB', 'RCB', 'RB'],
+    5: ['LB', 'LCB', 'CB', 'RCB', 'RB'],
+  },
+  midfielders: {
+    1: ['CM'],
+    2: ['LCM', 'RCM'],
+    3: ['LCM', 'CM', 'RCM'],
+    4: ['LM', 'LCM', 'RCM', 'RM'],
+    5: ['LM', 'LCM', 'CM', 'RCM', 'RM'],
+  },
+  deeperMidfielders: {
+    1: ['CDM'],
+    2: ['LDM', 'RDM'],
+    3: ['LDM', 'CDM', 'RDM'],
+  },
+  advancedMidfielders: {
+    1: ['CAM'],
+    2: ['LCAM', 'RCAM'],
+    3: ['LCAM', 'CAM', 'RCAM'],
+  },
+  attackers: {
+    1: ['ST'],
+    2: ['LST', 'RST'],
+    3: ['LW', 'ST', 'RW'],
+  },
+} as const
+
+/** Rebuilds any valid shape produced by New Match while keeping one unique tactical slot per starter. */
+export function formationSlotsFor(name: string | undefined): TacticalSlot[] | undefined {
+  if (!name) return undefined
+  if (FORMATION_SLOTS[name]) return FORMATION_SLOTS[name]
+  const counts = name.split('-').map(Number)
+  if (!counts.every(Number.isInteger) || counts.reduce((sum, count) => sum + count, 0) !== 10) return undefined
+  const ids = counts.length === 3
+    ? [
+        ROW_SLOTS.defenders[counts[0] as keyof typeof ROW_SLOTS.defenders],
+        ROW_SLOTS.midfielders[counts[1] as keyof typeof ROW_SLOTS.midfielders],
+        ROW_SLOTS.attackers[counts[2] as keyof typeof ROW_SLOTS.attackers],
+      ]
+    : counts.length === 4
+      ? [
+          ROW_SLOTS.defenders[counts[0] as keyof typeof ROW_SLOTS.defenders],
+          ROW_SLOTS.deeperMidfielders[counts[1] as keyof typeof ROW_SLOTS.deeperMidfielders],
+          ROW_SLOTS.advancedMidfielders[counts[2] as keyof typeof ROW_SLOTS.advancedMidfielders],
+          ROW_SLOTS.attackers[counts[3] as keyof typeof ROW_SLOTS.attackers],
+        ]
+      : []
+  if (!ids.length || ids.some(row => !row)) return undefined
+  return formation(...ids.flat(), 'GK')
 }
 
 

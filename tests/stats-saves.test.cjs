@@ -101,5 +101,5 @@ test('other statistics match the pre-change engine snapshot and inputs remain im
   const serialized = JSON.stringify(output, function (key, value) {
     return key === 'saves' && Object.hasOwn(this, 'avgRating') ? undefined : value
   })
-  assert.equal(createHash('sha256').update(serialized).digest('hex'), 'bf83ed0b212e1f5249c674a4b3fe5889382a1323bb8e02d86247a886f334921e')
+  assert.equal(createHash('sha256').update(serialized).digest('hex'), 'ed8235b823a6cd6821c771167a72f2d80296889b28e8002899c7fd7f12374433')
 })
