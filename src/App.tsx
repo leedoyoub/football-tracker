@@ -29,6 +29,8 @@ import { AuthEntryScreen } from './screens/AuthEntryScreen'
 import { loadLastRoute, saveLastRoute } from './lib/lastRoute'
 import { canUseApp, shouldRestoreLastRoute, startupScreen } from './lib/startup'
 import { BootstrapShell, StartupRecovery } from './components/StartupBoundary'
+import { emptyFilters, type RankingFilters } from './screens/RankingFilters'
+import { popPlayerEditHistory } from './lib/playerNavigation'
 
 export default function App() {
   const { user, loading, startupError, signInWithGoogle, retryStartup } = useAuth()
@@ -37,6 +39,7 @@ export default function App() {
   const seasons = seasonsFromMatches(matches)
   const [season, setSeason] = useState(seasons[0] ?? 'Season 1')
   const [history, setHistory] = useState<View[]>([{ name: 'home' }])
+  const [playerFilters, setPlayerFilters] = useState<RankingFilters>(emptyFilters)
   const [localOnly, setLocalOnly] = useState(false)
   const [routeRestored, setRouteRestored] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -109,6 +112,11 @@ export default function App() {
     setHistory((prev) => prev.length > 1 ? prev.slice(0, -1) : [{ name: 'home' }])
   }
 
+  function dismissPlayerEdit(playerId: string) {
+    navigation.current = 'back'
+    setHistory(prev => popPlayerEditHistory(prev, playerId))
+  }
+
   const screen = startupScreen(startup)
   if (screen === 'loading') return <StartupLoading />
   if (screen === 'error') return <StartupError onRetry={retryStartup} />
@@ -137,7 +145,7 @@ export default function App() {
           {view.name === 'teams' && <TeamsScreen onNavigate={onNavigate} />}
           {view.name === 'team' && <TeamDetailScreen teamId={view.id} season={season} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'import-squad' && <SquadImportScreen teamId={view.teamId} onBack={onBack} />}
-          {view.name === 'players' && <PlayersScreen onNavigate={onNavigate} />}
+          {view.name === 'players' && <PlayersScreen onNavigate={onNavigate} appliedFilters={playerFilters} onFiltersChange={setPlayerFilters} />}
 
           {view.name === 'player' && (
             <PlayerDetailScreen playerId={view.id} season={season} onNavigate={onNavigate} onBack={onBack} />
@@ -150,7 +158,7 @@ export default function App() {
           {view.name === 'new-player' && (
             <NewPlayerScreen teamId={view.teamId} onNavigate={onNavigate} />
           )}
-          {view.name === 'edit-player' && <EditPlayerScreen playerId={view.id} onNavigate={onNavigate} />}
+          {view.name === 'edit-player' && <EditPlayerScreen playerId={view.id} onNavigate={onNavigate} onDone={dismissPlayerEdit} />}
           {view.name === 'data-management' && <DataManagementScreen onNavigate={onNavigate} />}
           {/* Removed Reset demo data button */}
         </div>

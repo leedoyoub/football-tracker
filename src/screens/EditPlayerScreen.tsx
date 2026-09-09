@@ -7,7 +7,7 @@ import { fetchApiFootballPlayer, searchApiFootballPlayers, type ApiFootballPlaye
 import { useAuth } from '../lib/auth'
 import { deriveApiPlayerNames } from '../lib/playerNames'
 
-export function EditPlayerScreen({ playerId, onNavigate }: { playerId: string; onNavigate: (view: View) => void }) {
+export function EditPlayerScreen({ playerId, onNavigate, onDone }: { playerId: string; onNavigate: (view: View) => void; onDone?: (playerId: string) => void }) {
   const { players, teams, updatePlayer } = useStore()
   const { user } = useAuth()
   const player = players.find((item) => item.id === playerId)
@@ -29,6 +29,8 @@ export function EditPlayerScreen({ playerId, onNavigate }: { playerId: string; o
 
   if (!player) return <div className="p-6">Player not found.</div>
 
+  const finish = () => onDone ? onDone(playerId) : onNavigate({ name: 'player', id: playerId })
+
   const previewPhotoUrl = photoChanged ? pendingPhotoUrl : player.photoUrl || player.image
   const closePhoto = () => { setPhotoOpen(false); setPhotoSelected(null); setPhotoResults([]); setPhotoError('') }
   const searchPhotos = async () => { const query = photoQuery.trim(); if (!user) { setPhotoError('Google sign-in is required for API player search.'); return }; if (query.length < 3) { setPhotoError('Enter at least 3 characters to search.'); return }; setPhotoLoading(true); setPhotoError(''); setPhotoResults([]); try { const results = await searchApiFootballPlayers(query); setPhotoResults(results); if (!results.length) setPhotoError('No matching API players found.') } catch (error) { setPhotoError(error instanceof Error ? error.message : 'Could not search players. Try again later.') } finally { setPhotoLoading(false) } }
@@ -38,7 +40,7 @@ export function EditPlayerScreen({ playerId, onNavigate }: { playerId: string; o
   
   return (
     <div className="px-4 pb-8 pt-6">
-      <button type="button" onClick={() => onNavigate({ name: 'player', id: playerId })} className="mb-3 text-xs text-emerald-400">Cancel</button>
+      <button type="button" onClick={finish} className="mb-3 text-xs text-emerald-400">Cancel</button>
       <h1 className="mb-4 text-2xl font-semibold">Edit player</h1>
       <div className="space-y-3">
         <section className="rounded-xl border border-white/10 bg-zinc-900 p-3">
@@ -93,7 +95,7 @@ export function EditPlayerScreen({ playerId, onNavigate }: { playerId: string; o
                     teamId: teamIds[0] ?? '',
                     ...(photoChanged ? { photoUrl: pendingPhotoUrl } : {})
                 }); 
-                onNavigate({ name: 'player', id: playerId }) 
+                finish()
             }} 
             className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-black text-black disabled:opacity-40"
         >

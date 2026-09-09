@@ -22,6 +22,8 @@ export const FORMATION_SLOTS: Record<string, TacticalSlot[]> = {
   '4-3-3': formation('LB', 'LCB', 'RCB', 'RB', 'LCM', 'CM', 'RCM', 'LW', 'ST', 'RW', 'GK'),
   '4-2-3-1': formation('LB', 'LCB', 'RCB', 'RB', 'LDM', 'RDM', 'LW', 'CAM', 'RW', 'ST', 'GK'),
   '4-4-2': formation('LB', 'LCB', 'RCB', 'RB', 'LM', 'LCM', 'RCM', 'RM', 'LST', 'RST', 'GK'),
+  '3-4-1-2': formation('LCB', 'CB', 'RCB', 'LM', 'LCM', 'RCM', 'RM', 'CAM', 'LST', 'RST', 'GK'),
+  '3-5-2': formation('LCB', 'CB', 'RCB', 'LM', 'LCM', 'CM', 'RCM', 'RM', 'LST', 'RST', 'GK'),
 }
 
 
@@ -51,7 +53,13 @@ export function Pitch({ compact = false, slots, players, teams, statsByPlayer, o
   }
   const endDrag = (event: DragEndEvent) => { const active = String(event.active.id).replace('player:', ''); const target = String(event.over?.id ?? '').replace('target:', ''); if (event.over && active !== target) onSlotDrop?.(active, target); window.setTimeout(() => { suppressClick.current = false }, 0) }
   const content = <div className={`relative mx-auto w-full overflow-hidden rounded-lg border border-emerald-700/50 pitch-grass ${compact ? 'aspect-square' : 'aspect-[3/4]'}`}><div className="pointer-events-none absolute inset-2 border border-white/40"><div className="absolute left-1/2 top-0 h-14 w-24 -translate-x-1/2 border border-t-0 border-white/40" /><div className="absolute bottom-0 left-1/2 h-14 w-24 -translate-x-1/2 border border-b-0 border-white/40" /><div className="absolute left-0 right-0 top-1/2 border-t border-white/40" /><div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/40" /></div>{slots.map((slot) => {
-    const tactical = grid[slot.slot] ?? grid.CM; const point = layout === 'free' ? homePositions[slot.slot] ?? tactical : tactical; const player = slot.playerId ? byId[slot.playerId] : undefined; if (!player) return draggable ? <EmptyPitchSlotDrop key={slot.slot} slot={slot} point={point} onClick={onEmptySlotClick ? () => onEmptySlotClick(slot) : undefined} /> : null; const stats = statsByPlayer?.[player.id]; const matchPosition = (slot.matchPosition ?? tactical.matchPosition) as Position
+    const tactical = grid[slot.slot] ?? grid.CM
+    // Saved historical coordinates can be normalized (0..1) or percentages.
+    // Do not use `||`: zero is a valid edge coordinate.
+    const coordinate = (value: number | undefined) => value === undefined ? undefined : Math.max(4, Math.min(96, value <= 1 ? value * 100 : value))
+    const savedX = coordinate(slot.x); const savedY = coordinate(slot.y)
+    const point = savedX !== undefined && savedY !== undefined ? { x: savedX, y: savedY } : layout === 'free' ? homePositions[slot.slot] ?? tactical : tactical
+    const player = slot.playerId ? byId[slot.playerId] : undefined; if (!player) return draggable ? <EmptyPitchSlotDrop key={slot.slot} slot={slot} point={point} onClick={onEmptySlotClick ? () => onEmptySlotClick(slot) : undefined} /> : null; const stats = statsByPlayer?.[player.id]; const matchPosition = (slot.matchPosition ?? tactical.matchPosition) as Position
     const representativeTeam = teamById[slot.teamId ?? '']
     const badges = (
       <>

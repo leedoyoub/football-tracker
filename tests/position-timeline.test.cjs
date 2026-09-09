@@ -22,12 +22,12 @@ test('goal, assist, team goal and concession weights follow each event position;
     goal(10, { playerId: 'teammate' }), goal(65, { playerId: 'teammate' }), goal(20, { teamId: 'B' }), goal(75, { teamId: 'B' })]
   const rating = ratePlayerMatch(match, player)
   near(rating.goals, 1.1 + 1)
-  near(rating.assists, .7 + .7)
+  near(rating.assists, .7 + .65)
   near(rating.teamGoals, .15 + .05)
   near(rating.conceded, -.2 - .1)
   const clean = .3 * ((20 / 90) ** 2 + (40 / 90) ** 2) + .15 * ((15 / 90) ** 2 + (15 / 90) ** 2)
   near(rating.noConceded, clean)
-  near(rating.raw, 6.5 + .1 + 2.1 + 1.4 + .2 - .3 + clean)
+  near(rating.raw, 6.5 + .1 + 2.1 + 1.35 + .2 - .3 + clean)
   assert.equal(rating.minutes, 90); assert.equal(rating.base, 6.5)
   assert.equal(player.position, 'CM')
 })
@@ -35,7 +35,7 @@ test('goal, assist, team goal and concession weights follow each event position;
 test('boundary minute belongs to the new position and a position change does not restart first-goal/assist or concession tiers', () => {
   const match = game('ST', [{ minute: 60, position: 'SS' }])
   match.events = [goal(20, { playerId: 'p' }), goal(60, { playerId: 'p' }), goal(30, { assistPlayerId: 'p' }), goal(70, { assistPlayerId: 'p' })]
-  near(ratePlayerMatch(match, player).goals, .85 + .9)
+  near(ratePlayerMatch(match, player).goals, .9 + .95)
   near(ratePlayerMatch(match, player).assists, .55 + .6)
   assert.equal(matchPositionAt(match, match.appearances[0], 59), 'ST')
   assert.equal(matchPositionAt(match, match.appearances[0], 60), 'SS')

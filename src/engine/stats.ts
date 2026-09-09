@@ -523,14 +523,26 @@ export function teamBestEleven(
   const starters = match.appearances.filter(item => item.teamId === teamId && item.role === 'starter')
   const unique = starters.filter((item, index) => starters.findIndex(other => other.playerId === item.playerId) === index)
   const tacticalSlots = match.formation ? FORMATION_SLOTS[match.formation] : undefined
+  const knownSlotIds = new Set(Object.values(FORMATION_SLOTS).flat().map(slot => slot.slot))
+  const normalizeTacticalPosition = (position: string) => ({
+    LCB: 'CB', RCB: 'CB', LCM: 'CM', RCM: 'CM', LDM: 'CDM', RDM: 'CDM', LST: 'ST', RST: 'ST',
+  }[position] ?? position)
+  const savedKickoffSlot = (playerId: string) => match.kickoffLineup?.find(slot => slot.playerId === playerId)
+  const savedCoordinate = (appearance: typeof unique[number]) => {
+    const saved = savedKickoffSlot(appearance.playerId)
+    const x = saved?.x ?? appearance.kickoffX ?? appearance.x
+    const y = saved?.y ?? appearance.kickoffY ?? appearance.y
+    return x !== undefined && y !== undefined ? { x, y } : {}
+  }
   const remaining = [...unique]
   const slots = (tacticalSlots ?? []).flatMap(tactical => {
-    const index = remaining.findIndex(item => (item.matchPosition ?? item.position) === tactical.matchPosition)
+    const index = remaining.findIndex(item => (item.matchPosition ?? item.position) === tactical.matchPosition || normalizeTacticalPosition(item.matchPosition ?? item.position) === normalizeTacticalPosition(tactical.matchPosition))
     if (index < 0) return []
     const appearance = remaining.splice(index, 1)[0]; const player = players.find(item => item.id === appearance.playerId); const rating = player ? ratePlayerMatch(match, player) : null
-    return [{ slot: tactical.slot, position: tactical.position, matchPosition: appearance.matchPosition ?? appearance.position, playerId: appearance.playerId, teamId, avgRating: rating?.raw ?? 0, matches: 1 }]
+    const saved = savedKickoffSlot(appearance.playerId)
+    return [{ slot: saved?.id && knownSlotIds.has(saved.id) ? saved.id : tactical.slot, position: tactical.position, matchPosition: appearance.matchPosition ?? appearance.position, playerId: appearance.playerId, teamId, avgRating: rating?.raw ?? 0, matches: 1, ...savedCoordinate(appearance) }]
   })
   // Unknown/malformed formations retain valid historical starters without filling from the roster.
-  remaining.forEach((appearance, index) => { const player = players.find(item => item.id === appearance.playerId); const rating = player ? ratePlayerMatch(match, player) : null; const position = (appearance.matchPosition ?? appearance.position) as Position; slots.push({ slot: `${position}-${index}`, position, matchPosition: position, playerId: appearance.playerId, teamId, avgRating: rating?.raw ?? 0, matches: 1 }) })
+  remaining.forEach((appearance, index) => { const player = players.find(item => item.id === appearance.playerId); const rating = player ? ratePlayerMatch(match, player) : null; const position = (appearance.matchPosition ?? appearance.position) as Position; const fallback = FORMATION_SLOTS['4-3-3'].filter(candidate => !slots.some(slot => slot.slot === candidate.slot))[index] ?? FORMATION_SLOTS['4-3-3'][index % FORMATION_SLOTS['4-3-3'].length]; const saved = savedKickoffSlot(appearance.playerId); slots.push({ slot: saved?.id && knownSlotIds.has(saved.id) ? saved.id : fallback.slot, position, matchPosition: position, playerId: appearance.playerId, teamId, avgRating: rating?.raw ?? 0, matches: 1, ...savedCoordinate(appearance) }) })
   return { formation: match.formation ?? null, slots, match }
 }

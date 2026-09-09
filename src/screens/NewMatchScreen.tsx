@@ -12,6 +12,7 @@ import { playerDisplayName, GoalIcon, AssistIcon, StatIcons, SubstitutePlayerCar
 import { PlayerAvatar } from '../components/PlayerAvatar'
 
 import { rebuildLiveHistory } from './liveHistory'
+import { sortPlayersByPosition } from '../lib/positionOrder'
 
 type FormationSlotConfig = TacticalSlot
 type MatchDraftState = { slotAssignments: Record<string, string>; homeBench: string[]; events: MatchEvent[]; positionHistories: Record<string, PositionChange[]> }
@@ -195,7 +196,6 @@ export function NewMatchScreen({
       assists: committed.filter((e) => e.type === 'goal' && e.assistPlayerId === player.id).length + (liveEvent === 'goal' && liveAssistId === player.id ? 1 : 0),
     }]
   }))
-  const liveBenchPlayers = activeDraft.homeBench.filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is Player => Boolean(player))
   const minuteIsValid = /^\d{1,2}$/.test(minuteInput) && liveMinute >= 0 && liveMinute <= (liveEvent === 'substitution' ? 89 : 90)
 
   function openLiveEvent(type: NonNullable<typeof liveEvent>) {
@@ -389,6 +389,7 @@ export function NewMatchScreen({
   }, [selectedTeamId, players, matchDraft, startingSnapshot, startingBenchSnapshot, lineupLocked])
 
   const eventMatch = { id: draftId, season, matchDay, date, duration: 90, homeTeamId, awayTeamId, appearances, events: matchDraft.events }
+  const liveBenchPlayers = sortPlayersByPosition(activeDraft.homeBench.filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is Player => Boolean(player)), appearances)
   function eligibleAt(minute: number) {
     return appearances.filter(appearance => {
       const window = pitchWindow(eventMatch, appearance)
@@ -487,10 +488,10 @@ export function NewMatchScreen({
             </div>
 
             <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Starting XI</h2><Pitch slots={universalPitchSlots} players={draftPlayers} teams={teams} statsByPlayer={seasonStats} badgeMode="position" draggable={!lineupLocked} externalDnd onSlotDrop={moveStartingSlot} onSlotClick={(slot) => { if (!lineupLocked && !suppressDragClick.current && slot.playerId) { setFocusedPlayerId(slot.playerId); setActivePlayer({ group: 'starting', id: slot.playerId, slotId: slot.slot }) } }} /></section>
-            <DragPlayerGroup title="Substitutes" group="substitute" team={teams.find(team => team.id === selectedTeamId)} players={matchDraft.homeBench.filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is NonNullable<typeof player> => Boolean(player))} statsByPlayer={seasonStats} onClick={(id) => { if (lineupLocked || suppressDragClick.current) return; setFocusedPlayerId(id); setActivePlayer({ group: 'substitute', id }) }} />
+            <DragPlayerGroup title="Substitutes" group="substitute" team={teams.find(team => team.id === selectedTeamId)} players={sortPlayersByPosition(matchDraft.homeBench.filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is NonNullable<typeof player> => Boolean(player)), appearances)} statsByPlayer={seasonStats} onClick={(id) => { if (lineupLocked || suppressDragClick.current) return; setFocusedPlayerId(id); setActivePlayer({ group: 'substitute', id }) }} />
             <DragPlayerGroup title="Squad" group="squad" players={squadPlayers} statsByPlayer={seasonStats} onClick={(id) => { if (lineupLocked || suppressDragClick.current) return; setFocusedPlayerId(id); setActivePlayer({ group: 'squad', id }) }} />
             <button disabled={startingIds.length !== 11} onClick={() => { if (!lineupLocked) { setStartingSnapshot({ ...matchDraft.slotAssignments }); setStartingBenchSnapshot([...matchDraft.homeBench]) } setStep(1) }} className="w-full rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl disabled:opacity-40">CONTINUE</button>
-            {activePlayer && <div className="fixed inset-0 z-40 flex items-end bg-black/70 p-4" onClick={() => setActivePlayer(null)}><div className="max-h-[75vh] w-full overflow-y-auto rounded-2xl bg-zinc-950 p-4" onClick={(event) => event.stopPropagation()}><div className="mb-4 flex items-center justify-between"><h2 className="text-sm font-black uppercase">Change Player</h2><button type="button" onClick={() => setActivePlayer(null)} className="text-zinc-500">×</button></div>{activePlayer.group !== 'starting' && <PlayerGroup title="Starting XI" players={UNIVERSAL_TACTICAL_SLOTS.map(s => matchDraft.slotAssignments[s.slot]).filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is NonNullable<typeof player> => Boolean(player))} onClick={(id) => swapDraft('starting', id)} />}{activePlayer.group !== 'substitute' && <PlayerGroup title="Substitutes" players={matchDraft.homeBench.filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is NonNullable<typeof player> => Boolean(player))} onClick={(id) => swapDraft('substitute', id)} />}{activePlayer.group !== 'squad' && <PlayerGroup title="Squad" players={squadPlayers} onClick={(id) => swapDraft('squad', id)} />}<button type="button" onClick={() => setActivePlayer(null)} className="mt-4 w-full rounded-xl bg-zinc-900 py-3 text-xs font-bold">CANCEL</button></div></div>}
+            {activePlayer && <div className="fixed inset-0 z-40 flex items-end bg-black/70 p-4" onClick={() => setActivePlayer(null)}><div className="max-h-[75vh] w-full overflow-y-auto rounded-2xl bg-zinc-950 p-4" onClick={(event) => event.stopPropagation()}><div className="mb-4 flex items-center justify-between"><h2 className="text-sm font-black uppercase">Change Player</h2><button type="button" onClick={() => setActivePlayer(null)} className="text-zinc-500">×</button></div>{activePlayer.group !== 'starting' && <PlayerGroup title="Starting XI" players={UNIVERSAL_TACTICAL_SLOTS.map(s => matchDraft.slotAssignments[s.slot]).filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is NonNullable<typeof player> => Boolean(player))} onClick={(id) => swapDraft('starting', id)} />}{activePlayer.group !== 'substitute' && <PlayerGroup title="Substitutes" players={sortPlayersByPosition(matchDraft.homeBench.filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is NonNullable<typeof player> => Boolean(player)), appearances)} onClick={(id) => swapDraft('substitute', id)} />}{activePlayer.group !== 'squad' && <PlayerGroup title="Squad" players={squadPlayers} onClick={(id) => swapDraft('squad', id)} />}<button type="button" onClick={() => setActivePlayer(null)} className="mt-4 w-full rounded-xl bg-zinc-900 py-3 text-xs font-bold">CANCEL</button></div></div>}
           </div>
           </DndContext>
         )}

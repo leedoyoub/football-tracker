@@ -77,6 +77,11 @@ export interface Appearance {
   position: Position
   matchPosition?: string
   positionHistory?: PositionChange[]
+  /** Optional historical kickoff coordinates. Legacy matches can omit these. */
+  kickoffX?: number
+  kickoffY?: number
+  x?: number
+  y?: number
   role: 'starter' | 'bench'
 }
 
@@ -130,6 +135,8 @@ export interface Match {
   duration: number
   appearances: Appearance[]
   events: MatchEvent[]
+  /** Optional saved kickoff layout; used only when historical data already has it. */
+  kickoffLineup?: FormationSlot[]
 }
 
 export interface AppState {
@@ -173,6 +180,9 @@ export interface Best11Slot {
   teamId?: string
   avgRating: number
   matches: number
+  /** Responsive percentage coordinates, when a saved kickoff layout provides them. */
+  x?: number
+  y?: number
 }
 
 export interface RatingBreakdown {

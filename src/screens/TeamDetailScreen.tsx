@@ -7,6 +7,7 @@ import { matchScore, ratePlayerMatch } from '../engine/rating'
 import { aggregatePlayerStats, playerSeasonStats, seasonsFromMatches, teamBestEleven } from '../engine/stats'
 import { seasonStandings, standingForTeam } from '../engine/standings'
 import { useStore } from '../store'
+import { sortPlayersByPosition } from '../lib/positionOrder'
 import type { View } from '../types'
 
 export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamId: string; season: string; onNavigate: (view: View) => void; onBack: () => void }) {
@@ -30,6 +31,7 @@ export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamI
   const starterIds = new Set(best.slots.flatMap(slot => slot.playerId ? [slot.playerId] : []))
   const latestBench = (best.match?.appearances.filter((appearance) => appearance.teamId === teamId && appearance.role === 'bench' && !starterIds.has(appearance.playerId)) ?? [])
     .filter((appearance, index, list) => list.findIndex(item => item.playerId === appearance.playerId) === index)
+  const latestBenchPlayers = sortPlayersByPosition(latestBench.map(appearance => players.find(player => player.id === appearance.playerId)).filter((player): player is typeof players[number] => Boolean(player)), latestBench)
   const record = recent.reduce((acc, match) => {
     const score = matchScore(match)
     const won = match.homeTeamId === teamId ? score.home > score.away : score.away > score.home
@@ -57,14 +59,13 @@ export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamI
     {best.match && best.slots.length ? <Pitch slots={best.slots} players={players} teams={teams} statsByPlayer={statsByPlayer} showPositionBadge={false} onSlotClick={(slot) => { if (slot.playerId) onNavigate({ name: 'player', id: slot.playerId }) }} /> : <div className="rounded-2xl bg-zinc-900 p-6 text-center text-sm text-zinc-500">No match data yet</div>}
     <section className="mt-6">
       <h2 className="mb-2 text-sm font-semibold">Substitutes</h2>
-      {latestBench.length > 0 ? (
+      {latestBenchPlayers.length > 0 ? (
         <div className="grid grid-cols-4 gap-2">
-          {latestBench.map((appearance) => {
-            const player = players.find((item) => item.id === appearance.playerId)
+          {latestBenchPlayers.map((player) => {
+            const appearance = latestBench.find(item => item.playerId === player.id)!
             const ratingBreakdown = best.match && player ? ratePlayerMatch(best.match, player) : null
             const entered = best.match?.events.some((event) => event.type === 'sub' && event.teamId === teamId && event.playerInId === appearance.playerId)
             const rating = entered ? ratingBreakdown?.raw : undefined
-            if (!player) return null
             const stats = ratingBreakdown && best.match ? aggregatePlayerStats(player, players, [best.match]) : undefined
             return (
               <SubstitutePlayerCard

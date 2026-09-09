@@ -30,11 +30,11 @@ const RULE = (
 ): PositionRules => ({ goal, assist, teamGoal, noConcededMax, conceded, save })
 
 export const POSITION_RULES: Record<Position, PositionRules> = {
-  ST: RULE(.85, .55, 0, 0, flatConceded(-.05)), LST: RULE(.85, .55, 0, 0, flatConceded(-.05)), RST: RULE(.85, .55, 0, 0, flatConceded(-.05)),
-  SS: RULE(.90, .60, 0, 0, flatConceded(-.05)),
+  ST: RULE(.90, .55, 0, 0, flatConceded(-.05)), LST: RULE(.90, .55, 0, 0, flatConceded(-.05)), RST: RULE(.90, .55, 0, 0, flatConceded(-.05)),
+  SS: RULE(.95, .60, 0, 0, flatConceded(-.05)),
   LW: RULE(1.00, .65, .05, .10, flatConceded(-.05)), RW: RULE(1.00, .65, .05, .10, flatConceded(-.05)),
-  CAM: RULE(1.00, .70, .05, .15, flatConceded(-.10)),
-  LM: RULE(1.05, .75, .10, .30, flatConceded(-.10)), RM: RULE(1.05, .75, .10, .30, flatConceded(-.10)),
+  CAM: RULE(1.00, .65, .05, .15, flatConceded(-.10)),
+  LM: RULE(1.05, .70, .05, .30, flatConceded(-.10)), RM: RULE(1.05, .70, .05, .30, flatConceded(-.10)),
   CM: RULE(1.10, .70, .15, .30, tieredConceded(-.20, -.30)), LCM: RULE(1.10, .70, .15, .30, tieredConceded(-.20, -.30)), RCM: RULE(1.10, .70, .15, .30, tieredConceded(-.20, -.30)),
   CDM: RULE(1.25, .80, .15, .50, tieredConceded(-.25, -.35)), LDM: RULE(1.25, .80, .15, .50, tieredConceded(-.25, -.35)), RDM: RULE(1.25, .80, .15, .50, tieredConceded(-.25, -.35)),
   CB: RULE(1.35, .80, .05, 1.00, tieredConceded(-.35, -.45)), LCB: RULE(1.35, .80, .05, 1.00, tieredConceded(-.35, -.45)), RCB: RULE(1.35, .80, .05, 1.00, tieredConceded(-.35, -.45)),

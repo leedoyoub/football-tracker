@@ -37,7 +37,7 @@ function text(n) { return Array.isArray(n) ? n.map(text).join('') : n && typeof 
 function screen(Component, store, props = {}) { const h = { cursor: 0, state: [], store }; const render = () => { owner = h; h.cursor = 0; return Component({ season: 'S1', onSeason() {}, onNavigate() {}, onBack() {}, ...props }) }; return { render } }
 const teams = [{ id: 'A', name: 'Team A', shortName: 'A' }, { id: 'B', name: 'Team B', shortName: 'B' }]
 
-test('ST always receives .85 per goal and .55 per assist for starters, subs and position changes', () => {
+test('ST always receives .90 per goal and .55 per assist for starters, subs and position changes', () => {
   const p = player('p')
   for (const position of ['ST', 'LST', 'RST']) {
     for (const role of ['starter', 'bench']) {
@@ -45,14 +45,14 @@ test('ST always receives .85 per goal and .55 per assist for starters, subs and 
       m.events = [goal('g1', 20, { playerId: 'p' }), goal('g2', 50, { playerId: 'p' }), goal('a1', 60, { assistPlayerId: 'p' })]
       if (role === 'bench') m.events.unshift({ id: 'sub', type: 'sub', teamId: 'A', minute: 10, playerOutId: 'other', playerInId: 'p', position })
       const before = JSON.stringify(m); const r = ratePlayerMatch(m, p)
-      near(r.goals, 1.7); near(r.assists, .55); near(r.goals + r.assists, 2.25)
+      near(r.goals, 1.8); near(r.assists, .55); near(r.goals + r.assists, 2.35)
       assert.equal(JSON.stringify(m), before)
-      m.events = m.events.filter(e => e.id !== 'g2'); near(ratePlayerMatch(m, p).goals, .85)
+      m.events = m.events.filter(e => e.id !== 'g2'); near(ratePlayerMatch(m, p).goals, .9)
     }
   }
   const switched = match('switch', [p]); switched.appearances[0].matchPosition = 'CM'; switched.appearances[0].positionHistory = [{ minute: 30, position: 'ST' }]
   switched.events = [goal('goal', 40, { playerId: 'p' }), goal('assist', 50, { assistPlayerId: 'p' })]
-  near(ratePlayerMatch(switched, p).goals, .85); near(ratePlayerMatch(switched, p).assists, .55)
+  near(ratePlayerMatch(switched, p).goals, .9); near(ratePlayerMatch(switched, p).assists, .55)
 })
 
 test('non-ST scoring rules, including SS first contributions, are preserved', () => {

@@ -5,16 +5,20 @@ import { aggregatePlayerStats, seasonsFromMatches } from '../engine/stats'
 import { useStore } from '../store'
 import { emptyFilters, matchesForPlayer, RankingFilterButton } from './RankingFilters'
 import type { View } from '../types'
+import type { RankingFilters } from './RankingFilters'
 
 
 export function PlayersScreen({
   onNavigate,
+  appliedFilters = emptyFilters,
+  onFiltersChange = () => {},
 }: {
   onNavigate: (view: View) => void
+  appliedFilters: RankingFilters
+  onFiltersChange: (filters: RankingFilters) => void
 }) {
   const { players, teams, matches } = useStore()
   const seasons = useMemo(() => seasonsFromMatches(matches), [matches])
-  const [appliedFilters, setAppliedFilters] = useState(emptyFilters)
   const [search, setSearch] = useState('')
 
   const rows = useMemo(() => {
@@ -52,7 +56,7 @@ export function PlayersScreen({
       
       <div className="mb-4 flex gap-2">
         <input type="search" aria-label="Search players" placeholder="Search players" value={search} onChange={event => setSearch(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm" />
-        <RankingFilterButton applied={appliedFilters} onApply={setAppliedFilters} seasons={seasons} teams={teams} />
+        <RankingFilterButton applied={appliedFilters} onApply={onFiltersChange} seasons={seasons} teams={teams} />
       </div>
 
       <div className="space-y-2">
