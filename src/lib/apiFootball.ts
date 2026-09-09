@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase'
+import { squadImportErrorMessage } from './apiFootballError'
 
 export type ApiFootballSquadPlayer = { id: number; name: string; age?: number; number?: number | null; position?: string; photo?: string }
 export type ApiFootballPlayerSearchResult = ApiFootballSquadPlayer & { firstname?: string; lastname?: string; nationality?: string; currentTeam?: string }
@@ -8,7 +9,7 @@ export async function fetchApiFootballSquad(externalTeamId: number): Promise<Api
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Sign in is required to import a squad.')
   const { data, error } = await supabase.functions.invoke('api-football-squad', { body: { externalTeamId } })
-  if (error) throw error
+  if (error) throw new Error(await squadImportErrorMessage(error))
   if (!Array.isArray(data?.players)) throw new Error('Invalid squad response.')
   return data.players
 }
