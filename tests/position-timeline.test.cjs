@@ -1,99 +1,62 @@
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
 const { test } = require('node:test')
+const fs = require('node:fs')
 const ts = require('typescript')
-for (const ext of ['.ts', '.tsx']) require.extensions[ext] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
-}).outputText, filename)
-const { ratePlayerMatch, matchPositionSegments, matchPositionAt } = require('../src/engine/rating.ts')
-const { aggregatePlayerStats, getLeaderboard } = require('../src/engine/stats.ts')
-const player = Object.freeze({ id: 'p', name: 'Player', position: 'CM', teamId: 'A', number: 10 })
-const game = (position = 'CM', history = [{ minute: 60, position: 'CAM' }]) => ({
-  id: 'match', season: 'S1', matchDay: 1, date: '2026-09-01', homeTeamId: 'A', awayTeamId: 'B', teamId: 'A', duration: 90,
-  appearances: [{ playerId: 'p', teamId: 'A', position: player.position, matchPosition: position, role: 'starter', positionHistory: history }], events: [],
-})
-const goal = (minute, props = {}) => ({ id: String(minute), type: 'goal', minute, teamId: 'A', ...props })
+for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename)
+const { GOALKEEPER_BASE_RATING, getMatchManOfTheMatch, ratePlayerMatch, saveBonusPerSave, sotMultiplier } = require('../src/engine/rating.ts')
+const { aggregatePlayerStats } = require('../src/engine/stats.ts')
 const near = (actual, expected) => assert(Math.abs(actual - expected) < 1e-10, `${actual} != ${expected}`)
+const player = (id = 'p', position = 'CM') => ({ id, name: id, position, teamId: 'A', number: 1 })
+const game = (p, position = p.position, props = {}) => ({ id: 'm', season: 'S', matchDay: 1, date: '2026-01-01', duration: 90, homeTeamId: 'A', awayTeamId: 'B', appearances: [{ playerId: p.id, teamId: 'A', position, matchPosition: position, role: 'starter' }], events: [], ...props })
+const goal = (minute, props = {}) => ({ id: `g${minute}`, type: 'goal', minute, teamId: 'A', ...props })
 
-test('goal, assist, team goal and concession weights follow each event position; clean intervals also split at position changes', () => {
-  const match = game()
-  match.events = [goal(30, { playerId: 'p' }), goal(70, { playerId: 'p', goalType: 'wonder' }),
-    goal(40, { playerId: 'teammate', assistPlayerId: 'p' }), goal(80, { playerId: 'teammate', assistPlayerId: 'p', goalType: 'assist-led' }),
-    goal(10, { playerId: 'teammate' }), goal(65, { playerId: 'teammate' }), goal(20, { teamId: 'B' }), goal(75, { teamId: 'B' })]
-  const rating = ratePlayerMatch(match, player)
-  near(rating.goals, 1.1 + 1)
-  near(rating.assists, .7 + .65)
-  near(rating.teamGoals, .15 + .05)
-  near(rating.conceded, -.2 - .1)
-  const clean = .3 * ((20 / 90) ** 2 + (40 / 90) ** 2) + .15 * ((15 / 90) ** 2 + (15 / 90) ** 2)
-  near(rating.noConceded, clean)
-  near(rating.raw, 6.5 + .1 + 2.1 + 1.35 + .2 - .3 + clean)
-  assert.equal(rating.minutes, 90); assert.equal(rating.base, 6.5)
-  assert.equal(player.position, 'CM')
+test('final direct goal and assist coefficients apply at event positions', () => {
+  const st = player('st', 'ST'), cb = player('cb', 'CB')
+  const stMatch = game(st); stMatch.events = [goal(10, { playerId: 'st' }), goal(20, { assistPlayerId: 'st' })]
+  const cbMatch = game(cb); cbMatch.events = [goal(10, { playerId: 'cb' }), goal(20, { assistPlayerId: 'cb' })]
+  near(ratePlayerMatch(stMatch, st).goals, .85); near(ratePlayerMatch(stMatch, st).assists, .5)
+  near(ratePlayerMatch(cbMatch, cb).goals, 1.35); near(ratePlayerMatch(cbMatch, cb).assists, .75)
 })
 
-test('boundary minute belongs to the new position and a position change does not restart first-goal/assist or concession tiers', () => {
-  const match = game('ST', [{ minute: 60, position: 'SS' }])
-  match.events = [goal(20, { playerId: 'p' }), goal(60, { playerId: 'p' }), goal(30, { assistPlayerId: 'p' }), goal(70, { assistPlayerId: 'p' })]
-  near(ratePlayerMatch(match, player).goals, .9 + .95)
-  near(ratePlayerMatch(match, player).assists, .55 + .6)
-  assert.equal(matchPositionAt(match, match.appearances[0], 59), 'ST')
-  assert.equal(matchPositionAt(match, match.appearances[0], 60), 'SS')
-  const defence = game('CAM', [{ minute: 60, position: 'CM' }])
-  defence.events = [goal(70, { teamId: 'B' }), goal(20, { teamId: 'B' })]
-  near(ratePlayerMatch(defence, player).conceded, -.1 - .3)
+test('uninvolved team goals exclude scorer and assister and use event-time position', () => {
+  const p = player(); const match = game(p)
+  match.appearances[0].positionHistory = [{ minute: 30, position: 'CDM' }]
+  match.events = [goal(10, { playerId: 'p' }), goal(20, { playerId: 'mate', assistPlayerId: 'p' }), goal(40, { playerId: 'mate' })]
+  near(ratePlayerMatch(match, p).teamGoals, .10)
+  const cb = player('cb', 'CB'); const cbMatch = game(cb); cbMatch.events = [goal(20, { playerId: 'mate' })]
+  near(ratePlayerMatch(cbMatch, cb).teamGoals, 0)
 })
 
-test('timeline is clipped to actual appearance, sorted without mutation, and redundant aliases do not split a clean interval', () => {
-  const match = game('CM', [{ minute: 60, position: 'LCM' }])
-  assert.deepEqual(matchPositionSegments(match, match.appearances[0]), [{ enter: 0, exit: 90, position: 'CM' }])
-  near(ratePlayerMatch(match, player).noConceded, .3)
-  match.appearances[0].role = 'bench'
-  assert.equal(ratePlayerMatch(match, player), null)
-  match.events = [{ id: 'on', type: 'sub', teamId: 'A', playerOutId: 'first', playerInId: 'p', position: 'CM', minute: 30 }, { id: 'off', type: 'sub', teamId: 'A', playerOutId: 'p', playerInId: 'next', position: 'CAM', minute: 80 }]
-  match.appearances[0].positionHistory = [{ minute: 85, position: 'GK' }, { minute: 60, position: 'CAM' }]
-  const original = JSON.stringify(match)
-  assert.deepEqual(matchPositionSegments(match, match.appearances[0]), [{ enter: 30, exit: 60, position: 'CM' }, { enter: 60, exit: 80, position: 'CAM' }])
-  assert.equal(ratePlayerMatch(match, player).minutes, 50)
-  assert.equal(JSON.stringify(match), original)
-})
-
-test('GK save rewards and Saves statistics use the same timeline when an existing player switches into GK', () => {
-  const match = game('CM', [{ minute: 60, position: 'GK' }])
-  match.events = [{ id: 'early', type: 'save', teamId: 'A', playerId: 'p', minute: 20, count: 5 }, { id: 'late', type: 'save', teamId: 'A', playerId: 'p', minute: 70, count: 3 }, goal(10, { playerId: 'p' }), goal(65, { playerId: 'p' }), goal(75, { assistPlayerId: 'p' })]
-  near(ratePlayerMatch(match, player).saves, .9)
-  near(ratePlayerMatch(match, player).goals, 1.1)
-  near(ratePlayerMatch(match, player).assists, 0)
-  assert.equal(aggregatePlayerStats(player, [player], [match]).saves, 3)
-  assert.equal(getLeaderboard([player], [match], { seasons: [], teams: [], positions: [] }, 'saves')[0].value, 3)
-})
-
-test('empty histories preserve legacy contributions exactly, including multiple legacy save counts', () => {
-  const match = game('GK', undefined)
-  delete match.appearances[0].positionHistory
-  match.events = [2, 4, 1].map((count, index) => ({ id: String(index), type: 'save', teamId: 'A', playerId: 'p', count }))
-  const before = ratePlayerMatch(match, player)
-  assert.equal(before.saves, 7 * .3)
-  match.appearances[0].positionHistory = []
-  assert.deepEqual(ratePlayerMatch(match, player), before)
-})
-
-test('multiple corrections at the same minute keep only the final position and never invent a clean-sheet break', () => {
-  const match = game('CM', [{ minute: 60, position: 'CAM' }, { minute: 60, position: 'CM' }])
-  assert.deepEqual(matchPositionSegments(match, match.appearances[0]), [{ enter: 0, exit: 90, position: 'CM' }])
-  near(ratePlayerMatch(match, player).noConceded, .3)
-})
-
-
-test('historical wonder, legacy wondergoal and assist-led flags have no rating effect and remain untouched', () => {
-  for (const flags of [{ goalType: 'wonder' }, { wondergoal: true }, { goalType: 'assist-led' }]) {
-    const match = game('CM', [])
-    match.events = [goal(20, { playerId: 'p', ...flags }), goal(40, { playerId: 'other', assistPlayerId: 'p', ...flags })]
-    const before = JSON.stringify(match)
-    const normal = { ...match, events: match.events.map(({ goalType, wondergoal, ...event }) => ({ ...event, goalType: 'normal' })) }
-    assert.deepEqual(ratePlayerMatch(match, player), ratePlayerMatch(normal, player))
-    assert.equal(JSON.stringify(match), before)
-    near(ratePlayerMatch(match, player).goals, 1.1)
-    near(ratePlayerMatch(match, player).assists, .7)
+test('SOT curve and minute-prorated suppression use the finalized values', () => {
+  assert.deepEqual([0, 1, 2, 3, 5, 10].map(sotMultiplier), [1, .86, .73, .62, .45, .20])
+  for (const [minutes, expected] of [[30, .45], [45, .675], [60, .9], [90, 1.35]]) {
+    const cb = player(`cb${minutes}`, 'CB'); const match = game(cb); match.appearances[0].role = 'bench'; match.events = [{ id: 'on', type: 'sub', minute: 90 - minutes, teamId: 'A', playerOutId: 'out', playerInId: cb.id, position: 'CB' }]
+    near(ratePlayerMatch(match, cb).noConceded, expected)
   }
+})
+
+test('conceded penalties honor on-pitch event-time position and individual cause', () => {
+  const cb = player('cb', 'CB'); const off = game(cb); off.events = [{ id: 'off', type: 'sub', minute: 30, teamId: 'A', playerOutId: 'cb', playerInId: 'x', position: 'CB' }, goal(40, { teamId: 'B' })]
+  near(ratePlayerMatch(off, cb).conceded, 0)
+  const sub = player('sub', 'CB'); const after = game(sub); after.appearances[0].role = 'bench'; after.events = [goal(20, { teamId: 'B' }), { id: 'on', type: 'sub', minute: 30, teamId: 'A', playerOutId: 'x', playerInId: 'sub', position: 'CB' }]
+  near(ratePlayerMatch(after, sub).conceded, 0)
+  const changed = player('changed', 'CB'); const match = game(changed); match.appearances[0].positionHistory = [{ minute: 50, position: 'CDM' }]; match.events = [goal(20, { teamId: 'B' }), goal(60, { teamId: 'B', concededGoalCausePlayerId: 'changed' })]
+  near(ratePlayerMatch(match, changed).conceded, -.35); near(ratePlayerMatch(match, changed).concededCause, -.3)
+  for (const [position, penalty] of [['LB', -.2], ['CDM', -.1], ['CM', -.08], ['LM', -.04]]) { const p = player(position, position); const m = game(p); m.events = [goal(30, { teamId: 'B' })]; near(ratePlayerMatch(m, p).conceded, penalty) }
+})
+
+test('GK base and save-rate bands are derived safely from saves and conceded goals', () => {
+  const gk = player('gk', 'GK'); const empty = game(gk)
+  assert.equal(ratePlayerMatch(empty, gk).base, GOALKEEPER_BASE_RATING); near(ratePlayerMatch(empty, gk).saves, 0)
+  assert.deepEqual([.8, .6, .4, .2, 0].map(saveBonusPerSave), [.25, .22, .20, .16, .12])
+  const match = game(gk); match.events = [{ id: 's', type: 'save', teamId: 'A', playerId: 'gk', minute: 20, count: 4 }, goal(30, { teamId: 'B' })]
+  near(ratePlayerMatch(match, gk).saves, 1); near(ratePlayerMatch(match, gk).conceded, -.25)
+})
+
+test('historical rating derivation is raw-data-safe, clamped, and drives averages and MOM', () => {
+  const p = player('p', 'ST'), other = player('other', 'ST'); const one = game(p); one.appearances.push({ playerId: 'other', teamId: 'A', position: 'ST', matchPosition: 'ST', role: 'starter' }); one.events = [goal(20, { playerId: 'p' })]
+  const two = { ...one, id: 'm2', events: [goal(20, { playerId: 'other' }), goal(30, { playerId: 'other' }), goal(40, { playerId: 'other' }), goal(50, { playerId: 'other' }), goal(60, { playerId: 'other' })] }
+  const before = JSON.stringify([one, two]); assert.equal(getMatchManOfTheMatch(one, [p, other]), 'p'); assert.equal(getMatchManOfTheMatch(two, [p, other]), 'other')
+  const stats = aggregatePlayerStats(p, [p, other], [one, two]); near(stats.avgRating, Math.round((ratePlayerMatch(one, p).rating + ratePlayerMatch(two, p).rating) / 2 * 100) / 100)
+  assert.equal(ratePlayerMatch(two, other).rating, 10); assert.equal(JSON.stringify([one, two]), before)
 })

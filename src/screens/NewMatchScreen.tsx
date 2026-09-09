@@ -1,18 +1,19 @@
-import { createContext, useEffect, useMemo, useRef, useState } from 'react'
-import { DndContext, PointerSensor, TouchSensor, closestCenter, pointerWithin, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent, type DragStartEvent, type CollisionDetection } from '@dnd-kit/core'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FORMATION_SLOTS, Pitch, UNIVERSAL_TACTICAL_SLOTS, type TacticalSlot } from '../components/Pitch'
 import { calculateFormation } from '../engine/formation'
 import { playerSeasonStats } from '../engine/stats'
 import { pitchWindow } from '../engine/rating'
-import { canConfirmSubstitution, lineupTarget, moveLineup, moveSubstitution, type LineupTarget, type SubstitutionDraft } from './matchLineup'
+import { canConfirmSubstitution, moveLineup, moveSubstitution, type LineupTarget, type SubstitutionDraft } from './matchLineup'
 import { getNextMatchDayForTeam } from '../engine/match'
-import type { Appearance, Best11Slot, Match, MatchEvent, Player, Position, PositionChange, Team, View } from '../types'
+import { competitionAssignment, competitionMatches, matchCompetitionType } from '../engine/competition'
+import type { Appearance, Best11Slot, CompetitionType, Match, MatchEvent, Player, Position, PositionChange, Team, View } from '../types'
 import { useStore } from '../store'
 import { playerDisplayName, GoalIcon, AssistIcon, StatIcons, SubstitutePlayerCard, SubstitutionSelection } from '../components/ui'
 import { PlayerAvatar } from '../components/PlayerAvatar'
 
 import { rebuildLiveHistory } from './liveHistory'
 import { sortPlayersByPosition } from '../lib/positionOrder'
+import { currentStaticTeams } from '../data/teams'
 
 type FormationSlotConfig = TacticalSlot
 type MatchDraftState = { slotAssignments: Record<string, string>; homeBench: string[]; events: MatchEvent[]; positionHistories: Record<string, PositionChange[]> }
@@ -40,12 +41,6 @@ function restoreDraft(match: Match | undefined, players: Player[]): { draft: Mat
   }
 }
 
-const lineupCollision: CollisionDetection = args => {
-  return args.pointerCoordinates ? pointerWithin(args) : closestCenter(args)
-}
-
-const StarterPositionContext = createContext<{ positions: Record<string, Position>; highlightPosition?: Position }>({ positions: {} })
-
 function fillFormationSlots(
   squad: { id: string; position: Position }[],
   slots: FormationSlotConfig[],
@@ -67,19 +62,23 @@ function fillFormationSlots(
 
 export function NewMatchScreen({
   teamId,
+  requestedSeason,
   onNavigate,
 }: {
   teamId?: string
+  requestedSeason?: string
   onNavigate: (view: View) => void
 }) {
-  const { teams, players, matches, draftMatch, addMatch, saveDraftMatch, clearDraftMatch } = useStore()
+  const { teams, players, matches, competitionStates = [], draftMatch, addMatch, saveDraftMatch, clearDraftMatch } = useStore()
   const selectedTeamId = teamId ?? draftMatch?.teamId ?? draftMatch?.homeTeamId ?? teams[0]?.id ?? ''
   const restored = useMemo(() => draftMatch && (draftMatch.teamId ?? draftMatch.homeTeamId) === selectedTeamId ? restoreDraft(draftMatch, players) : null, [draftMatch, players, selectedTeamId])
   const [draftId] = useState(() => restored ? draftMatch!.id : crypto.randomUUID())
   const savingRef = useRef(false)
-  const nextMatch = useMemo(() => getNextMatchDayForTeam(selectedTeamId, matches), [selectedTeamId, matches])
-  const season = restored ? draftMatch!.season : nextMatch.season
-  const matchDay = restored ? draftMatch!.matchDay : nextMatch.matchDay
+  const completedSeasons = useMemo(() => competitionStates.filter(state => state.kind === 'season-complete').map(state => state.season), [competitionStates])
+  const nextMatch = useMemo(() => getNextMatchDayForTeam(selectedTeamId, matches, completedSeasons), [selectedTeamId, matches, completedSeasons])
+  const [competitionType, setCompetitionType] = useState<CompetitionType>(() => restored ? matchCompetitionType(draftMatch!) : 'league')
+  const season = restored ? draftMatch!.season : requestedSeason ?? nextMatch.season
+  const matchDay = restored ? draftMatch!.matchDay : competitionMatches(matches, season, competitionType).filter(match => match.teamId === selectedTeamId || match.homeTeamId === selectedTeamId || match.awayTeamId === selectedTeamId).length + 1
   const date = restored ? draftMatch!.date : new Date().toISOString().split('T')[0]
   
   const [step, setStep] = useState(() => restored?.draft.events.length ? 1 : 0) // 0: Lineups, 1: Events
@@ -92,7 +91,11 @@ export function NewMatchScreen({
       positionHistories: {} as Record<string, PositionChange[]>,
   })
   
-  const opponentId = `opponent:${draftId}`
+  const championsDraw = competitionStates.find(state => state.id === `champions:${season}`)
+  const tournamentTeams = useMemo(() => currentStaticTeams(teams), [teams])
+  const assignment = useMemo(() => competitionAssignment(competitionType, season, selectedTeamId, tournamentTeams, matches, championsDraw), [competitionType, season, selectedTeamId, tournamentTeams, matches, championsDraw])
+  const opponentId = assignment.opponentTeamId ?? `opponent:${draftId}`
+  const opponentName = teams.find(team => team.id === assignment.opponentTeamId)?.shortName ?? 'OPP'
   const homeTeamId = selectedTeamId
   const awayTeamId = opponentId
   
@@ -115,40 +118,18 @@ export function NewMatchScreen({
   const [historyError, setHistoryError] = useState('')
   const [subEdit, setSubEdit] = useState<Extract<MatchEvent, { type: 'sub' }> | null>(null)
   const [subEditMinute, setSubEditMinute] = useState('')
-  const suppressDragClick = useRef(false)
   const [activePlayer, setActivePlayer] = useState<{ group: 'starting' | 'substitute' | 'squad'; id: string; slotId?: string } | null>(null)
-  const [focusedPlayerId, setFocusedPlayerId] = useState<string | null>(null)
   const [startingSnapshot, setStartingSnapshot] = useState<Record<string, string>>(() => restored?.starters ?? {})
   const [startingBenchSnapshot, setStartingBenchSnapshot] = useState<string[]>(() => restored?.bench ?? [])
   const initializedTeam = useRef<string | null>(restored ? selectedTeamId : null)
   const [draftReady, setDraftReady] = useState(Boolean(restored))
   const lineupLocked = matchDraft.events.length > 0
   
-  const lineupSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } }),
-  )
-  
-  function handleLineupDragStart(event: DragStartEvent) {
-    suppressDragClick.current = true
-    const id = String(event.active.id)
-    const playerId = id.startsWith('player:')
-      ? matchDraft.slotAssignments[id.slice(7)]
-      : id.match(/^roster:(?:substitute|squad):(.+)$/)?.[1]
-    if (playerId) setFocusedPlayerId(playerId)
-  }
-
   const universalPitchSlots = UNIVERSAL_TACTICAL_SLOTS.map((slot) => ({ ...slot, playerId: matchDraft.slotAssignments[slot.slot] ?? null, teamId: selectedTeamId, avgRating: 0, matches: 0 }))
   const activeFormationName = calculateFormation(
     UNIVERSAL_TACTICAL_SLOTS.filter((slot) => Boolean(matchDraft.slotAssignments[slot.slot])).map((slot) => slot.matchPosition),
   )
   const startingIds = UNIVERSAL_TACTICAL_SLOTS.map((slot) => matchDraft.slotAssignments[slot.slot]).filter(Boolean)
-  const focusedPlayer = focusedPlayerId ? players.find((player) => player.id === focusedPlayerId) : undefined
-  const starterPositionByPlayer = Object.fromEntries(UNIVERSAL_TACTICAL_SLOTS.flatMap((slot) => {
-    const id = matchDraft.slotAssignments[slot.slot]
-    return id ? [[id, slot.matchPosition]] : []
-  })) as Record<string, Position>
-
   useEffect(() => {
     if (initializedTeam.current === selectedTeamId || !players.length) return
     initializedTeam.current = selectedTeamId
@@ -172,6 +153,7 @@ export function NewMatchScreen({
   const activeDraft = substitutionDraft ?? matchDraft
   // Visual feedback comes only from the current selection and unconfirmed draft.
   const substitutionSelection: Record<string, 'in' | 'out'> = {}
+  const startingSelection: Record<string, 'in' | 'out'> | undefined = activePlayer ? { [activePlayer.id]: 'out' } : undefined
   const pendingSubs = substitutionDraft?.events.filter((event): event is Extract<MatchEvent, { type: 'sub' }> => event.type === 'sub' && !matchDraft.events.some(saved => saved.id === event.id)) ?? []
   if (liveEvent === 'substitution' && substitutionDraft) {
     for (const event of pendingSubs) {
@@ -196,7 +178,7 @@ export function NewMatchScreen({
       assists: committed.filter((e) => e.type === 'goal' && e.assistPlayerId === player.id).length + (liveEvent === 'goal' && liveAssistId === player.id ? 1 : 0),
     }]
   }))
-  const minuteIsValid = /^\d{1,2}$/.test(minuteInput) && liveMinute >= 0 && liveMinute <= (liveEvent === 'substitution' ? 89 : 90)
+  const minuteIsValid = /^\d{1,2}$/.test(minuteInput) && liveMinute >= 0 && liveMinute <= 99
 
   function openLiveEvent(type: NonNullable<typeof liveEvent>) {
     pendingMoves.current = []; pendingBase.current = null
@@ -278,7 +260,7 @@ export function NewMatchScreen({
     else setMatchDraft(prev => ({ ...prev, events: prev.events.filter(e => e.id !== event.id) }))
   }
   function saveSubEdit() {
-    if (!subEdit || !/^\d{1,2}$/.test(subEditMinute) || Number(subEditMinute) >= 90) return
+    if (!subEdit || !/^\d{1,2}$/.test(subEditMinute) || Number(subEditMinute) > 99) return
     const original = matchDraft.events.find(e => e.id === subEdit.id)!
     const minute = Number(subEditMinute)
     const histories = Object.fromEntries(Object.entries(matchDraft.positionHistories).map(([id, changes]) => [id, changes.map(c => c.minute === original.minute && !matchDraft.events.some(e => e.type === 'sub' && e.id !== original.id && e.minute === original.minute) ? { ...c, minute } : c)]))
@@ -311,7 +293,7 @@ export function NewMatchScreen({
   }
 
   function replayPendingMoves(minute: number) {
-    if (!pendingBase.current || !Number.isInteger(minute) || minute < 0 || minute >= 90) return
+    if (!pendingBase.current || !Number.isInteger(minute) || minute < 0 || minute > 99) return
     let draft = pendingBase.current
     for (const move of pendingMoves.current) {
       const next = moveSubstitution(draft, move.source, move.target, startingSnapshot, slotPositions, minute, selectedTeamId, () => crypto.randomUUID())
@@ -322,7 +304,6 @@ export function NewMatchScreen({
   }
 
   function selectSubstitutionTarget(target: LineupTarget) {
-    if (suppressDragClick.current) return
     if (target.group === 'substitute' && target.id && !activeDraft.homeBench.includes(target.id)) return
     if (subSelection) {
       if (subSelection.group === target.group && subSelection.id === target.id) setSubSelection(null)
@@ -333,32 +314,17 @@ export function NewMatchScreen({
     }
   }
 
-  function handleSubstitutionDragEnd(event: DragEndEvent) {
-    const source = lineupTarget(String(event.active.id))
-    const target = lineupTarget(String(event.over?.id ?? ''))
-    if (source && target) applyLiveMove(source, target)
-    window.setTimeout(() => { suppressDragClick.current = false }, 0)
-  }
-
-  function swapDraft(targetGroup: 'starting' | 'substitute' | 'squad', targetId: string) {
-    if (lineupLocked || !activePlayer) return
+  function selectStartingTarget(target: LineupTarget) {
+    if (lineupLocked) return
+    if (!activePlayer) {
+      const selectedId = target.group === 'starting' ? matchDraft.slotAssignments[target.id] : target.id
+      if (selectedId) setActivePlayer({ ...target, id: selectedId, ...(target.group === 'starting' ? { slotId: target.id } : {}) })
+      return
+    }
     const source: LineupTarget = { group: activePlayer.group, id: activePlayer.group === 'starting' ? activePlayer.slotId! : activePlayer.id }
-    const target: LineupTarget = { group: targetGroup, id: targetGroup === 'starting' ? Object.keys(matchDraft.slotAssignments).find(slot => matchDraft.slotAssignments[slot] === targetId)! : targetId }
+    if (source.group === target.group && source.id === target.id) { setActivePlayer(null); return }
     setMatchDraft(prev => ({ ...prev, ...moveLineup(prev, source, target) }))
     setActivePlayer(null)
-  }
-
-  function moveStartingSlot(activeSlot: string, targetSlot: string) {
-    if (lineupLocked) return
-    setMatchDraft(prev => ({ ...prev, ...moveLineup(prev, { group: 'starting', id: activeSlot }, { group: 'starting', id: targetSlot }) }))
-  }
-
-  function handleLineupDragEnd(event: DragEndEvent) {
-    window.setTimeout(() => { suppressDragClick.current = false }, 0)
-    if (lineupLocked) return
-    const source = lineupTarget(String(event.active.id))
-    const target = lineupTarget(String(event.over?.id ?? ''))
-    if (source && target) setMatchDraft(prev => ({ ...prev, ...moveLineup(prev, source, target) }))
   }
 
   const appearances: Appearance[] = useMemo(() => {
@@ -453,21 +419,20 @@ export function NewMatchScreen({
 
   useEffect(() => {
     if (!draftReady) return
-    saveDraftMatch({ id: draftId, season, matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName: 'OPP', duration: 90, appearances, events: matchDraft.events })
-  }, [draftReady, draftId, season, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, appearances, saveDraftMatch])
+    saveDraftMatch({ id: draftId, season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events })
+  }, [draftReady, draftId, season, competitionType, assignment.stage, assignment.pairingId, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, opponentName, appearances, saveDraftMatch])
 
   function save() {
     if (savingRef.current || liveEvent || startingIds.length !== 11) return
     savingRef.current = true
     const id = addMatch({ id: draftId,
-      season, matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName: 'OPP', duration: 90, appearances, events: matchDraft.events,
+      season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events,
     })
     clearDraftMatch()
     onNavigate({ name: 'match', id })
   }
 
   return (
-    <StarterPositionContext.Provider value={{ positions: starterPositionByPlayer, highlightPosition: focusedPlayer?.position }}>
     <div className="flex h-full min-h-0 flex-col bg-black text-white">
       <div className="px-4 pt-3">
         <button onClick={() => onNavigate(teamId ? { name: 'team', id: teamId } : { name: 'teams' })} className="mb-3 text-xs font-semibold text-emerald-400">← Cancel</button>
@@ -481,19 +446,17 @@ export function NewMatchScreen({
       {historyError && <p role="alert" className="px-4 text-xs text-red-400">{historyError}</p>}
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-4">
         {step === 0 && (
-          <DndContext sensors={lineupSensors} collisionDetection={lineupCollision} onDragStart={handleLineupDragStart} onDragEnd={handleLineupDragEnd} onDragCancel={() => { suppressDragClick.current = false }}>
           <div className="space-y-6">
             <div className="space-y-3">
+              <div><p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">Competition</p><div className="grid grid-cols-3 gap-1 rounded-xl bg-zinc-900 p-1">{(['league', 'cup', 'champions'] as CompetitionType[]).map(type => <button key={type} type="button" aria-pressed={competitionType === type} disabled={lineupLocked} onClick={() => setCompetitionType(type)} className={`rounded-lg py-2 text-[10px] font-black ${competitionType === type ? 'bg-emerald-500 text-black' : 'text-zinc-400'}`}>{type === 'league' ? 'League' : type === 'cup' ? 'Cup' : 'Champions'}</button>)}</div><p className="mt-2 text-xs text-zinc-400">{competitionType === 'league' ? 'Regular league match' : `${String(assignment.stage).replace(/([A-Z])/g, ' $1')} · ${opponentName}`}</p>{!assignment.available && <p role="alert" className="mt-1 text-xs font-semibold text-amber-300">{assignment.message}</p>}</div>
               <div className="text-[10px] font-bold uppercase text-zinc-500">Formation<div className="mt-1 rounded-xl bg-zinc-900 px-3 py-2 text-sm font-black text-white">{activeFormationName}</div><span className="mt-1 block text-[9px] normal-case text-zinc-500">Calculated from current tactical slots</span></div>
             </div>
 
-            <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Starting XI</h2><Pitch slots={universalPitchSlots} players={draftPlayers} teams={teams} statsByPlayer={seasonStats} badgeMode="position" draggable={!lineupLocked} externalDnd onSlotDrop={moveStartingSlot} onSlotClick={(slot) => { if (!lineupLocked && !suppressDragClick.current && slot.playerId) { setFocusedPlayerId(slot.playerId); setActivePlayer({ group: 'starting', id: slot.playerId, slotId: slot.slot }) } }} /></section>
-            <DragPlayerGroup title="Substitutes" group="substitute" team={teams.find(team => team.id === selectedTeamId)} players={sortPlayersByPosition(matchDraft.homeBench.filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is NonNullable<typeof player> => Boolean(player)), appearances)} statsByPlayer={seasonStats} onClick={(id) => { if (lineupLocked || suppressDragClick.current) return; setFocusedPlayerId(id); setActivePlayer({ group: 'substitute', id }) }} />
-            <DragPlayerGroup title="Squad" group="squad" players={squadPlayers} statsByPlayer={seasonStats} onClick={(id) => { if (lineupLocked || suppressDragClick.current) return; setFocusedPlayerId(id); setActivePlayer({ group: 'squad', id }) }} />
-            <button disabled={startingIds.length !== 11} onClick={() => { if (!lineupLocked) { setStartingSnapshot({ ...matchDraft.slotAssignments }); setStartingBenchSnapshot([...matchDraft.homeBench]) } setStep(1) }} className="w-full rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl disabled:opacity-40">CONTINUE</button>
-            {activePlayer && <div className="fixed inset-0 z-40 flex items-end bg-black/70 p-4" onClick={() => setActivePlayer(null)}><div className="max-h-[75vh] w-full overflow-y-auto rounded-2xl bg-zinc-950 p-4" onClick={(event) => event.stopPropagation()}><div className="mb-4 flex items-center justify-between"><h2 className="text-sm font-black uppercase">Change Player</h2><button type="button" onClick={() => setActivePlayer(null)} className="text-zinc-500">×</button></div>{activePlayer.group !== 'starting' && <PlayerGroup title="Starting XI" players={UNIVERSAL_TACTICAL_SLOTS.map(s => matchDraft.slotAssignments[s.slot]).filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is NonNullable<typeof player> => Boolean(player))} onClick={(id) => swapDraft('starting', id)} />}{activePlayer.group !== 'substitute' && <PlayerGroup title="Substitutes" players={sortPlayersByPosition(matchDraft.homeBench.filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is NonNullable<typeof player> => Boolean(player)), appearances)} onClick={(id) => swapDraft('substitute', id)} />}{activePlayer.group !== 'squad' && <PlayerGroup title="Squad" players={squadPlayers} onClick={(id) => swapDraft('squad', id)} />}<button type="button" onClick={() => setActivePlayer(null)} className="mt-4 w-full rounded-xl bg-zinc-900 py-3 text-xs font-bold">CANCEL</button></div></div>}
+            <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Starting XI</h2><Pitch slots={universalPitchSlots} players={draftPlayers} teams={teams} statsByPlayer={seasonStats} badgeMode="position" substitutionSelection={startingSelection} draggable={false} onEmptySlotClick={(slot) => selectStartingTarget({ group: 'starting', id: slot.slot })} onSlotClick={(slot) => selectStartingTarget({ group: 'starting', id: slot.slot })} /></section>
+            <RosterPlayerGroup title="Substitutes" group="substitute" team={teams.find(team => team.id === selectedTeamId)} players={sortPlayersByPosition(matchDraft.homeBench.filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is NonNullable<typeof player> => Boolean(player)), appearances)} statsByPlayer={seasonStats} selectedPlayerId={activePlayer?.id} onClick={(id) => selectStartingTarget({ group: 'substitute', id })} />
+            <RosterPlayerGroup title="Squad" group="squad" players={squadPlayers} statsByPlayer={seasonStats} selectedPlayerId={activePlayer?.id} onClick={(id) => selectStartingTarget({ group: 'squad', id })} />
+            <button disabled={startingIds.length !== 11 || !assignment.available} onClick={() => { if (!lineupLocked) { setStartingSnapshot({ ...matchDraft.slotAssignments }); setStartingBenchSnapshot([...matchDraft.homeBench]) } setStep(1) }} className="w-full rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl disabled:opacity-40">CONTINUE</button>
           </div>
-          </DndContext>
         )}
 
         {step === 1 && <LiveMatchStep
@@ -505,18 +468,14 @@ export function NewMatchScreen({
           onSubBench={() => selectSubstitutionTarget({ group: 'substitute', id: '' })}
           onSubOut={(id) => { const slot = Object.keys(activeDraft.slotAssignments).find(slotId => activeDraft.slotAssignments[slotId] === id); if (slot) selectSubstitutionTarget({ group: 'starting', id: slot }) }}
           onSubIn={(id) => selectSubstitutionTarget({ group: 'substitute', id })}
-          onSubDragEnd={handleSubstitutionDragEnd}
-          onDragStart={() => { suppressDragClick.current = true; setSubSelection(null) }}
-          onDragCancel={() => { suppressDragClick.current = false }}
           canConfirmSubstitutions={!substitutionError && !!substitutionDraft && canConfirmSubstitution(substitutionDraft, matchDraft)}
           liveEvent={liveEvent} liveMinute={minuteInput} liveScorerId={liveScorerId} liveAssistId={liveAssistId} liveCauseId={liveCauseId} livePicker={livePicker}
           onOpen={openLiveEvent} onSave={saveLiveEvent} onCancel={cancelLiveEvent} onMinute={changeMinute} onScorer={chooseScorer} onAssist={chooseAssist} onCause={setLiveCauseId} onPicker={setLivePicker}
           validMinute={minuteIsValid} onPitchClick={(id) => { if (liveEvent === 'goal') { if (livePicker === 'scorer') chooseScorer(id); else if (livePicker === 'assist') chooseAssist(id) }  else if (liveEvent === 'conceded' && livePicker === 'cause' && eligibleGoalIds.includes(id)) { setLiveCauseId(id === liveCauseId ? '' : id); setLivePicker('minute') } }}
           onBack={() => { cancelLiveEvent(); setStep(0) }} onFinish={save} startingGoalkeeperName={playerDisplayName(players.find(p => p.id === startingGoalkeeperId))} selectedTeamId={selectedTeamId} onEditEvent={editLiveEvent} onDeleteEvent={deleteLiveEvent} />}
       </div>
+      {subEdit && <div role="dialog" aria-modal="true" aria-label="Edit substitution" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="w-full max-w-sm space-y-3 rounded-xl bg-zinc-900 p-4 text-white"><h2>Edit substitution</h2>{historyError && <p role="alert" className="text-xs text-red-400">{historyError}</p>}<label className="block">OUT<select aria-label="OUT player" value={subEdit.playerOutId} onChange={e => setSubEdit({ ...subEdit, playerOutId: e.target.value })} className="w-full bg-black p-2">{draftPlayers.map(p => <option key={p.id} value={p.id}>{playerDisplayName(p)}</option>)}</select></label><label className="block">IN<select aria-label="IN player" value={subEdit.playerInId} onChange={e => setSubEdit({ ...subEdit, playerInId: e.target.value })} className="w-full bg-black p-2">{draftPlayers.map(p => <option key={p.id} value={p.id}>{playerDisplayName(p)}</option>)}</select></label><MinuteInput value={subEditMinute} onChange={setSubEditMinute} label="Substitution Time" /><button disabled={!/^\d{1,2}$/.test(subEditMinute) || Number(subEditMinute) > 99} onClick={saveSubEdit} className="w-full rounded-lg bg-emerald-500 p-2 font-bold text-black disabled:opacity-40">SAVE</button><button onClick={() => { setSubEdit(null); setHistoryError('') }} className="w-full p-2">CANCEL</button></div></div>}
     </div>
-    {subEdit && <div role="dialog" aria-modal="true" aria-label="Edit substitution" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="w-full max-w-sm space-y-3 rounded-xl bg-zinc-900 p-4 text-white"><h2>Edit substitution</h2>{historyError && <p role="alert" className="text-xs text-red-400">{historyError}</p>}<label className="block">OUT<select aria-label="OUT player" value={subEdit.playerOutId} onChange={e => setSubEdit({ ...subEdit, playerOutId: e.target.value })} className="w-full bg-black p-2">{draftPlayers.map(p => <option key={p.id} value={p.id}>{playerDisplayName(p)}</option>)}</select></label><label className="block">IN<select aria-label="IN player" value={subEdit.playerInId} onChange={e => setSubEdit({ ...subEdit, playerInId: e.target.value })} className="w-full bg-black p-2">{draftPlayers.map(p => <option key={p.id} value={p.id}>{playerDisplayName(p)}</option>)}</select></label><MinuteInput value={subEditMinute} onChange={setSubEditMinute} label="Substitution Time" /><button disabled={!/^\d{1,2}$/.test(subEditMinute) || Number(subEditMinute) >= 90} onClick={saveSubEdit} className="w-full rounded-lg bg-emerald-500 p-2 font-bold text-black disabled:opacity-40">SAVE</button><button onClick={() => { setSubEdit(null); setHistoryError('') }} className="w-full p-2">CANCEL</button></div></div>}
-    </StarterPositionContext.Provider>
   )
 }
 
@@ -525,15 +484,10 @@ function LiveMatchStep(props: {
   goalReady: boolean; assistChosen: boolean; teams: Team[]; substitutionSelection: Record<string, 'in' | 'out'>; pendingSubs: Extract<MatchEvent, { type: 'sub' }>[]
   totalSaves: string; onTotalSaves: (value: string) => void; hasStartingGoalkeeper: boolean; subOutId: string; substitutionError: string; canConfirmSubstitutions: boolean
   onSubOut: (id: string) => void; onSubIn: (id: string) => void; onSubSlot: (id: string) => void; onSubBench: () => void
-  onSubDragEnd: (event: DragEndEvent) => void; onDragStart: () => void; onDragCancel: () => void
   slots: Best11Slot[]; players: Player[]; benchPlayers: Player[]; stats: Record<string, { goals: number; assists: number }>; events: MatchEvent[]; selectedTeamId: string
   liveEvent: 'goal' | 'conceded' | 'substitution' | null; liveMinute: string; liveScorerId: string; liveAssistId: string; liveCauseId: string; livePicker: 'scorer' | 'assist' | 'cause' | 'minute'; validMinute: boolean
   onOpen: (type: 'goal' | 'conceded' | 'substitution') => void; onSave: () => void; onCancel: () => void; onMinute: (value: string | number) => void; onScorer: (id: string) => void; onAssist: (id: string) => void; onCause: (id: string) => void; onPicker: (picker: 'scorer' | 'assist' | 'cause' | 'minute') => void; onPitchClick: (id: string) => void; onBack: () => void; onFinish: () => void; onEditEvent: (event: MatchEvent) => void; onDeleteEvent: (event: MatchEvent) => void
 }) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } }),
-  )
   const [finishStage, setFinishStage] = useState<'saves' | null>(null)
   const [finishing, setFinishing] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<MatchEvent | null>(null)
@@ -544,7 +498,7 @@ function LiveMatchStep(props: {
   }
   const eventName = props.liveEvent === 'conceded' ? 'Conceded Goal' : 'Goal'
   const playerName = (id: string) => playerDisplayName(props.players.find((player) => player.id === id))
-  return <DndContext sensors={sensors} collisionDetection={lineupCollision} onDragStart={props.onDragStart} onDragEnd={props.onSubDragEnd} onDragCancel={props.onDragCancel}><div className="space-y-3">
+  return <div className="space-y-3">
     <div className="sticky top-0 z-30 space-y-2 bg-black/95 py-2">
     <div className="grid grid-cols-3 gap-2">{([['goal', 'GOAL'], ['conceded', 'CONCEDED'], ['substitution', 'SUBSTITUTION']] as const).map(([type, label]) => <button key={type} type="button" disabled={!!props.liveEvent} onClick={() => props.onOpen(type)} className={`rounded-xl py-3 text-[10px] font-black ${props.liveEvent === type ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-white'}`}>{label}</button>)}</div>
     {props.liveEvent && props.liveEvent !== 'substitution' && <div className="space-y-2 rounded-xl bg-zinc-900 p-2">{props.liveEvent !== 'goal' && <MinuteInput value={props.liveMinute} onChange={props.onMinute} label={`${eventName} Time`} />}
@@ -573,8 +527,8 @@ function LiveMatchStep(props: {
       </div>
     </div>}
     </div>
-    <section>{props.liveEvent === 'goal' && <p className="mb-3 text-sm font-bold text-emerald-300">{props.livePicker === 'scorer' ? '1. Select scorer on the pitch' : props.livePicker === 'assist' ? '2. Select assist on the pitch or No Assist' : '3. Enter minute and save'}</p>}<h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Starting XI</h2><Pitch compact goalSelection={props.liveEvent === 'goal' ? { ...(props.liveScorerId ? { [props.liveScorerId]: 'scorer' as const } : {}), ...(props.liveAssistId ? { [props.liveAssistId]: 'assist' as const } : {}) } : props.liveEvent === 'conceded' && props.liveCauseId ? { [props.liveCauseId]: 'fault' } : undefined} disabledPlayerIds={props.liveEvent === 'goal' && props.livePicker === 'assist' ? [props.liveScorerId] : undefined} slots={props.slots} players={props.players} teams={props.teams} substitutionSelection={props.substitutionSelection} statsByPlayer={props.stats} badgeMode="position" draggable={props.liveEvent === 'substitution'} externalDnd onEmptySlotClick={props.liveEvent === 'substitution' ? slot => props.onSubSlot(slot.slot) : undefined} onSlotClick={(slot) => { if (!slot.playerId) return; if (props.liveEvent === 'substitution') props.onSubOut(slot.playerId); else props.onPitchClick(slot.playerId) }} /></section>
-    {props.liveEvent === 'substitution' && <><DragPlayerGroup title="Substitutes" group="substitute" team={props.teams.find(team => team.id === props.selectedTeamId)} selection={props.substitutionSelection} players={props.benchPlayers} statsByPlayer={props.stats} onClick={props.onSubIn} /><BenchDropTarget onClick={props.onSubBench} /></>}
+    <section>{props.liveEvent === 'goal' && <p className="mb-3 text-sm font-bold text-emerald-300">{props.livePicker === 'scorer' ? '1. Select scorer on the pitch' : props.livePicker === 'assist' ? '2. Select assist on the pitch or No Assist' : '3. Enter minute and save'}</p>}<h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Starting XI</h2><Pitch compact goalSelection={props.liveEvent === 'goal' ? { ...(props.liveScorerId ? { [props.liveScorerId]: 'scorer' as const } : {}), ...(props.liveAssistId ? { [props.liveAssistId]: 'assist' as const } : {}) } : props.liveEvent === 'conceded' && props.liveCauseId ? { [props.liveCauseId]: 'fault' } : undefined} disabledPlayerIds={props.liveEvent === 'goal' && props.livePicker === 'assist' ? [props.liveScorerId] : undefined} slots={props.slots} players={props.players} teams={props.teams} substitutionSelection={props.substitutionSelection} statsByPlayer={props.stats} badgeMode="position" draggable={false} onEmptySlotClick={props.liveEvent === 'substitution' ? slot => props.onSubSlot(slot.slot) : undefined} onSlotClick={(slot) => { if (!slot.playerId) return; if (props.liveEvent === 'substitution') props.onSubOut(slot.playerId); else props.onPitchClick(slot.playerId) }} /></section>
+    {props.liveEvent === 'substitution' && <><RosterPlayerGroup title="Substitutes" group="substitute" team={props.teams.find(team => team.id === props.selectedTeamId)} selection={props.substitutionSelection} players={props.benchPlayers} statsByPlayer={props.stats} onClick={props.onSubIn} /><BenchTapTarget onClick={props.onSubBench} /></>}
     <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Event History</h2><button type="button" disabled={!!props.liveEvent || !props.events.some(e => e.type !== 'save')} onClick={() => { const events = props.events.filter(e => e.type !== 'save'); const event = events[events.length - 1]; if (event) props.onDeleteEvent(event) }} className="mb-2 text-xs font-bold text-emerald-400 disabled:opacity-40">UNDO LAST</button><div className="space-y-1.5">{props.events.slice().sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0)).map((event) => <button type="button" disabled={!!props.liveEvent} onClick={() => event.type === 'save' ? setFinishStage('saves') : setSelectedEvent(event)} key={event.id} className="block w-full rounded-xl bg-zinc-900 px-3 py-2 text-left text-[11px]">{event.type !== 'save' && `${event.minute}' `}{event.type === 'goal' ? event.teamId === props.selectedTeamId ? `Goal${event.playerId ? `: ${playerName(event.playerId)}` : ' · Opponent own goal'}${event.assistPlayerId ? ` · Assist: ${playerName(event.assistPlayerId)}` : ''}` : `Conceded${event.concededGoalCausePlayerId ? ` · Cause: ${playerName(event.concededGoalCausePlayerId)}` : ''}` : event.type === 'sub' ? `Substitution: ${playerName(event.playerOutId)} → ${playerName(event.playerInId)}` : `Save: ${playerName(event.playerId)} × ${event.count ?? 1}`}</button>)}</div></section>
     <div className="flex gap-2"><button type="button" onClick={props.onBack} className="flex-1 rounded-2xl bg-zinc-900 py-4 text-sm font-black">BACK</button><button type="button" disabled={!!props.liveEvent} onClick={() => setFinishStage('saves')} className="flex-2 rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl">END MATCH</button></div>
     {finishStage && <div role="dialog" aria-modal="true" aria-label="End match" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="w-full max-w-sm space-y-3 rounded-xl bg-zinc-900 p-4">
@@ -582,27 +536,20 @@ function LiveMatchStep(props: {
       <button onClick={() => setFinishStage(null)} className="w-full p-2 text-xs">CANCEL</button>
     </div></div>}
     {selectedEvent && <div role="dialog" aria-modal="true" aria-label="Event actions" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="flex w-full max-w-sm gap-2 rounded-xl bg-zinc-900 p-4"><button className="flex-1 p-3" onClick={() => { props.onEditEvent(selectedEvent); setSelectedEvent(null) }}>EDIT</button><button className="flex-1 p-3 text-red-400" onClick={() => { props.onDeleteEvent(selectedEvent); setSelectedEvent(null) }}>DELETE</button><button className="flex-1 p-3" onClick={() => setSelectedEvent(null)}>CANCEL</button></div></div>}
-  </div></DndContext>
+  </div>
 }
 
-function BenchDropTarget({ onClick }: { onClick: () => void }) {
-  const drop = useDroppable({ id: 'bench:empty' })
-  return <button ref={drop.setNodeRef} type="button" onClick={onClick} aria-label="Move selected player to bench" className={`w-full rounded-lg border border-dashed p-3 text-xs ${drop.isOver ? 'border-emerald-400 text-emerald-400' : 'border-zinc-700 text-zinc-400'}`}>Bench</button>
+function BenchTapTarget({ onClick }: { onClick: () => void }) {
+  return <button type="button" onClick={onClick} aria-label="Move selected player to bench" className="w-full rounded-lg border border-dashed border-zinc-700 p-3 text-xs text-zinc-400">Bench</button>
 }
 
-function DragPlayerGroup({ title, group, players, onClick, statsByPlayer, team, selection }: { title: string; group: 'substitute' | 'squad'; team?: Team; selection?: Record<string, 'in' | 'out'>; players: Player[]; onClick: (id: string) => void; statsByPlayer?: Record<string, { goals: number; assists: number }> }) {
-  return <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">{title}</h2><div className="grid grid-cols-4 gap-2">{players.map((player) => <DraggableRosterPlayer key={player.id} player={player} team={team} selection={selection?.[player.id]} group={group} onClick={onClick} stats={statsByPlayer?.[player.id]} />)}</div></section>
+function RosterPlayerGroup({ title, group, players, onClick, statsByPlayer, team, selection, selectedPlayerId }: { title: string; group: 'substitute' | 'squad'; team?: Team; selection?: Record<string, 'in' | 'out'>; selectedPlayerId?: string; players: Player[]; onClick: (id: string) => void; statsByPlayer?: Record<string, { goals: number; assists: number }> }) {
+  return <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">{title}</h2><div className="grid grid-cols-4 gap-2">{players.map((player) => <RosterPlayer key={player.id} player={player} team={team} selection={selection?.[player.id]} group={group} selected={selectedPlayerId === player.id} onClick={onClick} stats={statsByPlayer?.[player.id]} />)}</div></section>
 }
 
-function DraggableRosterPlayer({ player, group, onClick, stats, team, selection }: { player: Player; team?: Team; selection?: 'in' | 'out'; group: 'substitute' | 'squad'; onClick: (id: string) => void; stats?: { goals: number; assists: number } }) {
-  const drag = useDraggable({ id: `roster:${group}:${player.id}` })
-  const drop = useDroppable({ id: `roster:${group}:${player.id}` })
-  if (group === 'substitute') return <div ref={drop.setNodeRef} className={`min-w-0 ${drop.isOver ? 'rounded-lg ring-2 ring-white/80' : ''}`}><div ref={drag.setNodeRef} {...drag.listeners} {...drag.attributes} role={undefined} tabIndex={undefined} style={{ opacity: drag.isDragging ? 0.45 : 1, touchAction: 'none' }}><SubstitutePlayerCard player={player} team={team} stats={stats} showRating={false} selection={selection} onClick={() => onClick(player.id)} /></div></div>
-  return <button ref={drop.setNodeRef} type="button" onClick={() => onClick(player.id)} className={`flex min-w-0 flex-col items-center rounded-lg bg-zinc-900 p-1 text-center ${drop.isOver ? 'ring-2 ring-white/80' : ''}`}><span ref={drag.setNodeRef} {...drag.listeners} {...drag.attributes} className="relative flex h-8 w-8 items-center justify-center overflow-visible" style={{ opacity: drag.isDragging ? 0.45 : 1, touchAction: 'none' }}><PlayerAvatar photoUrl={player.photoUrl || player.image} number={player.number} className="h-8 w-8 text-[10px]" /><span className="absolute -left-1 -top-1 rounded bg-zinc-800 px-0.5 text-[6px] font-black text-zinc-300">{player.position}</span></span><span className="w-full truncate text-[8px] font-semibold">{player.displayName ?? player.name}</span>{stats && <StatIcons goals={stats.goals} assists={stats.assists} className="text-[7px] text-zinc-400" />}</button>
-}
-
-function PlayerGroup({ title, players, onClick }: { title: string; players: { id: string; name: string; number: number; position: Position; photoUrl?: string; image?: string }[]; onClick: (id: string) => void }) {
-  return <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">{title}</h2><div className="grid grid-cols-4 gap-2">{players.map((player) => <button key={player.id} type="button" onClick={() => onClick(player.id)} className="flex min-w-0 flex-col items-center rounded-lg bg-zinc-900 p-1 text-center"><span className="relative flex h-8 w-8 items-center justify-center overflow-visible"><PlayerAvatar photoUrl={player.photoUrl || player.image} number={player.number} className="h-8 w-8 text-[10px]" /><span className="absolute -left-1 -top-1 rounded bg-zinc-800 px-0.5 text-[6px] font-black text-zinc-300">{player.position}</span></span><span className="w-full truncate text-[8px] font-semibold">{player.name}</span></button>)}</div></section>
+function RosterPlayer({ player, group, onClick, stats, team, selection, selected = false }: { player: Player; team?: Team; selection?: 'in' | 'out'; group: 'substitute' | 'squad'; selected?: boolean; onClick: (id: string) => void; stats?: { goals: number; assists: number } }) {
+  if (group === 'substitute') return <div className={selected ? 'min-w-0 rounded-lg ring-2 ring-emerald-400' : 'min-w-0'}><SubstitutePlayerCard player={player} team={team} stats={stats} showRating={false} selection={selection} onClick={() => onClick(player.id)} /></div>
+  return <button type="button" onClick={() => onClick(player.id)} className={`flex min-w-0 flex-col items-center rounded-lg bg-zinc-900 p-1 text-center ${selected ? 'ring-2 ring-emerald-400' : ''}`}><span className="relative flex h-8 w-8 items-center justify-center overflow-visible"><PlayerAvatar photoUrl={player.photoUrl || player.image} number={player.number} className="h-8 w-8 text-[10px]" /><span className="absolute -left-1 -top-1 rounded bg-zinc-800 px-0.5 text-[6px] font-black text-zinc-300">{player.position}</span></span><span className="w-full truncate text-[8px] font-semibold">{player.displayName ?? player.name}</span>{stats && <StatIcons goals={stats.goals} assists={stats.assists} className="text-[7px] text-zinc-400" />}</button>
 }
 
 function MinuteInput({ value, onChange, label, autoFocus = false }: { value: string; onChange: (value: string) => void; label: string; autoFocus?: boolean }) {

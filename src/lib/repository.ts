@@ -1,7 +1,6 @@
 import type { AppState, Player } from '../types';
 import { getFromIndexedDB, saveToIndexedDB } from './db';
 import { validateState } from './validation';
-import { withStaticTeams } from '../data/teams';
 
 const STORAGE_KEY = 'football-tracker-v1';
 const BACKUP_KEY = 'football-tracker-v1-backup';
@@ -28,7 +27,7 @@ export const LocalRepository = {
           // Migration: Ensure player position is valid
           const migratedState: AppState = {
             ...parsed,
-            teams: withStaticTeams(parsed.teams),
+            teams: parsed.teams,
             players: parsed.players.map((player: Player) => ({
               ...player,
               position: player.position || 'CM',

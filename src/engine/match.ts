@@ -10,7 +10,7 @@ export function getTeamMatches(matches: Match[], teamId: string): Match[] {
     })
 }
 
-export function getNextMatchDayForTeam(teamId: string, matches: Match[]): { season: string; matchDay: number } {
+export function getNextMatchDayForTeam(teamId: string, matches: Match[], completedSeasons: string[] = []): { season: string; matchDay: number } {
   const teamMatches = getTeamMatches(matches, teamId)
   if (teamMatches.length === 0) {
     return { season: 'Season 1', matchDay: 1 }
@@ -19,9 +19,10 @@ export function getNextMatchDayForTeam(teamId: string, matches: Match[]): { seas
   const lastMatch = teamMatches[teamMatches.length - 1]
   const lastSeasonNum = parseInt(lastMatch.season.replace('Season ', '')) || 1
   
-  if (lastMatch.matchDay < 38) {
-    return { season: `Season ${lastSeasonNum}`, matchDay: lastMatch.matchDay + 1 }
-  } else {
+  if (completedSeasons.includes(lastMatch.season)) {
     return { season: `Season ${lastSeasonNum + 1}`, matchDay: 1 }
   }
+  // League MD38 alone no longer rolls the app into a new season. Cup and
+  // Champions may still need matches in this season before explicit completion.
+  return { season: `Season ${lastSeasonNum}`, matchDay: lastMatch.matchDay + 1 }
 }

@@ -51,10 +51,10 @@ test('edit player completion pops to the existing detail route without duplicate
   assert.deepEqual(popPlayerEditHistory([{ name: 'edit-player', id: 'p1' }], 'p1'), [{ name: 'player', id: 'p1' }])
 })
 
-test('requested rating constants changed and neighboring constants did not', () => {
-  assert.equal(POSITION_RULES.ST.goal, .90); assert.equal(POSITION_RULES.SS.goal, .95)
-  assert.equal(POSITION_RULES.LM.assist, .70); assert.equal(POSITION_RULES.RM.assist, .70)
+test('finalized rating constants replace legacy values', () => {
+  assert.equal(POSITION_RULES.ST.goal, .85); assert.equal(POSITION_RULES.SS.goal, .90)
+  assert.equal(POSITION_RULES.LM.assist, .65); assert.equal(POSITION_RULES.RM.assist, .65)
   assert.equal(POSITION_RULES.LM.teamGoal, .05); assert.equal(POSITION_RULES.RM.teamGoal, .05)
   assert.equal(POSITION_RULES.CAM.assist, .65)
-  assert.equal(POSITION_RULES.CM.goal, 1.10); assert.equal(POSITION_RULES.GK.save, .30)
+  assert.equal(POSITION_RULES.CM.goal, 1.05); assert.equal(POSITION_RULES.GK.goal, 1.50)
 })

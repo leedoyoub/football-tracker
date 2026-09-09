@@ -49,7 +49,7 @@ export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamI
     <header className="mb-5 flex items-center gap-3">
       <TeamIcon team={team} className="h-12 w-12 text-sm font-black">{team.shortName}</TeamIcon>
       <div><h1 className="text-xl font-bold">{team.name}</h1><p className="text-[10px] uppercase tracking-widest text-zinc-500">{activeSeason} · Season stats</p></div>
-      <div className="ml-auto"><button type="button" onClick={() => onNavigate({ name: 'new-match', teamId })} className="rounded-full bg-emerald-500 px-3 py-2 text-xs font-bold text-black">Log match</button></div>
+      <div className="ml-auto"><button type="button" onClick={() => onNavigate({ name: 'new-match', teamId, season: activeSeason })} className="rounded-full bg-emerald-500 px-3 py-2 text-xs font-bold text-black">Log match</button></div>
     </header>
     <section aria-label="Roster management" className="mb-5 rounded-xl border border-white/10 bg-zinc-900 p-3"><div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold">Roster management</h2><p className="mt-0.5 text-[11px] text-zinc-400">Import official squad and player photos</p></div><button type="button" onClick={() => onNavigate({ name: 'import-squad', teamId })} className="shrink-0 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300">Import Squad</button></div></section>
     <div className="mb-5 grid grid-cols-4 gap-2 text-center">
@@ -65,7 +65,7 @@ export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamI
             const appearance = latestBench.find(item => item.playerId === player.id)!
             const ratingBreakdown = best.match && player ? ratePlayerMatch(best.match, player) : null
             const entered = best.match?.events.some((event) => event.type === 'sub' && event.teamId === teamId && event.playerInId === appearance.playerId)
-            const rating = entered ? ratingBreakdown?.raw : undefined
+            const rating = entered ? ratingBreakdown?.rating : undefined
             const stats = ratingBreakdown && best.match ? aggregatePlayerStats(player, players, [best.match]) : undefined
             return (
               <SubstitutePlayerCard

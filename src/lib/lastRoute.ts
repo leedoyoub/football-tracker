@@ -1,10 +1,9 @@
-import type { AppState, RankSort, View } from '../types'
+import type { AppState, View } from '../types'
 
 /** Device-only UI state. It is deliberately never part of the sync queue. */
 export const LAST_ROUTE_STORAGE_KEY = 'football-tracker-last-route'
 
-const rankSorts: RankSort[] = ['rating', 'goals', 'assists', 'minutes']
-const newsKinds = ['player', 'match', 'team'] as const
+const competitionTypes = ['league', 'cup', 'champions'] as const
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
@@ -22,7 +21,7 @@ function storage(): StorageLike | null {
 export function restorableView(view: View, draftMatch?: AppState['draftMatch']): View {
   if (view.name !== 'new-match' || view.teamId) return view
   const teamId = draftMatch?.teamId ?? draftMatch?.homeTeamId
-  return teamId ? { name: 'new-match', teamId } : view
+  return teamId ? { name: 'new-match', teamId, ...(view.season ? { season: view.season } : {}) } : view
 }
 
 export function saveLastRoute(view: View, draftMatch?: AppState['draftMatch'], target = storage()) {
@@ -48,10 +47,8 @@ export function validRestoredView(value: unknown, state: AppState): View | null 
   switch (view.name) {
     case 'home': case 'results': case 'records': case 'standings': case 'chemistry': case 'comparison': case 'teams': case 'players': case 'data-management':
       return { name: view.name }
-    case 'news':
-      return view.kind === undefined || newsKinds.includes(view.kind) ? { name: 'news', ...(view.kind ? { kind: view.kind } : {}) } : null
-    case 'rankings':
-      return rankSorts.includes(view.sort) ? { name: 'rankings', sort: view.sort } : null
+    case 'competition':
+      return (view.competitionType === undefined || competitionTypes.includes(view.competitionType)) && (view.season === undefined || typeof view.season === 'string') ? { name: 'competition', ...(view.season ? { season: view.season } : {}), ...(view.competitionType ? { competitionType: view.competitionType } : {}) } : null
     case 'season-recap':
       return typeof view.season === 'string' && view.season.length > 0 && state.matches.some(match => match.season === view.season) ? { name: 'season-recap', season: view.season } : null
     case 'team':
@@ -66,7 +63,7 @@ export function validRestoredView(value: unknown, state: AppState): View | null 
       return view.teamId === undefined || hasTeam(view.teamId) ? { name: 'new-player', ...(view.teamId ? { teamId: view.teamId } : {}) } : null
     case 'new-match': {
       const teamId = view.teamId ?? state.draftMatch?.teamId ?? state.draftMatch?.homeTeamId
-      return hasTeam(teamId) ? { name: 'new-match', teamId } : null
+      return hasTeam(teamId) ? { name: 'new-match', teamId, ...(typeof view.season === 'string' ? { season: view.season } : {}) } : null
     }
     default:
       return null

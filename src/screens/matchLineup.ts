@@ -58,7 +58,7 @@ export function moveSubstitution(
   starters: Record<string, string>, positions: Record<string, Position>, minute: number, teamId: string,
   newId: () => string,
 ): SubstitutionDraft {
-  if (!Number.isInteger(minute) || minute < 0 || minute >= 90 || source.group === 'squad' || target.group === 'squad') return draft
+  if (!Number.isInteger(minute) || minute < 0 || minute > 99 || source.group === 'squad' || target.group === 'squad') return draft
   if ([source, target].some(item => item.group === 'starting' && !positions[item.id])) return draft
   const subs = draft.events.filter((event): event is Extract<MatchEvent, { type: 'sub' }> => event.type === 'sub')
   if (subs.some(event => event.minute > minute) || Object.values(draft.positionHistories).some(history => history.some(change => change.minute > minute))) return draft

@@ -5,14 +5,14 @@ import { useStore } from '../store'
 import type { View } from '../types'
 
 export function SeasonRecapScreen({ season, onNavigate, onBack }: { season: string; onNavigate: (view: View) => void; onBack: () => void }) {
-  const { players, teams, matches } = useStore(); const recap = seasonRecap(players, matches, season); const xiLeaders = startingXILeaders(players, matches, season)
+  const { players, teams, matches, competitionStates = [] } = useStore(); const recap = seasonRecap(players, matches, season, competitionStates); const xiLeaders = startingXILeaders(players, matches, season)
   const byId = Object.fromEntries(players.map(player => [player.id, player]))
   const xiRows: { label: string; row: StartingXIStat | undefined; value: (row: StartingXIStat) => string }[] = [
     { label: 'Most Used XI', row: xiLeaders.mostUsed, value: row => `${row.matches} matches` },
     { label: 'Highest Win Rate XI', row: xiLeaders.highestWinRate, value: row => `${(row.winRate * 100).toFixed(0)}% wins` },
     { label: 'Best Rated XI', row: xiLeaders.bestRated, value: row => row.averageRating.toFixed(2) },
   ]
-  if (!recap.complete) return <div className="px-4 pb-8 pt-6"><button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">Back</button><h1 className="text-2xl font-semibold">Season Recap</h1><p className="mt-2 rounded-xl bg-zinc-900 p-4 text-sm text-zinc-400">{recap.matchDays}/38 match days recorded. The recap unlocks when all 38 match days are complete.</p></div>
+  if (!recap.complete) return <div className="px-4 pb-8 pt-6"><button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">Back</button><h1 className="text-2xl font-semibold">Season Recap</h1><p className="mt-2 rounded-xl bg-zinc-900 p-4 text-sm text-zinc-400">The recap unlocks after League, Cup and Champions are complete and Complete Season is confirmed.</p></div>
   return <div className="px-4 pb-8 pt-6">
     <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">Back</button>
     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-400">Complete season</p><h1 className="mb-1 text-2xl font-semibold">Season Recap</h1><p className="mb-5 text-xs text-zinc-400">{season} · {recap.matchDays} match days · calculated from saved matches</p>

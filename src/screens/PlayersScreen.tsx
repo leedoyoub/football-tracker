@@ -76,7 +76,7 @@ export function PlayersScreen({
               </span>
             </span>
             <span className={`text-sm font-bold ${ratingTone(stats.avgRating || 6.5)}`}>
-              {stats.matches ? stats.avgRating.toFixed(1) : '—'}
+              {stats.matches ? stats.avgRating.toFixed(2) : '—'}
             </span>
           </button>
         ))}

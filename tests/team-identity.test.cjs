@@ -6,16 +6,28 @@ for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module
 const { STATIC_TEAMS, withStaticTeams } = require('../src/data/teams.ts')
 const { selectedPlayerPhoto } = require('../src/lib/playerPhoto.ts')
 
-test('static catalog has exactly the intended API-Football mapped teams', () => {
-  assert.equal(STATIC_TEAMS.length, 14)
-  assert.deepEqual(STATIC_TEAMS.map(team => team.name), ['Real Madrid', 'Barcelona', 'Atlético Madrid', 'Arsenal', 'Manchester City', 'Liverpool', 'Manchester United', 'Tottenham Hotspur', 'Chelsea', 'Bayern Munich', 'AC Milan', 'Inter Milan', 'Juventus', 'Paris Saint-Germain'])
-  assert.equal(new Set(STATIC_TEAMS.map(team => team.id)).size, 14)
-  assert.equal(new Set(STATIC_TEAMS.map(team => team.externalTeamId)).size, 14)
+test('static catalog has the 16 intended API-Football teams in requested order', () => {
+  assert.equal(STATIC_TEAMS.length, 16)
+  assert.equal(new Set(STATIC_TEAMS.map(team => team.id)).size, 16)
+  assert.equal(new Set(STATIC_TEAMS.map(team => team.externalTeamId)).size, 16)
+  const bayern = STATIC_TEAMS.findIndex(team => team.id === 'bayern-munich')
+  assert.equal(STATIC_TEAMS[bayern + 1].id, 'borussia-dortmund')
+  assert.equal(STATIC_TEAMS[bayern + 1].externalTeamId, 165)
+  assert.equal(STATIC_TEAMS.at(-1).id, 'inter-miami')
+  assert.equal(STATIC_TEAMS.at(-1).externalTeamId, 9568)
   assert(STATIC_TEAMS.every(team => team.abbreviation && team.logo && team.logo.includes(String(team.externalTeamId))))
+})
+
+test('catalog reconciliation is additive, preserves existing data, and prevents duplicate real teams', () => {
   const legacy = { id: 'historic-opponent', name: 'Historic', shortName: 'HIS', abbreviation: 'HIS', visualStyle: 'solid', primaryColor: 'black', jerseyNumberColor: 'white' }
-  const teams = withStaticTeams([legacy])
-  assert.equal(teams.length, 14)
-  assert(!teams.some(team => team.id === legacy.id))
+  const existingBayern = { ...STATIC_TEAMS.find(team => team.id === 'bayern-munich'), name: 'My Bayern', customFlag: true }
+  const existingDortmund = { ...STATIC_TEAMS.find(team => team.id === 'borussia-dortmund'), id: 'my-dortmund', name: 'My Dortmund' }
+  const teams = withStaticTeams([legacy, existingBayern, existingDortmund])
+  assert.equal(teams[0], legacy)
+  assert.equal(teams.find(team => team.id === 'bayern-munich').name, 'My Bayern')
+  assert.equal(teams.filter(team => team.externalTeamId === 165).length, 1)
+  assert.equal(teams.filter(team => team.externalTeamId === 9568).length, 1)
+  assert.equal(withStaticTeams(teams).length, teams.length)
 })
 
 test('photo selection is explicit and changes only photoUrl', () => {

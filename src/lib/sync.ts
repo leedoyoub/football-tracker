@@ -2,18 +2,18 @@ import { getSupabase } from './supabase'
 import { getFromIndexedDB, openDB } from './db'
 import { LocalRepository } from './repository'
 import { validateState } from './validation'
-import type { AppState, Match, Player, Team } from '../types'
+import type { AppState, CompetitionState, CompetitionType, Match, Player, Team } from '../types'
 
 const DATA_KEY = 'football-tracker-v1'
 const QUEUE_STORE = 'sync_queue'
 const META_STORE = 'sync_metadata'
-export type SyncEntity = 'team' | 'player' | 'match'
-export type SyncItem = { id: string; entityType: SyncEntity; entityId: string; operation: 'upsert' | 'delete'; payload?: Team | Player | Match; timestamp: number; status: 'pending' | 'failed' }
+export type SyncEntity = 'team' | 'player' | 'match' | 'competition'
+export type SyncItem = { id: string; entityType: SyncEntity; entityId: string; operation: 'upsert' | 'delete'; payload?: Team | Player | Match | CompetitionState; timestamp: number; status: 'pending' | 'failed' }
 export type SyncMetadata = { lastSyncedUserId: string | null; lastSyncAt: number; retryAt: number; entityUpdatedAt: Record<string, number>; lastError?: string }
-export const TABLE_FOR: Record<SyncEntity, 'teams' | 'players' | 'matches'> = { team: 'teams', player: 'players', match: 'matches' }
+export const TABLE_FOR: Record<SyncEntity, 'teams' | 'players' | 'matches' | 'competition_states'> = { team: 'teams', player: 'players', match: 'matches', competition: 'competition_states' }
 const emptyMeta = (): SyncMetadata => ({ lastSyncedUserId: null, lastSyncAt: 0, retryAt: 0, entityUpdatedAt: {} })
 const key = (type: SyncEntity, id: string) => `${type}:${id}`
-const entities = (state: AppState, type: SyncEntity) => type === 'team' ? state.teams : type === 'player' ? state.players : state.matches
+const entities = (state: AppState, type: SyncEntity): (Team | Player | Match | CompetitionState)[] => type === 'team' ? state.teams : type === 'player' ? state.players : type === 'match' ? state.matches : state.competitionStates ?? []
 let retryTimer: ReturnType<typeof setTimeout> | undefined
 function scheduleRetry(delay: number) {
   if (retryTimer) return
@@ -23,17 +23,22 @@ function scheduleRetry(delay: number) {
 async function allQueue(): Promise<SyncItem[]> { const db = await openDB(); return new Promise((resolve, reject) => { const req = db.transaction(QUEUE_STORE, 'readonly').objectStore(QUEUE_STORE).getAll(); req.onsuccess = () => resolve(req.result ?? []); req.onerror = () => reject(req.error) }) }
 async function metadata(): Promise<SyncMetadata> { const db = await openDB(); return new Promise((resolve, reject) => { const req = db.transaction(META_STORE, 'readonly').objectStore(META_STORE).get('meta'); req.onsuccess = () => resolve(req.result ?? emptyMeta()); req.onerror = () => reject(req.error) }) }
 async function putMetadata(value: SyncMetadata) { const db = await openDB(); await new Promise<void>((resolve, reject) => { const tx = db.transaction(META_STORE, 'readwrite'); tx.objectStore(META_STORE).put(value, 'meta'); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error) }) }
-export const serializeCloudEntity = (entity: Team | Player | Match) => {
+export const serializeCloudEntity = (entity: Team | Player | Match | CompetitionState) => {
+  if ('kind' in entity) return { id: entity.id, season: entity.season, kind: entity.kind, team_ids: entity.teamIds }
   if ('position' in entity && 'number' in entity) {
     const { externalPlayerId, photoUrl, ...player } = entity
     // Supabase uses snake_case columns; retain the app's camelCase shape locally.
     return { ...player, external_player_id: externalPlayerId === undefined ? null : String(externalPlayerId), photo_url: photoUrl ?? null }
   }
+  if ('appearances' in entity && 'events' in entity) {
+    const { competitionType, competitionStage, competitionPairingId, ...match } = entity
+    return { ...match, competition_type: competitionType ?? 'league', competition_stage: competitionStage ?? 'regular', competition_pairing_id: competitionPairingId ?? null }
+  }
   return { ...entity }
 }
-export const deserializeCloudEntity = <T extends Team | Player | Match>(row: T & { user_id?: string; created_at?: string; updated_at?: string; external_player_id?: string | number | null; photo_url?: string | null }) => {
-  const { user_id: _user, created_at: _created, updated_at: _updated, external_player_id, photo_url, ...entity } = row
-  return { ...entity, ...(external_player_id === undefined || external_player_id === null ? {} : { externalPlayerId: external_player_id }), ...(photo_url === undefined || photo_url === null ? {} : { photoUrl: photo_url }) } as T
+export const deserializeCloudEntity = <T extends Team | Player | Match | CompetitionState>(row: T & { user_id?: string; created_at?: string; updated_at?: string; external_player_id?: string | number | null; photo_url?: string | null; team_ids?: string[]; competition_type?: CompetitionType; competition_stage?: Match['competitionStage']; competition_pairing_id?: string | null }) => {
+  const { user_id: _user, created_at: _created, updated_at: _updated, external_player_id, photo_url, team_ids, competition_type, competition_stage, competition_pairing_id, ...entity } = row
+  return { ...entity, ...(external_player_id === undefined || external_player_id === null ? {} : { externalPlayerId: external_player_id }), ...(photo_url === undefined || photo_url === null ? {} : { photoUrl: photo_url }), ...(team_ids === undefined ? {} : { teamIds: team_ids }), ...(competition_type === undefined ? {} : { competitionType: competition_type }), ...(competition_stage === undefined ? {} : { competitionStage: competition_stage }), ...(competition_pairing_id ? { competitionPairingId: competition_pairing_id } : {}) } as T
 }
 
 export const SyncManager = {
@@ -46,7 +51,7 @@ export const SyncManager = {
     const meta = await metadata(); meta.entityUpdatedAt[key(item.entityType, item.entityId)] = now; await putMetadata(meta)
   },
   async queueStateChange(previous: AppState, next: AppState) {
-    for (const type of ['team', 'player', 'match'] as const) {
+    for (const type of ['team', 'player', 'match', 'competition'] as const) {
       const before = new Map(entities(previous, type).map(entity => [entity.id, entity])); const after = new Map(entities(next, type).map(entity => [entity.id, entity]))
       for (const [id, entity] of after) if (JSON.stringify(before.get(id)) !== JSON.stringify(entity)) await this.queueOperation({ entityType: type, entityId: id, operation: 'upsert', payload: entity })
       for (const id of before.keys()) if (!after.has(id)) await this.queueOperation({ entityType: type, entityId: id, operation: 'delete' })
@@ -61,16 +66,16 @@ export const SyncManager = {
     // Never upload one account's durable local queue into a different account.
     if (meta.lastSyncedUserId && meta.lastSyncedUserId !== user.id) return { status: 'pending', message: 'Account changed; local data was kept and cloud upload is paused.' }
     try {
-      const [teams, players, matches] = await Promise.all([supabase.from('teams').select('*'), supabase.from('players').select('*'), supabase.from('matches').select('*')])
-      if (teams.error) throw teams.error; if (players.error) throw players.error; if (matches.error) throw matches.error
-      const cloud: AppState = { teams: (teams.data ?? []).map(deserializeCloudEntity), players: (players.data ?? []).map(deserializeCloudEntity), matches: (matches.data ?? []).map(deserializeCloudEntity), draftMatch: local.draftMatch }
+      const [teams, players, matches, competitions] = await Promise.all([supabase.from('teams').select('*'), supabase.from('players').select('*'), supabase.from('matches').select('*'), supabase.from('competition_states').select('*')])
+      if (teams.error) throw teams.error; if (players.error) throw players.error; if (matches.error) throw matches.error; if (competitions.error) throw competitions.error
+      const cloud: AppState = { teams: (teams.data ?? []).map(deserializeCloudEntity), players: (players.data ?? []).map(deserializeCloudEntity), matches: (matches.data ?? []).map(deserializeCloudEntity), competitionStates: (competitions.data ?? []).map(deserializeCloudEntity) as CompetitionState[], draftMatch: local.draftMatch }
       const merge = <T extends { id: string }>(type: SyncEntity, localRows: T[], cloudRows: T[]) => {
         const out = new Map(localRows.map(row => [row.id, row])); for (const row of cloudRows) if (!pendingKeys.has(key(type, row.id))) out.set(row.id, row); return [...out.values()]
       }
-      const merged: AppState = { teams: merge('team', local.teams, cloud.teams), players: merge('player', local.players, cloud.players), matches: merge('match', local.matches, cloud.matches), draftMatch: local.draftMatch }
+      const merged: AppState = { teams: merge('team', local.teams, cloud.teams), players: merge('player', local.players, cloud.players), matches: merge('match', local.matches, cloud.matches), competitionStates: merge('competition', local.competitionStates ?? [], cloud.competitionStates ?? []), draftMatch: local.draftMatch }
       if (validateState(merged)) await LocalRepository.saveAppState(merged)
       // First sign-in / remote-empty safety: every local-only entity gets an upload.
-      for (const type of ['team', 'player', 'match'] as const) { const remoteIds = new Set(entities(cloud, type).map(row => row.id)); for (const entity of entities(merged, type)) if (!remoteIds.has(entity.id) && !pendingKeys.has(key(type, entity.id))) await this.queueOperation({ entityType: type, entityId: entity.id, operation: 'upsert', payload: entity }) }
+      for (const type of ['team', 'player', 'match', 'competition'] as const) { const remoteIds = new Set(entities(cloud, type).map(row => row.id)); for (const entity of entities(merged, type)) if (!remoteIds.has(entity.id) && !pendingKeys.has(key(type, entity.id))) await this.queueOperation({ entityType: type, entityId: entity.id, operation: 'upsert', payload: entity }) }
       for (const item of await allQueue()) {
         const table = TABLE_FOR[item.entityType]
         const result = item.operation === 'delete' ? await supabase.from(table).delete().eq('id', item.entityId).eq('user_id', user.id) : await supabase.from(table).upsert({ ...serializeCloudEntity(item.payload!), user_id: user.id })

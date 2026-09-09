@@ -23,7 +23,6 @@ Module._load = function(name, parent, main) {
 const { ratePlayerMatch, POSITION_RULES } = require('../src/engine/rating.ts')
 const { unifiedBestEleven, aggregatePlayerStats } = require('../src/engine/stats.ts')
 const { PlayersScreen } = require('../src/screens/PlayersScreen.tsx')
-const { RankingsScreen } = require('../src/screens/RankingsScreen.tsx')
 const { HomeScreen } = require('../src/screens/HomeScreen.tsx')
 const { PlayerDetailScreen } = require('../src/screens/PlayerDetailScreen.tsx')
 const { playerFullName, playerDisplayName } = require('../src/components/ui.tsx')
@@ -37,7 +36,7 @@ function text(n) { return Array.isArray(n) ? n.map(text).join('') : n && typeof 
 function screen(Component, store, props = {}) { const h = { cursor: 0, state: [], store }; const render = () => { owner = h; h.cursor = 0; return Component({ season: 'S1', onSeason() {}, onNavigate() {}, onBack() {}, ...props }) }; return { render } }
 const teams = [{ id: 'A', name: 'Team A', shortName: 'A' }, { id: 'B', name: 'Team B', shortName: 'B' }]
 
-test('ST always receives .90 per goal and .55 per assist for starters, subs and position changes', () => {
+test('ST always receives .85 per goal and .50 per assist for starters, subs and position changes', () => {
   const p = player('p')
   for (const position of ['ST', 'LST', 'RST']) {
     for (const role of ['starter', 'bench']) {
@@ -45,22 +44,22 @@ test('ST always receives .90 per goal and .55 per assist for starters, subs and 
       m.events = [goal('g1', 20, { playerId: 'p' }), goal('g2', 50, { playerId: 'p' }), goal('a1', 60, { assistPlayerId: 'p' })]
       if (role === 'bench') m.events.unshift({ id: 'sub', type: 'sub', teamId: 'A', minute: 10, playerOutId: 'other', playerInId: 'p', position })
       const before = JSON.stringify(m); const r = ratePlayerMatch(m, p)
-      near(r.goals, 1.8); near(r.assists, .55); near(r.goals + r.assists, 2.35)
+      near(r.goals, 1.7); near(r.assists, .5); near(r.goals + r.assists, 2.2)
       assert.equal(JSON.stringify(m), before)
-      m.events = m.events.filter(e => e.id !== 'g2'); near(ratePlayerMatch(m, p).goals, .9)
+      m.events = m.events.filter(e => e.id !== 'g2'); near(ratePlayerMatch(m, p).goals, .85)
     }
   }
   const switched = match('switch', [p]); switched.appearances[0].matchPosition = 'CM'; switched.appearances[0].positionHistory = [{ minute: 30, position: 'ST' }]
   switched.events = [goal('goal', 40, { playerId: 'p' }), goal('assist', 50, { assistPlayerId: 'p' })]
-  near(ratePlayerMatch(switched, p).goals, .9); near(ratePlayerMatch(switched, p).assists, .55)
+  near(ratePlayerMatch(switched, p).goals, .85); near(ratePlayerMatch(switched, p).assists, .5)
 })
 
-test('non-ST scoring rules, including SS first contributions, are preserved', () => {
+test('non-ST scoring rules do not have legacy first-contribution adjustments', () => {
   for (const position of Object.keys(POSITION_RULES).filter(p => !['ST', 'LST', 'RST'].includes(p))) {
     const p = player('p', position), m = match('m', [p]); m.events = [goal('g', 20, { playerId: 'p' }), goal('a', 30, { assistPlayerId: 'p' })]
     const r = ratePlayerMatch(m, p)
-    near(r.goals, position === 'SS' ? .7 : POSITION_RULES[position].goal)
-    near(r.assists, position === 'SS' ? .4 : POSITION_RULES[position].assist)
+    near(r.goals, POSITION_RULES[position].goal)
+    near(r.assists, POSITION_RULES[position].assist)
   }
 })
 
@@ -80,11 +79,12 @@ test('list and ranking names use Full Name, compact helpers retain Display Name,
   const p = player('p'), store = { teams, players: [p], matches: [match('m', [p])] }
   assert.equal(playerFullName(p), 'Complete Name p'); assert.equal(playerDisplayName(p), 'Short p')
   assert.equal(playerFullName({ ...p, fullName: ' ' }), 'Legacy p')
-  for (const Component of [PlayersScreen, RankingsScreen, HomeScreen, PlayerDetailScreen]) {
+  for (const Component of [PlayersScreen, HomeScreen, PlayerDetailScreen]) {
     const tree = screen(Component, store, { playerId: p.id }).render()
     assert(text(tree).includes('Complete Name p'), Component.name)
     assert(!text(tree).includes('Short p'), Component.name)
   }
+  assert(fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8').includes('playerFullName(player)'))
   const h = screen(PlayersScreen, store)
   for (const query of ['oMpLeTe nA', 'HORT P', 'not found']) {
     const input = nodes(h.render(), n => n.props?.['aria-label'] === 'Search players')[0]
@@ -114,7 +114,9 @@ test('Home footer reads the central version after all content, and common layout
   const tree = screen(HomeScreen, { players: [], matches: [], teams }).render()
   const footer = nodes(tree, n => n.type === 'footer')[0]
   assert.equal(text(footer), 'Football Tracker \u00b7 v' + APP_VERSION)
-  assert.equal(tree.props.children.filter(Boolean).at(-1), footer)
+  const finalSection = tree.props.children.filter(Boolean).at(-1)
+  assert.equal(finalSection.props['data-home-section'], 'account')
+  assert(nodes(finalSection, n => n.type === 'footer').includes(footer))
   const css = fs.readFileSync(require.resolve('../src/index.css'), 'utf8')
   assert(css.includes('env(safe-area-inset-bottom, 0px)'))
   assert.match(css, /\.app-content\s*\{[^}]*padding-bottom:\s*calc\(var\(--nav-height\)/)

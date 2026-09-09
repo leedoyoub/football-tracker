@@ -70,7 +70,7 @@ function buildCombination(match: Match, playerIds: string[], teamId: string, rol
     if (!event.ownGoal && playerIds.includes(event.assistPlayerId ?? '')) combinedAssists++
   }
   const score = matchScore(match); const ours = teamId === match.homeTeamId ? score.home : score.away; const theirs = teamId === match.homeTeamId ? score.away : score.home
-  const ratings = playerIds.flatMap(playerId => { const player = playersById.get(playerId); const rating = player && ratePlayerMatch(match, player); return rating ? [rating.raw] : [] })
+  const ratings = playerIds.flatMap(playerId => { const player = playersById.get(playerId); const rating = player && ratePlayerMatch(match, player); return rating ? [rating.rating] : [] })
   return { togetherMinutes, matches: 1, goalsFor, goalsAgainst, goalDifference: goalsFor - goalsAgainst, combinedGoals, combinedAssists, combinedGA: combinedGoals + combinedAssists, averageRating: ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 0, wins: ours > theirs ? 1 : 0, draws: ours === theirs ? 1 : 0, losses: ours < theirs ? 1 : 0, cleanSheets: goalsAgainst === 0 ? 1 : 0 }
 }
 
@@ -132,7 +132,7 @@ export function positionSplits(player: Player, matches: Match[], filter: Analyti
   const ratingMinutes = new Map<Position, number>()
   for (const match of matches.filter(match => isScoped(match, filter))) for (const appearance of match.appearances.filter(appearance => appearance.playerId === player.id && (!filter.teamId || appearance.teamId === filter.teamId))) {
     const segments = teamIntervals(match, player.id, appearance.teamId); const rating = ratePlayerMatch(match, player)
-    for (const segment of segments) { const row = totals.get(segment.position) ?? { position: segment.position, matches: 0, minutes: 0, averageRating: 0, goals: 0, assists: 0, combinedGA: 0 }; const seen = seenMatches.get(segment.position) ?? new Set<string>(); if (!seen.has(match.id)) { row.matches++; seen.add(match.id); seenMatches.set(segment.position, seen) }; const segmentMinutes = segment.end - segment.start; row.minutes += segmentMinutes; ratingMinutes.set(segment.position, (ratingMinutes.get(segment.position) ?? 0) + (rating?.raw ?? 0) * segmentMinutes)
+      for (const segment of segments) { const row = totals.get(segment.position) ?? { position: segment.position, matches: 0, minutes: 0, averageRating: 0, goals: 0, assists: 0, combinedGA: 0 }; const seen = seenMatches.get(segment.position) ?? new Set<string>(); if (!seen.has(match.id)) { row.matches++; seen.add(match.id); seenMatches.set(segment.position, seen) }; const segmentMinutes = segment.end - segment.start; row.minutes += segmentMinutes; ratingMinutes.set(segment.position, (ratingMinutes.get(segment.position) ?? 0) + (rating?.rating ?? 0) * segmentMinutes)
       for (const event of match.events) if (event.type === 'goal' && includesMinute([segment], event.minute) && !event.ownGoal) { if (event.playerId === player.id) row.goals++; if (event.assistPlayerId === player.id) row.assists++ }
       row.combinedGA = row.goals + row.assists; totals.set(segment.position, row)
     }
@@ -145,7 +145,7 @@ export function starterSubstituteSplits(player: Player, matches: Match[], filter
   const result = { starter: make(), substitute: make() }
   for (const match of matches.filter(match => isScoped(match, filter))) for (const appearance of match.appearances.filter(appearance => appearance.playerId === player.id && (!filter.teamId || appearance.teamId === filter.teamId))) {
     const intervals = teamIntervals(match, player.id, appearance.teamId); const totalMinutes = minutes(intervals); if (!totalMinutes) continue
-    const row = appearance.role === 'starter' ? result.starter : result.substitute; const rating = ratePlayerMatch(match, player); row.apps++; row.minutes += totalMinutes; row.averageRating += rating?.raw ?? 0
+    const row = appearance.role === 'starter' ? result.starter : result.substitute; const rating = ratePlayerMatch(match, player); row.apps++; row.minutes += totalMinutes; row.averageRating += rating?.rating ?? 0
     for (const event of match.events) if (event.type === 'goal' && !event.ownGoal && includesMinute(intervals, event.minute)) { if (event.playerId === player.id) row.goals++; if (event.assistPlayerId === player.id) row.assists++ }
   }
   for (const row of Object.values(result)) { row.combinedGA = row.goals + row.assists; row.averageRating = row.apps ? row.averageRating / row.apps : 0; row.goalsPer90 = row.minutes ? row.goals / row.minutes * 90 : 0; row.assistsPer90 = row.minutes ? row.assists / row.minutes * 90 : 0; row.gaPer90 = row.minutes ? row.combinedGA / row.minutes * 90 : 0 }

@@ -46,9 +46,9 @@ test('timeline is chronological and preserves saved order for same-minute events
   assert(output.includes('Mbappe') && output.includes('Bellingham') && output.includes('Rodrygo'))
 })
 
-test('home preview and the full table are wired to the central standings engine', () => {
-  const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
+test('League competition preview and the full table are wired to the central standings engine', () => {
+  const competition = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
   const full = fs.readFileSync(require.resolve('../src/screens/StandingsScreen.tsx'), 'utf8')
-  assert(home.includes('standings.slice(0, 7)') && home.includes("name: 'standings'"))
+  assert(competition.includes('league.standings.slice(0, 8)') && competition.includes('StandingsTable'))
   assert(full.includes('seasonStandings') && full.includes('StandingsTable'))
 })

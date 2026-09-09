@@ -7,9 +7,9 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { AppState, Match, Player, Team } from './types'
+import type { AppState, CompetitionState, Match, Player, Team } from './types'
 import { LocalRepository } from './lib/repository'
-import { STATIC_TEAMS } from './data/teams'
+import { STATIC_TEAMS, withStaticTeams } from './data/teams'
 import { assertRosterCapacity, currentTeamIds } from './lib/roster'
 import { applySquadImport, type SquadImportItem } from './lib/squadImport'
 import { SyncManager } from './lib/sync'
@@ -27,13 +27,20 @@ interface StoreValue extends AppState {
   saveDraftMatch: (match: Match) => void
   clearDraftMatch: () => void
   deleteMatch: (id: string) => void
+  setChampionsDraw: (season: string, teamIds: string[]) => void
+  completeSeason: (season: string) => void
 }
 
 const StoreContext = createContext<StoreValue | null>(null)
 
+function reconcileTeamCatalog(snapshot: AppState): AppState {
+  const teams = withStaticTeams(snapshot.teams)
+  return teams === snapshot.teams ? snapshot : { ...snapshot, teams }
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
-  const [state, setState] = useState<AppState>({ teams: STATIC_TEAMS, players: [], matches: [] })
+  const [state, setState] = useState<AppState>({ teams: STATIC_TEAMS, players: [], matches: [], competitionStates: [] })
   const [hydration, setHydration] = useState<'loading' | 'ready' | 'error'>('loading')
   const [attempt, setAttempt] = useState(0)
 
@@ -43,7 +50,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setHydration('loading')
       try {
         const saved = await LocalRepository.getAppState()
-        if (active && saved) setState(saved)
+        if (active && saved) {
+          const reconciled = reconcileTeamCatalog(saved)
+          setState(reconciled)
+          if (reconciled !== saved) void LocalRepository.saveAppState(reconciled).then(() => SyncManager.queueStateChange(saved, reconciled)).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker storage] Catalog update deferred.'))
+        }
       } catch {
         // Do not replace potentially recoverable durable data with an empty
         // snapshot after a browser storage/privacy failure.
@@ -64,7 +75,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         await SyncManager.syncNow()
         const restored = await LocalRepository.getAppState()
-        if (restored) setState(restored)
+        if (restored) {
+          const reconciled = reconcileTeamCatalog(restored)
+          setState(reconciled)
+          if (reconciled !== restored) void LocalRepository.saveAppState(reconciled).then(() => SyncManager.queueStateChange(restored, reconciled)).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker sync] Catalog update deferred.'))
+        }
       } catch {
         // Cloud backup is non-critical to local startup.
         console.error('[Football Tracker sync] Post-auth sync deferred.')
@@ -139,6 +154,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       clearDraftMatch,
       deleteMatch: (id) => {
         update((prev) => ({ ...prev, matches: prev.matches.filter((m) => m.id !== id) }))
+      },
+      setChampionsDraw: (season, teamIds) => {
+        const draw: CompetitionState = { id: `champions:${season}`, season, kind: 'champions-draw', teamIds: [...teamIds] }
+        update(prev => ({ ...prev, competitionStates: [...(prev.competitionStates ?? []).filter(item => item.id !== draw.id), draw] }))
+      },
+      completeSeason: (season) => {
+        const completion: CompetitionState = { id: `complete:${season}`, season, kind: 'season-complete', teamIds: [] }
+        update(prev => ({ ...prev, competitionStates: [...(prev.competitionStates ?? []).filter(item => item.id !== completion.id), completion] }))
       },
     }),
     [state, update, saveDraftMatch, clearDraftMatch],

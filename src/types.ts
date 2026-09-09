@@ -18,7 +18,20 @@ export const POSITIONS = [
 
 export type Position = (typeof POSITIONS)[number]
 
-export type Tab = 'teams' | 'news' | 'home' | 'records' | 'players'
+export type Tab = 'teams' | 'competition' | 'home' | 'records' | 'players'
+
+export type CompetitionType = 'league' | 'cup' | 'champions'
+export type CupStage = 'stage1' | 'stage2' | 'stage3' | 'stage4' | 'stage5' | 'stage6' | 'stage7' | 'final' | 'finalReplay'
+export type ChampionsStage = 'roundOf16' | 'quarterFinal' | 'semiFinal' | 'final' | 'finalReplay'
+export type CompetitionStage = 'regular' | CupStage | ChampionsStage
+
+export interface CompetitionState {
+  id: string
+  season: string
+  kind: 'champions-draw' | 'season-complete'
+  /** Persisted draw slots; empty for a season-complete marker. */
+  teamIds: string[]
+}
 
 export interface Team {
   id: string
@@ -120,6 +133,11 @@ export type MatchEvent =
 export interface Match {
   id: string
   season: string
+  /** Legacy matches omit this and are treated as league matches. */
+  competitionType?: CompetitionType
+  competitionStage?: CompetitionStage
+  /** Stable tournament tie identity, e.g. roundOf16:0. */
+  competitionPairingId?: string
   matchDay: number
   date: string
   formation?: string
@@ -143,15 +161,15 @@ export interface AppState {
   teams: Team[]
   players: Player[]
   matches: Match[]
+  competitionStates?: CompetitionState[]
   draftMatch?: Match
 }
 
 export type View =
   | { name: 'home' }
-  | { name: 'news'; kind?: 'player' | 'match' | 'team' }
+  | { name: 'competition'; season?: string; competitionType?: CompetitionType }
   | { name: 'results' }
   | { name: 'records' }
-  | { name: 'rankings'; sort: RankSort }
   | { name: 'standings' }
   | { name: 'season-recap'; season: string }
   | { name: 'chemistry' }
@@ -163,14 +181,16 @@ export type View =
   | { name: 'player'; id: string }
   | { name: 'match'; id: string }
   | { name: 'edit-match'; id: string }
-  | { name: 'new-match'; teamId?: string }
+  | { name: 'new-match'; teamId?: string; season?: string }
   | { name: 'new-team' }
   | { name: 'edit-team'; id: string }
   | { name: 'new-player'; teamId?: string }
   | { name: 'edit-player'; id: string }
   | { name: 'data-management' }
 
-export type RankSort = 'rating' | 'goals' | 'assists' | 'minutes'
+export type RankSort =
+  | 'rating' | 'goals' | 'assists' | 'g+a' | 'minutes' | 'mom'
+  | 'goals/90' | 'assists/90' | 'g+a/90' | 'ga/90' | 'cleanSheets' | 'saves'
 
 export interface Best11Slot {
   slot: string

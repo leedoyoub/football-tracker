@@ -2,7 +2,7 @@ import type { Tab } from '../types'
 
 const ITEMS: { id: Tab; label: string; icon: string }[] = [
   { id: 'teams', label: 'Teams', icon: '◈' },
-  { id: 'news', label: 'News', icon: '◉' },
+  { id: 'competition', label: 'Competitions', icon: '◇' },
   { id: 'home', label: 'Home', icon: '⌂' },
   { id: 'records', label: 'Records', icon: '▤' },
   { id: 'players', label: 'Players', icon: '●' },

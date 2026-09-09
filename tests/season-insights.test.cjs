@@ -32,12 +32,13 @@ test('clutch classification rebuilds score state in chronological event order', 
   assert.deepEqual(classifications[2].labels, ['Go-ahead Goal', 'Winning Goal', 'Late Goal'])
 })
 
-test('starting XI leaders enforce the three-match sample and recap unlocks at 38 match days', () => {
+test('starting XI leaders enforce the sample and recap requires explicit all-competition season completion', () => {
   const games = [1, 2, 3].map(day => match(`xi-${day}`, day, [goal(`g-${day}`, 10, { playerId: 'p' })]))
   const xi = insights.startingXIAnalytics([p, q], games, 'S1')
   assert.equal(xi.length, 1); assert.equal(xi[0].eligible, true); assert.equal(insights.startingXILeaders([p, q], games, 'S1').mostUsed.matches, 3)
   const fullSeason = Array.from({ length: 38 }, (_, index) => match(`m-${index + 1}`, index + 1))
-  assert.equal(insights.isSeasonComplete(fullSeason, 'S1'), true)
+  assert.equal(insights.isSeasonComplete(fullSeason, 'S1'), false)
+  assert.equal(insights.isSeasonComplete(fullSeason, 'S1', [{ id: 'complete:S1', season: 'S1', kind: 'season-complete', teamIds: [] }]), true)
 })
 
 test('home stories are compact, derived output only', () => {

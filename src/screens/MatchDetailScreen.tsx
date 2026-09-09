@@ -2,6 +2,7 @@ import { Pitch } from '../components/Pitch'
 import { MatchTimeline } from '../components/MatchTimeline'
 import { formatDate, SubstitutePlayerCard } from '../components/ui'
 import { getMatchManOfTheMatch, matchScore, rateMatch } from '../engine/rating'
+import { matchCompetitionType } from '../engine/competition'
 import { useStore } from '../store'
 import type { Best11Slot, MatchEvent, Player, View } from '../types'
 
@@ -30,7 +31,7 @@ export function MatchDetailScreen({ matchId, onNavigate }: { matchId: string; on
   }
   return <div className="px-4 pb-8 pt-6">
     <button type="button" onClick={() => onNavigate({ name: 'home' })} className="mb-3 text-xs font-semibold text-emerald-400">Back</button>
-    <p className="text-xs text-zinc-400">{match.season} · MD {match.matchDay} · {formatDate(match.date)}</p>
+    <p className="text-xs text-zinc-400">{match.season} · {matchCompetitionType(match).toUpperCase()} · {match.competitionStage ?? 'regular'} · MD {match.matchDay} · {formatDate(match.date)}</p>
     <h1 className="mb-4 text-2xl font-semibold">{team?.shortName} {ours}-{theirs} {opponent}</h1>
     <section className="mb-5"><h2 className="mb-2 text-sm font-semibold">Timeline</h2><MatchTimeline events={match.events} players={players} teamId={teamId} match={match} /></section>
     <h2 className="mb-2 text-sm font-semibold">Starting XI</h2>

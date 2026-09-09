@@ -116,7 +116,7 @@ export function Pitch({ compact = false, slots, players, teams, statsByPlayer, o
     const coordinate = (value: number | undefined) => value === undefined ? undefined : Math.max(4, Math.min(96, value <= 1 ? value * 100 : value))
     const savedX = coordinate(slot.x); const savedY = coordinate(slot.y)
     const point = savedX !== undefined && savedY !== undefined ? { x: savedX, y: savedY } : layout === 'free' ? homePositions[slot.slot] ?? tactical : tactical
-    const player = slot.playerId ? byId[slot.playerId] : undefined; if (!player) return draggable ? <EmptyPitchSlotDrop key={slot.slot} slot={slot} point={point} onClick={onEmptySlotClick ? () => onEmptySlotClick(slot) : undefined} /> : null; const stats = statsByPlayer?.[player.id]; const matchPosition = (slot.matchPosition ?? tactical.matchPosition) as Position
+    const player = slot.playerId ? byId[slot.playerId] : undefined; if (!player) return draggable ? <EmptyPitchSlotDrop key={slot.slot} slot={slot} point={point} onClick={onEmptySlotClick ? () => onEmptySlotClick(slot) : undefined} /> : onEmptySlotClick ? <EmptyPitchSlot key={slot.slot} slot={slot} point={point} onClick={() => onEmptySlotClick(slot)} /> : null; const stats = statsByPlayer?.[player.id]; const matchPosition = (slot.matchPosition ?? tactical.matchPosition) as Position
     const representativeTeam = teamById[slot.teamId ?? '']
     const badges = (
       <>
@@ -126,7 +126,7 @@ export function Pitch({ compact = false, slots, players, teams, statsByPlayer, o
             className="absolute -right-3 -top-3 z-30 shadow-lg"
             size="large"
           >
-            {slot.avgRating.toFixed(1)}{player.id === motmPlayerId ? ' ★' : ''}
+            {slot.avgRating.toFixed(slot.matches > 1 ? 2 : 1)}{player.id === motmPlayerId ? ' ★' : ''}
           </Badge>
         )}
       </>
@@ -165,4 +165,8 @@ function EmptyPitchSlotDrop({ slot, point, onClick }: { slot: Best11Slot; point:
   const drop = useDroppable({ id: `target:${slot.slot}` })
   if (onClick) return <button ref={drop.setNodeRef} type="button" aria-label={`Empty ${slot.matchPosition ?? slot.position} slot`} onClick={onClick} className="absolute h-12 w-12 -translate-x-1/2 -translate-y-1/2 bg-transparent focus-visible:ring-2 focus-visible:ring-white" style={{ left: `${point.x}%`, top: `${point.y}%` }} />
   return <div ref={drop.setNodeRef} aria-hidden="true" className="pointer-events-none absolute h-12 w-12 -translate-x-1/2 -translate-y-1/2" style={{ left: `${point.x}%`, top: `${point.y}%` }} />
+}
+
+function EmptyPitchSlot({ slot, point, onClick }: { slot: Best11Slot; point: { x: number; y: number }; onClick: () => void }) {
+  return <button type="button" aria-label={`Empty ${slot.matchPosition ?? slot.position} slot`} onClick={onClick} className="absolute h-12 w-12 -translate-x-1/2 -translate-y-1/2 bg-transparent focus-visible:ring-2 focus-visible:ring-white" style={{ left: `${point.x}%`, top: `${point.y}%` }} />
 }

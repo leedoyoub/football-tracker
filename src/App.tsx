@@ -8,7 +8,6 @@ import { EditPlayerScreen } from './screens/EditPlayerScreen'
 import { EditMatchScreen } from './screens/EditMatchScreen'
 import { PlayerDetailScreen } from './screens/PlayerDetailScreen'
 import { PlayersScreen } from './screens/PlayersScreen'
-import { RankingsScreen } from './screens/RankingsScreen'
 import { StandingsScreen } from './screens/StandingsScreen'
 import { ChemistryScreen } from './screens/ChemistryScreen'
 import { ComparisonScreen } from './screens/ComparisonScreen'
@@ -16,7 +15,7 @@ import { TeamDetailScreen } from './screens/TeamDetailScreen'
 import { TeamsScreen } from './screens/TeamsScreen'
 import { DataManagementScreen } from './screens/DataManagementScreen'
 import { SeasonRecapScreen } from './screens/SeasonRecapScreen'
-import { NewsScreen } from './screens/NewsScreen'
+import { CompetitionScreen } from './screens/CompetitionScreen'
 import { RecordsScreen } from './screens/RecordsScreen'
 import { ResultsScreen } from './screens/ResultsScreen'
 import { SquadImportScreen } from './screens/SquadImportScreen'
@@ -35,8 +34,9 @@ import { popPlayerEditHistory } from './lib/playerNavigation'
 export default function App() {
   const { user, loading, startupError, signInWithGoogle, retryStartup } = useAuth()
   const store = useStore()
-  const { matches } = store
-  const seasons = seasonsFromMatches(matches)
+  const { matches, competitionStates = [] } = store
+  const completedNextSeasons = competitionStates.filter(state => state.kind === 'season-complete').map(state => `Season ${Number(state.season.match(/\d+/)?.[0] ?? 1) + 1}`)
+  const seasons = [...new Set([...seasonsFromMatches(matches), ...competitionStates.map(state => state.season), ...completedNextSeasons])].sort((a, b) => Number(b.match(/\d+/)?.[0] ?? 0) - Number(a.match(/\d+/)?.[0] ?? 0))
   const [season, setSeason] = useState(seasons[0] ?? 'Season 1')
   const [history, setHistory] = useState<View[]>([{ name: 'home' }])
   const [playerFilters, setPlayerFilters] = useState<RankingFilters>(emptyFilters)
@@ -87,7 +87,7 @@ export default function App() {
     if (view.name === 'players' || view.name === 'player' || view.name === 'new-player' || view.name === 'edit-player') {
       return 'players'
     }
-    if (view.name === 'news' || view.name === 'results') return 'news'
+    if (view.name === 'competition') return 'competition'
     if (view.name === 'records' || view.name === 'chemistry' || view.name === 'comparison') return 'records'
     return 'home'
   }, [view])
@@ -97,7 +97,7 @@ export default function App() {
     if (next === 'home') setHistory([{ name: 'home' }])
     if (next === 'teams') setHistory([{ name: 'teams' }])
     if (next === 'players') setHistory([{ name: 'players' }])
-    if (next === 'news') setHistory([{ name: 'news' }])
+    if (next === 'competition') setHistory([{ name: 'competition' }])
     if (next === 'records') setHistory([{ name: 'records' }])
   }
 
@@ -129,20 +129,15 @@ export default function App() {
           {view.name === 'home' && (
             <HomeScreen season={season} onSeason={setSeason} onNavigate={onNavigate} />
           )}
-          {view.name === 'news' && <NewsScreen season={season} kind={view.kind} onNavigate={onNavigate} />}
+          {view.name === 'competition' && <CompetitionScreen season={view.season ?? season} initialType={view.competitionType ?? 'league'} onSeason={(nextSeason) => { setSeason(nextSeason); setHistory(previous => previous.map((item, index) => index === previous.length - 1 && item.name === 'competition' ? { ...item, season: nextSeason } : item)) }} onNavigate={onNavigate} />}
           {view.name === 'results' && <ResultsScreen onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'records' && <RecordsScreen season={season} onNavigate={onNavigate} />}
-          {view.name === 'rankings' && (
-            <RankingsScreen
-              onNavigate={onNavigate}
-            />
-          )}
           {view.name === 'standings' && <StandingsScreen season={season} onNavigate={onNavigate} />}
           {view.name === 'season-recap' && <SeasonRecapScreen season={view.season} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'chemistry' && <ChemistryScreen season={season} onNavigate={onNavigate} />}
           {view.name === 'comparison' && <ComparisonScreen season={season} onNavigate={onNavigate} />}
 
-          {view.name === 'teams' && <TeamsScreen onNavigate={onNavigate} />}
+          {view.name === 'teams' && <TeamsScreen season={season} onNavigate={onNavigate} />}
           {view.name === 'team' && <TeamDetailScreen teamId={view.id} season={season} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'import-squad' && <SquadImportScreen teamId={view.teamId} onBack={onBack} />}
           {view.name === 'players' && <PlayersScreen onNavigate={onNavigate} appliedFilters={playerFilters} onFiltersChange={setPlayerFilters} />}
@@ -153,7 +148,7 @@ export default function App() {
           {view.name === 'match' && <MatchDetailScreen matchId={view.id} onNavigate={onNavigate} />}
           {view.name === 'edit-match' && <EditMatchScreen matchId={view.id} onNavigate={onNavigate} />}
           {view.name === 'new-match' && (
-            <NewMatchScreen teamId={view.teamId} onNavigate={onNavigate} />
+            <NewMatchScreen teamId={view.teamId} requestedSeason={view.season} onNavigate={onNavigate} />
           )}
           {view.name === 'new-player' && (
             <NewPlayerScreen teamId={view.teamId} onNavigate={onNavigate} />

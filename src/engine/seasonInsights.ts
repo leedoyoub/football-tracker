@@ -1,7 +1,7 @@
 import { matchScore, ratePlayerMatch } from './rating'
 import { playerSeasonStats, unifiedBestEleven } from './stats'
 import { combinationStats, goalPartnerships, starterSubstituteSplits } from './analytics'
-import type { Match, MatchEvent, Player } from '../types'
+import type { CompetitionState, Match, MatchEvent, Player } from '../types'
 
 /** All season insight calculations live here so none of them require extra match input. */
 export const STARTING_XI_MIN_SAMPLE = 3
@@ -69,7 +69,7 @@ export function playerForm(player: Player, matches: Match[]): PlayerForm {
     const appearance = match.appearances.find(item => item.playerId === player.id)
     const rating = appearance ? ratePlayerMatch(match, player) : null
     // ratePlayerMatch deliberately returns null for a bench player who never entered.
-    return rating ? [{ matchId: match.id, matchDay: match.matchDay, rating: rating.raw }] : []
+    return rating ? [{ matchId: match.id, matchDay: match.matchDay, rating: rating.rating }] : []
   })
   const average = (rows: typeof ratings) => rows.length ? rows.reduce((sum, row) => sum + row.rating, 0) / rows.length : 0
   return { seasonAverage: average(ratings), last5Average: average(ratings.slice(-5)), last3Average: average(ratings.slice(-3)), ratings }
@@ -86,7 +86,7 @@ export function playerStreaks(player: Player, matches: Match[]): PlayerStreak[] 
     const goals = match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.playerId === player.id).length
     const assists = match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id).length
     const score = matchScore(match); const conceded = appearance.teamId === match.homeTeamId ? score.away : score.home
-    return [{ goals, assists, rating: rating?.raw ?? 0, started: appearance.role === 'starter', cleanSheet: Boolean(rating) && conceded === 0 }]
+    return [{ goals, assists, rating: rating?.rating ?? 0, started: appearance.role === 'starter', cleanSheet: Boolean(rating) && conceded === 0 }]
   })
   const definitions: { key: StreakName; label: string; passes: (entry: typeof entries[number]) => boolean }[] = [
     { key: 'goals', label: 'Goals', passes: entry => entry.goals > 0 },
@@ -118,7 +118,7 @@ export function startingXIAnalytics(players: Player[], matches: Match[], season:
       if (!starters.length) continue
       const key = `${currentTeamId}:${starters.join(':')}`
       const score = matchScore(match); const ours = currentTeamId === match.homeTeamId ? score.home : score.away; const theirs = currentTeamId === match.homeTeamId ? score.away : score.home
-      const values = starters.flatMap(id => { const player = byId.get(id); const rating = player ? ratePlayerMatch(match, player) : null; return rating ? [rating.raw] : [] })
+      const values = starters.flatMap(id => { const player = byId.get(id); const rating = player ? ratePlayerMatch(match, player) : null; return rating ? [rating.rating] : [] })
       const previous = totals.get(key) ?? { key, teamId: currentTeamId, playerIds: starters, matches: 0, wins: 0, draws: 0, losses: 0, winRate: 0, averageRating: 0, eligible: false }
       previous.matches++; previous.wins += Number(ours > theirs); previous.draws += Number(ours === theirs); previous.losses += Number(ours < theirs)
       previous.averageRating = ((previous.averageRating * (previous.matches - 1)) + (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0)) / previous.matches
@@ -140,9 +140,9 @@ export function startingXILeaders(players: Player[], matches: Match[], season: s
 
 export type SeasonAward = { id: string; title: string; playerIds: string[]; detail: string }
 export type SeasonRecap = { season: string; complete: boolean; matchDays: number; awards: SeasonAward[]; bestXI: ReturnType<typeof unifiedBestEleven>['slots'] }
-export function isSeasonComplete(matches: Match[], season: string) { return new Set(matches.filter(match => match.season === season).map(match => match.matchDay)).size >= 38 }
+export function isSeasonComplete(_matches: Match[], season: string, states: CompetitionState[] = []) { return states.some(state => state.kind === 'season-complete' && state.season === season) }
 
-export function seasonRecap(players: Player[], matches: Match[], season: string): SeasonRecap {
+export function seasonRecap(players: Player[], matches: Match[], season: string, states: CompetitionState[] = []): SeasonRecap {
   const stats = players.map(player => ({ player, stats: playerSeasonStats(player, players, matches, season) })).filter(row => row.stats.matches > 0)
   const pick = (rows: typeof stats, value: (row: typeof stats[number]) => number) => rows.slice().sort((a, b) => value(b) - value(a) || b.stats.minutes - a.stats.minutes)[0]
   const awardFor = (id: string, title: string, row: typeof stats[number] | undefined, detail: (row: typeof stats[number]) => string): SeasonAward | undefined => row && { id, title, playerIds: [row.player.id], detail: detail(row) }
@@ -168,7 +168,7 @@ export function seasonRecap(players: Player[], matches: Match[], season: string)
     awardFor('substitute', 'Best Substitute', bestSub, row => `${starterSubstituteSplits(row.player, matches, filter).substitute.averageRating.toFixed(2)} as a substitute`),
     xi && { id: 'most-used-xi', title: 'Most Used XI', playerIds: xi.playerIds, detail: `${xi.matches} matches · ${(xi.winRate * 100).toFixed(0)}% wins` },
   ].filter((award): award is SeasonAward => Boolean(award))
-  return { season, complete: isSeasonComplete(matches, season), matchDays: new Set(matches.filter(match => match.season === season).map(match => match.matchDay)).size, awards, bestXI }
+  return { season, complete: isSeasonComplete(matches, season, states), matchDays: new Set(matches.filter(match => match.season === season && (match.competitionType ?? 'league') === 'league').map(match => match.matchDay)).size, awards, bestXI }
 }
 
 export type DataStory = { id: string; eyebrow: string; title: string; detail: string; playerIds: string[] }
