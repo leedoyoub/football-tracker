@@ -108,6 +108,18 @@ test('Champions bracket is a dark symmetric scrollable graphic with connector-re
   assert(source.includes("side=\"left\"") && source.includes("side=\"right\""))
 })
 
+test('Champions bracket keeps native horizontal scrolling while hiding its browser scrollbar', () => {
+  const source = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
+  const css = fs.readFileSync(require.resolve('../src/index.css'), 'utf8')
+  const bracketSource = source.slice(source.indexOf('function ChampionsBracket'), source.indexOf('function Round'))
+
+  assert.match(source, /champions-bracket-scroll no-scrollbar overflow-x-auto overflow-y-hidden/)
+  assert.match(css, /\.champions-bracket-scroll\s*\{[\s\S]*?-webkit-overflow-scrolling:\s*touch/)
+  assert.match(css, /\.champions-bracket-scroll::-webkit-scrollbar\s*\{[\s\S]*?display:\s*none/)
+  assert.match(css, /\.champions-bracket-scroll\s*\{[\s\S]*?scrollbar-width:\s*none/)
+  assert.doesNotMatch(bracketSource, /on(?:Touch|Pointer)[A-Z]/)
+})
+
 test('Home has only the ordered dashboard responsibilities and no full ranking, standings or Best XI', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   const order = ['competition-progress', 'recent-matches', 'news', 'season-leaders', 'account'].map(token => source.indexOf(`data-home-section="${token}"`))
