@@ -41,8 +41,18 @@ test('conceded penalties honor on-pitch event-time position and individual cause
   const sub = player('sub', 'CB'); const after = game(sub); after.appearances[0].role = 'bench'; after.events = [goal(20, { teamId: 'B' }), { id: 'on', type: 'sub', minute: 30, teamId: 'A', playerOutId: 'x', playerInId: 'sub', position: 'CB' }]
   near(ratePlayerMatch(after, sub).conceded, 0)
   const changed = player('changed', 'CB'); const match = game(changed); match.appearances[0].positionHistory = [{ minute: 50, position: 'CDM' }]; match.events = [goal(20, { teamId: 'B' }), goal(60, { teamId: 'B', concededGoalCausePlayerId: 'changed' })]
-  near(ratePlayerMatch(match, changed).conceded, -.35); near(ratePlayerMatch(match, changed).concededCause, -.3)
-  for (const [position, penalty] of [['LB', -.2], ['CDM', -.1], ['CM', -.08], ['LM', -.04]]) { const p = player(position, position); const m = game(p); m.events = [goal(30, { teamId: 'B' })]; near(ratePlayerMatch(m, p).conceded, penalty) }
+  near(ratePlayerMatch(match, changed).conceded, -.45); near(ratePlayerMatch(match, changed).concededCause, -.3)
+  for (const [position, penalty] of [['LB', -.3], ['LWB', -.3], ['RB', -.3], ['RWB', -.3], ['CB', -.35], ['LCB', -.35], ['RCB', -.35], ['CDM', -.1], ['CM', -.08], ['LM', -.04], ['ST', 0]]) { const p = player(position, position); const m = game(p); m.events = [goal(30, { teamId: 'B' })]; near(ratePlayerMatch(m, p).conceded, penalty) }
+})
+
+test('v2.1.2 per-goal conceded coefficients scale for fullbacks, centre-backs, and goalkeepers', () => {
+  for (const [position, oneGoal, twoGoals] of [['LB', -.30, -.60], ['CB', -.35, -.70], ['GK', -.35, -.70]]) {
+    const p = player(position, position)
+    const once = game(p); once.events = [goal(30, { teamId: 'B' })]
+    const twice = game(p); twice.events = [goal(30, { teamId: 'B' }), goal(60, { teamId: 'B' })]
+    near(ratePlayerMatch(once, p).conceded, oneGoal)
+    near(ratePlayerMatch(twice, p).conceded, twoGoals)
+  }
 })
 
 test('GK base and save-rate bands are derived safely from saves and conceded goals', () => {
@@ -50,7 +60,7 @@ test('GK base and save-rate bands are derived safely from saves and conceded goa
   assert.equal(ratePlayerMatch(empty, gk).base, GOALKEEPER_BASE_RATING); near(ratePlayerMatch(empty, gk).saves, 0)
   assert.deepEqual([.8, .6, .4, .2, 0].map(saveBonusPerSave), [.25, .22, .20, .16, .12])
   const match = game(gk); match.events = [{ id: 's', type: 'save', teamId: 'A', playerId: 'gk', minute: 20, count: 4 }, goal(30, { teamId: 'B' })]
-  near(ratePlayerMatch(match, gk).saves, 1); near(ratePlayerMatch(match, gk).conceded, -.25)
+  near(ratePlayerMatch(match, gk).saves, 1); near(ratePlayerMatch(match, gk).conceded, -.35)
 })
 
 test('historical rating derivation is raw-data-safe, clamped, and drives averages and MOM', () => {

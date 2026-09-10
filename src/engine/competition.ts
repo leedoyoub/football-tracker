@@ -37,8 +37,10 @@ function sameStanding(a?: Standing, b?: Standing): boolean {
 export function leagueCompetition(teams: Team[], matches: Match[], season: string) {
   const games = competitionMatches(matches, season, 'league')
   const standings = seasonStandings(teams, games, season)
-  const progress = standings.length ? Math.min(...standings.map(row => row.played)) : 0
-  return { standings, matches: games, matchdayProgress: progress, complete: standings.length > 0 && progress >= 38, championId: progress >= 38 ? standings[0]?.teamId : undefined }
+  const minimumTeamMatches = standings.length ? Math.min(...standings.map(row => row.played)) : 0
+  const matchdayProgress = Math.min(minimumTeamMatches + 1, 38)
+  const complete = standings.length > 0 && minimumTeamMatches >= 38
+  return { standings, matches: games, matchdayProgress, complete, championId: complete ? standings[0]?.teamId : undefined }
 }
 
 type StageMetric = Standing & { averageRating: number; opponentShotsOnTarget: number }

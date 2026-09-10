@@ -33,7 +33,7 @@ export function HomeScreen({ season, onNavigate }: { season: string; onSeason?: 
   const teamById = Object.fromEntries(teams.map(team => [team.id, team]))
   const stageName = (stage: string) => ({ roundOf16: 'Round of 16', quarterFinal: 'Quarter-finals', semiFinal: 'Semi-finals', final: 'Final', finalReplay: 'Final Replay' } as Record<string, string>)[stage] ?? stage
   const progress: { type: CompetitionType; emoji: string; label: string; value: string }[] = [
-    { type: 'league', emoji: '👑', label: 'League', value: league.complete ? 'Completed' : `Matchday ${league.matchdayProgress + 1}` },
+    { type: 'league', emoji: '👑', label: 'League', value: league.complete ? 'Completed' : `Matchday ${league.matchdayProgress}` },
     { type: 'cup', emoji: '🥇', label: 'Cup', value: cup.championId ? 'Completed' : `${cup.stage.startsWith('stage') ? `Stage ${cup.stage.replace('stage', '')}` : stageName(cup.stage)} · ${cup.activeTeamIds.length} Teams Remaining` },
     { type: 'champions', emoji: '🏆', label: 'Champions', value: champions.championId ? 'Completed' : champions.drawn ? stageName(champions.currentStage) : champions.drawCount ? `Draw ${champions.drawCount} / 16` : 'Not Started' },
   ]

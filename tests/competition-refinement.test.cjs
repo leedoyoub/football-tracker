@@ -135,11 +135,11 @@ test('Competition Best XI labels and sources are scoped to League, Cup stages an
   assert(!source.includes('Team of the Year'))
 })
 
-test('Recent Match cards retain green/yellow/orange result colors and plain competition labels', () => {
+test('Recent Match cards retain green/yellow/red result colors and plain competition labels', () => {
   const source = fs.readFileSync(require.resolve('../src/components/ResultCard.tsx'), 'utf8')
   assert(source.includes("W: 'bg-emerald-500/15"))
   assert(source.includes("D: 'bg-yellow-500/15"))
-  assert(source.includes("L: 'bg-orange-500/15"))
+  assert(source.includes("L: 'bg-red-500/15 text-red-300'"))
   for (const label of ["'League'", "'Cup'", "'Champions'"]) assert(source.includes(label))
   assert(!/[👑🥇🏆]/u.test(source))
 })
@@ -187,9 +187,9 @@ test('season completion is synchronized as backward-compatible CompetitionState 
   assert(validation.includes("'season-complete'"))
 })
 
-test('visible and package metadata version are exactly v2.1.1 / 2.1.1', () => {
-  assert.equal(APP_VERSION, '2.1.1')
-  assert.equal(require('../package.json').version, '2.1.1')
+test('visible and package metadata version are exactly v2.1.2 / 2.1.2', () => {
+  assert.equal(APP_VERSION, '2.1.2')
+  assert.equal(require('../package.json').version, '2.1.2')
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('v{APP_VERSION}'))
 })

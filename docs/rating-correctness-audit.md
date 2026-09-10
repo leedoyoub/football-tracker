@@ -25,7 +25,7 @@ The initial repository schema and subsequent position-history schema were inspec
 
 Match Result/Detail, Player Detail/Matches, Recent Form, MOM, Rankings, Best XI, Records, competition tie-break averages, Awards and History use the current central rating output. Cached results are shared by Match object revision and player ID. Match replacements invalidate that match's timeline/rating; unchanged Match objects keep their cached results. The repository's immutable array replacements invalidate affected aggregate projections.
 
-`RATING_ENGINE_REVISION = 3` is part of timeline, rating, Player Detail scope, ranking and Best XI cache identity. These caches exist only in memory and are never persisted as football history. Loading the updated application recalculates historical matches automatically; no edit/resave, logout, reinstall or storage wipe is required.
+`RATING_ENGINE_REVISION = 4` is part of timeline, rating, Player Detail scope, ranking and Best XI cache identity. These caches exist only in memory and are never persisted as football history. Loading the updated application recalculates historical matches automatically; no edit/resave, logout, reinstall or storage wipe is required.
 
 ## Gerard Martín regression
 
@@ -78,4 +78,4 @@ Browser discovery returned `No browser is available` and an empty browser list. 
 - `tests/stats-saves.test.cjs`
 - `docs/rating-correctness-audit.md` (this report)
 
-The existing uncommitted v2.1.1 refinements were preserved. No finalized rating coefficients, the 7.2 Good Rating threshold, display colors, general average-rating eligibility, or special award eligibility rules were changed. No historical football data, legacy fields, IDs, substitutions, position timelines or storage were deleted/reset or migrated destructively. No deployment was performed.
+Version 2.1.2 preserves the existing correctness refinements. Only the finalized per-goal conceded coefficients for fullbacks/wingbacks, centre-backs, and goalkeepers changed; the 7.2 Good Rating threshold, other rating coefficients, and general average-rating eligibility remain unchanged. No historical football data, legacy fields, IDs, substitutions, position timelines or storage were deleted/reset or migrated destructively. No deployment was performed.

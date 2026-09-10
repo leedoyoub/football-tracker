@@ -22,13 +22,34 @@ test('legacy matches safely fall back to League and season/type filtering stays 
   assert.deepEqual(competitionMatches([legacy, cup, otherSeason], 'Season 1', 'cup').map(match => match.id), ['cup'])
 })
 
-test('League progress uses the least-played team', () => {
+test('League Matchday is one after the least-played team in the current season and competition', () => {
   const matches = [
     game('a1', 'Season 1', 'league', 'regular', 'T1', 'T2', 1, 0),
     game('a2', 'Season 1', 'league', 'regular', 'T1', 'T3', 1, 0),
     game('b2', 'Season 1', 'league', 'regular', 'T2', 'T3', 1, 0),
+    game('cup', 'Season 1', 'cup', 'stage1', 'T1', 'T2', 1, 0),
+    game('other-season', 'Season 2', 'league', 'regular', 'T1', 'T2', 1, 0),
   ]
-  assert.equal(leagueCompetition(teams.slice(0, 3), matches, 'Season 1').matchdayProgress, 2)
+  assert.equal(leagueCompetition(teams.slice(0, 3), matches, 'Season 1').matchdayProgress, 3)
+})
+
+test('League Matchday is 10 when league teams have played 10, 10, 9, and 9 matches', () => {
+  const matches = [
+    ...Array.from({ length: 10 }, (_, index) => game(`t1-${index}`, 'Season 1', 'league', 'regular', 'T1', `OPP:T1:${index}`, 1, 0)),
+    ...Array.from({ length: 10 }, (_, index) => game(`t2-${index}`, 'Season 1', 'league', 'regular', 'T2', `OPP:T2:${index}`, 1, 0)),
+    ...Array.from({ length: 9 }, (_, index) => game(`t3-${index}`, 'Season 1', 'league', 'regular', 'T3', `OPP:T3:${index}`, 1, 0)),
+    ...Array.from({ length: 9 }, (_, index) => game(`t4-${index}`, 'Season 1', 'league', 'regular', 'T4', `OPP:T4:${index}`, 1, 0)),
+    game('ignored-cup', 'Season 1', 'cup', 'stage1', 'T3', 'T4', 1, 0),
+  ]
+  assert.equal(leagueCompetition(teams.slice(0, 4), matches, 'Season 1').matchdayProgress, 10)
+})
+
+test('League Matchday is capped at 38 after every team completes its schedule', () => {
+  const leagueTeams = teams.slice(0, 2)
+  const matches = Array.from({ length: 38 }, (_, index) => game(`league-${index + 1}`, 'Season 1', 'league', 'regular', 'T1', 'T2', 1, 0))
+  const league = leagueCompetition(leagueTeams, matches, 'Season 1')
+  assert.equal(league.matchdayProgress, 38)
+  assert.equal(league.complete, true)
 })
 
 test('Cup completes a stage, eliminates exactly the bottom two, and resets the next table', () => {

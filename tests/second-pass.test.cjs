@@ -20,17 +20,17 @@ test('second-pass regression: CB entering at 77 receives both later conceded-goa
   const rating = ratePlayerMatch(match, player)
   assert.equal(rating.minutes, 13)
   assert.equal(rating.noConceded, 1.35 * .73 * 13 / 90)
-  assert.equal(rating.conceded, -.5)
+  assert.equal(rating.conceded, -.7)
   assert.equal(rating.result, -.1)
-  assert(Math.abs(rating.raw - 6.04235) < 1e-10)
-  assert.equal(rating.rating.toFixed(1), '6.0')
+  assert(Math.abs(rating.raw - 5.84235) < 1e-10)
+  assert.equal(rating.rating.toFixed(1), '5.8')
 })
 
 test('same-minute event ordering preserves saved legacy order', () => {
   const before = base([{ id: 'goal', type: 'goal', minute: 77, teamId: 'B' }, { id: 'on', type: 'sub', minute: 77, teamId: 'A', playerOutId: 'out', playerInId: 'cb', position: 'CB' }])
   const after = base([{ id: 'on', type: 'sub', minute: 77, teamId: 'A', playerOutId: 'out', playerInId: 'cb', position: 'CB' }, { id: 'goal', type: 'goal', minute: 77, teamId: 'B' }])
   assert.equal(ratePlayerMatch(before, player).conceded, 0)
-  assert.equal(ratePlayerMatch(after, player).conceded, -.25)
+  assert.equal(ratePlayerMatch(after, player).conceded, -.35)
 })
 
 test('good rating threshold is centrally 7.2', () => {
