@@ -45,7 +45,10 @@ Deno.serve(async request => {
     const payload = await providerResponse.json()
     if (!Array.isArray(payload?.response)) return json(request, { error: 'Malformed player response' }, 502)
     const players = payload.response.map(sanitizedPlayer).filter((player: { id?: unknown; name?: unknown }) => Number.isInteger(player.id) && typeof player.name === 'string')
-    if (exactLookup) return players[0] ? json(request, { player: players[0] }) : json(request, { error: 'API player was not found' }, 404)
+    if (exactLookup) {
+      const player = players.find((item: { id: number }) => item.id === externalPlayerId)
+      return player ? json(request, { player }) : json(request, { error: 'API player was not found' }, 404)
+    }
     // API-Football search is provider-dependent for accents. Normalize only
     // comparisons, never the returned spelling, and keep a short safe list.
     return json(request, { players: players.filter((player: Record<string, unknown>) => matchesQuery(query, player)).slice(0, 20) })

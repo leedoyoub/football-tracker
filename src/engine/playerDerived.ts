@@ -56,14 +56,14 @@ function startingPerformance(matches: Match[], playerId: string, scope: PlayerSc
   })
 }
 
-export function derivePlayerScope(player: Player, players: Player[], matches: Match[], scope: PlayerScope = {}): PlayerDerived {
+export function derivePlayerScope(player: Player, players: Player[], matches: Match[], scope: PlayerScope = {}, onDiagnostic?: (diagnostic: { cacheHit: boolean }) => void): PlayerDerived {
   let byPlayers = cache.get(matches)
   if (!byPlayers) { byPlayers = new WeakMap(); cache.set(matches, byPlayers) }
   let byScope = byPlayers.get(players)
   if (!byScope) { byScope = new Map(); byPlayers.set(players, byScope) }
   const key = scopeKey(scope); let byPlayer = byScope.get(key)
   if (!byPlayer) { byPlayer = new Map(); byScope.set(key, byPlayer) }
-  const existing = byPlayer.get(player.id); if (existing) return existing
+  const existing = byPlayer.get(player.id); if (existing) { onDiagnostic?.({ cacheHit: true }); return existing }
   const appearances: DerivedAppearance[] = []
   for (const match of scoped(matches, scope)) {
     const appearance = match.appearances.find(item => item.playerId === player.id && (!scope.teamIds?.length || scope.teamIds.includes(item.teamId)))
@@ -98,6 +98,7 @@ export function derivePlayerScope(player: Player, players: Player[], matches: Ma
     starter: roleSummary(actual.filter(row => row.appearance.role === 'starter'), player.id), substitute: roleSummary(actual.filter(row => row.appearance.role !== 'starter'), player.id), startingPerformance: startingPerformance(matches, player.id, scope),
   }
   byPlayer.set(player.id, result)
+  onDiagnostic?.({ cacheHit: false })
   return result
 }
 

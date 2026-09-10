@@ -84,6 +84,92 @@ export function opponentSotProxy(match: Match, teamId: string): number {
   return saves + goals
 }
 
+export type ConcededGoalTrace = {
+  eventId: string
+  minute: number
+  sequence?: number
+  savedIndex: number
+  onPitch: boolean
+  position?: Position
+  penalty: number
+}
+
+export type PlayerMatchRatingTrace = {
+  playerId: string
+  matchId: string
+  status: 'starter' | 'substitute'
+  enter: number
+  exit: number
+  minutes: number
+  intervals: ReturnType<typeof matchPositionSegments>
+  concededGoals: ConcededGoalTrace[]
+  opponentSot: number
+  sotMultiplier: number
+  sotBonus: number
+  goals: number
+  assists: number
+  teamGoals: number
+  ownGoals: number
+  concededPenalty: number
+  individualCausePenalty: number
+  saveBonus: number
+  result: number
+  componentSum: number
+  raw: number
+  clamped: number
+  display: string
+  ratingSource: 'recomputed-current-engine'
+  cacheHit: false
+  legacyStoredPlayerRating?: number
+  legacyStoredRatingUsed: false
+}
+
+/** Explain the exact same raw derivation consumed by Match Detail, Player
+ * Detail, MOM, Rankings, and Best XI. This is diagnostic only; it never reads
+ * a persisted rating as authoritative. */
+export function tracePlayerMatchRating(match: Match, player: Player): PlayerMatchRatingTrace | null {
+  const appearance = match.appearances.find(item => item.playerId === player.id)
+  const rating = ratePlayerMatch(match, player)
+  if (!appearance || !rating) return null
+  const opponentSot = opponentSotProxy(match, appearance.teamId)
+  const concededGoals = match.events.flatMap((event, savedIndex): ConcededGoalTrace[] => {
+    if (event.type !== 'goal' || scoringTeamId(match, event) === appearance.teamId) return []
+    const position = matchPositionAtEvent(match, appearance, event)
+    return [{ eventId: event.id, minute: event.minute, sequence: event.sequence, savedIndex, onPitch: Boolean(position), position, penalty: position ? POSITION_RULES[position].conceded : 0 }]
+  })
+  const ownGoals = match.events.filter(event => event.type === 'goal' && event.ownGoal && event.playerId === player.id && isOnPitchAtEvent(match, appearance, event)).length
+  const componentSum = rating.base + rating.result + rating.goals + rating.assists + rating.teamGoals + rating.conceded + rating.noConceded + rating.concededCause + rating.saves
+  return {
+    playerId: player.id,
+    matchId: match.id,
+    status: appearance.role === 'starter' ? 'starter' : 'substitute',
+    enter: rating.enter,
+    exit: rating.exit,
+    minutes: rating.minutes,
+    intervals: matchPositionSegments(match, appearance),
+    concededGoals,
+    opponentSot,
+    sotMultiplier: sotMultiplier(opponentSot),
+    sotBonus: rating.noConceded,
+    goals: rating.goals,
+    assists: rating.assists,
+    teamGoals: rating.teamGoals,
+    ownGoals,
+    concededPenalty: rating.conceded,
+    individualCausePenalty: rating.concededCause,
+    saveBonus: rating.saves,
+    result: rating.result,
+    componentSum,
+    raw: rating.raw,
+    clamped: rating.rating,
+    display: rating.rating.toFixed(1),
+    ratingSource: 'recomputed-current-engine',
+    cacheHit: false,
+    ...(player.rating === undefined ? {} : { legacyStoredPlayerRating: player.rating }),
+    legacyStoredRatingUsed: false,
+  }
+}
+
 /** One raw-data-only rating calculation for every screen and award. */
 export function ratePlayerMatch(match: Match, player: Player): RatingBreakdown | null {
   const appearance = match.appearances.find(item => item.playerId === player.id)
