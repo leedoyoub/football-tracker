@@ -1,6 +1,8 @@
 import { matchScore, ratePlayerMatch } from './rating'
 import { playerSeasonStats, unifiedBestEleven } from './stats'
 import { combinationStats, goalPartnerships, starterSubstituteSplits } from './analytics'
+import { GOOD_RATING_THRESHOLD } from './constants'
+import { classifyGoalTypes } from './goalTypes'
 import type { CompetitionState, Match, MatchEvent, Player } from '../types'
 
 /** All season insight calculations live here so none of them require extra match input. */
@@ -34,31 +36,20 @@ export type GoalClassification = {
   scoringTeamId: string
   scoreBefore: { home: number; away: number }
   scoreAfter: { home: number; away: number }
-  labels: ('Opening Goal' | 'Equalizer' | 'Go-ahead Goal' | 'Winning Goal' | 'Late Goal')[]
+  labels: ('Opening Goal' | 'Equalizer' | 'Go-ahead Goal' | 'Comeback Goal' | 'Winning Goal' | 'Late Drama' | 'Late Goal')[]
 }
 
 /** Rebuilds the score at every goal, including own goals, in stable timeline order. */
 export function classifyGoalEvents(match: Match): GoalClassification[] {
-  const goals = goalsInOrder(match)
-  const final = matchScore(match)
-  const winner = final.home === final.away ? undefined : final.home > final.away ? match.homeTeamId : match.awayTeamId
-  let winningEventId: string | undefined
-  if (winner) {
-    for (let i = 0; i < goals.length; i++) {
-      const goal = goals[i]
-      const leads = winner === match.homeTeamId ? goal.homeAfter > goal.awayAfter : goal.awayAfter > goal.homeAfter
-      const neverRelinquishesLead = goals.slice(i + 1).every(next => winner === match.homeTeamId ? next.homeAfter > next.awayAfter : next.awayAfter > next.homeAfter)
-      if (goal.scoringTeamId === winner && leads && neverRelinquishesLead) { winningEventId = goal.event.id; break }
-    }
-  }
-  return goals.map((goal, index) => {
-    const labels: GoalClassification['labels'] = []
-    if (index === 0) labels.push('Opening Goal')
-    if (goal.homeBefore !== goal.awayBefore && goal.homeAfter === goal.awayAfter) labels.push('Equalizer')
-    if (goal.homeBefore === goal.awayBefore && goal.homeAfter !== goal.awayAfter) labels.push('Go-ahead Goal')
-    if (goal.event.id === winningEventId) labels.push('Winning Goal')
-    if (goal.event.minute >= 75) labels.push('Late Goal')
-    return { eventId: goal.event.id, scoringTeamId: goal.scoringTeamId, scoreBefore: { home: goal.homeBefore, away: goal.awayBefore }, scoreAfter: { home: goal.homeAfter, away: goal.awayAfter }, labels }
+  const goals = goalsInOrder(match); const derived = new Map(classifyGoalTypes(match).map(row => [row.event, row]))
+  const labels = { opening: 'Opening Goal', equalizer: 'Equalizer', goAhead: 'Go-ahead Goal', comeback: 'Comeback Goal', winning: 'Winning Goal', lateDrama: 'Late Drama' } as const
+  return goals.map(goal => {
+    const row = derived.get(goal.event)
+    const result: GoalClassification['labels'] = (row?.tags ?? []).map(tag => labels[tag])
+    // Compatibility presentation label; derived Goal Types uses the stricter
+    // >=85 match-state-changing Late Drama definition above.
+    if (goal.event.minute >= 75) result.push('Late Goal')
+    return { eventId: goal.event.id, scoringTeamId: goal.scoringTeamId, scoreBefore: { home: goal.homeBefore, away: goal.awayBefore }, scoreAfter: { home: goal.homeAfter, away: goal.awayAfter }, labels: result }
   })
 }
 
@@ -75,7 +66,7 @@ export function playerForm(player: Player, matches: Match[]): PlayerForm {
   return { seasonAverage: average(ratings), last5Average: average(ratings.slice(-5)), last3Average: average(ratings.slice(-3)), ratings }
 }
 
-export type StreakName = 'goals' | 'assists' | 'goalContributions' | 'rating75' | 'starts' | 'cleanSheets'
+export type StreakName = 'goals' | 'assists' | 'goalContributions' | 'goodRating' | 'starts' | 'cleanSheets'
 export type PlayerStreak = { key: StreakName; label: string; current: number; best: number }
 
 export function playerStreaks(player: Player, matches: Match[]): PlayerStreak[] {
@@ -92,7 +83,7 @@ export function playerStreaks(player: Player, matches: Match[]): PlayerStreak[] 
     { key: 'goals', label: 'Goals', passes: entry => entry.goals > 0 },
     { key: 'assists', label: 'Assists', passes: entry => entry.assists > 0 },
     { key: 'goalContributions', label: 'G+A', passes: entry => entry.goals + entry.assists > 0 },
-    { key: 'rating75', label: '7.5+ rating', passes: entry => entry.rating >= 7.5 },
+    { key: 'goodRating', label: `${GOOD_RATING_THRESHOLD.toFixed(1)}+ rating`, passes: entry => entry.rating >= GOOD_RATING_THRESHOLD },
     { key: 'starts', label: 'Starts', passes: entry => entry.started },
     { key: 'cleanSheets', label: 'Clean sheets', passes: entry => entry.cleanSheet },
   ]
@@ -179,10 +170,10 @@ export function homeDataStories(players: Player[], matches: Match[], season: str
   for (const player of players) {
     const involved = seasonMatches.filter(match => match.appearances.some(appearance => appearance.playerId === player.id))
     const form = playerForm(player, involved); const streaks = playerStreaks(player, involved)
-    const ga = streaks.find(row => row.key === 'goalContributions')!; const hot = streaks.find(row => row.key === 'rating75')!
+    const ga = streaks.find(row => row.key === 'goalContributions')!; const hot = streaks.find(row => row.key === 'goodRating')!
     if (ga.current >= 2) candidates.push({ id: `ga:${player.id}`, eyebrow: '🔥 Involved', title: player.displayName ?? player.name, detail: `${ga.current} matches with a goal contribution`, playerIds: [player.id], score: ga.current * 4 })
     if (form.ratings.length >= 3 && form.last5Average - form.seasonAverage >= .2) candidates.push({ id: `form:${player.id}`, eyebrow: '📈 Rising form', title: player.displayName ?? player.name, detail: `Season ${form.seasonAverage.toFixed(2)} → Last 5 ${form.last5Average.toFixed(2)}`, playerIds: [player.id], score: (form.last5Average - form.seasonAverage) * 10 })
-    if (hot.current >= 3) candidates.push({ id: `hot:${player.id}`, eyebrow: '⚡ Hot streak', title: player.displayName ?? player.name, detail: `${hot.current} straight 7.5+ ratings`, playerIds: [player.id], score: hot.current * 3 })
+    if (hot.current >= 3) candidates.push({ id: `hot:${player.id}`, eyebrow: '⚡ Hot streak', title: player.displayName ?? player.name, detail: `${hot.current} straight ${GOOD_RATING_THRESHOLD.toFixed(1)}+ ratings`, playerIds: [player.id], score: hot.current * 3 })
   }
   const partnership = goalPartnerships(players, seasonMatches, { season })[0]
   if (partnership) candidates.push({ id: `partnership:${partnership.key}`, eyebrow: '🤝 Best partnership', title: `${nameFor(partnership.assisterId)} → ${nameFor(partnership.scorerId)}`, detail: `${partnership.assistedGoals} assisted goals`, playerIds: [partnership.assisterId, partnership.scorerId], score: partnership.assistedGoals * 2 })

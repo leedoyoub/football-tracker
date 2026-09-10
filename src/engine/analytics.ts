@@ -1,11 +1,11 @@
-import { matchPositionSegments, matchScore, ratePlayerMatch } from './rating'
+import { matchPositionAt, matchPositionSegments, matchScore, ratePlayerMatch } from './rating'
 import type { Match, Player, Position } from '../types'
 
 export type AnalyticsFilter = { season?: string; teamId?: string }
-export type CombinationKind = 'duo' | 'attack' | 'midfield' | 'cb' | 'backFour'
+export type CombinationKind = 'duo' | 'attack' | 'midfield' | 'cb' | 'fullback' | 'backFour'
 export type CombinationStats = {
   key: string; kind: CombinationKind; playerIds: string[]; teamId: string
-  togetherMinutes: number; matches: number; goalsFor: number; goalsAgainst: number
+  togetherMinutes: number; matches: number; startsTogether: number; goalsFor: number; goalsAgainst: number
   goalDifference: number; combinedGoals: number; combinedAssists: number; combinedGA: number
   averageRating: number; wins: number; draws: number; losses: number; cleanSheets: number
   eligible: boolean
@@ -23,7 +23,7 @@ const centreBacks = new Set<Position>(['CB', 'LCB', 'RCB'])
 const leftBacks = new Set<Position>(['LB', 'LWB'])
 const rightBacks = new Set<Position>(['RB', 'RWB'])
 const anyRole: RoleCheck = () => true
-const roleFor = (kind: Exclude<CombinationKind, 'backFour'>): RoleCheck => kind === 'attack' ? position => attackers.has(position) : kind === 'midfield' ? position => midfielders.has(position) : kind === 'cb' ? position => centreBacks.has(position) : anyRole
+const roleFor = (kind: Exclude<CombinationKind, 'backFour' | 'fullback'>): RoleCheck => kind === 'attack' ? position => attackers.has(position) : kind === 'midfield' ? position => midfielders.has(position) : kind === 'cb' ? position => centreBacks.has(position) : anyRole
 
 function isScoped(match: Match, filter: AnalyticsFilter, teamId?: string) {
   if (filter.season && match.season !== filter.season) return false
@@ -71,7 +71,8 @@ function buildCombination(match: Match, playerIds: string[], teamId: string, rol
   }
   const score = matchScore(match); const ours = teamId === match.homeTeamId ? score.home : score.away; const theirs = teamId === match.homeTeamId ? score.away : score.home
   const ratings = playerIds.flatMap(playerId => { const player = playersById.get(playerId); const rating = player && ratePlayerMatch(match, player); return rating ? [rating.rating] : [] })
-  return { togetherMinutes, matches: 1, goalsFor, goalsAgainst, goalDifference: goalsFor - goalsAgainst, combinedGoals, combinedAssists, combinedGA: combinedGoals + combinedAssists, averageRating: ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 0, wins: ours > theirs ? 1 : 0, draws: ours === theirs ? 1 : 0, losses: ours < theirs ? 1 : 0, cleanSheets: goalsAgainst === 0 ? 1 : 0 }
+  const startsTogether = playerIds.every(id => { const appearance = match.appearances.find(item => item.playerId === id && item.teamId === teamId); return appearance?.role === 'starter' && Boolean(appearance && roles[id]?.(matchPositionAt(match, appearance, 0) ?? appearance.position)) }) ? 1 : 0
+  return { togetherMinutes, matches: 1, startsTogether, goalsFor, goalsAgainst, goalDifference: goalsFor - goalsAgainst, combinedGoals, combinedAssists, combinedGA: combinedGoals + combinedAssists, averageRating: ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 0, wins: ours > theirs ? 1 : 0, draws: ours === theirs ? 1 : 0, losses: ours < theirs ? 1 : 0, cleanSheets: goalsAgainst === 0 ? 1 : 0 }
 }
 
 export function combinationStats(players: Player[], matches: Match[], filter: AnalyticsFilter, kind: CombinationKind): CombinationStats[] {
@@ -88,9 +89,10 @@ export function combinationStats(players: Player[], matches: Match[], filter: An
       if (!entry) return
       const key = `${teamId}:${ids.slice().sort().join(':')}`; const previous = totals.get(key)
       if (!previous) { totals.set(key, { key, kind, playerIds: ids.slice().sort(), teamId, ...entry, eligible: false }); return }
-      previous.togetherMinutes += entry.togetherMinutes; previous.matches += entry.matches; previous.goalsFor += entry.goalsFor; previous.goalsAgainst += entry.goalsAgainst; previous.goalDifference += entry.goalDifference; previous.combinedGoals += entry.combinedGoals; previous.combinedAssists += entry.combinedAssists; previous.combinedGA += entry.combinedGA; previous.averageRating = (previous.averageRating * (previous.matches - 1) + entry.averageRating) / previous.matches; previous.wins += entry.wins; previous.draws += entry.draws; previous.losses += entry.losses; previous.cleanSheets += entry.cleanSheets
+      previous.togetherMinutes += entry.togetherMinutes; previous.matches += entry.matches; previous.startsTogether += entry.startsTogether; previous.goalsFor += entry.goalsFor; previous.goalsAgainst += entry.goalsAgainst; previous.goalDifference += entry.goalDifference; previous.combinedGoals += entry.combinedGoals; previous.combinedAssists += entry.combinedAssists; previous.combinedGA += entry.combinedGA; previous.averageRating = (previous.averageRating * (previous.matches - 1) + entry.averageRating) / previous.matches; previous.wins += entry.wins; previous.draws += entry.draws; previous.losses += entry.losses; previous.cleanSheets += entry.cleanSheets
     }
     if (kind === 'backFour') for (const left of available(position => leftBacks.has(position))) for (const centre of combinations(available(position => centreBacks.has(position)), 2)) for (const right of available(position => rightBacks.has(position))) add([left, ...centre, right], { [left]: position => leftBacks.has(position), [centre[0]]: position => centreBacks.has(position), [centre[1]]: position => centreBacks.has(position), [right]: position => rightBacks.has(position) })
+    else if (kind === 'fullback') for (const left of available(position => leftBacks.has(position))) for (const right of available(position => rightBacks.has(position))) add([left, right], { [left]: position => leftBacks.has(position), [right]: position => rightBacks.has(position) })
     else { const count = kind === 'duo' || kind === 'cb' ? 2 : 3; const role = roleFor(kind); for (const ids of combinations(available(role), count)) add(ids, Object.fromEntries(ids.map(id => [id, role]))) }
   }
   return [...totals.values()].map(row => ({ ...row, eligible: eligible(row.matches, row.togetherMinutes) })).sort((a, b) => Number(b.eligible) - Number(a.eligible) || b.togetherMinutes - a.togetherMinutes || b.goalDifference - a.goalDifference)
@@ -124,6 +126,40 @@ export function onPitchStats(players: Player[], matches: Match[], filter: Analyt
     }
     return [...totals.values()]
   })
+}
+
+export type PlayerChemistry = {
+  direct?: { partnerId: string; connections: number; playerScored: number; partnerScored: number; matchesTogether: number; minutesTogether: number }
+  positional?: CombinationStats
+  results?: CombinationStats
+}
+
+/** Evidence-first chemistry: direct links, relevant positional overlap, then
+ * team outcomes when starting together. There is deliberately no opaque score. */
+export function playerChemistry(player: Player, players: Player[], matches: Match[], filter: AnalyticsFilter): PlayerChemistry {
+  const directions = goalPartnerships(players, matches, filter).filter(row => row.assisterId === player.id || row.scorerId === player.id)
+  const duoRows = combinationStats(players, matches, filter, 'duo').filter(row => row.playerIds.includes(player.id))
+  const duoFor = (id: string) => duoRows.find(row => row.playerIds.includes(id))
+  const directRows = new Map<string, { connections: number; playerScored: number; partnerScored: number }>()
+  for (const row of directions) {
+    const partnerId = row.assisterId === player.id ? row.scorerId : row.assisterId
+    const current = directRows.get(partnerId) ?? { connections: 0, playerScored: 0, partnerScored: 0 }
+    current.connections += row.assistedGoals
+    if (row.scorerId === player.id) current.playerScored += row.assistedGoals; else current.partnerScored += row.assistedGoals
+    directRows.set(partnerId, current)
+  }
+  const bestDirect = [...directRows.entries()].map(([partnerId, row]) => ({ partnerId, ...row, matchesTogether: duoFor(partnerId)?.matches ?? 0, minutesTogether: duoFor(partnerId)?.togetherMinutes ?? 0 })).sort((left, right) => right.connections - left.connections || right.minutesTogether - left.minutesTogether || left.partnerId.localeCompare(right.partnerId))[0]
+  const positionalKind: CombinationKind = centreBacks.has(player.position) ? 'cb' : leftBacks.has(player.position) || rightBacks.has(player.position) ? 'fullback' : attackers.has(player.position) ? 'attack' : midfielders.has(player.position) ? 'midfield' : 'duo'
+  const positional = combinationStats(players, matches, filter, positionalKind).filter(row => row.playerIds.includes(player.id)).sort((left, right) => {
+    const leftValue = positionalKind === 'cb' || positionalKind === 'fullback' ? left.goalsAgainst / Math.max(left.matches, 1) : (left.wins * 3 + left.draws) / Math.max(left.matches, 1)
+    const rightValue = positionalKind === 'cb' || positionalKind === 'fullback' ? right.goalsAgainst / Math.max(right.matches, 1) : (right.wins * 3 + right.draws) / Math.max(right.matches, 1)
+    return (positionalKind === 'cb' || positionalKind === 'fullback' ? leftValue - rightValue : rightValue - leftValue) || right.startsTogether - left.startsTogether || left.key.localeCompare(right.key)
+  })[0]
+  const results = duoRows.slice().sort((left, right) => {
+    const leftPpg = (left.wins * 3 + left.draws) / Math.max(left.startsTogether, 1); const rightPpg = (right.wins * 3 + right.draws) / Math.max(right.startsTogether, 1)
+    return rightPpg - leftPpg || right.startsTogether - left.startsTogether || right.goalDifference - left.goalDifference || left.key.localeCompare(right.key)
+  })[0]
+  return { direct: bestDirect, positional, results }
 }
 
 export function positionSplits(player: Player, matches: Match[], filter: AnalyticsFilter): PositionSplit[] {

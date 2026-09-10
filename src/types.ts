@@ -101,6 +101,8 @@ export interface Appearance {
 export type MatchEvent =
   | {
       id: string
+      /** Optional explicit sequence for equal-minute events. Legacy rows use array order. */
+      sequence?: number
       type: 'goal'
       minute: number
       teamId: string
@@ -114,6 +116,7 @@ export type MatchEvent =
     }
   | {
       id: string
+      sequence?: number
       type: 'save'
       minute?: number
       teamId: string
@@ -122,6 +125,7 @@ export type MatchEvent =
     }
   | {
       id: string
+      sequence?: number
       type: 'sub'
       minute: number
       teamId: string

@@ -262,15 +262,12 @@ export type GlobalLeaderboardRow = PlayerSeasonStats & {
 const defenderRankingPosition = (position: Position) => ['CB', 'LB', 'RB'].includes(position)
 const goalkeeperPosition = (position: Position) => position === 'GK'
 
-/** A small module cache, deliberately never persisted.  Its key includes the
- * relevant raw match revision, so a Cup write cannot invalidate League data. */
-const competitionStatsCache = new Map<string, GlobalLeaderboardRow[]>()
+/** Derived-only cache. A new store match/player array naturally invalidates
+ * it, so lookup never serializes or hashes raw Match/Event payloads. */
+const competitionStatsCache = new WeakMap<Match[], WeakMap<Player[], Map<string, GlobalLeaderboardRow[]>>>()
 function presentMetric(rows: GlobalLeaderboardRow[], metric: LeaderboardMetric) {
   const value = (row: GlobalLeaderboardRow) => metric === 'goals' ? row.goals : metric === 'assists' ? row.assists : metric === 'g+a' ? row.goals + row.assists : metric === 'minutes' ? row.minutes : metric === 'mom' ? row.mom : metric === 'goals/90' ? row.goals / row.minutes * 90 : metric === 'assists/90' ? row.assists / row.minutes * 90 : metric === 'g+a/90' ? (row.goals + row.assists) / row.minutes * 90 : row.avgRating
   return rows.map(row => ({ ...row, value: value(row) })).sort((a, b) => b.value - a.value)
-}
-function matchRevision(matches: Match[]) {
-  return matches.map(match => `${match.id}:${match.date}:${match.events.map(event => `${event.id}:${event.type}:${event.minute ?? ''}:${event.type === 'save' ? event.count ?? '' : ''}`).join(',')}:${match.appearances.map(app => `${app.playerId}:${app.role}:${app.positionHistory?.map(change => `${change.minute}${change.position}`).join('.') ?? ''}`).join(',')}`).sort().join('|')
 }
 
 /**
@@ -284,10 +281,14 @@ export function buildGlobalRankingData(
   filters: { seasons: string[], teams: string[], positions: Position[] },
   _metric: LeaderboardMetric,
 ): GlobalLeaderboardRow[] {
-  const selected = matches.filter(match => (!filters.seasons.length || filters.seasons.includes(match.season)))
-  const cacheKey = `${filters.seasons.slice().sort().join(',')}|${filters.teams.slice().sort().join(',')}|${filters.positions.slice().sort().join(',')}|${players.map(player => `${player.id}:${player.position}`).join(',')}|${matchRevision(selected)}`
-  const cached = competitionStatsCache.get(cacheKey)
+  const cacheKey = `${filters.seasons.slice().sort().join(',')}|${filters.teams.slice().sort().join(',')}|${filters.positions.slice().sort().join(',')}`
+  let byPlayers = competitionStatsCache.get(matches)
+  if (!byPlayers) { byPlayers = new WeakMap(); competitionStatsCache.set(matches, byPlayers) }
+  let byFilter = byPlayers.get(players)
+  if (!byFilter) { byFilter = new Map(); byPlayers.set(players, byFilter) }
+  const cached = byFilter.get(cacheKey)
   if (cached) return presentMetric(cached, _metric)
+  const selected = matches.filter(match => (!filters.seasons.length || filters.seasons.includes(match.season)))
   const playerById = new Map(players.map(player => [player.id, player]))
   const matchesByPlayer = new Map<string, Match[]>()
   for (const match of selected) {
@@ -373,7 +374,7 @@ export function buildGlobalRankingData(
     const value = _metric === 'goals' ? stats.goals : _metric === 'assists' ? stats.assists : _metric === 'g+a' ? stats.goals + stats.assists : _metric === 'minutes' ? stats.minutes : _metric === 'mom' ? stats.mom : _metric === 'goals/90' ? stats.goals / stats.minutes * 90 : _metric === 'assists/90' ? stats.assists / stats.minutes * 90 : _metric === 'g+a/90' ? (stats.goals + stats.assists) / stats.minutes * 90 : stats.avgRating
     return [{ ...stats, value, historicalTeamId: latest?.appearances.find(item => item.playerId === player.id)?.teamId, playedGoalkeeper, sotAllowedAppearances, sotAllowedTotal, concededOnPitch, qualifyingGoalkeeperAppearances, qualifyingSaves }]
   })
-  competitionStatsCache.set(cacheKey, rows)
+  byFilter.set(cacheKey, rows)
   return presentMetric(rows, _metric)
 }
 

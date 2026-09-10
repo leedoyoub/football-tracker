@@ -9,8 +9,17 @@ export function matchCompetitionType(match: Match): CompetitionType {
   return match.competitionType ?? 'league'
 }
 
+const scopedCompetitionMatches = new WeakMap<Match[], Map<string, { length: number; rows: Match[] }>>()
+/** The initial selection is indexed by source-array identity and scope. This
+ * makes a return to an unchanged competition an O(1) lookup. */
 export function competitionMatches(matches: Match[], season: string, type: CompetitionType): Match[] {
-  return matches.filter(match => match.season === season && matchCompetitionType(match) === type)
+  let index = scopedCompetitionMatches.get(matches)
+  if (!index) { index = new Map(); scopedCompetitionMatches.set(matches, index) }
+  const key = `${season}:${type}`; const cached = index.get(key)
+  if (cached && cached.length === matches.length) return cached.rows
+  const selected = matches.filter(match => match.season === season && matchCompetitionType(match) === type)
+  index.set(key, { length: matches.length, rows: selected })
+  return selected
 }
 
 export function competitionStageMatches(matches: Match[], season: string, type: CompetitionType, stage: string): Match[] {

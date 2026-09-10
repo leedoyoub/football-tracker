@@ -3,12 +3,17 @@ import { POSITION_GROUPS, REGISTRATION_POSITIONS, type Match, type Player, type 
 
 export type RankingFilters = { seasons: string[]; teams: string[]; positions: Position[] }
 export const emptyFilters: RankingFilters = { seasons: [], teams: [], positions: [] }
+/** Virtual filter value only. It is never persisted as a Team. */
+export const NO_TEAM_FILTER = '__no-team__'
+export function playerHasNoCurrentTeam(player: Player) { return ![player.teamId, ...(player.teamIds ?? [])].filter(Boolean).length }
 
 export function matchesForPlayer(player: Player, matches: Match[], filters: RankingFilters) {
   return matches.filter(match =>
     (!filters.seasons.length || filters.seasons.includes(match.season)) &&
-    match.appearances.some(appearance => appearance.playerId === player.id &&
-      (!filters.teams.length || filters.teams.includes(appearance.teamId))),
+    match.appearances.some(appearance => appearance.playerId === player.id) &&
+    (!filters.teams.length ||
+      (filters.teams.includes(NO_TEAM_FILTER) && playerHasNoCurrentTeam(player)) ||
+      match.appearances.some(appearance => appearance.playerId === player.id && filters.teams.includes(appearance.teamId))),
   )
 }
 
@@ -45,7 +50,7 @@ export function RankingFilterButton({ applied, onApply, seasons, teams }: {
         <div className="flex flex-wrap gap-3">{seasons.map(season => <label key={season} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={draft.seasons.includes(season)} onChange={() => toggle('seasons', season)} />{season}</label>)}</div>
       </fieldset>
       <fieldset className="mb-4"><legend className="mb-2 text-sm font-semibold">Team</legend>
-        <div className="space-y-2">{teams.map(team => <label key={team.id} className="flex items-center gap-2 break-words text-xs"><input type="checkbox" checked={draft.teams.includes(team.id)} onChange={() => toggle('teams', team.id)} />{team.name}</label>)}</div>
+        <div className="space-y-2"><label className="flex items-center gap-2 break-words text-xs"><input type="checkbox" checked={draft.teams.includes(NO_TEAM_FILTER)} onChange={() => toggle('teams', NO_TEAM_FILTER)} />No Team</label>{teams.map(team => <label key={team.id} className="flex items-center gap-2 break-words text-xs"><input type="checkbox" checked={draft.teams.includes(team.id)} onChange={() => toggle('teams', team.id)} />{team.name}</label>)}</div>
       </fieldset>
       <fieldset><legend className="mb-2 text-sm font-semibold">Detailed Position</legend>
         <div className="mb-3 grid grid-cols-2 gap-3">{Object.entries(POSITION_GROUPS).map(([name, positions]) => <label key={name} className="flex items-center gap-2 text-xs">

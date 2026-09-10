@@ -4,8 +4,8 @@ import { playerDisplayName } from '../components/ui'
 import { useStore } from '../store'
 import type { View } from '../types'
 
-const CATEGORIES: [CombinationKind | 'goals', string][] = [['duo', 'Duo'], ['attack', 'Attack Trio'], ['midfield', 'Midfield Trio'], ['cb', 'CB Pair'], ['backFour', 'Back Four'], ['goals', 'Goal Partnership']]
-const labels: Record<CombinationKind, string> = { duo: 'Together', attack: 'Attack trio', midfield: 'Midfield trio', cb: 'CB partnership', backFour: 'Back four' }
+const CATEGORIES: [CombinationKind | 'goals', string][] = [['duo', 'Duo'], ['attack', 'Attack Unit'], ['midfield', 'Midfield Unit'], ['cb', 'CB Pair'], ['fullback', 'Fullback Pair'], ['backFour', 'Back Four'], ['goals', 'Goal Partnership']]
+const labels: Record<CombinationKind, string> = { duo: 'Together', attack: 'Attack unit', midfield: 'Midfield unit', cb: 'CB partnership', fullback: 'Fullback pair', backFour: 'Back four' }
 
 export function ChemistryScreen({ season, onNavigate }: { season: string; onNavigate: (view: View) => void }) {
   const { players, teams, matches } = useStore(); const [category, setCategory] = useState<CombinationKind | 'goals'>('duo'); const [teamId, setTeamId] = useState('')

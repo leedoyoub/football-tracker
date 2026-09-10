@@ -7,6 +7,12 @@ const corsHeaders = (request: Request): HeadersInit => {
 }
 const json = (request: Request, body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders(request), 'Content-Type': 'application/json' } })
 type ProviderEntry = { player?: Record<string, unknown>; statistics?: { team?: { name?: string } }[] }
+const normalizeForSearch = (value: unknown) => typeof value === 'string' ? value.trim().toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ') : ''
+const matchesQuery = (query: string, player: Record<string, unknown>) => {
+  const needle = normalizeForSearch(query)
+  const fields = [player.name, player.firstname, player.lastname, [player.firstname, player.lastname].filter(value => typeof value === 'string').join(' ')]
+  return fields.some(value => normalizeForSearch(value).includes(needle))
+}
 const sanitizedPlayer = (entry: ProviderEntry) => {
   const player = entry.player ?? entry
   const statistics = Array.isArray(entry.statistics) ? entry.statistics : []
@@ -38,8 +44,10 @@ Deno.serve(async request => {
     if (!providerResponse.ok) return json(request, { error: 'Player provider unavailable' }, providerResponse.status === 429 ? 429 : 502)
     const payload = await providerResponse.json()
     if (!Array.isArray(payload?.response)) return json(request, { error: 'Malformed player response' }, 502)
-    const players = payload.response.slice(0, exactLookup ? 1 : 20).map(sanitizedPlayer).filter((player: { id?: unknown; name?: unknown }) => Number.isInteger(player.id) && typeof player.name === 'string')
+    const players = payload.response.map(sanitizedPlayer).filter((player: { id?: unknown; name?: unknown }) => Number.isInteger(player.id) && typeof player.name === 'string')
     if (exactLookup) return players[0] ? json(request, { player: players[0] }) : json(request, { error: 'API player was not found' }, 404)
-    return json(request, { players })
+    // API-Football search is provider-dependent for accents. Normalize only
+    // comparisons, never the returned spelling, and keep a short safe list.
+    return json(request, { players: players.filter((player: Record<string, unknown>) => matchesQuery(query, player)).slice(0, 20) })
   } catch { return json(request, { error: 'Could not reach player provider' }, 502) }
 })

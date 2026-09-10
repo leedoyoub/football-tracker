@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Pitch } from '../components/Pitch'
 import { PlayerIcon } from '../components/PlayerIcon'
 import { TeamIcon } from '../components/TeamIcon'
@@ -43,9 +43,9 @@ export function CompetitionScreen({ season, initialType = 'league', onSeason, on
   const tournamentTeams = useMemo(() => currentStaticTeams(teams), [teams])
   const seasons = useMemo(() => [...new Set([...seasonsFromMatches(matches), ...competitionStates.map(state => state.season), season, 'Season 1'])].sort((a, b) => Number(b.match(/\d+/)?.[0] ?? 0) - Number(a.match(/\d+/)?.[0] ?? 0)), [matches, competitionStates, season])
   const draw = competitionStates.find(state => state.id === `champions:${season}`)
-  const league = useMemo(() => leagueCompetition(teams, matches, season), [teams, matches, season])
-  const cup = useMemo(() => cupCompetition(tournamentTeams, matches, season, players), [tournamentTeams, matches, season, players])
-  const champions = useMemo(() => championsCompetition(draw, matches, season, players), [draw, matches, season, players])
+  const league = useMemo(() => type === 'league' ? leagueCompetition(teams, matches, season) : null, [type, teams, matches, season])
+  const cup = useMemo(() => type === 'cup' ? cupCompetition(tournamentTeams, matches, season, players) : null, [type, tournamentTeams, matches, season, players])
+  const champions = useMemo(() => type === 'champions' ? championsCompetition(draw, matches, season, players) : null, [type, draw, matches, season, players])
   const selectedMatches = useMemo(() => competitionMatches(matches, season, type), [matches, season, type])
   const seasonStatus = useMemo(() => competitionSeasonStatus(tournamentTeams, matches, season, players, draw), [tournamentTeams, matches, season, players, draw])
   const finalized = competitionStates.some(state => state.kind === 'season-complete' && state.season === season)
@@ -56,18 +56,30 @@ export function CompetitionScreen({ season, initialType = 'league', onSeason, on
     <div className="mb-3 flex items-center justify-between gap-3"><div><h1 className="text-2xl font-semibold">Competitions</h1><p className="text-xs text-zinc-500">Season and tournament detail</p></div><select aria-label="Competition season" value={season} onChange={event => onSeason(event.target.value)} className="rounded-full border border-white/10 bg-zinc-900 px-3 py-1.5 text-xs font-bold">{seasons.map(item => <option key={item}>{item}</option>)}</select></div>
     <div role="tablist" aria-label="Competition type" className="mb-5 grid grid-cols-3 gap-1 rounded-xl bg-zinc-900 p-1">{(['league', 'cup', 'champions'] as CompetitionType[]).map(item => <button key={item} role="tab" aria-selected={type === item} type="button" onClick={() => setType(item)} className={`rounded-lg py-2 text-xs font-black ${type === item ? 'bg-emerald-500 text-black' : 'text-zinc-400'}`}><span aria-hidden>{SYMBOLS[item]}</span> {LABELS[item]}</button>)}</div>
 
-    {type === 'league' && <LeagueView season={season} teams={teams} league={league} onNavigate={onNavigate} />}
-    {type === 'cup' && <CupView season={season} teams={teams} cup={cup} onNavigate={onNavigate} />}
+    {type === 'league' && league && <LeagueView season={season} teams={teams} league={league} onNavigate={onNavigate} />}
+    {type === 'cup' && cup && <CupView season={season} teams={teams} cup={cup} onNavigate={onNavigate} />}
     {type === 'champions' && <section>
-      <CompetitionHeader type="champions" label={champions.currentStage} season={season} champion={champions.championId ? teamById[champions.championId] : undefined} />
-      {!champions.drawn ? <DrawPanel teams={tournamentTeams} drawnIds={draw?.kind === 'champions-draw' ? draw.teamIds : []} teamById={teamById} onDraw={ids => setChampionsDraw(season, ids)} /> : <ChampionsBracket teams={teamById} rounds={champions.rounds} championId={champions.championId} currentStage={champions.currentStage} />}
+      {champions && <><CompetitionHeader type="champions" label={champions.currentStage} season={season} champion={champions.championId ? teamById[champions.championId] : undefined} />
+      {!champions.drawn ? <DrawPanel teams={tournamentTeams} drawnIds={draw?.kind === 'champions-draw' ? draw.teamIds : []} teamById={teamById} onDraw={ids => setChampionsDraw(season, ids)} /> : <ChampionsBracket teams={teamById} rounds={champions.rounds} championId={champions.championId} currentStage={champions.currentStage} />}</>}
     </section>}
 
-    <CompetitionRankings season={season} type={type} players={players} teams={teams} matches={selectedMatches} onNavigate={onNavigate} />
-    <CompetitionBestElevens season={season} type={type} players={players} teams={teams} matches={selectedMatches} allMatches={matches} cup={cup} champions={champions} onNavigate={onNavigate} />
+    <DeferredCompetitionPanels key={`${season}:${type}`}><CompetitionRankings season={season} type={type} players={players} teams={teams} matches={selectedMatches} onNavigate={onNavigate} />
+    <CompetitionBestElevens season={season} type={type} players={players} teams={teams} matches={selectedMatches} allMatches={matches} cup={cup} champions={champions} onNavigate={onNavigate} /></DeferredCompetitionPanels>
 
     {seasonStatus.complete && <section className="mt-7 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4"><h2 className="text-sm font-black">Season complete</h2><p className="mt-1 text-xs text-zinc-300">League, Cup and Champions all have champions.</p>{finalized ? <p className="mt-3 text-xs font-bold text-emerald-300">History finalized · {nextSeason} is available</p> : <button type="button" onClick={() => { completeSeason(season); onSeason(nextSeason) }} className="mt-3 rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-black text-black">Complete Season</button>}</section>}
   </div>
+}
+
+/** Leave standings/header on the first paint. Idle work is Safari-safe and
+ * preserves native page scrolling. */
+function DeferredCompetitionPanels({ children }: { children: ReactNode }) {
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    const idle = window.requestIdleCallback?.(() => setReady(true), { timeout: 400 })
+    const timer = idle === undefined ? window.setTimeout(() => setReady(true), 0) : undefined
+    return () => { if (idle !== undefined) window.cancelIdleCallback?.(idle); if (timer !== undefined) window.clearTimeout(timer) }
+  }, [])
+  return ready ? <>{children}</> : <section aria-label="Competition summaries" className="mt-7 h-14 rounded-2xl bg-zinc-900/60" />
 }
 
 function CompetitionHeader({ type, label, season, champion }: { type: CompetitionType; label: string; season: string; champion?: Team }) {
@@ -127,21 +139,21 @@ function CompetitionRankings({ season, type, players, teams, matches, onNavigate
   </section>
 }
 
-function CompetitionBestElevens({ season, type, players, teams, matches, allMatches, cup, champions, onNavigate }: { season: string; type: CompetitionType; players: Player[]; teams: Team[]; matches: Match[]; allMatches: Match[]; cup: CupCompetition; champions: ReturnType<typeof championsCompetition>; onNavigate: (view: View) => void }) {
+function CompetitionBestElevens({ season, type, players, teams, matches, allMatches, cup, champions, onNavigate }: { season: string; type: CompetitionType; players: Player[]; teams: Team[]; matches: Match[]; allMatches: Match[]; cup: CupCompetition | null; champions: ReturnType<typeof championsCompetition> | null; onNavigate: (view: View) => void }) {
   const seasonXI = useMemo(() => unifiedBestEleven(players, matches, season), [players, matches, season])
   const snapshots = useMemo(() => {
     if (type === 'league') return [{ title: 'Team of the Week', games: matches, recent: true }]
     if (type === 'cup') return [...CUP_STAGES.flatMap((stage, index) => {
       const games = competitionStageMatches(allMatches, season, 'cup', stage)
-      const complete = cup.stage !== stage && games.length > 0
+      const complete = cup?.stage !== stage && games.length > 0
       return complete ? [{ title: `Team of the Stage ${index + 1}`, games, recent: false }] : []
-    }), ...(cup.championId ? [{ title: 'Team of the Final', games: competitionMatches(allMatches, season, 'cup').filter(match => match.competitionStage === 'final' || match.competitionStage === 'finalReplay'), recent: false }] : [])]
+    }), ...(cup?.championId ? [{ title: 'Team of the Final', games: competitionMatches(allMatches, season, 'cup').filter(match => match.competitionStage === 'final' || match.competitionStage === 'finalReplay'), recent: false }] : [])]
     return CHAMPIONS_ROUNDS.flatMap((stage, index) => {
       const games = competitionMatches(allMatches, season, 'champions').filter(match => match.competitionStage === stage || (stage === 'final' && match.competitionStage === 'finalReplay'))
-      const pairs = champions.rounds[stage]
+      const pairs = champions?.rounds[stage] ?? []
       return pairs.length > 0 && pairs.every(pair => Boolean(pair.winnerId)) ? [{ title: `Team of the Round ${index + 1}`, games, recent: false }] : []
     })
-  }, [type, matches, allMatches, season, cup.stage, cup.championId, champions.rounds])
+  }, [type, matches, allMatches, season, cup?.stage, cup?.championId, champions?.rounds])
   return <section className="mt-7"><h2 className="text-lg font-semibold">Best XI</h2><p className="mb-3 text-xs text-zinc-500">Competition-scoped · existing 4-3-3 position rules</p>{snapshots.map(snapshot => <BestEleven key={snapshot.title} title={snapshot.title} xi={unifiedBestEleven(players, snapshot.games, season, snapshot.recent)} players={players} teams={teams} onNavigate={onNavigate} />)}<BestEleven title="Team of the Season" xi={seasonXI} players={players} teams={teams} onNavigate={onNavigate} /></section>
 }
 
