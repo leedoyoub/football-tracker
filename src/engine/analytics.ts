@@ -6,6 +6,7 @@ export type CombinationKind = 'duo' | 'attack' | 'midfield' | 'cb' | 'fullback' 
 export type CombinationStats = {
   key: string; kind: CombinationKind; playerIds: string[]; teamId: string
   togetherMinutes: number; matches: number; startsTogether: number; goalsFor: number; goalsAgainst: number
+  onPitchGoalsFor: number; onPitchGoalsAgainst: number; onPitchGoalDifference: number; onPitchGoalsForPer90: number; onPitchGoalsAgainstPer90: number; onPitchGoalDifferencePer90: number
   goalDifference: number; combinedGoals: number; combinedAssists: number; combinedGA: number
   averageRating: number; wins: number; draws: number; losses: number; cleanSheets: number
   eligible: boolean
@@ -72,7 +73,8 @@ function buildCombination(match: Match, playerIds: string[], teamId: string, rol
   const score = matchScore(match); const ours = teamId === match.homeTeamId ? score.home : score.away; const theirs = teamId === match.homeTeamId ? score.away : score.home
   const ratings = playerIds.flatMap(playerId => { const player = playersById.get(playerId); const rating = player && ratePlayerMatch(match, player); return rating ? [rating.rating] : [] })
   const startsTogether = playerIds.every(id => { const appearance = match.appearances.find(item => item.playerId === id && item.teamId === teamId); return appearance?.role === 'starter' && Boolean(appearance && roles[id]?.(matchPositionAt(match, appearance, 0) ?? appearance.position)) }) ? 1 : 0
-  return { togetherMinutes, matches: 1, startsTogether, goalsFor, goalsAgainst, goalDifference: goalsFor - goalsAgainst, combinedGoals, combinedAssists, combinedGA: combinedGoals + combinedAssists, averageRating: ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 0, wins: ours > theirs ? 1 : 0, draws: ours === theirs ? 1 : 0, losses: ours < theirs ? 1 : 0, cleanSheets: goalsAgainst === 0 ? 1 : 0 }
+  const onPitchGoalDifference = goalsFor - goalsAgainst
+  return { togetherMinutes, matches: 1, startsTogether, goalsFor, goalsAgainst, onPitchGoalsFor: goalsFor, onPitchGoalsAgainst: goalsAgainst, onPitchGoalDifference, onPitchGoalsForPer90: goalsFor / togetherMinutes * 90, onPitchGoalsAgainstPer90: goalsAgainst / togetherMinutes * 90, onPitchGoalDifferencePer90: onPitchGoalDifference / togetherMinutes * 90, goalDifference: onPitchGoalDifference, combinedGoals, combinedAssists, combinedGA: combinedGoals + combinedAssists, averageRating: ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 0, wins: ours > theirs ? 1 : 0, draws: ours === theirs ? 1 : 0, losses: ours < theirs ? 1 : 0, cleanSheets: goalsAgainst === 0 ? 1 : 0 }
 }
 
 export function combinationStats(players: Player[], matches: Match[], filter: AnalyticsFilter, kind: CombinationKind): CombinationStats[] {
@@ -89,13 +91,19 @@ export function combinationStats(players: Player[], matches: Match[], filter: An
       if (!entry) return
       const key = `${teamId}:${ids.slice().sort().join(':')}`; const previous = totals.get(key)
       if (!previous) { totals.set(key, { key, kind, playerIds: ids.slice().sort(), teamId, ...entry, eligible: false }); return }
-      previous.togetherMinutes += entry.togetherMinutes; previous.matches += entry.matches; previous.startsTogether += entry.startsTogether; previous.goalsFor += entry.goalsFor; previous.goalsAgainst += entry.goalsAgainst; previous.goalDifference += entry.goalDifference; previous.combinedGoals += entry.combinedGoals; previous.combinedAssists += entry.combinedAssists; previous.combinedGA += entry.combinedGA; previous.averageRating = (previous.averageRating * (previous.matches - 1) + entry.averageRating) / previous.matches; previous.wins += entry.wins; previous.draws += entry.draws; previous.losses += entry.losses; previous.cleanSheets += entry.cleanSheets
+      previous.togetherMinutes += entry.togetherMinutes; previous.matches += entry.matches; previous.startsTogether += entry.startsTogether; previous.goalsFor += entry.goalsFor; previous.goalsAgainst += entry.goalsAgainst; previous.onPitchGoalsFor += entry.onPitchGoalsFor; previous.onPitchGoalsAgainst += entry.onPitchGoalsAgainst; previous.onPitchGoalDifference += entry.onPitchGoalDifference; previous.goalDifference += entry.goalDifference; previous.combinedGoals += entry.combinedGoals; previous.combinedAssists += entry.combinedAssists; previous.combinedGA += entry.combinedGA; previous.averageRating = (previous.averageRating * (previous.matches - 1) + entry.averageRating) / previous.matches; previous.wins += entry.wins; previous.draws += entry.draws; previous.losses += entry.losses; previous.cleanSheets += entry.cleanSheets
     }
     if (kind === 'backFour') for (const left of available(position => leftBacks.has(position))) for (const centre of combinations(available(position => centreBacks.has(position)), 2)) for (const right of available(position => rightBacks.has(position))) add([left, ...centre, right], { [left]: position => leftBacks.has(position), [centre[0]]: position => centreBacks.has(position), [centre[1]]: position => centreBacks.has(position), [right]: position => rightBacks.has(position) })
     else if (kind === 'fullback') for (const left of available(position => leftBacks.has(position))) for (const right of available(position => rightBacks.has(position))) add([left, right], { [left]: position => leftBacks.has(position), [right]: position => rightBacks.has(position) })
     else { const count = kind === 'duo' || kind === 'cb' ? 2 : 3; const role = roleFor(kind); for (const ids of combinations(available(role), count)) add(ids, Object.fromEntries(ids.map(id => [id, role]))) }
   }
-  return [...totals.values()].map(row => ({ ...row, eligible: eligible(row.matches, row.togetherMinutes) })).sort((a, b) => Number(b.eligible) - Number(a.eligible) || b.togetherMinutes - a.togetherMinutes || b.goalDifference - a.goalDifference)
+  return [...totals.values()].map(row => ({ ...row, onPitchGoalsForPer90: row.togetherMinutes ? row.onPitchGoalsFor / row.togetherMinutes * 90 : 0, onPitchGoalsAgainstPer90: row.togetherMinutes ? row.onPitchGoalsAgainst / row.togetherMinutes * 90 : 0, onPitchGoalDifferencePer90: row.togetherMinutes ? row.onPitchGoalDifference / row.togetherMinutes * 90 : 0, eligible: eligible(row.matches, row.togetherMinutes) })).sort((a, b) => Number(b.eligible) - Number(a.eligible) || b.togetherMinutes - a.togetherMinutes || b.goalDifference - a.goalDifference)
+}
+
+export type CombinationOnPitchMetric = 'onPitchGF90' | 'onPitchGA90' | 'onPitchGD90'
+export function sortCombinationsByOnPitch(rows: CombinationStats[], metric: CombinationOnPitchMetric): CombinationStats[] {
+  const value = (row: CombinationStats) => metric === 'onPitchGF90' ? row.onPitchGoalsForPer90 : metric === 'onPitchGA90' ? row.onPitchGoalsAgainstPer90 : row.onPitchGoalDifferencePer90
+  return rows.slice().sort((left, right) => (metric === 'onPitchGA90' ? value(left) - value(right) : value(right) - value(left)) || right.startsTogether - left.startsTogether || right.togetherMinutes - left.togetherMinutes || left.key.localeCompare(right.key))
 }
 
 export function goalPartnerships(players: Player[], matches: Match[], filter: AnalyticsFilter): GoalPartnership[] {
