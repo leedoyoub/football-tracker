@@ -144,10 +144,12 @@ test('Recent Match cards retain green/yellow/orange result colors and plain comp
   assert(!/[👑🥇🏆]/u.test(source))
 })
 
-test('competition identity emoji are scarce and absent from progress/result UI', () => {
+test('competition identity emoji appear on compact Home progress cards', () => {
   const competitionSource = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
   const teamsSource = fs.readFileSync(require.resolve('../src/screens/TeamsScreen.tsx'), 'utf8')
-  const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
+  const homeSource = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
+  assert(homeSource.includes('🏆'))
+  const home = ''
   const result = fs.readFileSync(require.resolve('../src/components/ResultCard.tsx'), 'utf8')
   assert(competitionSource.includes('👑') && competitionSource.includes('🥇') && competitionSource.includes('🏆'))
   assert(teamsSource.includes('👑') && teamsSource.includes('🥇') && teamsSource.includes('🏆'))

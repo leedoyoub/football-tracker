@@ -190,7 +190,8 @@ export type View =
 
 export type RankSort =
   | 'rating' | 'goals' | 'assists' | 'g+a' | 'minutes' | 'mom'
-  | 'goals/90' | 'assists/90' | 'g+a/90' | 'ga/90' | 'cleanSheets' | 'saves'
+  | 'goals/90' | 'assists/90' | 'g+a/90' | 'sotAllowed' | 'cleanSheets' | 'saves'
+  | 'goalsConceded' | 'savePercentage'
 
 export interface Best11Slot {
   slot: string

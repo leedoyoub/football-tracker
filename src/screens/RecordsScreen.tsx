@@ -8,6 +8,7 @@ import { currentStaticTeams } from '../data/teams'
 import { playerFullName } from '../components/ui'
 import { useStore } from '../store'
 import { emptyFilters, matchesForPlayer, RankingFilterButton, type RankingFilters } from './RankingFilters'
+import { awardsForCompetition, seasonAwards } from '../engine/awards'
 import type { Match, Team, View } from '../types'
 
 type Category = 'player' | 'combination' | 'team' | 'history' | 'insights'
@@ -50,8 +51,8 @@ export function RecordsScreen({ season, onNavigate }: { season: string; onNaviga
     const stats = buildGlobalRankingData(players, games, { seasons: [entry.season], teams: [], positions: [] }, 'rating')
     const scorer = stats.slice().sort((a, b) => b.goals - a.goals)[0]; const assists = stats.slice().sort((a, b) => b.assists - a.assists)[0]; const rating = stats[0]; const mom = stats.slice().sort((a, b) => b.mom - a.mom)[0]
     const xi = unifiedBestEleven(players, games, entry.season).slots.flatMap(slot => slot.playerId ? [playerFullName(players.find(player => player.id === slot.playerId))] : [])
-    return { ...entry, scorer, assists, rating, mom, xi }
-  }), [category, champions, matches, players])
+    return { ...entry, scorer, assists, rating, mom, xi, awards: { league: awardsForCompetition('league', entry.season, tournamentTeams, players, matches, competitionStates), cup: awardsForCompetition('cup', entry.season, tournamentTeams, players, matches, competitionStates), champions: awardsForCompetition('champions', entry.season, tournamentTeams, players, matches, competitionStates), season: seasonAwards(entry.season, tournamentTeams, players, matches, competitionStates) } }
+  }), [category, champions, matches, players, tournamentTeams, competitionStates])
   const trophies = useMemo(() => teams.map(team => { const league = champions.filter(row => row.league === team.id).length; const cup = champions.filter(row => row.cup === team.id).length; const championsTitles = champions.filter(row => row.champions === team.id).length; return { team, league, cup, champions: championsTitles, total: league + cup + championsTitles } }).filter(row => row.total).sort((a, b) => b.total - a.total), [teams, champions])
   const insights = useMemo(() => {
     if (category !== 'insights') return { teams: [], players: [] }

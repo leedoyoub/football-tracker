@@ -37,7 +37,10 @@ export function RankingFilterButton({ applied, onApply, seasons, teams }: {
       dialog.current?.showModal()
     }}>Filter</button>
     <dialog ref={dialog} onCancel={cancel} className="fixed inset-0 m-auto max-h-[85dvh] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-lg border border-white/10 bg-zinc-900 p-4 text-white backdrop:bg-black/70">
-      <h2 className="mb-4 text-lg font-semibold">Filter</h2>
+      <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-4 border-b border-white/10 bg-zinc-900 px-4 pt-4 pb-3"><h2 className="mb-3 text-lg font-semibold">Filter</h2><div className="flex justify-end gap-3">
+        <button type="button" onClick={cancel} className="rounded-lg bg-zinc-800 px-4 py-2 text-sm">Cancel</button>
+        <button type="button" onClick={() => { onApply(draft); dialog.current?.close() }} className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-black">Apply</button>
+      </div></div>
       <fieldset className="mb-4"><legend className="mb-2 text-sm font-semibold">Season</legend>
         <div className="flex flex-wrap gap-3">{seasons.map(season => <label key={season} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={draft.seasons.includes(season)} onChange={() => toggle('seasons', season)} />{season}</label>)}</div>
       </fieldset>
@@ -51,10 +54,6 @@ export function RankingFilterButton({ applied, onApply, seasons, teams }: {
         </label>)}</div>
         <div className="grid grid-cols-4 gap-3">{REGISTRATION_POSITIONS.map(position => <label key={position} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={draft.positions.includes(position)} onChange={() => toggle('positions', position)} />{position}</label>)}</div>
       </fieldset>
-      <div className="mt-5 flex justify-end gap-3">
-        <button type="button" onClick={cancel} className="rounded-lg bg-zinc-800 px-4 py-2 text-sm">Cancel</button>
-        <button type="button" onClick={() => { onApply(draft); dialog.current?.close() }} className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-black">Apply</button>
-      </div>
     </dialog>
   </>
 }

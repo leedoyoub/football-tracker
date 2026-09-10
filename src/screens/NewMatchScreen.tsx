@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { FORMATION_SLOTS, Pitch, UNIVERSAL_TACTICAL_SLOTS, type TacticalSlot } from '../components/Pitch'
 import { calculateFormation } from '../engine/formation'
 import { playerSeasonStats } from '../engine/stats'
-import { pitchWindow } from '../engine/rating'
+import { matchScore, pitchWindow } from '../engine/rating'
 import { canConfirmSubstitution, moveLineup, moveSubstitution, type LineupTarget, type SubstitutionDraft } from './matchLineup'
 import { getNextMatchDayForTeam } from '../engine/match'
 import { competitionAssignment, competitionMatches, matchCompetitionType } from '../engine/competition'
@@ -437,9 +437,9 @@ export function NewMatchScreen({
       <div className="px-4 pt-3">
         <button onClick={() => onNavigate(teamId ? { name: 'team', id: teamId } : { name: 'teams' })} className="mb-3 text-xs font-semibold text-emerald-400">← Cancel</button>
         <h1 className="text-2xl font-bold">Log Match</h1>
-        <div className="mb-2 rounded-xl bg-zinc-900 px-3 py-1">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Next Match Day</p>
-          <p className="text-sm font-black text-emerald-400">{season} · MD {matchDay}</p>
+        <div className="mb-2 flex items-center justify-between rounded-xl bg-zinc-900 px-3 py-1">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Current Matchday</p>
+          <p className="text-sm font-black text-emerald-400">{season} · MD {matchDay}</p><p aria-label="Live score" className="text-xl font-black tabular-nums text-white">{matchScore(eventMatch).home} - {matchScore(eventMatch).away}</p>
         </div>
       </div>
 

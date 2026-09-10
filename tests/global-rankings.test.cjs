@@ -10,17 +10,16 @@ const players = ['GK', 'CB', 'LB', 'RB', 'CDM', 'CM', 'ST'].map(position => play
 const match = (id, season, teamId, roster, events = []) => ({ id, season, matchDay: Number(id.replace(/\D/g, '')) || 1, date: `2026-01-0${Number(id.replace(/\D/g, '')) || 1}`, duration: 90, homeTeamId: teamId, awayTeamId: 'OPP', teamId, appearances: roster.map(item => ({ playerId: item.id, teamId, position: item.position, matchPosition: item.position, role: 'starter' })), events })
 const filters = (overrides = {}) => ({ seasons: [], teams: [], positions: [], ...overrides })
 
-test('Goals Against /90 includes only GK, CB, LB and RB, including aliases', () => {
-  const rows = buildGlobalRankingData(players, [match('1', 'S1', 'A', players)], filters(), 'ga/90')
-  assert.deepEqual(rows.map(row => row.playerId), ['gk', 'cb', 'lb', 'rb'])
-  assert.deepEqual(getLeaderboard(players, [match('1', 'S1', 'A', players)], filters(), 'ga/90').map(row => row.playerId), ['gk', 'cb', 'lb', 'rb'])
+test('Goals Against /90 has been removed from ranking types and UI', () => {
+  const typeSource = fs.readFileSync(require.resolve('../src/types.ts'), 'utf8')
+  const screenSource = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
+  assert(!typeSource.includes("'ga/90'"))
+  assert(!screenSource.includes('Goals Against/90'))
 })
 
-test('Goals Against /90 eligibility intersects team and detailed-position filters', () => {
-  const bKeeper = player('b-gk', 'GK', 'B')
-  const games = [match('1', 'S1', 'A', players), match('2', 'S1', 'B', [bKeeper])]
-  assert.deepEqual(buildGlobalRankingData([...players, bKeeper], games, filters({ teams: ['A'] }), 'ga/90').map(row => row.playerId), ['gk', 'cb', 'lb', 'rb'])
-  assert.deepEqual(buildGlobalRankingData([...players, bKeeper], games, filters({ positions: ['CB', 'CM'] }), 'ga/90').map(row => row.playerId), ['cb'])
+test('new defensive and goalkeeper metrics are present', () => {
+  const typeSource = fs.readFileSync(require.resolve('../src/types.ts'), 'utf8')
+  assert(typeSource.includes("'sotAllowed'") && typeSource.includes("'goalsConceded'") && typeSource.includes("'savePercentage'"))
 })
 
 test('one derived ranking dataset supplies identical preview and full-list values/order', () => {
