@@ -11,7 +11,7 @@ import type {
   TeamSeasonStats,
   PartnershipStats,
 } from '../types'
-import { ratePlayerMatch, getMatchManOfTheMatch, matchScore, pitchWindow, matchPositionAt, matchPositionSegments } from './rating'
+import { ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, pitchWindow, matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './rating'
 import { FORMATION_SLOTS, formationSlotsFor, type TacticalSlot } from '../components/Pitch'
 
 
@@ -49,8 +49,7 @@ export function aggregatePlayerStats(
       // Counts are raw events, not the weighted saves contribution in RatingBreakdown.
       saves += match.events.reduce((total, event) => {
         if (event.type !== 'save' || event.playerId !== player.id || event.teamId !== appearance.teamId) return total
-        if (matchPositionAt(match, appearance, event.minute) !== 'GK') return total
-        if (event.minute !== undefined && !(event.minute >= rating.enter && event.minute < rating.exit)) return total
+        if (event.minute === undefined ? !matchPositionSegments(match, appearance).some(segment => segment.position === 'GK') : matchPositionAtEvent(match, appearance, event) !== 'GK') return total
         const count = event.count ?? 1
         return Number.isInteger(count) && count > 0 ? total + count : total
       }, 0)
@@ -264,7 +263,8 @@ const goalkeeperPosition = (position: Position) => position === 'GK'
 
 /** Derived-only cache. A new store match/player array naturally invalidates
  * it, so lookup never serializes or hashes raw Match/Event payloads. */
-const competitionStatsCache = new WeakMap<Match[], WeakMap<Player[], Map<string, GlobalLeaderboardRow[]>>>()
+type CompetitionStatsCacheEntry = { rows: GlobalLeaderboardRow[]; presented: Map<LeaderboardMetric, GlobalLeaderboardRow[]> }
+const competitionStatsCache = new WeakMap<Match[], WeakMap<Player[], Map<string, CompetitionStatsCacheEntry>>>()
 function presentMetric(rows: GlobalLeaderboardRow[], metric: LeaderboardMetric) {
   const value = (row: GlobalLeaderboardRow) => metric === 'goals' ? row.goals : metric === 'assists' ? row.assists : metric === 'g+a' ? row.goals + row.assists : metric === 'minutes' ? row.minutes : metric === 'mom' ? row.mom : metric === 'goals/90' ? row.goals / row.minutes * 90 : metric === 'assists/90' ? row.assists / row.minutes * 90 : metric === 'g+a/90' ? (row.goals + row.assists) / row.minutes * 90 : row.avgRating
   return rows.map(row => ({ ...row, value: value(row) })).sort((a, b) => b.value - a.value)
@@ -287,7 +287,13 @@ export function buildGlobalRankingData(
   let byFilter = byPlayers.get(players)
   if (!byFilter) { byFilter = new Map(); byPlayers.set(players, byFilter) }
   const cached = byFilter.get(cacheKey)
-  if (cached) return presentMetric(cached, _metric)
+  if (cached) {
+    const presented = cached.presented.get(_metric)
+    if (presented) return presented
+    const rows = presentMetric(cached.rows, _metric)
+    cached.presented.set(_metric, rows)
+    return rows
+  }
   const selected = matches.filter(match => (!filters.seasons.length || filters.seasons.includes(match.season)))
   const playerById = new Map(players.map(player => [player.id, player]))
   const matchesByPlayer = new Map<string, Match[]>()
@@ -335,8 +341,7 @@ export function buildGlobalRankingData(
       if (appearance.role === 'starter') starts++; else subs++
       const matchSaves = match.events.reduce((total, event) => {
         if (event.type !== 'save' || event.playerId !== player.id || event.teamId !== appearance.teamId) return total
-        if (matchPositionAt(match, appearance, event.minute) !== 'GK') return total
-        if (event.minute !== undefined && !(event.minute >= rating.enter && event.minute < rating.exit)) return total
+        if (event.minute === undefined ? !matchPositionSegments(match, appearance).some(segment => segment.position === 'GK') : matchPositionAtEvent(match, appearance, event) !== 'GK') return total
         const count = event.count ?? 1
         return Number.isInteger(count) && count > 0 ? total + count : total
       }, 0)
@@ -354,14 +359,14 @@ export function buildGlobalRankingData(
       if (window && isGoalkeeper && rating.minutes >= 60) {
         qualifyingGoalkeeperAppearances++
         qualifyingSaves += matchSaves
-        concededOnPitch += match.events.filter(event => event.type === 'goal' && event.teamId !== appearance.teamId && event.minute >= window.enter && event.minute < window.exit).length
+        concededOnPitch += match.events.filter(event => event.type === 'goal' && scoringTeamId(match, event) !== appearance.teamId && isOnPitchAtEvent(match, appearance, event)).length
       }
       const score = matchScore(match); const ours = appearance.teamId === match.homeTeamId ? score.home : score.away; const theirs = appearance.teamId === match.homeTeamId ? score.away : score.home
       if (ours > theirs) { wins++; recentForm.push('W') } else if (ours === theirs) { draws++; recentForm.push('D') } else { losses++; recentForm.push('L') }
     }
     if (!ratingRows.length) return []
-    const goals = playerMatches.reduce((sum, match) => sum + match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.playerId === player.id).length, 0)
-    const assists = playerMatches.reduce((sum, match) => sum + match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id).length, 0)
+    const goals = playerMatches.reduce((sum, match) => { const appearance = match.appearances.find(item => item.playerId === player.id); return sum + (appearance ? match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.playerId === player.id && isOnPitchAtEvent(match, appearance, event)).length : 0) }, 0)
+    const assists = playerMatches.reduce((sum, match) => { const appearance = match.appearances.find(item => item.playerId === player.id); return sum + (appearance ? match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id && isOnPitchAtEvent(match, appearance, event)).length : 0) }, 0)
     const minutes = ratingRows.reduce((sum, rating) => sum + rating.minutes, 0)
     const avgRating = Math.round(ratingRows.reduce((sum, rating) => sum + rating.rating, 0) / ratingRows.length * 100) / 100
     const latest = playerMatches.reduce<Match | undefined>((current, match) => !current || match.date > current.date || (match.date === current.date && match.matchDay > current.matchDay) ? match : current, undefined)
@@ -374,12 +379,20 @@ export function buildGlobalRankingData(
     const value = _metric === 'goals' ? stats.goals : _metric === 'assists' ? stats.assists : _metric === 'g+a' ? stats.goals + stats.assists : _metric === 'minutes' ? stats.minutes : _metric === 'mom' ? stats.mom : _metric === 'goals/90' ? stats.goals / stats.minutes * 90 : _metric === 'assists/90' ? stats.assists / stats.minutes * 90 : _metric === 'g+a/90' ? (stats.goals + stats.assists) / stats.minutes * 90 : stats.avgRating
     return [{ ...stats, value, historicalTeamId: latest?.appearances.find(item => item.playerId === player.id)?.teamId, playedGoalkeeper, sotAllowedAppearances, sotAllowedTotal, concededOnPitch, qualifyingGoalkeeperAppearances, qualifyingSaves }]
   })
-  byFilter.set(cacheKey, rows)
-  return presentMetric(rows, _metric)
+  const presented = presentMetric(rows, _metric)
+  byFilter.set(cacheKey, { rows, presented: new Map([[_metric, presented]]) })
+  return presented
 }
 
 /** Re-sorts an already-derived player index without recalculating any ratings. */
+const rankedRowsCache = new WeakMap<GlobalLeaderboardRow[], WeakMap<Player[], Map<LeaderboardMetric, GlobalLeaderboardRow[]>>>()
 export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Player[], metric: LeaderboardMetric): GlobalLeaderboardRow[] {
+  let byPlayers = rankedRowsCache.get(rows)
+  if (!byPlayers) { byPlayers = new WeakMap(); rankedRowsCache.set(rows, byPlayers) }
+  let byMetric = byPlayers.get(players)
+  if (!byMetric) { byMetric = new Map(); byPlayers.set(players, byMetric) }
+  const cached = byMetric.get(metric)
+  if (cached) return cached
   const playerById = new Map(players.map(player => [player.id, player]))
   const valueFor = (row: GlobalLeaderboardRow) => {
     switch (metric) {
@@ -399,12 +412,14 @@ export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Pla
       case 'savePercentage': { const saves = row.qualifyingSaves ?? 0; const denominator = saves + (row.concededOnPitch ?? 0); return denominator ? saves / denominator * 100 : Number.NaN }
     }
   }
-  return rows.flatMap(row => {
+  const ranked = rows.flatMap(row => {
     const player = playerById.get(row.playerId)
     if (!player || (metric === 'sotAllowed' && (!defenderRankingPosition(player.position) || !row.sotAllowedAppearances)) || ((metric === 'saves' || metric === 'goalsConceded' || metric === 'savePercentage') && (!goalkeeperPosition(player.position) || !row.playedGoalkeeper))) return []
     const value = valueFor(row)
     return Number.isFinite(value) ? [{ ...row, value }] : []
   }).sort((a, b) => (metric === 'sotAllowed' || metric === 'goalsConceded' ? a.value - b.value : b.value - a.value) || b.avgRating - a.avgRating || a.playerId.localeCompare(b.playerId))
+  byMetric.set(metric, ranked)
+  return ranked
 }
 
 export function getLeaderboard(
@@ -587,12 +602,22 @@ function unifiedCandidates(players: Player[], matches: Match[], season: string, 
   }).filter((candidate) => candidate.matches > 0).sort(candidateOrder)
 }
 
+type UnifiedBestEleven = { slots: Best11Slot[]; statsByPlayer: Record<string, { goals: number; assists: number }> }
+const bestElevenCache = new WeakMap<Match[], WeakMap<Player[], Map<string, UnifiedBestEleven>>>()
+
 export function unifiedBestEleven(
   players: Player[],
   matches: Match[],
   season: string,
   recentOnly = false,
-): { slots: Best11Slot[]; statsByPlayer: Record<string, { goals: number; assists: number }> } {
+): UnifiedBestEleven {
+  let byPlayers = bestElevenCache.get(matches)
+  if (!byPlayers) { byPlayers = new WeakMap(); bestElevenCache.set(matches, byPlayers) }
+  let byScope = byPlayers.get(players)
+  if (!byScope) { byScope = new Map(); byPlayers.set(players, byScope) }
+  const cacheKey = `${season}:${recentOnly ? 'recent' : 'season'}`
+  const cached = byScope.get(cacheKey)
+  if (cached) return cached
   const candidates = unifiedCandidates(players, matches, season, recentOnly)
   const used = new Set<string>()
   const pick = (positions: Position[], fallback: Position[] = []): UnifiedCandidate | undefined => {
@@ -610,7 +635,9 @@ export function unifiedBestEleven(
     const stats = playerSeasonStats(player, players, matches, season)
     return [player.id, { goals: stats.goals, assists: stats.assists }]
   }))
-  return { slots, statsByPlayer }
+  const result = { slots, statsByPlayer }
+  byScope.set(cacheKey, result)
+  return result
 }
 
 export function bestEleven(

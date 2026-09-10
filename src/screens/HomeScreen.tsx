@@ -32,16 +32,16 @@ export function HomeScreen({ season, onNavigate }: { season: string; onSeason?: 
   const playerById = Object.fromEntries(players.map(player => [player.id, player]))
   const teamById = Object.fromEntries(teams.map(team => [team.id, team]))
   const stageName = (stage: string) => ({ roundOf16: 'Round of 16', quarterFinal: 'Quarter-finals', semiFinal: 'Semi-finals', final: 'Final', finalReplay: 'Final Replay' } as Record<string, string>)[stage] ?? stage
-  const progress: { type: CompetitionType; label: string; value: string }[] = [
-    { type: 'league', label: '🏆 League', value: league.complete ? 'Completed' : `Matchday ${league.matchdayProgress + 1}` },
-    { type: 'cup', label: 'Cup', value: cup.championId ? 'Completed' : `${cup.stage.startsWith('stage') ? `Stage ${cup.stage.replace('stage', '')}` : stageName(cup.stage)} · ${cup.activeTeamIds.length} Teams Remaining` },
-    { type: 'champions', label: 'Champions', value: champions.championId ? 'Completed' : champions.drawn ? stageName(champions.currentStage) : champions.drawCount ? `Draw ${champions.drawCount} / 16` : 'Not Started' },
+  const progress: { type: CompetitionType; emoji: string; label: string; value: string }[] = [
+    { type: 'league', emoji: '👑', label: 'League', value: league.complete ? 'Completed' : `Matchday ${league.matchdayProgress + 1}` },
+    { type: 'cup', emoji: '🥇', label: 'Cup', value: cup.championId ? 'Completed' : `${cup.stage.startsWith('stage') ? `Stage ${cup.stage.replace('stage', '')}` : stageName(cup.stage)} · ${cup.activeTeamIds.length} Teams Remaining` },
+    { type: 'champions', emoji: '🏆', label: 'Champions', value: champions.championId ? 'Completed' : champions.drawn ? stageName(champions.currentStage) : champions.drawCount ? `Draw ${champions.drawCount} / 16` : 'Not Started' },
   ]
 
   return <div className="px-4 pb-8 pt-6">
     <header className="mb-5"><p className="text-[10px] font-bold uppercase tracking-[.18em] text-emerald-400">Current-season dashboard</p><h1 className="text-2xl font-semibold">{season}</h1></header>
 
-    <section className="mb-6" data-home-section="competition-progress"><h2 className="mb-2 text-lg font-semibold">Competition Progress</h2><div className="grid grid-cols-3 gap-2">{progress.map(item => <button key={item.type} type="button" onClick={() => onNavigate({ name: 'competition', season, competitionType: item.type })} className="min-h-20 rounded-xl border border-white/5 bg-zinc-900 p-2.5 text-left"><b className="block text-xs">{item.type === 'cup' ? '🏆 ' : item.type === 'champions' ? '🏆 ' : ''}{item.label}</b><span className="mt-2 block text-[10px] leading-tight text-zinc-400">{item.value}</span></button>)}</div></section>
+    <section className="mb-6" data-home-section="competition-progress"><h2 className="mb-2 text-lg font-semibold">Competition Progress</h2><div className="grid grid-cols-3 gap-2">{progress.map(item => <button key={item.type} type="button" onClick={() => onNavigate({ name: 'competition', season, competitionType: item.type })} className="min-h-20 rounded-xl border border-white/5 bg-zinc-900 p-2.5 text-left"><b className="block text-xs"><span aria-hidden="true">{item.emoji}</span> {item.label}</b><span className="mt-2 block text-[10px] leading-tight text-zinc-400">{item.value}</span></button>)}</div></section>
 
     <section className="mb-6" data-home-section="recent-matches"><div className="mb-2 flex items-end justify-between"><div><h2 className="text-lg font-semibold">Recent Matches</h2><p className="text-xs text-zinc-500">All teams and competitions</p></div>{matches.length > 5 && <button type="button" onClick={() => onNavigate({ name: 'results' })} className="secondary-view-all">View All</button>}</div><div className="space-y-2">{recent.length ? recent.map(result => <ResultCard key={result.match.id} result={result} teams={teams} showCompetition onClick={() => onNavigate({ name: 'match', id: result.match.id })} />) : <Empty text="No completed matches yet." />}</div></section>
 

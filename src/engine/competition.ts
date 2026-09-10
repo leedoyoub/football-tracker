@@ -282,6 +282,14 @@ export function competitionSeasonStatus(teams: Team[], matches: Match[], season:
   return { league, cup, champions, complete: league.complete && Boolean(cup.championId) && Boolean(champions.championId) }
 }
 
+/** Completion-only fast path. Most seasons are not at MD38, so do not derive
+ * tournament rating tie-breakers merely to prove the answer is false. */
+export function isCompetitionSeasonComplete(teams: Team[], matches: Match[], season: string, players: Player[], draw?: CompetitionState): boolean {
+  if (!leagueCompetition(teams, matches, season).complete) return false
+  if (!cupCompetition(teams, matches, season, players).championId) return false
+  return Boolean(championsCompetition(draw, matches, season, players).championId)
+}
+
 export type SeasonChampions = { season: string; league?: string; cup?: string; champions?: string }
 export function competitionHistory(teams: Team[], matches: Match[], players: Player[], states: CompetitionState[]): SeasonChampions[] {
   const seasons = [...new Set([...matches.map(match => match.season), ...states.map(state => state.season)])]

@@ -18,7 +18,7 @@ export function PlayersScreen({ onNavigate, appliedFilters = emptyFilters, onFil
       .filter(player => [player.displayName, player.fullName, player.name].some(name => name?.toLowerCase().includes(query)))
       .map(player => {
         const playerMatches = matchesForPlayer(player, matches, appliedFilters)
-        return { player, team: teams.find(team => team.id === player.teamId), stats: aggregatePlayerStats(player, players, playerMatches), matchesFilter: (!appliedFilters.seasons.length && !appliedFilters.teams.length) || playerMatches.length > 0 || (!appliedFilters.seasons.length && [player.teamId, ...(player.teamIds ?? [])].some(id => appliedFilters.teams.includes(id))) }
+        return { player, team: teams.find(team => team.id === player.teamId), stats: aggregatePlayerStats(player, players, playerMatches), matchesFilter: (!appliedFilters.seasons.length && !appliedFilters.teams.length) || playerMatches.length > 0 || (appliedFilters.teams.includes('__no-team__') && playerHasNoCurrentTeam(player)) || (!appliedFilters.seasons.length && [player.teamId, ...(player.teamIds ?? [])].some(id => appliedFilters.teams.includes(id))) }
       })
       .filter(row => row.matchesFilter)
       .sort((left, right) => right.stats.avgRating - left.stats.avgRating || playerFullName(left.player).localeCompare(playerFullName(right.player)))
