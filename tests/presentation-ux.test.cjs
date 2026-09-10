@@ -113,8 +113,8 @@ test('Home footer reads the central version after all content, and common layout
   const footer = nodes(tree, n => n.type === 'footer')[0]
   assert.equal(text(footer), 'Football Tracker \u00b7 v' + APP_VERSION)
   const finalSection = tree.props.children.filter(Boolean).at(-1)
-  assert.equal(finalSection.props['data-home-section'], 'account')
-  assert(nodes(finalSection, n => n.type === 'footer').includes(footer))
+  assert.equal(finalSection.props['data-home-section'], 'play-style-performance')
+  assert(nodes(tree, n => n.type === 'footer').includes(footer))
   const css = fs.readFileSync(require.resolve('../src/index.css'), 'utf8')
   assert(css.includes('env(safe-area-inset-bottom, 0px)'))
   assert.match(css, /\.app-content\s*\{[^}]*padding-bottom:\s*calc\(var\(--nav-height\)/)

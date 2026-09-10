@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { TEAM_COLORS, type TeamColor, type View } from '../types'
+import { TEAM_COLORS, TEAM_PLAY_STYLES, type TeamColor, type TeamPlayStyle, type View } from '../types'
 import { useStore } from '../store'
 
 export function EditTeamScreen({ teamId, onNavigate }: { teamId: string; onNavigate: (view: View) => void }) {
@@ -11,6 +11,7 @@ export function EditTeamScreen({ teamId, onNavigate }: { teamId: string; onNavig
   const [primary, setPrimary] = useState<TeamColor>(team?.primaryColor ?? 'green')
   const [secondary, setSecondary] = useState<TeamColor>(team?.secondaryColor ?? 'white')
   const [numberColor, setNumberColor] = useState<TeamColor>(team?.jerseyNumberColor ?? 'white')
+  const [playStyle, setPlayStyle] = useState<TeamPlayStyle>(team?.playStyle ?? 'possession')
 
   if (!team) return <div className="p-6">Team not found.</div>
 
@@ -35,11 +36,12 @@ export function EditTeamScreen({ teamId, onNavigate }: { teamId: string; onNavig
         <label className="flex items-center justify-between rounded-xl bg-zinc-900 p-3 text-sm">Primary {select(primary, setPrimary)}</label>
         {style === 'striped' && <label className="flex items-center justify-between rounded-xl bg-zinc-900 p-3 text-sm">Secondary {select(secondary, setSecondary)}</label>}
         <label className="flex items-center justify-between rounded-xl bg-zinc-900 p-3 text-sm">Jersey number {select(numberColor, setNumberColor)}</label>
+        <label className="flex items-center justify-between rounded-xl bg-zinc-900 p-3 text-sm">Play style <select aria-label="Team play style" value={playStyle} onChange={(e) => setPlayStyle(e.target.value as TeamPlayStyle)} className="rounded-xl bg-black px-3 py-2 text-sm">{TEAM_PLAY_STYLES.map(item => <option key={item} value={item}>{item === 'possession' ? 'Possession' : item === 'short-pass-counter' ? 'Short-Pass Counter' : 'Long-Pass Counter'}</option>)}</select></label>
         <button
           type="button"
           disabled={abbreviation.length !== 3}
           onClick={() => {
-            updateTeam(teamId, { name: name.trim(), abbreviation, shortName: abbreviation, visualStyle: style, primaryColor: primary, secondaryColor: style === 'striped' ? secondary : null, jerseyNumberColor: numberColor });
+            updateTeam(teamId, { name: name.trim(), abbreviation, shortName: abbreviation, visualStyle: style, primaryColor: primary, secondaryColor: style === 'striped' ? secondary : null, jerseyNumberColor: numberColor, playStyle });
             onNavigate({ name: 'team', id: teamId })
           }}
           className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-black text-black"

@@ -7,6 +7,19 @@ export const STATIC_TEAMS: Team[] = [
   team('inter-miami','Inter Miami CF','MIA',9568,'red'),
 ]
 
+const CATALOG_PLAY_STYLES: Record<string, TeamPlayStyle> = {
+  'real-madrid': 'short-pass-counter', barcelona: 'possession', 'atletico-madrid': 'long-pass-counter',
+  arsenal: 'possession', 'manchester-city': 'possession', liverpool: 'short-pass-counter', 'manchester-united': 'short-pass-counter', tottenham-hotspur: 'long-pass-counter', chelsea: 'possession',
+  'bayern-munich': 'possession', 'borussia-dortmund': 'long-pass-counter', 'ac-milan': 'short-pass-counter', 'inter-milan': 'long-pass-counter', juventus: 'short-pass-counter', 'paris-saint-germain': 'possession', 'inter-miami': 'possession',
+}
+
+/** The saved team value wins; catalog defaults keep legacy static records classified without rewriting them. */
+export function teamPlayStyle(team: Team | undefined): TeamPlayStyle | undefined {
+  if (!team) return undefined
+  const catalog = STATIC_TEAMS.find(item => team.externalTeamId !== undefined && item.externalTeamId === team.externalTeamId)
+  return team.playStyle ?? CATALOG_PLAY_STYLES[team.id] ?? (catalog ? CATALOG_PLAY_STYLES[catalog.id] : undefined)
+}
+
 /**
  * Adds catalog entries without replacing a user's existing teams or their
  * properties. Matching either stable ID or upstream ID prevents real-team

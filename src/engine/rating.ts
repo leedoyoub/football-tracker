@@ -235,4 +235,26 @@ function calculatePlayerMatch(match: Match, player: Player): RatingBreakdown | n
 }
 
 export function rateMatch(match: Match, players: Player[]): RatingBreakdown[] { return players.map(player => ratePlayerMatch(match, player)).filter((row): row is RatingBreakdown => row !== null) }
-export function getMatchManOfTheMatch(match: Match, players: Player[]): string | undefined { return rateMatch(match, players).sort((left, right) => right.raw - left.raw || right.minutes - left.minutes || left.playerId.localeCompare(right.playerId))[0]?.playerId }
+const MOM_POSITION_PRIORITY: Record<Position, number> = {
+  GK: 0, CB: 1, LCB: 1, RCB: 1, LB: 2, LWB: 2, RB: 2, RWB: 2,
+  CDM: 3, LDM: 3, RDM: 3, CM: 4, LCM: 4, RCM: 4, LM: 5, RM: 5,
+  CAM: 6, LW: 7, RW: 7, SS: 8, ST: 9, LST: 9, RST: 9,
+}
+function momEventCount(match: Match, playerId: string, key: 'playerId' | 'assistPlayerId'): number {
+  const appearance = match.appearances.find(item => item.playerId === playerId)
+  return appearance ? match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && !event.ownGoal && event[key] === playerId && isOnPitchAtEvent(match, appearance, event)).length : 0
+}
+/** Uses the same effective match position exposed by the authoritative rating breakdown. */
+export function getMatchManOfTheMatch(match: Match, players: Player[]): string | undefined {
+  return rateMatch(match, players).sort((left, right) => {
+    if (left.raw !== right.raw) return right.raw - left.raw
+    const positionPriority = MOM_POSITION_PRIORITY[left.position] - MOM_POSITION_PRIORITY[right.position]
+    if (positionPriority) return positionPriority
+    const goals = momEventCount(match, right.playerId, 'playerId') - momEventCount(match, left.playerId, 'playerId')
+    if (goals) return goals
+    const assists = momEventCount(match, right.playerId, 'assistPlayerId') - momEventCount(match, left.playerId, 'assistPlayerId')
+    if (assists) return assists
+    if (left.minutes !== right.minutes) return right.minutes - left.minutes
+    return left.playerId.localeCompare(right.playerId)
+  })[0]?.playerId
+}

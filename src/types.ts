@@ -45,10 +45,14 @@ export interface Team {
   primaryColor: TeamColor
   secondaryColor?: TeamColor | null
   jerseyNumberColor: TeamColor
+  /** User-managed opponent classification used for derived performance summaries. */
+  playStyle?: TeamPlayStyle
 }
 
 export type TeamColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'purple' | 'black' | 'white'
 export const TEAM_COLORS: TeamColor[] = ['red', 'orange', 'yellow', 'green', 'blue', 'indigo', 'purple', 'black', 'white']
+export const TEAM_PLAY_STYLES = ['possession', 'short-pass-counter', 'long-pass-counter'] as const
+export type TeamPlayStyle = (typeof TEAM_PLAY_STYLES)[number]
 
 export interface FormationSlot {
   id: string

@@ -122,7 +122,7 @@ test('Champions bracket keeps native horizontal scrolling while hiding its brows
 
 test('Home has only the ordered dashboard responsibilities and no full ranking, standings or Best XI', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
-  const order = ['competition-progress', 'recent-matches', 'news', 'season-leaders', 'account'].map(token => source.indexOf(`data-home-section="${token}"`))
+  const order = ['competition-progress', 'recent-matches', 'news', 'season-leaders', 'account', 'play-style-performance'].map(token => source.indexOf(`data-home-section="${token}"`))
   assert(order.every((value, index) => value >= 0 && (!index || value > order[index - 1])))
   assert(!source.includes('Global Rankings') && !source.includes('Team of the Week') && !source.includes('Team of the Season') && !source.includes('StandingsTable'))
   assert(source.includes('derivedResults(matches, teams).slice(0, 5)') && source.includes('showCompetition'))
@@ -187,9 +187,9 @@ test('season completion is synchronized as backward-compatible CompetitionState 
   assert(validation.includes("'season-complete'"))
 })
 
-test('visible and package metadata version are exactly v2.1.2 / 2.1.2', () => {
-  assert.equal(APP_VERSION, '2.1.2')
-  assert.equal(require('../package.json').version, '2.1.2')
+test('visible and package metadata version are exactly v2.1.3 / 2.1.3', () => {
+  assert.equal(APP_VERSION, '2.1.3')
+  assert.equal(require('../package.json').version, '2.1.3')
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('v{APP_VERSION}'))
 })

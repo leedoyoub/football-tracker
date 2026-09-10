@@ -4,6 +4,7 @@ import { PlayerIcon } from '../components/PlayerIcon'
 import { ResultCard } from '../components/ResultCard'
 import { playerFullName } from '../components/ui'
 import { championsCompetition, cupCompetition, leagueCompetition } from '../engine/competition'
+import { formatPlayStyleAverage, opponentPlayStylePerformance } from '../engine/playStyleStats'
 import { homeMilestoneNews } from '../engine/news'
 import { buildGlobalRankingData } from '../engine/stats'
 import { currentStaticTeams } from '../data/teams'
@@ -20,6 +21,7 @@ export function HomeScreen({ season, onNavigate }: { season: string; onSeason?: 
   const champions = useMemo(() => championsCompetition(draw, matches, season, players), [draw, matches, season, players])
   const recent = useMemo(() => derivedResults(matches, teams).slice(0, 5), [matches, teams])
   const news = useMemo(() => homeMilestoneNews(players, teams, matches, competitionStates), [players, teams, matches, competitionStates])
+  const playStylePerformance = useMemo(() => opponentPlayStylePerformance(matches, teams), [matches, teams])
   const seasonStats = useMemo(() => buildGlobalRankingData(players, matches.filter(match => match.season === season), { seasons: [season], teams: [], positions: [] }, 'rating'), [players, matches, season])
   const leaders = useMemo(() => {
     const eligible = seasonStats.filter(row => row.matches > 0)
@@ -50,6 +52,7 @@ export function HomeScreen({ season, onNavigate }: { season: string; onSeason?: 
     <section className="mb-6" data-home-section="season-leaders"><h2 className="mb-2 text-lg font-semibold">Season Leaders</h2><div className="grid grid-cols-3 gap-2">{leaders.map(item => { const row = item.rows[0]; const player = row ? playerById[row.playerId] : undefined; const team = row ? teamById[row.historicalTeamId ?? row.teamId] : undefined; return <button key={item.label} type="button" disabled={!player} onClick={() => player && onNavigate({ name: 'player', id: player.id })} className="rounded-xl bg-zinc-900 p-2 text-center disabled:opacity-50"><PlayerIcon player={player} team={team} className="mx-auto h-10 w-10 text-[8px]" /><small className="mt-1 block text-[9px] uppercase text-zinc-500">{item.label}</small><b className="mt-1 block truncate text-[10px]">{player ? playerFullName(player) : '—'}</b><span className="text-xs font-black text-emerald-300">{row ? item.value(row) : '—'}</span>{item.rows.slice(1).map((next, index) => <span key={next.playerId} className="mt-1 flex justify-between text-[8px] text-zinc-400"><b>{index + 2}</b><span className="truncate px-1">{playerFullName(playerById[next.playerId])}</span><b>{item.value(next)}</b></span>)}</button> })}</div></section>
 
     <section data-home-section="account" className="rounded-2xl border border-white/5 bg-zinc-900 p-4"><div className="flex items-center justify-between"><div><h2 className="text-sm font-semibold">Account</h2><p className="text-[10px] text-zinc-500">Session, backup and data management</p></div><button type="button" onClick={() => onNavigate({ name: 'data-management' })} className="rounded-lg bg-zinc-800 px-3 py-2 text-xs font-bold text-emerald-300">Manage</button></div><footer className="mt-4 border-t border-white/5 pt-3 text-center text-[10px] text-zinc-600">Football Tracker · v{APP_VERSION}</footer></section>
+    <section data-home-section="play-style-performance" className="mt-6"><h2 className="mb-2 text-lg font-semibold">Performance by Play Style</h2><div className="space-y-2">{playStylePerformance.map(row => <article key={row.style} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-xl bg-zinc-900 px-3 py-2.5 text-xs"><b className="truncate">{row.label}</b><span className="text-right text-zinc-400"><b className="block text-zinc-100">{formatPlayStyleAverage(row.averageGoalsFor)} GF</b><small>Goals / Match</small></span><span className="text-right text-zinc-400"><b className="block text-zinc-100">{formatPlayStyleAverage(row.averageGoalsAgainst)} GA</b><small>Conceded / Match</small></span></article>)}</div></section>
   </div>
 }
 
