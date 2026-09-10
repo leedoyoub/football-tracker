@@ -1,5 +1,6 @@
 import type { Appearance, CompetitionType, Match, Player, Position, RatingBreakdown } from '../types'
 import { GOOD_RATING_THRESHOLD, isGoodRating } from './constants'
+import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { combineGoalTypeTotals, goalTypeTotals, type GoalTypeTotals } from './goalTypes'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import { isOnPitchAtEvent, matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './timeline'
@@ -61,7 +62,7 @@ export function derivePlayerScope(player: Player, players: Player[], matches: Ma
   if (!byPlayers) { byPlayers = new WeakMap(); cache.set(matches, byPlayers) }
   let byScope = byPlayers.get(players)
   if (!byScope) { byScope = new Map(); byPlayers.set(players, byScope) }
-  const key = scopeKey(scope); let byPlayer = byScope.get(key)
+  const key = `${RATING_ENGINE_REVISION}:${scopeKey(scope)}`; let byPlayer = byScope.get(key)
   if (!byPlayer) { byPlayer = new Map(); byScope.set(key, byPlayer) }
   const existing = byPlayer.get(player.id); if (existing) { onDiagnostic?.({ cacheHit: true }); return existing }
   const appearances: DerivedAppearance[] = []

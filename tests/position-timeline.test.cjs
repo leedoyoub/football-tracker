@@ -57,6 +57,6 @@ test('historical rating derivation is raw-data-safe, clamped, and drives average
   const p = player('p', 'ST'), other = player('other', 'ST'); const one = game(p); one.appearances.push({ playerId: 'other', teamId: 'A', position: 'ST', matchPosition: 'ST', role: 'starter' }); one.events = [goal(20, { playerId: 'p' })]
   const two = { ...one, id: 'm2', events: [goal(20, { playerId: 'other' }), goal(30, { playerId: 'other' }), goal(40, { playerId: 'other' }), goal(50, { playerId: 'other' }), goal(60, { playerId: 'other' })] }
   const before = JSON.stringify([one, two]); assert.equal(getMatchManOfTheMatch(one, [p, other]), 'p'); assert.equal(getMatchManOfTheMatch(two, [p, other]), 'other')
-  const stats = aggregatePlayerStats(p, [p, other], [one, two]); near(stats.avgRating, Math.round((ratePlayerMatch(one, p).rating + ratePlayerMatch(two, p).rating) / 2 * 100) / 100)
+  const stats = aggregatePlayerStats(p, [p, other], [one, two]); near(stats.avgRating, (ratePlayerMatch(one, p).raw + ratePlayerMatch(two, p).raw) / 2)
   assert.equal(ratePlayerMatch(two, other).rating, 10); assert.equal(JSON.stringify([one, two]), before)
 })

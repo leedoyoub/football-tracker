@@ -13,6 +13,7 @@ import type {
 } from '../types'
 import { ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, pitchWindow, matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './rating'
 import { FORMATION_SLOTS, formationSlotsFor, type TacticalSlot } from '../components/Pitch'
+import { RATING_ENGINE_REVISION } from './ratingRevision'
 
 
 export function seasonsFromMatches(matches: Match[]): string[] {
@@ -86,7 +87,7 @@ export function aggregatePlayerStats(
   const avgRating =
     ratings.length === 0
       ? 0
-      : Math.round((ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length) * 100) / 100
+      : ratings.reduce((sum, r) => sum + r.raw, 0) / ratings.length
   const mom = matches.filter((match) => getMatchManOfTheMatch(match, allPlayers) === player.id).length
   
   return {
@@ -215,7 +216,7 @@ export function partnershipStats(
         e.type === 'goal' && 
         !e.ownGoal && 
         e.teamId === appA.teamId && 
-        e.minute >= enter && e.minute < exit
+        isOnPitchAtEvent(match, appA, e) && isOnPitchAtEvent(match, appB, e)
       ).length
     }
 
@@ -224,13 +225,13 @@ export function partnershipStats(
       e.type === 'goal' && 
       !e.ownGoal && 
       e.assistPlayerId === playerAId && 
-      e.playerId === playerBId
+      e.playerId === playerBId && isOnPitchAtEvent(match, appA, e) && isOnPitchAtEvent(match, appB, e)
     ).length
     assistsBtoA += match.events.filter(e => 
       e.type === 'goal' && 
       !e.ownGoal && 
       e.assistPlayerId === playerBId && 
-      e.playerId === playerAId
+      e.playerId === playerAId && isOnPitchAtEvent(match, appA, e) && isOnPitchAtEvent(match, appB, e)
     ).length
   }
 
@@ -281,7 +282,7 @@ export function buildGlobalRankingData(
   filters: { seasons: string[], teams: string[], positions: Position[] },
   _metric: LeaderboardMetric,
 ): GlobalLeaderboardRow[] {
-  const cacheKey = `${filters.seasons.slice().sort().join(',')}|${filters.teams.slice().sort().join(',')}|${filters.positions.slice().sort().join(',')}`
+  const cacheKey = `${RATING_ENGINE_REVISION}|${filters.seasons.slice().sort().join(',')}|${filters.teams.slice().sort().join(',')}|${filters.positions.slice().sort().join(',')}`
   let byPlayers = competitionStatsCache.get(matches)
   if (!byPlayers) { byPlayers = new WeakMap(); competitionStatsCache.set(matches, byPlayers) }
   let byFilter = byPlayers.get(players)
@@ -368,7 +369,7 @@ export function buildGlobalRankingData(
     const goals = playerMatches.reduce((sum, match) => { const appearance = match.appearances.find(item => item.playerId === player.id); return sum + (appearance ? match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.playerId === player.id && isOnPitchAtEvent(match, appearance, event)).length : 0) }, 0)
     const assists = playerMatches.reduce((sum, match) => { const appearance = match.appearances.find(item => item.playerId === player.id); return sum + (appearance ? match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id && isOnPitchAtEvent(match, appearance, event)).length : 0) }, 0)
     const minutes = ratingRows.reduce((sum, rating) => sum + rating.minutes, 0)
-    const avgRating = Math.round(ratingRows.reduce((sum, rating) => sum + rating.rating, 0) / ratingRows.length * 100) / 100
+    const avgRating = ratingRows.reduce((sum, rating) => sum + rating.raw, 0) / ratingRows.length
     const latest = playerMatches.reduce<Match | undefined>((current, match) => !current || match.date > current.date || (match.date === current.date && match.matchDay > current.matchDay) ? match : current, undefined)
     const stats: PlayerSeasonStats = { playerId: player.id, teamId: player.teamId, season: 'All', matches: ratingRows.length, starts, subs, minutes, goals, assists, avgRating, mom: playerMatches.filter(match => momFor(match) === player.id).length, saves, wins, draws, losses, recentForm: recentForm.slice(-5).reverse(), ratings: ratingRows }
     const playedGoalkeeper = ratingRows.some(rating => {
@@ -615,7 +616,7 @@ export function unifiedBestEleven(
   if (!byPlayers) { byPlayers = new WeakMap(); bestElevenCache.set(matches, byPlayers) }
   let byScope = byPlayers.get(players)
   if (!byScope) { byScope = new Map(); byPlayers.set(players, byScope) }
-  const cacheKey = `${season}:${recentOnly ? 'recent' : 'season'}`
+  const cacheKey = `${RATING_ENGINE_REVISION}:${season}:${recentOnly ? 'recent' : 'season'}`
   const cached = byScope.get(cacheKey)
   if (cached) return cached
   const candidates = unifiedCandidates(players, matches, season, recentOnly)
@@ -629,7 +630,7 @@ export function unifiedBestEleven(
     const candidate = pick(role.group, role.fallback)
     if (!candidate) return { slot: role.slot, position: role.position, playerId: null, avgRating: 0, matches: 0 }
     used.add(candidate.player.id)
-    return { slot: role.slot, position: role.position, playerId: candidate.player.id, teamId: candidate.teamId, avgRating: Math.round(candidate.average * 10) / 10, matches: candidate.matches }
+    return { slot: role.slot, position: role.position, playerId: candidate.player.id, teamId: candidate.teamId, avgRating: candidate.average, matches: candidate.matches }
   })
   const statsByPlayer = Object.fromEntries(players.map((player) => {
     const stats = playerSeasonStats(player, players, matches, season)
@@ -677,7 +678,7 @@ export function bestEleven(
       slot: role.slot,
       position: role.position,
       playerId: pick.player.id,
-      avgRating: Math.round(pick.avg * 10) / 10,
+      avgRating: pick.avg,
       matches: pick.matches,
     }
   })

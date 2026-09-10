@@ -1,3 +1,4 @@
+import { nextTimelineSequence } from '../engine/timeline'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FORMATION_SLOTS, Pitch, UNIVERSAL_TACTICAL_SLOTS, type TacticalSlot } from '../components/Pitch'
 import { calculateFormation } from '../engine/formation'
@@ -202,7 +203,7 @@ export function NewMatchScreen({
   function saveLiveEvent() {
     if (!liveEvent || !minuteIsValid) return
     const id = crypto.randomUUID()
-    const writeEvent = (event: MatchEvent) => setMatchDraft(prev => ({ ...prev, events: editingEventId ? prev.events.map((e) => e.id === editingEventId ? event : e) : [...prev.events, event] }))
+    const writeEvent = (event: MatchEvent) => setMatchDraft(prev => ({ ...prev, events: editingEventId ? prev.events.map((e) => e.id === editingEventId ? { ...event, sequence: e.sequence } : e) : [...prev.events, { ...event, sequence: nextTimelineSequence(prev.events, prev.positionHistories) }] }))
     if (liveEvent === 'goal') {
       if (!liveScorerId || !assistChosen || !eligibleGoalIds.includes(liveScorerId) || (liveAssistId && (!eligibleGoalIds.includes(liveAssistId) || liveScorerId === liveAssistId))) return
       writeEvent({ id: editingEventId ?? id, type: 'goal', minute: liveMinute, teamId: selectedTeamId, playerId: liveScorerId || undefined, assistPlayerId: liveScorerId ? liveAssistId || undefined : undefined, goalType: 'normal' })

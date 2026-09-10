@@ -1,9 +1,12 @@
 import type { Appearance, Match, MatchEvent, Player, Position, RatingBreakdown } from '../types'
+import { RATING_ENGINE_REVISION } from './ratingRevision'
+export { RATING_ENGINE_REVISION } from './ratingRevision'
 import {
   isOnPitchAtEvent,
   matchPositionAtEvent,
   matchPositionSegments,
   pitchWindow,
+  normalizeMatchTimeline,
   scoringTeamId,
 } from './timeline'
 
@@ -115,6 +118,8 @@ export type PlayerMatchRatingTrace = {
   saveBonus: number
   result: number
   componentSum: number
+  preClamp: number
+  suppressionIntervals: { enter: number; exit: number; position: Position; minutes: number; bonus: number }[]
   raw: number
   clamped: number
   display: string
@@ -160,6 +165,8 @@ export function tracePlayerMatchRating(match: Match, player: Player): PlayerMatc
     saveBonus: rating.saves,
     result: rating.result,
     componentSum,
+    preClamp: rating.preClamp,
+    suppressionIntervals: suppressionByInterval(match, appearance),
     raw: rating.raw,
     clamped: rating.rating,
     display: rating.rating.toFixed(1),
@@ -171,7 +178,27 @@ export function tracePlayerMatchRating(match: Match, player: Player): PlayerMatc
 }
 
 /** One raw-data-only rating calculation for every screen and award. */
-export function ratePlayerMatch(match: Match, player: Player): RatingBreakdown | null {
+const ratingCache = new WeakMap<ReturnType<typeof normalizeMatchTimeline>, { revision: number; ratings: Map<string, RatingBreakdown | null> }>()
+export function ratePlayerMatch(match: Match, player: Player, revision = RATING_ENGINE_REVISION): RatingBreakdown | null {
+  const timeline = normalizeMatchTimeline(match)
+  let entry = ratingCache.get(timeline)
+  if (!entry || entry.revision !== revision) { entry = { revision, ratings: new Map() }; ratingCache.set(timeline, entry) }
+  const ratings = entry.ratings
+  if (ratings.has(player.id)) return ratings.get(player.id)!
+  const rating = calculatePlayerMatch(match, player)
+  ratings.set(player.id, rating)
+  return rating
+}
+
+function suppressionByInterval(match: Match, appearance: Appearance) {
+  const segments = matchPositionSegments(match, appearance)
+  const minutes = segments.reduce((total, row) => total + row.exit - row.enter, 0)
+  const multiplier = sotMultiplier(opponentSotProxy(match, appearance.teamId))
+  // Cap the total minutes factor once, preserving each position's actual share.
+  return segments.map(row => ({ ...row, minutes: row.exit - row.enter, bonus: POSITION_RULES[row.position].suppressionMax * multiplier * (row.exit - row.enter) / Math.max(90, minutes) }))
+}
+
+function calculatePlayerMatch(match: Match, player: Player): RatingBreakdown | null {
   const appearance = match.appearances.find(item => item.playerId === player.id)
   if (!appearance) return null
   const window = pitchWindow(match, appearance)
@@ -180,13 +207,14 @@ export function ratePlayerMatch(match: Match, player: Player): RatingBreakdown |
   const position = segments[0]?.position
   if (!position) return null
   const teamId = appearance.teamId
-  const minutes = window.exit - window.enter
+  const minutes = segments.reduce((total, row) => total + row.exit - row.enter, 0)
+  if (!minutes) return null
   const goals = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && !event.ownGoal && event.playerId === player.id && isOnPitchAtEvent(match, appearance, event))
   const assists = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id && isOnPitchAtEvent(match, appearance, event))
   const teamGoals = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && scoringTeamId(match, event) === teamId && isOnPitchAtEvent(match, appearance, event) && event.playerId !== player.id && event.assistPlayerId !== player.id)
   const concededGoals = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && scoringTeamId(match, event) !== teamId && isOnPitchAtEvent(match, appearance, event))
   const caused = concededGoals.filter(event => event.concededGoalCausePlayerId === player.id || (event.ownGoal && event.playerId === player.id)).length
-  const suppression = segments.reduce((total, segment) => total + POSITION_RULES[segment.position].suppressionMax * Math.min((segment.exit - segment.enter) / 90, 1), 0) * sotMultiplier(opponentSotProxy(match, teamId))
+  const suppression = suppressionByInterval(match, appearance).reduce((total, row) => total + row.bonus, 0)
   const goalkeeperSaves = saveCount(match, appearance)
   const goalkeeperConceded = concededGoals.filter(event => matchPositionAtEvent(match, appearance, event) === 'GK').length
   const saveRate = goalkeeperSaves + goalkeeperConceded ? goalkeeperSaves / (goalkeeperSaves + goalkeeperConceded) : 0
@@ -198,10 +226,11 @@ export function ratePlayerMatch(match: Match, player: Player): RatingBreakdown |
     assists: assists.reduce((total, event) => total + eventValue(match, appearance, event, 'assist'), 0),
     teamGoals: teamGoals.reduce((total, event) => total + eventValue(match, appearance, event, 'teamGoal'), 0),
     conceded: concededGoals.reduce((total, event) => total + eventValue(match, appearance, event, 'conceded'), 0),
-    cleanSheet: 0, noConceded: suppression, noPoint: 0, ownGoals: 0, concededCause: caused * -.3, saves: saveBonus, raw: 0, rating: 0,
+    cleanSheet: 0, noConceded: suppression, noPoint: 0, ownGoals: 0, concededCause: caused * -.3, saves: saveBonus, preClamp: 0, raw: 0, rating: 0,
   }
-  breakdown.raw = breakdown.base + breakdown.result + breakdown.goals + breakdown.assists + breakdown.teamGoals + breakdown.conceded + breakdown.noConceded + breakdown.concededCause + breakdown.saves
-  breakdown.rating = clampRating(breakdown.raw)
+  breakdown.preClamp = breakdown.base + breakdown.result + breakdown.goals + breakdown.assists + breakdown.teamGoals + breakdown.conceded + breakdown.noConceded + breakdown.concededCause + breakdown.saves
+  breakdown.raw = clampRating(breakdown.preClamp)
+  breakdown.rating = breakdown.raw
   return breakdown
 }
 

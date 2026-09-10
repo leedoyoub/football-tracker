@@ -63,7 +63,7 @@ test('analytics source and UI expose season/team filters, comparison and Player 
   const chemistry = fs.readFileSync(require.resolve('../src/screens/ChemistryScreen.tsx'), 'utf8'); const comparison = fs.readFileSync(require.resolve('../src/screens/ComparisonScreen.tsx'), 'utf8'); const detail = fs.readFileSync(require.resolve('../src/screens/PlayerDetailScreen.tsx'), 'utf8')
   assert(chemistry.includes('Chemistry team filter') && chemistry.includes('combinationStats') && chemistry.includes('goalPartnerships'))
   assert(comparison.includes('Comparison team filter') && comparison.includes('On-pitch +/-'))
-  assert(detail.includes('Position splits') && detail.includes('Starter / Substitute'))
+  assert(detail.includes('Position Stats') && detail.includes('Role Impact'))
   const nav = fs.readFileSync(require.resolve('../src/components/BottomNav.tsx'), 'utf8')
   assert(nav.includes("id: 'records'") && nav.includes('grid-cols-5'))
 })

@@ -43,8 +43,9 @@ export function CombinationRecords({ players, matches }: { players: Player[]; ma
   const kind = section === 'defensive' ? defensiveKind : sectionKinds[section]
   const options = startingOptions[section]
   const activeStarting = options.some(option => option.id === sort) ? sort as StartingMetric : options[0].id
+  const prepared = useMemo(() => combinationStats(players, matches, {}, kind), [players, matches, kind])
   const rows = useMemo(() => {
-    const data = combinationStats(players, matches, {}, kind)
+    const data = prepared
     if (sort === 'onPitchGF90' || sort === 'onPitchGA90' || sort === 'onPitchGD90') return sortCombinationsByOnPitch(data, sort)
     return data.slice().sort((left, right) => {
       const leftValue = startingValue(left, sort); const rightValue = startingValue(right, sort)
@@ -53,7 +54,7 @@ export function CombinationRecords({ players, matches }: { players: Player[]; ma
       const b = rightValue ?? (reverse ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY)
       return (reverse ? a - b : b - a) || right.startsTogether - left.startsTogether || right.togetherMinutes - left.togetherMinutes || left.key.localeCompare(right.key)
     })
-  }, [players, matches, kind, sort])
+  }, [prepared, sort])
   const changeSection = (next: Section) => { setSection(next); setSort(startingOptions[next][0].id) }
   const changeDefensiveKind = (next: CombinationKind) => { setDefensiveKind(next); setSort(startingOptions.defensive[0].id) }
   const startingLabel = options.find(option => option.id === activeStarting)?.label ?? 'Starting metric'

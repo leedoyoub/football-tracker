@@ -1,4 +1,5 @@
 import type { MatchEvent, Position, PositionChange } from '../types'
+import { nextTimelineSequence } from '../engine/timeline'
 
 export type Lineup = { slotAssignments: Record<string, string>; homeBench: string[] }
 export type LineupTarget = { group: 'starting' | 'substitute' | 'squad'; id: string }
@@ -85,7 +86,7 @@ export function moveSubstitution(
     const playerInId = unpaired.includes(sameSlot) ? sameSlot : unpaired[0]
     unpaired.splice(unpaired.indexOf(playerInId), 1)
     const newSlot = Object.keys(next.slotAssignments).find(slot => next.slotAssignments[slot] === playerInId)!
-    events.push({ id: newId(), type: 'sub', minute, teamId, playerOutId, playerInId, position: positions[newSlot] })
+    events.push({ id: newId(), sequence: nextTimelineSequence(events, draft.positionHistories), type: 'sub', minute, teamId, playerOutId, playerInId, position: positions[newSlot] })
   }
   const positionHistories = { ...draft.positionHistories }
   for (const id of nextIds.filter(id => beforeIds.includes(id))) {
@@ -94,7 +95,7 @@ export function moveSubstitution(
     if (oldSlot === newSlot) continue
     if (positions[oldSlot] === 'GK' && positions[newSlot] !== 'GK' && events.some(event => event.type === 'save' && event.playerId === id && (event.minute === undefined || event.minute >= minute))) return draft
     const history = (positionHistories[id] ?? []).filter(change => change.minute !== minute)
-    positionHistories[id] = [...history, { minute, position: positions[newSlot] }]
+    positionHistories[id] = [...history, { minute, position: positions[newSlot], sequence: nextTimelineSequence(events, positionHistories) }]
   }
   return { ...next, events, positionHistories, checkpoint: next }
 }

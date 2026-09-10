@@ -81,10 +81,10 @@ test('Player Detail, Match Story, Match Log, and Data Integrity remain reachable
   const match = source('src/screens/MatchDetailScreen.tsx')
   const log = source('src/screens/NewMatchScreen.tsx')
   const records = source('src/screens/RecordsScreen.tsx')
-  for (const label of ['Recent Form', 'Positions Played', 'Goal Types', 'Starter / Substitute', 'Team Performance When Starting', 'Player Chemistry', 'Career Timeline', 'Personal Records', 'Substitute Impact', 'Rating Details']) assert(detail.includes(label))
+  for (const label of ['Recent Form', 'Position Stats', 'Positions Played', 'Goal Types', 'Role Impact', 'Team Performance When Starting', 'Player Chemistry', 'Career Timeline', 'Personal Records', 'Substitute impact', 'Rating Details']) assert(detail.includes(label))
   assert(match.includes('Match Story') && match.includes('story.tags.slice(0, 3)'))
   assert(log.includes('Current Matchday') && log.includes('aria-label="Live score"') && log.includes('matchScore(eventMatch)'))
-  assert(records.includes("['integrity', 'Data Integrity']") && records.includes("category === 'integrity' ? auditDataIntegrity"))
+  assert(records.includes("['integrity', 'Data Integrity'") && records.includes('function IntegrityRecords') && records.includes('auditDataIntegrity(matches, players, teams)'))
 })
 
 test('integrity audit is read-only, permits unassigned players, and detects a tracked goal without a scorer', () => {

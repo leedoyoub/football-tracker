@@ -3,7 +3,8 @@ import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
 
 export type NewsKind = 'player' | 'match' | 'team'
-export type NewsItem = { id: string; kind: NewsKind; date: string; matchId?: string; playerId?: string; teamId?: string; eyebrow: string; title: string; detail: string; context: string }
+export type NewsItem = { id: string; kind: NewsKind; date: string; matchId?: string; playerId?: string; teamId?: string; eyebrow: string; title: string; detail: string; context: string; emoji: string }
+type NewsDraft = Omit<NewsItem, 'emoji'>
 type Totals = { goals: number; assists: number; apps: number; mom: number; saves: number; cleanSheets: number }
 type Streak = { scoring: number; contribution: number }
 type TeamRun = { wins: number; unbeaten: number; cleanSheets: number; seasonGoals: number; seasonCleanSheets: number }
@@ -17,6 +18,18 @@ const scoreText = (match: Match, teams: Team[]) => { const score = matchScore(ma
 const crossed = (before: number, after: number, values: number[]) => values.filter(value => before < value && after >= value)
 const multiples = (step: number, max: number, start = step) => Array.from({ length: Math.max(0, Math.floor((max - start) / step) + 1) }, (_, index) => start + index * step)
 const didAppear = (match: Match, playerId: string) => { const appearance = match.appearances.find(item => item.playerId === playerId); return Boolean(appearance && (appearance.role === 'starter' || match.events.some(event => event.type === 'sub' && event.playerInId === playerId))) }
+const newsEmoji = (item: NewsDraft) => {
+  const text = `${item.eyebrow} ${item.title}`.toLowerCase()
+  if (text.includes('champion')) return text.includes('league') ? '👑' : text.includes('cup') ? '🥇' : text.includes('champions') ? '🏆' : '🏆'
+  if (text.includes('partnership')) return '🤝'
+  if (text.includes('goalkeeper') || text.includes('clean sheet') || text.includes('save')) return '🧤'
+  if (text.includes('hat-trick')) return '🎩'
+  if (text.includes('assist') || text.includes('creates')) return '🅰️'
+  if (text.includes('streak') || text.includes('form') || text.includes('winning') || text.includes('unbeaten')) return '🔥'
+  if (text.includes('mom') || text.includes('rare performance')) return '🌟'
+  if (text.includes('goal') || text.includes('scoring')) return '⚽'
+  return '🏅'
+}
 
 /**
  * Deterministic milestone projection from raw Match/Event data. Stable IDs make
@@ -24,7 +37,7 @@ const didAppear = (match: Match, playerId: string) => { const appearance = match
  */
 export function deriveNews(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = []): NewsItem[] {
   const items = new Map<string, NewsItem>()
-  const add = (item: NewsItem) => { if (!items.has(item.id)) items.set(item.id, item) }
+  const add = (item: NewsDraft) => { if (!items.has(item.id)) items.set(item.id, { ...item, emoji: newsEmoji(item) }) }
   const career = new Map<string, Totals>()
   const season = new Map<string, Totals>()
   const competition = new Map<string, Totals>()

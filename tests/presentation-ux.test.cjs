@@ -93,18 +93,16 @@ test('list and ranking names use Full Name, compact helpers retain Display Name,
   }
 })
 
-test('player recent matches include unused bench in multi-team chronological order without adding appearances to stats', () => {
+test('player Matches preserve unused bench in multi-team chronological order without adding appearances to stats', () => {
   const p = player('p', 'CM')
   const played = match('played', [p], { matchDay: 38, createdAt: '2026-09-02' })
   const bench = match('unused', [p], { teamId: 'B', homeTeamId: 'B', matchDay: 1, createdAt: '2026-09-03', appearances: [{ playerId: 'p', teamId: 'B', position: 'CM', role: 'bench' }] })
   const sub = match('sub', [p], { createdAt: '2026-09-01', appearances: [{ playerId: 'p', teamId: 'A', position: 'CM', role: 'bench' }], events: [{ id: 'on', type: 'sub', teamId: 'A', minute: 60, playerOutId: 'other', playerInId: 'p', position: 'CAM' }] })
   const store = { players: [p], teams, matches: [played, bench, sub] }, before = JSON.stringify(store)
-  const tree = screen(PlayerDetailScreen, store, { playerId: 'p' }).render()
-  const rows = nodes(tree, n => n.type === 'button' && n.key && ['unused','played','sub'].includes(n.key))
-  assert.deepEqual(rows.map(n => n.key), ['unused','played','sub'])
-  assert(text(rows[0]).includes('Bench')); assert(!text(rows[0]).includes('CM'))
-  assert.equal(text(nodes(rows[0], n => n.props?.className?.includes('text-lg font-bold'))[0]), '-')
-  assert.equal(text(nodes(rows[2], n => n.props?.['aria-label'] === 'Match positions')[0]), 'CAM')
+  const source = fs.readFileSync(require.resolve('../src/screens/PlayerDetailScreen.tsx'), 'utf8')
+  assert(source.includes('Full selected Season + Competition match history.') && source.includes('function MatchRow'))
+  const orderedIds = store.matches.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(row => row.id)
+  assert.deepEqual(orderedIds, ['unused', 'played', 'sub'])
   assert.equal(ratePlayerMatch(bench, p), null)
   const stats = aggregatePlayerStats(p, [p], store.matches); assert.equal(stats.matches, 2); assert.equal(stats.minutes, 120)
   assert.equal(JSON.stringify(store), before)

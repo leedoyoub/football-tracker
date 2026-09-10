@@ -19,7 +19,7 @@ export function substituteImpact(player: Player, matches: Match[]): { appearance
     const appearance = match.appearances.find(item => item.playerId === player.id)
     if (!appearance || appearance.role !== 'bench') continue
     const rating = ratePlayerMatch(match, player)
-    const entry = match.events.find((event): event is Extract<Match['events'][number], { type: 'sub' }> => event.type === 'sub' && event.playerInId === player.id && event.teamId === appearance.teamId)
+    const entry = orderedEvents(match).map(row => row.event).find((event): event is Extract<Match['events'][number], { type: 'sub' }> => event.type === 'sub' && event.playerInId === player.id && event.teamId === appearance.teamId)
     if (!rating || !entry || rating.minutes <= 0) continue
     let home = 0; let away = 0
     for (const { event } of orderedEvents(match)) {

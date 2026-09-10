@@ -69,13 +69,13 @@ test('only actual GK appearances count; substitute time boundaries and event tea
     ['end', bench.id, 'A', 90, 50], ['wrong-team', bench.id, 'B', 65, 50], ['field', field.id, 'A', 65, 50],
   ]) game.events.push({ id, type: 'save', playerId, teamId, minute, count })
   assert.equal(stats.aggregatePlayerStats(keeper, players, [game]).saves, 3)
-  assert.equal(stats.aggregatePlayerStats(bench, players, [game]).saves, 2)
+  assert.equal(stats.aggregatePlayerStats(bench, players, [game]).saves, 52, 'a save at the recorded final minute counts')
   assert.equal(stats.aggregatePlayerStats(field, players, [game]).saves, 0)
-  assert.deepEqual(rank([game]).map(row => [row.playerId, row.value]), [['keeper', 3], ['bench', 2]])
+  assert.deepEqual(rank([game]).map(row => [row.playerId, row.value]), [['bench', 52], ['keeper', 3]])
   game.events = game.events.filter(event => event.type !== 'sub')
   assert.equal(stats.aggregatePlayerStats(bench, players, [game]).saves, 0)
   assert(!rank([game]).some(row => row.playerId === bench.id))
-  game.appearances[0].matchPosition = 'CM'
+  game.appearances = game.appearances.map((appearance, index) => index === 0 ? { ...appearance, matchPosition: 'CM' } : appearance)
   assert.equal(stats.aggregatePlayerStats(keeper, players, [game]).saves, 0, 'base GK playing outfield must not receive saves')
 })
 

@@ -105,7 +105,7 @@ test('edited Match arrays invalidate derived player values while all consumers s
   near(after.appearances[0].rating.raw, shared.raw)
   assert.equal(getMatchManOfTheMatch(twoGoals, [cb]), 'cb')
   const ranking = buildGlobalRankingData([cb], [twoGoals], { seasons: ['Season 1'], teams: [], positions: [] }, 'rating')[0]
-  assert.equal(ranking.avgRating, Math.round(shared.rating * 100) / 100)
+  assert.equal(ranking.avgRating, shared.raw)
   near(shared.base + shared.result + shared.goals + shared.assists + shared.teamGoals + shared.conceded + shared.noConceded + shared.concededCause + shared.saves, shared.raw)
 })
 

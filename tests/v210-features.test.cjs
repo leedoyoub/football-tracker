@@ -84,7 +84,7 @@ test('v2.1 feature surfaces are exposed in the intended focused screens', () => 
   const chemistry = fs.readFileSync(require.resolve('../src/screens/ChemistryScreen.tsx'), 'utf8')
   const match = fs.readFileSync(require.resolve('../src/screens/MatchDetailScreen.tsx'), 'utf8')
   const records = fs.readFileSync(require.resolve('../src/screens/RecordsScreen.tsx'), 'utf8')
-  assert(detail.includes('Substitute Impact'))
+  assert(detail.includes('Role Impact') && detail.includes('Substitute impact'))
   assert(chemistry.includes('On-pitch') && chemistry.includes('sortCombinationsByOnPitch'))
   assert(match.includes('Match Story'))
   assert(records.includes('Data Integrity') && records.includes('Read-only diagnostics'))

@@ -33,7 +33,7 @@ export function auditDataIntegrity(matches: Match[], players: Player[], teams: T
       const history = appearance.positionHistory ?? []
       for (let index = 0; index < history.length; index++) {
         const change = history[index]
-        if (!Number.isFinite(change.minute) || change.minute < 0 || change.minute > match.duration || !normalizeMatchPosition(change.position)) add(issues, 'error', match, 'Malformed position-change timeline.')
+        if (!Number.isFinite(change.minute) || change.minute < 0 || change.minute > 99 || !normalizeMatchPosition(change.position)) add(issues, 'error', match, 'Malformed position-change timeline.')
         if (index && change.minute < history[index - 1].minute) add(issues, 'warning', match, 'Position changes are not chronological.')
       }
       const segments = matchPositionSegments(match, appearance)

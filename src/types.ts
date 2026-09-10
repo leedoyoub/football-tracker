@@ -82,6 +82,8 @@ export interface Player {
 export interface PositionChange {
   minute: number
   position: Position
+  /** Shares ordering with MatchEvent.sequence; absent in legacy histories. */
+  sequence?: number
 }
 
 export interface Appearance {
@@ -231,6 +233,9 @@ export interface RatingBreakdown {
   ownGoals: number
   concededCause: number
   saves: number
+  /** Component sum before the 3–10 clamp. */
+  preClamp: number
+  /** Current clamped rating at full precision; formatting is UI-only. */
   raw: number
   rating: number
 }
