@@ -27,7 +27,7 @@ test('numeric player IDs use the exact lookup path and text matching remains acc
   assert(helper.includes('apiFootballPlayerIdQuery') && helper.includes('if (exactId !== undefined) return [await fetchApiFootballPlayer(exactId)]'))
   assert(helper.indexOf('if (exactId !== undefined)') < helper.indexOf('if (options.externalTeamId)'))
   assert(screen.includes('No API player found for ID'))
-  assert(edge.includes("url.searchParams.set('player', String(externalPlayerId))"))
+  assert(edge.includes("url.searchParams.set('id', String(externalPlayerId))"))
   assert(edge.includes('players.find((item: { id: number }) => item.id === externalPlayerId)'))
   assert(playerSearchMatches('Ake', { name: 'Aké' }))
   assert(playerSearchMatches('Gundogan', { name: 'Gündogan' }))

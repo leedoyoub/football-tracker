@@ -122,7 +122,7 @@ test('Champions bracket keeps native horizontal scrolling while hiding its brows
 
 test('Home has only the ordered dashboard responsibilities and no full ranking, standings or Best XI', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
-  const order = ['competition-progress', 'recent-matches', 'news', 'season-leaders', 'account', 'play-style-performance'].map(token => source.indexOf(`data-home-section="${token}"`))
+  const order = ['competition-progress', 'recent-matches', 'news', 'season-leaders', 'play-style-performance', 'account'].map(token => source.indexOf(`data-home-section="${token}"`))
   assert(order.every((value, index) => value >= 0 && (!index || value > order[index - 1])))
   assert(!source.includes('Global Rankings') && !source.includes('Team of the Week') && !source.includes('Team of the Season') && !source.includes('StandingsTable'))
   assert(source.includes('derivedResults(matches, teams).slice(0, 5)') && source.includes('showCompetition'))

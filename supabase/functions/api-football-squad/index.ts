@@ -53,6 +53,13 @@ function hasProviderError(payload: unknown): boolean {
   if (typeof errors === 'string') return errors.length > 0
   return Boolean(errors && typeof errors === 'object' && Object.keys(errors).length)
 }
+function providerPayloadFailure(request: Request, details: { apiErrorType: string; sanitizedMessage: string }) {
+  const value = `${details.apiErrorType} ${details.sanitizedMessage}`.toLowerCase()
+  if (/rate|limit|quota|requests/.test(value)) return failure(request, 'API_FOOTBALL_RATE_LIMIT', 'API-Football request limit reached. Try again later.', 429)
+  if (/authori[sz]|invalid.*key|credential/.test(value)) return failure(request, 'UPSTREAM_AUTH_ERROR', 'API-Football could not authorize the squad request.', 502)
+  if (/access|subscription|plan|forbidden/.test(value)) return failure(request, 'UPSTREAM_ACCESS_DENIED', 'API-Football denied the squad request.', 502)
+  return failure(request, 'UPSTREAM_API_ERROR', 'API-Football could not complete the squad request.', 502)
+}
 
 Deno.serve(async request => {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(request) })
@@ -97,7 +104,7 @@ Deno.serve(async request => {
   if (!providerResponse.ok) return upstreamFailure(request, providerResponse.status)
   let payload: unknown
   try { payload = await providerResponse.json() } catch (error) { logProviderFailure('api-football-invalid-json', providerResponse.status, 'invalid-json', safeErrorMessage(error)); return failure(request, 'INVALID_UPSTREAM_JSON', 'API-Football returned an invalid response.', 502) }
-  if (hasProviderError(payload)) { const details = providerErrorDetails(payload); logProviderFailure('api-football-api-error', providerResponse.status, details.apiErrorType, details.sanitizedMessage); return failure(request, 'UPSTREAM_API_ERROR', 'API-Football could not complete the squad request.', 502) }
+  if (hasProviderError(payload)) { const details = providerErrorDetails(payload); logProviderFailure('api-football-api-error', providerResponse.status, details.apiErrorType, details.sanitizedMessage); return providerPayloadFailure(request, details) }
   const response = payload && typeof payload === 'object' ? (payload as { response?: unknown }).response : undefined
   if (!Array.isArray(response)) { logProviderFailure('api-football-response-shape', providerResponse.status, 'invalid-response-shape', 'Expected an array response from API-Football.'); return failure(request, 'INVALID_UPSTREAM_RESPONSE', 'API-Football returned an unexpected squad response.', 502) }
   const players = response[0] && typeof response[0] === 'object' ? (response[0] as { players?: unknown }).players : undefined

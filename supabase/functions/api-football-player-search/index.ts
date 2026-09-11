@@ -1,6 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const ALLOWED_ORIGINS = new Set(['https://leedoyoub.github.io', 'http://127.0.0.1:5174', 'http://localhost:5174'])
+const ALLOWED_ORIGINS = new Set(['https://leedoyoub.github.io', 'http://127.0.0.1:5173', 'http://localhost:5173', 'http://127.0.0.1:5174', 'http://localhost:5174'])
+const FETCH_TIMEOUT_MS = 8_000
+const CURRENT_API_FOOTBALL_SEASON = new Date().getUTCFullYear()
 const corsHeaders = (request: Request): HeadersInit => {
   const origin = request.headers.get('Origin')
   return { 'Access-Control-Allow-Origin': origin && ALLOWED_ORIGINS.has(origin) ? origin : 'https://leedoyoub.github.io', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Max-Age': '86400', 'Vary': 'Origin' }
@@ -36,13 +38,24 @@ Deno.serve(async request => {
   const apiKey = Deno.env.get('API_FOOTBALL_KEY')
   if (!apiKey) return json(request, { error: 'Player search is not configured' }, 503)
   try {
-    // Profiles is API-Football's global player directory; unlike /players it does not require a league/team season.
-    const url = new URL('https://v3.football.api-sports.io/players/profiles')
-    if (exactLookup) url.searchParams.set('player', String(externalPlayerId))
+    // API-Football's supported partial-name lookup is /players?search=…&season=….
+    const url = new URL('https://v3.football.api-sports.io/players')
+    if (exactLookup) url.searchParams.set('id', String(externalPlayerId))
     else url.searchParams.set('search', query)
-    const providerResponse = await fetch(url, { headers: { 'x-apisports-key': apiKey } })
-    if (!providerResponse.ok) return json(request, { error: 'Player provider unavailable' }, providerResponse.status === 429 ? 429 : 502)
+    url.searchParams.set('season', String(CURRENT_API_FOOTBALL_SEASON))
+    let providerResponse: Response | undefined
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+      try { providerResponse = await fetch(url, { headers: { 'x-apisports-key': apiKey }, signal: controller.signal }); if (providerResponse.ok || providerResponse.status < 500 || attempt === 1) break } catch (error) { if (attempt === 1) throw error } finally { clearTimeout(timeout) }
+    }
+    if (!providerResponse) return json(request, { error: 'Could not reach player provider' }, 502)
+    if (!providerResponse.ok) {
+      const message = providerResponse.status === 401 ? 'API-Football rejected the server credentials.' : providerResponse.status === 403 ? 'API-Football denied player-search access.' : providerResponse.status === 429 ? 'API-Football request limit reached. Try again later.' : 'Player provider is temporarily unavailable.'
+      return json(request, { error: message }, providerResponse.status === 429 ? 429 : 502)
+    }
     const payload = await providerResponse.json()
+    const providerErrors = payload && typeof payload === 'object' ? (payload as { errors?: unknown }).errors : undefined
+    if (providerErrors && (!Array.isArray(providerErrors) || providerErrors.length)) return json(request, { error: 'API-Football reported a player-search error.' }, 502)
     if (!Array.isArray(payload?.response)) return json(request, { error: 'Malformed player response' }, 502)
     const players = payload.response.map(sanitizedPlayer).filter((player: { id?: unknown; name?: unknown }) => Number.isInteger(player.id) && typeof player.name === 'string')
     if (exactLookup) {

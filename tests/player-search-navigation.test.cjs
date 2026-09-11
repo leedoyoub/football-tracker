@@ -23,16 +23,16 @@ test('New Player search is explicit, optional, and cannot override the chosen ap
   assert(!screen.includes('currentTeamId'))
 })
 
-test('player search is authenticated server-side, globally searches profiles, and has CORS before auth', () => {
+test('player search is authenticated server-side, uses the supported seasonal partial-name endpoint, and has CORS before auth', () => {
   const helper = read('src/lib/apiFootball.ts'); const edge = read('supabase/functions/api-football-player-search/index.ts')
   assert(helper.includes("functions.invoke('api-football-player-search'"))
   assert(!helper.includes('v3.football.api-sports.io'))
-  assert(edge.includes("players/profiles") && edge.includes("url.searchParams.set('search'"))
+  assert(edge.includes("v3.football.api-sports.io/players") && edge.includes("url.searchParams.set('search'") && edge.includes("url.searchParams.set('season'"))
   assert(edge.indexOf("request.method === 'OPTIONS'") < edge.indexOf("request.headers.get('Authorization')"))
   assert(edge.includes("'Access-Control-Allow-Origin'") && edge.includes("'Access-Control-Allow-Methods': 'POST, OPTIONS'"))
   assert(edge.includes("Deno.env.get('API_FOOTBALL_KEY')"))
   assert(edge.includes('firstname: player.firstname') && edge.includes('lastname: player.lastname'))
-  assert(edge.includes("url.searchParams.set('player', String(externalPlayerId))"))
+  assert(edge.includes("url.searchParams.set('id', String(externalPlayerId))"))
   assert(helper.includes('fetchApiFootballPlayer') && helper.includes('externalPlayerId'))
 })
 

@@ -57,7 +57,7 @@ export async function searchApiFootballPlayers(query: string, options: { externa
   const { data, error } = await supabase.functions.invoke('api-football-player-search', { body: { query } })
   if (error) throw error
   if (!Array.isArray(data?.players)) throw new Error('Invalid player search response.')
-  return data.players
+  return data.players.map((player: ApiFootballPlayerSearchResult) => ({ ...player, photo: apiFootballPlayerPhotoUrl(player) }))
 }
 
 /** Exact lookup is for an already-linked player; it never guesses by name. */
@@ -69,7 +69,7 @@ export async function fetchApiFootballPlayer(externalPlayerId: string | number):
   const { data, error } = await supabase.functions.invoke('api-football-player-search', { body: { externalPlayerId } })
   if (error) throw error
   if (!data?.player || typeof data.player.id !== 'number' || typeof data.player.name !== 'string') throw new Error('Invalid player lookup response.')
-  return data.player
+  return { ...data.player, photo: apiFootballPlayerPhotoUrl(data.player) }
 }
 
 /** Keeps numeric-ID not-found feedback specific without exposing provider details. */

@@ -108,12 +108,13 @@ test('player Matches preserve unused bench in multi-team chronological order wit
   assert.equal(JSON.stringify(store), before)
 })
 
-test('Home footer reads the central version after all content, and common layout reserves nav plus safe area', () => {
+test('Home footer reads the central version with Account last, and common layout reserves nav plus safe area', () => {
   const tree = screen(HomeScreen, { players: [], matches: [], teams }).render()
   const footer = nodes(tree, n => n.type === 'footer')[0]
   assert.equal(text(footer), 'Football Tracker \u00b7 v' + APP_VERSION)
-  const finalSection = tree.props.children.filter(Boolean).at(-1)
-  assert.equal(finalSection.props['data-home-section'], 'play-style-performance')
+  const sections = tree.props.children.filter(Boolean)
+  assert.equal(sections.at(-2).props['data-home-section'], 'play-style-performance')
+  assert.equal(sections.at(-1).props['data-home-section'], 'account')
   assert(nodes(tree, n => n.type === 'footer').includes(footer))
   const css = fs.readFileSync(require.resolve('../src/index.css'), 'utf8')
   assert(css.includes('env(safe-area-inset-bottom, 0px)'))
