@@ -5,6 +5,7 @@ const ts = require('typescript')
 for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename)
 
 const { formatPlayStyleAverage, formatPlayStylePercentage, trackedStyleTeams, trackedTeamPlayStylePerformance } = require('../src/engine/playStyleStats.ts')
+const { STATIC_TEAMS, teamPlayStyle } = require('../src/data/teams.ts')
 const teams = [
   { id: 'ours', name: 'Ours', shortName: 'OUR', abbreviation: 'OUR', visualStyle: 'solid', primaryColor: 'blue', jerseyNumberColor: 'white', playStyle: 'possession' },
   { id: 'pos', name: 'Possession', shortName: 'POS', abbreviation: 'POS', visualStyle: 'solid', primaryColor: 'blue', jerseyNumberColor: 'white', playStyle: 'possession' },
@@ -50,4 +51,17 @@ test('current team assignments drive visible play-style crest groups even withou
   const moved = teams.map(team => team.id === 'long' ? { ...team, playStyle: 'possession' } : team)
   assert(!trackedStyleTeams(moved, 'long-pass-counter').some(team => team.id === 'long'))
   assert(trackedStyleTeams(moved, 'possession').some(team => team.id === 'long'))
+})
+
+test('the catalog is the exact 6/5/5 play-style source of truth, including stale saved records', () => {
+  const expected = {
+    possession: ['barcelona', 'arsenal', 'manchester-city', 'chelsea', 'bayern-munich', 'paris-saint-germain'],
+    'short-pass-counter': ['liverpool', 'manchester-united', 'tottenham-hotspur', 'inter-milan', 'inter-miami'],
+    'long-pass-counter': ['real-madrid', 'atletico-madrid', 'borussia-dortmund', 'ac-milan', 'juventus'],
+  }
+  for (const [style, ids] of Object.entries(expected)) {
+    assert.deepEqual(trackedStyleTeams(STATIC_TEAMS, style).map(team => team.id), ids, `Home ${style} icon group`)
+  }
+  const staleRealTeam = { ...STATIC_TEAMS.find(team => team.id === 'real-madrid'), playStyle: 'short-pass-counter' }
+  assert.equal(teamPlayStyle(staleRealTeam), 'long-pass-counter')
 })
