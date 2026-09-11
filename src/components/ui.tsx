@@ -15,7 +15,9 @@ export function SubstitutionSelection({ direction }: { direction: 'in' | 'out' }
   return <span className={`pointer-events-none whitespace-nowrap text-[9px] font-bold ${direction === 'out' ? 'text-red-400' : 'text-emerald-400'}`}>{direction === 'out' ? '\u2190 OUT' : '\u2192 IN'}</span>
 }
 
-export const ratingBadgeColor = (rating: number) => rating >= GOOD_RATING_THRESHOLD ? 'bg-emerald-500 text-white' : rating >= 6 ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'
+/** Rating colour is presentation-only and must follow the one-decimal rating shown to users. */
+export function displayedRating(rating: number): number { return Number(rating.toFixed(1)) }
+export const ratingBadgeColor = (rating: number) => displayedRating(rating) >= GOOD_RATING_THRESHOLD ? 'bg-emerald-500 text-white' : displayedRating(rating) >= 6 ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'
 
 export function SubstitutePlayerCard({ player, team, rating, stats, position, inMinute, outMinute, showRating = true, selection, onClick }: { player: Player, team?: Team, rating?: number, stats?: { goals: number, assists: number }, position?: string, inMinute?: number, outMinute?: number, showRating?: boolean, selection?: 'in' | 'out', onClick: () => void }) {
   return (
@@ -65,8 +67,8 @@ export function StatIcons({ goals, assists, className = '' }: { goals: number; a
 }
 
 export function ratingTone(rating: number) {
-  if (rating >= GOOD_RATING_THRESHOLD) return 'text-emerald-400'
-  if (rating >= 6) return 'text-orange-400'
+  if (displayedRating(rating) >= GOOD_RATING_THRESHOLD) return 'text-emerald-400'
+  if (displayedRating(rating) >= 6) return 'text-orange-400'
   return 'text-red-400'
 }
 

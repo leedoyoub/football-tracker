@@ -14,6 +14,12 @@ export type PlayStylePerformance = {
   matches: number
   goalsFor: number
   goalsAgainst: number
+  wins: number
+  draws: number
+  losses: number
+  winPercentage: number | null
+  drawPercentage: number | null
+  lossPercentage: number | null
   averageGoalsFor: number | null
   averageGoalsAgainst: number | null
 }
@@ -25,7 +31,7 @@ function completedMatch(match: Match): boolean {
 /** Derived from saved, valid matches only; never persisted as a stale aggregate. */
 export function opponentPlayStylePerformance(matches: Match[], teams: Team[]): PlayStylePerformance[] {
   const byId = new Map(teams.map(team => [team.id, team]))
-  const totals = new Map<TeamPlayStyle, { matches: number; goalsFor: number; goalsAgainst: number }>(TEAM_PLAY_STYLES.map(style => [style, { matches: 0, goalsFor: 0, goalsAgainst: 0 }]))
+  const totals = new Map<TeamPlayStyle, { matches: number; goalsFor: number; goalsAgainst: number; wins: number; draws: number; losses: number }>(TEAM_PLAY_STYLES.map(style => [style, { matches: 0, goalsFor: 0, goalsAgainst: 0, wins: 0, draws: 0, losses: 0 }]))
   const uniqueMatches = [...new Map(matches.map(match => [match.id, match])).values()]
 
   for (const match of uniqueMatches) {
@@ -42,12 +48,17 @@ export function opponentPlayStylePerformance(matches: Match[], teams: Team[]): P
     total.matches++
     total.goalsFor += goalsFor
     total.goalsAgainst += goalsAgainst
+    if (goalsFor > goalsAgainst) total.wins++
+    else if (goalsFor < goalsAgainst) total.losses++
+    else total.draws++
   }
 
   return TEAM_PLAY_STYLES.map(style => {
     const total = totals.get(style)!
-    return { style, label: PLAY_STYLE_LABELS[style], ...total, averageGoalsFor: total.matches ? total.goalsFor / total.matches : null, averageGoalsAgainst: total.matches ? total.goalsAgainst / total.matches : null }
+    const percentage = (value: number) => total.matches ? value / total.matches * 100 : null
+    return { style, label: PLAY_STYLE_LABELS[style], ...total, winPercentage: percentage(total.wins), drawPercentage: percentage(total.draws), lossPercentage: percentage(total.losses), averageGoalsFor: total.matches ? total.goalsFor / total.matches : null, averageGoalsAgainst: total.matches ? total.goalsAgainst / total.matches : null }
   })
 }
 
 export function formatPlayStyleAverage(value: number | null): string { return value === null ? '—' : value.toFixed(2) }
+export function formatPlayStylePercentage(value: number | null): string { return value === null ? '—' : `${value.toFixed(0)}%` }

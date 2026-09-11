@@ -6,6 +6,13 @@ export type ApiFootballSquadPlayer = { id: number; name: string; age?: number; n
 export type ApiFootballPlayerSearchResult = ApiFootballSquadPlayer & { firstname?: string; lastname?: string; nationality?: string; currentTeam?: string }
 const squadCache = new Map<number, Promise<ApiFootballSquadPlayer[]>>()
 
+/** API-Sports documents this stable image route for players without a photo field. */
+export function apiFootballPlayerPhotoUrl(player: Pick<ApiFootballSquadPlayer, 'id' | 'photo'>): string | undefined {
+  const photo = player.photo?.trim()
+  if (photo) return photo
+  return Number.isSafeInteger(player.id) && player.id > 0 ? `https://media.api-sports.io/football/players/${player.id}.png` : undefined
+}
+
 /** Numeric input is an exact API-Football player ID, never a name-search term. */
 export function apiFootballPlayerIdQuery(query: string): number | undefined {
   const trimmed = query.trim()
@@ -13,7 +20,9 @@ export function apiFootballPlayerIdQuery(query: string): number | undefined {
   const id = Number(trimmed)
   return Number.isSafeInteger(id) && id > 0 ? id : undefined
 }
-export async function fetchApiFootballSquad(externalTeamId: number): Promise<ApiFootballSquadPlayer[]> {
+export function clearApiFootballSquadCache(externalTeamId?: number) { if (externalTeamId === undefined) squadCache.clear(); else squadCache.delete(externalTeamId) }
+export async function fetchApiFootballSquad(externalTeamId: number, options: { forceRefresh?: boolean } = {}): Promise<ApiFootballSquadPlayer[]> {
+  if (options.forceRefresh) squadCache.delete(externalTeamId)
   const cached = squadCache.get(externalTeamId)
   if (cached) return cached
   const request = fetchApiFootballSquadUncached(externalTeamId).catch(error => { squadCache.delete(externalTeamId); throw error })
@@ -28,7 +37,7 @@ async function fetchApiFootballSquadUncached(externalTeamId: number): Promise<Ap
   const { data, error } = await supabase.functions.invoke('api-football-squad', { body: { externalTeamId } })
   if (error) throw new Error(await squadImportErrorMessage(error))
   if (!Array.isArray(data?.players)) throw new Error('Invalid squad response.')
-  return data.players
+  return data.players.map((player: ApiFootballSquadPlayer) => ({ ...player, photo: apiFootballPlayerPhotoUrl(player) }))
 }
 
 export async function searchApiFootballPlayers(query: string, options: { externalTeamId?: number } = {}): Promise<ApiFootballPlayerSearchResult[]> {

@@ -1,4 +1,4 @@
-import type { Team } from '../types'
+import type { Team, TeamPlayStyle } from '../types'
 const team = (id: string, name: string, abbreviation: string, externalTeamId: number, primaryColor: Team['primaryColor']): Team => ({ id, name, shortName: abbreviation, abbreviation, externalTeamId, logo: `https://media.api-sports.io/football/teams/${externalTeamId}.png`, visualStyle: 'solid', primaryColor, jerseyNumberColor: 'white' })
 export const STATIC_TEAMS: Team[] = [
   team('real-madrid','Real Madrid','RMA',541,'white'), team('barcelona','Barcelona','BAR',529,'blue'), team('atletico-madrid','Atlético Madrid','ATM',530,'red'),
@@ -9,7 +9,7 @@ export const STATIC_TEAMS: Team[] = [
 
 const CATALOG_PLAY_STYLES: Record<string, TeamPlayStyle> = {
   'real-madrid': 'short-pass-counter', barcelona: 'possession', 'atletico-madrid': 'long-pass-counter',
-  arsenal: 'possession', 'manchester-city': 'possession', liverpool: 'short-pass-counter', 'manchester-united': 'short-pass-counter', tottenham-hotspur: 'long-pass-counter', chelsea: 'possession',
+  arsenal: 'possession', 'manchester-city': 'possession', liverpool: 'short-pass-counter', 'manchester-united': 'short-pass-counter', 'tottenham-hotspur': 'long-pass-counter', chelsea: 'possession',
   'bayern-munich': 'possession', 'borussia-dortmund': 'long-pass-counter', 'ac-milan': 'short-pass-counter', 'inter-milan': 'long-pass-counter', juventus: 'short-pass-counter', 'paris-saint-germain': 'possession', 'inter-miami': 'possession',
 }
 

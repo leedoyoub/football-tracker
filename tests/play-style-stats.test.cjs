@@ -4,7 +4,7 @@ const { test } = require('node:test')
 const ts = require('typescript')
 for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename)
 
-const { formatPlayStyleAverage, opponentPlayStylePerformance } = require('../src/engine/playStyleStats.ts')
+const { formatPlayStyleAverage, formatPlayStylePercentage, opponentPlayStylePerformance } = require('../src/engine/playStyleStats.ts')
 const teams = [
   { id: 'ours', name: 'Ours', shortName: 'OUR', abbreviation: 'OUR', visualStyle: 'solid', primaryColor: 'blue', jerseyNumberColor: 'white', playStyle: 'possession' },
   { id: 'pos', name: 'Possession', shortName: 'POS', abbreviation: 'POS', visualStyle: 'solid', primaryColor: 'blue', jerseyNumberColor: 'white', playStyle: 'possession' },
@@ -17,9 +17,9 @@ const row = (rows, style) => rows.find(item => item.style === style)
 test('opponent play-style performance aggregates completed saved matches by opponent style', () => {
   const matches = [match('p1', 'ours', 'pos', 2, 1), match('p2', 'pos', 'ours', 1, 3), match('short', 'ours', 'short', 1, 2), match('long', 'long', 'ours', 0, 2), { id: 'future', homeTeamId: 'ours', awayTeamId: 'pos', events: null, appearances: [] }]
   const rows = opponentPlayStylePerformance(matches, teams)
-  assert.deepEqual(row(rows, 'possession'), { style: 'possession', label: 'Possession', matches: 2, goalsFor: 5, goalsAgainst: 2, averageGoalsFor: 2.5, averageGoalsAgainst: 1 })
-  assert.deepEqual(row(rows, 'short-pass-counter'), { style: 'short-pass-counter', label: 'Short-Pass Counter', matches: 1, goalsFor: 1, goalsAgainst: 2, averageGoalsFor: 1, averageGoalsAgainst: 2 })
-  assert.deepEqual(row(rows, 'long-pass-counter'), { style: 'long-pass-counter', label: 'Long-Pass Counter', matches: 1, goalsFor: 2, goalsAgainst: 0, averageGoalsFor: 2, averageGoalsAgainst: 0 })
+  assert.deepEqual(row(rows, 'possession'), { style: 'possession', label: 'Possession', matches: 2, goalsFor: 5, goalsAgainst: 2, wins: 2, draws: 0, losses: 0, winPercentage: 100, drawPercentage: 0, lossPercentage: 0, averageGoalsFor: 2.5, averageGoalsAgainst: 1 })
+  assert.deepEqual(row(rows, 'short-pass-counter'), { style: 'short-pass-counter', label: 'Short-Pass Counter', matches: 1, goalsFor: 1, goalsAgainst: 2, wins: 0, draws: 0, losses: 1, winPercentage: 0, drawPercentage: 0, lossPercentage: 100, averageGoalsFor: 1, averageGoalsAgainst: 2 })
+  assert.deepEqual(row(rows, 'long-pass-counter'), { style: 'long-pass-counter', label: 'Long-Pass Counter', matches: 1, goalsFor: 2, goalsAgainst: 0, wins: 1, draws: 0, losses: 0, winPercentage: 100, drawPercentage: 0, lossPercentage: 0, averageGoalsFor: 2, averageGoalsAgainst: 0 })
 })
 
 test('opponent play-style performance handles zero matches and recalculates after match edits and deletion', () => {
@@ -34,4 +34,6 @@ test('play-style average display rounds to two decimals and renders no-data neut
   assert.equal(formatPlayStyleAverage(1.6666), '1.67')
   assert.equal(formatPlayStyleAverage(.5), '0.50')
   assert.equal(formatPlayStyleAverage(null), '—')
+  assert.equal(formatPlayStylePercentage(50), '50%')
+  assert.equal(formatPlayStylePercentage(null), '—')
 })

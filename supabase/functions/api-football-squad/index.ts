@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const ALLOWED_ORIGINS = new Set(['https://leedoyoub.github.io', 'http://127.0.0.1:5174', 'http://localhost:5174'])
+const ALLOWED_ORIGINS = new Set(['https://leedoyoub.github.io', 'http://127.0.0.1:5173', 'http://localhost:5173', 'http://127.0.0.1:5174', 'http://localhost:5174'])
 const FETCH_TIMEOUT_MS = 8_000
 
 function corsHeaders(request: Request): HeadersInit {
@@ -72,18 +72,28 @@ Deno.serve(async request => {
   if (!Number.isInteger(externalTeamId) || Number(externalTeamId) <= 0) { logFailure('request-validation'); return failure(request, 'INVALID_REQUEST', 'externalTeamId must be a positive integer.', 400) }
   const apiKey = Deno.env.get('API_FOOTBALL_KEY')
   if (!apiKey) { logFailure('api-key-check'); return failure(request, 'API_FOOTBALL_NOT_CONFIGURED', 'Squad import is not configured.', 503) }
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
-  let providerResponse: Response
-  try {
-    const url = new URL('https://v3.football.api-sports.io/players/squads')
-    url.searchParams.set('team', String(externalTeamId))
-    providerResponse = await fetch(url, { headers: { 'x-apisports-key': apiKey }, signal: controller.signal })
-  } catch (error) {
-    const timedOut = controller.signal.aborted
+  const url = new URL('https://v3.football.api-sports.io/players/squads')
+  url.searchParams.set('team', String(externalTeamId))
+  let providerResponse: Response | undefined
+  let lastTransportFailure: { timedOut: boolean; error: unknown } | undefined
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+    try {
+      providerResponse = await fetch(url, { headers: { 'x-apisports-key': apiKey }, signal: controller.signal })
+      if (providerResponse.ok || providerResponse.status < 500 || attempt === 1) break
+      logProviderFailure('api-football-retryable-http-error', providerResponse.status, `http-${providerResponse.status}`, 'Retrying one transient API-Football server error.')
+    } catch (error) {
+      lastTransportFailure = { timedOut: controller.signal.aborted, error }
+      if (attempt === 1) break
+    } finally { clearTimeout(timeout) }
+  }
+  if (!providerResponse) {
+    const timedOut = lastTransportFailure?.timedOut ?? false
+    const error = lastTransportFailure?.error
     logFailure(timedOut ? 'api-football-timeout' : 'api-football-fetch', { errorType: error instanceof Error ? error.name : 'UnknownError', errorMessage: safeErrorMessage(error) })
     return failure(request, timedOut ? 'UPSTREAM_TIMEOUT' : 'UPSTREAM_NETWORK_ERROR', timedOut ? 'API-Football did not respond in time.' : 'Could not reach API-Football.', timedOut ? 504 : 502)
-  } finally { clearTimeout(timeout) }
+  }
   if (!providerResponse.ok) return upstreamFailure(request, providerResponse.status)
   let payload: unknown
   try { payload = await providerResponse.json() } catch (error) { logProviderFailure('api-football-invalid-json', providerResponse.status, 'invalid-json', safeErrorMessage(error)); return failure(request, 'INVALID_UPSTREAM_JSON', 'API-Football returned an invalid response.', 502) }

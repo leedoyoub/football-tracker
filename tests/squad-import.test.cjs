@@ -80,7 +80,8 @@ test('import metadata has an explicit Supabase serialization and restore path', 
 
 test('import screen makes the authenticated request with externalTeamId and guards signed-out access', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/SquadImportScreen.tsx'), 'utf8')
-  assert(source.includes('fetchApiFootballSquad(team.externalTeamId)'))
+  assert(source.includes('fetchApiFootballSquad(team.externalTeamId, { forceRefresh })'))
+  assert(source.includes('void loadSquad(true)'))
   assert(source.includes("if (!user) { setError('Google sign-in is required for secure squad import.')"))
   assert(source.includes('setSelected(new Set())'))
 })
