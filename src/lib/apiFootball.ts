@@ -1,6 +1,5 @@
 import { getSupabase } from './supabase'
 import { squadImportErrorMessage } from './apiFootballError'
-import { playerSearchMatches } from './normalizedSearch'
 
 export type ApiFootballSquadPlayer = { id: number; name: string; age?: number; number?: number | null; position?: string; photo?: string }
 export type ApiFootballPlayerSearchResult = ApiFootballSquadPlayer & { firstname?: string; lastname?: string; nationality?: string; currentTeam?: string }
@@ -40,24 +39,10 @@ async function fetchApiFootballSquadUncached(externalTeamId: number): Promise<Ap
   return data.players.map((player: ApiFootballSquadPlayer) => ({ ...player, photo: apiFootballPlayerPhotoUrl(player) }))
 }
 
-export async function searchApiFootballPlayers(query: string, options: { externalTeamId?: number } = {}): Promise<ApiFootballPlayerSearchResult[]> {
+export async function searchApiFootballPlayers(query: string): Promise<ApiFootballPlayerSearchResult[]> {
   const exactId = apiFootballPlayerIdQuery(query)
-  if (exactId !== undefined) return [await fetchApiFootballPlayer(exactId)]
-  if (options.externalTeamId) {
-    try {
-      const squad = await fetchApiFootballSquad(options.externalTeamId)
-      const local = squad.filter(player => playerSearchMatches(query, player))
-      if (local.length) return local
-    } catch { /* A global authenticated search remains a safe fallback. */ }
-  }
-  const supabase = getSupabase()
-  if (!supabase) throw new Error('Google sign-in is required to search API-Football players.')
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Google sign-in is required to search API-Football players.')
-  const { data, error } = await supabase.functions.invoke('api-football-player-search', { body: { query } })
-  if (error) throw error
-  if (!Array.isArray(data?.players)) throw new Error('Invalid player search response.')
-  return data.players.map((player: ApiFootballPlayerSearchResult) => ({ ...player, photo: apiFootballPlayerPhotoUrl(player) }))
+  if (exactId === undefined) return []
+  return [await fetchApiFootballPlayer(exactId)]
 }
 
 /** Exact lookup is for an already-linked player; it never guesses by name. */
