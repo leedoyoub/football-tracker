@@ -24,8 +24,18 @@ export type PlayStylePerformance = {
   averageGoalsAgainst: number | null
 }
 
-function completedMatch(match: Match): boolean {
+export function isCompletedRecordedMatch(match: Match): boolean {
   return Boolean(match.id && match.homeTeamId && match.awayTeamId && match.homeTeamId !== match.awayTeamId && Array.isArray(match.events) && Array.isArray(match.appearances))
+}
+
+export function trackedTeamId(match: Match, teams: Team[]): string | undefined { return match.teamId && teams.some(team => team.id === match.teamId) ? match.teamId : undefined }
+export function trackedStyleTeams(teams: Team[], style: TeamPlayStyle): Team[] { return teams.filter(team => teamPlayStyle(team) === style) }
+export function trackedStyleMatches(matches: Match[], teams: Team[], style: TeamPlayStyle): Match[] {
+  return matches.filter(match => isCompletedRecordedMatch(match) && trackedTeamId(match, teams) !== undefined && teamPlayStyle(teams.find(team => team.id === match.teamId)) === style)
+}
+export function trackedTeamResult(match: Match, teamId: string) {
+  const score = matchScore(match); const goalsFor = teamId === match.homeTeamId ? score.home : score.away; const goalsAgainst = teamId === match.homeTeamId ? score.away : score.home
+  return { goalsFor, goalsAgainst, outcome: goalsFor > goalsAgainst ? 'W' as const : goalsFor < goalsAgainst ? 'L' as const : 'D' as const }
 }
 
 /** Derived from saved, valid matches only; never persisted as a stale aggregate. */
@@ -36,14 +46,12 @@ export function trackedTeamPlayStylePerformance(matches: Match[], teams: Team[])
   const uniqueMatches = [...new Map(matches.map(match => [match.id, match])).values()]
 
   for (const match of uniqueMatches) {
-    if (!completedMatch(match)) continue
-    const trackedTeamId = match.teamId && byId.has(match.teamId) ? match.teamId : undefined
-    if (!trackedTeamId) continue
-    const style = teamPlayStyle(byId.get(trackedTeamId))
+    if (!isCompletedRecordedMatch(match)) continue
+    const teamId = trackedTeamId(match, teams)
+    if (!teamId) continue
+    const style = teamPlayStyle(byId.get(teamId))
     if (!style) continue
-    const score = matchScore(match)
-    const goalsFor = trackedTeamId === match.homeTeamId ? score.home : score.away
-    const goalsAgainst = trackedTeamId === match.homeTeamId ? score.away : score.home
+    const { goalsFor, goalsAgainst } = trackedTeamResult(match, teamId)
     const total = totals.get(style)!
     total.matches++
     total.goalsFor += goalsFor

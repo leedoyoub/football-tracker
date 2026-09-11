@@ -179,6 +179,7 @@ export type View =
   | { name: 'home' }
   | { name: 'competition'; season?: string; competitionType?: CompetitionType }
   | { name: 'results' }
+  | { name: 'play-style'; style: TeamPlayStyle }
   | { name: 'records' }
   | { name: 'standings' }
   | { name: 'season-recap'; season: string }

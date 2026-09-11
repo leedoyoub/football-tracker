@@ -4,7 +4,7 @@ const { test } = require('node:test')
 const ts = require('typescript')
 for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename)
 
-const { formatPlayStyleAverage, formatPlayStylePercentage, trackedTeamPlayStylePerformance } = require('../src/engine/playStyleStats.ts')
+const { formatPlayStyleAverage, formatPlayStylePercentage, trackedStyleTeams, trackedTeamPlayStylePerformance } = require('../src/engine/playStyleStats.ts')
 const teams = [
   { id: 'ours', name: 'Ours', shortName: 'OUR', abbreviation: 'OUR', visualStyle: 'solid', primaryColor: 'blue', jerseyNumberColor: 'white', playStyle: 'possession' },
   { id: 'pos', name: 'Possession', shortName: 'POS', abbreviation: 'POS', visualStyle: 'solid', primaryColor: 'blue', jerseyNumberColor: 'white', playStyle: 'possession' },
@@ -42,4 +42,12 @@ test('play-style average display rounds to two decimals and renders no-data neut
   assert.equal(formatPlayStyleAverage(null), '—')
   assert.equal(formatPlayStylePercentage(50), '50%')
   assert.equal(formatPlayStylePercentage(null), '—')
+})
+
+test('current team assignments drive visible play-style crest groups even without match history', () => {
+  assert.deepEqual(trackedStyleTeams(teams, 'possession').map(team => team.id), ['ours', 'pos'])
+  assert.deepEqual(trackedStyleTeams(teams, 'long-pass-counter').map(team => team.id), ['long'])
+  const moved = teams.map(team => team.id === 'long' ? { ...team, playStyle: 'possession' } : team)
+  assert(!trackedStyleTeams(moved, 'long-pass-counter').some(team => team.id === 'long'))
+  assert(trackedStyleTeams(moved, 'possession').some(team => team.id === 'long'))
 })

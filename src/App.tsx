@@ -19,6 +19,7 @@ import { CompetitionScreen } from './screens/CompetitionScreen'
 import { RecordsScreen } from './screens/RecordsScreen'
 import { ResultsScreen } from './screens/ResultsScreen'
 import { SquadImportScreen } from './screens/SquadImportScreen'
+import { PlayStyleDetailScreen } from './screens/PlayStyleDetailScreen'
 import { useStore } from './store'
 import type { Tab, View } from './types'
 import { seasonsFromMatches } from './engine/stats'
@@ -131,6 +132,7 @@ export default function App() {
           )}
           {view.name === 'competition' && <CompetitionScreen season={view.season ?? season} initialType={view.competitionType ?? 'league'} onSeason={(nextSeason) => { setSeason(nextSeason); setHistory(previous => previous.map((item, index) => index === previous.length - 1 && item.name === 'competition' ? { ...item, season: nextSeason } : item)) }} onNavigate={onNavigate} />}
           {view.name === 'results' && <ResultsScreen onNavigate={onNavigate} onBack={onBack} />}
+          {view.name === 'play-style' && <PlayStyleDetailScreen style={view.style} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'records' && <RecordsScreen season={season} onNavigate={onNavigate} />}
           {view.name === 'standings' && <StandingsScreen season={season} onNavigate={onNavigate} />}
           {view.name === 'season-recap' && <SeasonRecapScreen season={view.season} onNavigate={onNavigate} onBack={onBack} />}
