@@ -4,7 +4,7 @@ import { PlayerIcon } from '../components/PlayerIcon'
 import { ResultCard } from '../components/ResultCard'
 import { playerFullName } from '../components/ui'
 import { championsCompetition, cupCompetition, leagueCompetition } from '../engine/competition'
-import { formatPlayStyleAverage, formatPlayStylePercentage, opponentPlayStylePerformance } from '../engine/playStyleStats'
+import { formatPlayStyleAverage, formatPlayStylePercentage, trackedTeamPlayStylePerformance } from '../engine/playStyleStats'
 import { homeMilestoneNews } from '../engine/news'
 import { buildGlobalRankingData } from '../engine/stats'
 import { currentStaticTeams } from '../data/teams'
@@ -21,7 +21,7 @@ export function HomeScreen({ season, onNavigate }: { season: string; onSeason?: 
   const champions = useMemo(() => championsCompetition(draw, matches, season, players), [draw, matches, season, players])
   const recent = useMemo(() => derivedResults(matches, teams).slice(0, 5), [matches, teams])
   const news = useMemo(() => homeMilestoneNews(players, teams, matches, competitionStates), [players, teams, matches, competitionStates])
-  const playStylePerformance = useMemo(() => opponentPlayStylePerformance(matches, teams), [matches, teams])
+  const playStylePerformance = useMemo(() => trackedTeamPlayStylePerformance(matches, teams), [matches, teams])
   const seasonStats = useMemo(() => buildGlobalRankingData(players, matches.filter(match => match.season === season), { seasons: [season], teams: [], positions: [] }, 'rating'), [players, matches, season])
   const leaders = useMemo(() => {
     const eligible = seasonStats.filter(row => row.matches > 0)

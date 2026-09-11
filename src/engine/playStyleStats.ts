@@ -29,17 +29,17 @@ function completedMatch(match: Match): boolean {
 }
 
 /** Derived from saved, valid matches only; never persisted as a stale aggregate. */
-export function opponentPlayStylePerformance(matches: Match[], teams: Team[]): PlayStylePerformance[] {
+/** Groups each saved match by its authoritative tracked team's current style. */
+export function trackedTeamPlayStylePerformance(matches: Match[], teams: Team[]): PlayStylePerformance[] {
   const byId = new Map(teams.map(team => [team.id, team]))
   const totals = new Map<TeamPlayStyle, { matches: number; goalsFor: number; goalsAgainst: number; wins: number; draws: number; losses: number }>(TEAM_PLAY_STYLES.map(style => [style, { matches: 0, goalsFor: 0, goalsAgainst: 0, wins: 0, draws: 0, losses: 0 }]))
   const uniqueMatches = [...new Map(matches.map(match => [match.id, match])).values()]
 
   for (const match of uniqueMatches) {
     if (!completedMatch(match)) continue
-    const trackedTeamId = match.teamId && byId.has(match.teamId) ? match.teamId : byId.has(match.homeTeamId) ? match.homeTeamId : undefined
+    const trackedTeamId = match.teamId && byId.has(match.teamId) ? match.teamId : undefined
     if (!trackedTeamId) continue
-    const opponentId = trackedTeamId === match.homeTeamId ? match.awayTeamId : match.homeTeamId
-    const style = teamPlayStyle(byId.get(opponentId))
+    const style = teamPlayStyle(byId.get(trackedTeamId))
     if (!style) continue
     const score = matchScore(match)
     const goalsFor = trackedTeamId === match.homeTeamId ? score.home : score.away
