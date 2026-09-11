@@ -2,10 +2,14 @@ import { useState } from 'react';
 import { LocalRepository } from '../lib/repository';
 import type { View } from '../types';
 import { useAuth } from '../lib/auth';
+import { useStore } from '../store';
 
 export function DataManagementScreen({ onNavigate }: { onNavigate: (view: View) => void }) {
   const [message, setMessage] = useState('');
   const { user, signInWithGoogle, signOut } = useAuth();
+  const { deleteAllMatches } = useStore();
+  const [confirmationStep, setConfirmationStep] = useState<0 | 1 | 2>(0);
+  const [confirmationInput, setConfirmationInput] = useState('');
 
   const handleExport = async () => {
     try {
@@ -56,8 +60,34 @@ export function DataManagementScreen({ onNavigate }: { onNavigate: (view: View) 
           Import Data
           <input type="file" accept=".json" onChange={handleImport} className="hidden" />
         </label>
+        <button type="button" onClick={() => setConfirmationStep(1)} className="w-full rounded-xl bg-red-900/50 p-4 text-sm font-bold text-red-400">Delete All Matches</button>
         {message && <p className="text-center text-xs text-zinc-400">{message}</p>}
       </div>
+
+      {(confirmationStep === 1 || confirmationStep === 2) && (
+        <div role="dialog" aria-modal="true" aria-label="Delete All Matches?" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          {confirmationStep === 1 ? (
+            <div className="w-full max-w-sm rounded-xl bg-zinc-900 p-4">
+              <h2 className="text-lg font-bold">Delete All Matches?</h2>
+              <p className="mt-2 text-sm text-zinc-400">This will permanently delete all saved match history. This action cannot be undone.</p>
+              <div className="mt-4 flex gap-2">
+                <button className="flex-1 rounded-xl bg-red-900 p-3 font-bold" onClick={() => setConfirmationStep(2)}>Confirm</button>
+                <button className="flex-1 rounded-xl bg-zinc-800 p-3 font-bold" onClick={() => setConfirmationStep(0)}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <div className="w-full max-w-sm rounded-xl bg-zinc-900 p-4">
+              <h2 className="text-lg font-bold">Delete All Matches?</h2>
+              <p className="mt-2 text-sm text-zinc-400">For safety, enter 1001 to confirm.</p>
+              <input type="text" placeholder="Enter 1001" value={confirmationInput} onChange={(e) => setConfirmationInput(e.target.value)} className="mt-3 w-full rounded-lg bg-black px-3 py-2 text-sm" />
+              <div className="mt-4 flex gap-2">
+                <button disabled={confirmationInput !== '1001'} className="flex-1 rounded-xl bg-red-900 p-3 font-bold disabled:opacity-50" onClick={() => { deleteAllMatches(); setConfirmationStep(0); setConfirmationInput(''); setMessage('All matches deleted.') }}>Delete All Matches</button>
+                <button className="flex-1 rounded-xl bg-zinc-800 p-3 font-bold" onClick={() => { setConfirmationStep(0); setConfirmationInput('') }}>Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
