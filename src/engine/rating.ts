@@ -1,6 +1,6 @@
 import type { Appearance, Match, MatchEvent, Player, Position, RatingBreakdown } from '../types'
-import { RATING_ENGINE_REVISION } from './ratingRevision'
-export { RATING_ENGINE_REVISION } from './ratingRevision'
+import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
+export { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import {
   isOnPitchAtEvent,
   matchPositionAtEvent,
@@ -8,9 +8,9 @@ import {
   pitchWindow,
   normalizeMatchTimeline,
   scoringTeamId,
-} from './timeline'
+} from './timeline.ts'
 
-export { isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchPositionSegments, normalizeMatchPosition, pitchWindow, scoringTeamId } from './timeline'
+export { isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchPositionSegments, normalizeMatchPosition, pitchWindow, scoringTeamId } from './timeline.ts'
 
 export const BASE_RATING = 6.5
 export const GOALKEEPER_BASE_RATING = 7.1

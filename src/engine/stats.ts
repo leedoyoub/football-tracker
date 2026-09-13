@@ -13,7 +13,7 @@ import type {
 } from '../types'
 import { ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, pitchWindow, matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './rating'
 import { FORMATION_SLOTS, formationSlotsFor, type TacticalSlot } from '../components/Pitch'
-import { RATING_ENGINE_REVISION } from './ratingRevision'
+import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 
 
 export function seasonsFromMatches(matches: Match[]): string[] {

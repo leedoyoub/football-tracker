@@ -74,7 +74,7 @@ export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamI
                 key={player.id}
                 player={player}
                 team={team}
-                rating={stats?.avgRating ?? 0}
+                rating={stats?.matches === 0 ? undefined : stats?.avgRating}
                 position={player.position}
                 stats={{ goals: stats?.goals ?? 0, assists: stats?.assists ?? 0 }}
                 onClick={() => onNavigate({ name: 'player', id: player.id })}

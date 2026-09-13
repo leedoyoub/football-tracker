@@ -1,5 +1,10 @@
 
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const { test } = require('node:test')
+const ts = require('typescript')
+for (const ext of ['.ts', '.tsx']) require.extensions[ext] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename)
+
 const { recentMatches } = require('../src/screens/recentMatches.ts')
 
 test('recentMatches sorts newest-first', () => {

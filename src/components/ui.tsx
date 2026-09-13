@@ -62,8 +62,10 @@ export function AssistIcon({ className = 'h-3 w-3' }: { className?: string }) {
 }
 
 export function StatIcons({ goals, assists, className = '' }: { goals: number; assists: number; className?: string }) {
-  if (!goals && !assists) return null
-  return <span className={`flex items-center gap-1 ${className}`}>{goals > 0 && <span className="flex items-center gap-0.5"><GoalIcon />{goals}</span>}{assists > 0 && <span className="flex items-center gap-0.5"><AssistIcon />{assists}</span>}</span>
+  return <span className={`flex items-center gap-1 ${className}`}>
+    <span className="flex items-center gap-0.5 min-w-[16px] justify-end">{goals > 0 && <><GoalIcon />{goals}</>}</span>
+    <span className="flex items-center gap-0.5 min-w-[16px] justify-start">{assists > 0 && <><AssistIcon />{assists}</>}</span>
+  </span>
 }
 
 export function ratingTone(rating: number) {

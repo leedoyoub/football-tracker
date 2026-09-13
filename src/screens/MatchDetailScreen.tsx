@@ -12,7 +12,7 @@ const positionOrder: Record<string, number> = { ST: 0, LST: 0, RST: 0, SS: 0, LW
 const statsFor = (events: MatchEvent[], id: string) => ({ goals: events.filter(e => e.type === 'goal' && !e.ownGoal && e.playerId === id).length, assists: events.filter(e => e.type === 'goal' && !e.ownGoal && e.assistPlayerId === id).length })
 
 export function MatchDetailScreen({ matchId, onNavigate }: { matchId: string; onNavigate: (view: View) => void }) {
-  const { teams, players, matches, deleteMatch } = useStore()
+  const { teams, players, matches, deleteMatch, saveDraftMatch } = useStore()
   const match = matches.find(item => item.id === matchId)
   if (!match) return <div className="p-6 text-sm text-zinc-400">Match not found.</div>
   const teamId = match.teamId ?? (teams.some(team => team.id === match.homeTeamId) ? match.homeTeamId : match.awayTeamId)
@@ -44,7 +44,8 @@ export function MatchDetailScreen({ matchId, onNavigate }: { matchId: string; on
     <h2 className="mb-2 text-sm font-semibold">Starting XI</h2>
     <Pitch slots={slots} players={players} teams={teams} statsByPlayer={Object.fromEntries(starters.map(appearance => [appearance.playerId, statsFor(match.events, appearance.playerId)]))} motmPlayerId={getMatchManOfTheMatch(match, players)} outMinutesByPlayer={outMinutesByPlayer} />
     <h2 className="mb-2 mt-6 text-sm font-semibold">Bench / Substitutes</h2><div className="grid grid-cols-4 gap-2">{bench.map(appearance => card(appearance.playerId, appearance.position))}</div>
-    <button type="button" onClick={() => onNavigate({ name: 'team', id: teamId })} className="mt-5 w-full rounded-xl bg-emerald-500 py-3 text-xs font-black text-black">BACK TO TEAM</button>
+    <button type="button" onClick={() => { saveDraftMatch(match); onNavigate({ name: 'new-match' }) }} className="mt-5 w-full rounded-xl bg-emerald-500 py-3 text-xs font-black text-black">EDIT MATCH</button>
+    <button type="button" onClick={() => onNavigate({ name: 'team', id: teamId })} className="mt-3 w-full rounded-xl bg-zinc-800 py-3 text-xs font-black text-zinc-300">BACK TO TEAM</button>
     <button type="button" onClick={() => setDeleteConfirmationStep(1)} className="mt-3 w-full rounded-xl border border-red-500/30 py-2 text-xs font-semibold text-red-400">Delete match</button>
     {deleteConfirmationStep === 1 && (
       <div role="dialog" aria-modal="true" aria-label="Delete Match?" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">

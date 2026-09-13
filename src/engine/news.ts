@@ -1,4 +1,4 @@
-import { competitionHistory, cupCompetition, championsCompetition, matchCompetitionType } from './competition'
+import { competitionHistory, cupCompetition, championsCompetition, CHAMPIONS_ROUNDS, matchCompetitionType } from './competition'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
 import { seasonStandings } from './standings'
@@ -50,7 +50,6 @@ export function deriveNews(players: Player[], teams: Team[], matches: Match[], s
   // Track standings for league news
   const teamLeads = new Map<string, boolean>()
   const cupStatus = new Map<string, string[]>()
-  const championsStatus = new Map<string, string[]>()
 
   for (const match of chronological) {
     const type = matchCompetitionType(match)
@@ -96,9 +95,34 @@ export function deriveNews(players: Player[], teams: Team[], matches: Match[], s
             }
             cupStatus.set(match.season, currentActive)
         }
-        // Simplified Champions check
+        // Champions League news
         if (type === 'champions') {
-            // ...
+            const draw = states.find(s => s.season === match.season && s.kind === 'champions-draw')
+            if (draw) {
+                const champions = championsCompetition(draw, matchesUpToDate, match.season, players)
+                const prevActive = cupStatus.get(match.season + 'champions') || draw.teamIds
+                
+                // Elimination check
+                for (const round of CHAMPIONS_ROUNDS) {
+                    const pairings = champions.rounds[round]
+                    if (!pairings.length) continue
+                    for (const pair of pairings) {
+                        if (pair.winnerId) {
+                            const eliminated = pair.teamIds.find(id => id !== pair.winnerId)
+                            if (eliminated && prevActive.includes(eliminated)) {
+                                add({ id: `champions-eliminated:${match.season}:${eliminated}:${match.id}`, kind: 'team', date: match.date, matchId: match.id, teamId: eliminated, eyebrow: 'ELIMINATED', title: `${teamName(teams, eliminated)} is eliminated from the Champions League`, detail: `Eliminated in ${round}.`, context })
+                                cupStatus.set(match.season + 'champions', prevActive.filter(id => id !== eliminated))
+                            }
+                        }
+                    }
+                }
+                
+                // Winner check
+                if (champions.championId && !cupStatus.get(match.season + 'champions-champion')) {
+                    add({ id: `champions-winner:${match.season}:${champions.championId}:${match.id}`, kind: 'team', date: match.date, matchId: match.id, teamId: champions.championId, eyebrow: 'CHAMPION', title: `${teamName(teams, champions.championId)} wins the Champions League`, detail: 'Champions League final winner.', context })
+                    cupStatus.set(match.season + 'champions-champion', ['true'])
+                }
+            }
         }
     }
 
