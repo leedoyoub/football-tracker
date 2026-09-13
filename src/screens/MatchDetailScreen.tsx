@@ -5,6 +5,7 @@ import { getMatchManOfTheMatch, matchScore, rateMatch } from '../engine/rating'
 import { matchCompetitionType } from '../engine/competition'
 import { matchStory } from '../engine/matchStory'
 import { useStore } from '../store'
+import { useState } from 'react'
 import type { Best11Slot, MatchEvent, Player, View } from '../types'
 
 const positionOrder: Record<string, number> = { ST: 0, LST: 0, RST: 0, SS: 0, LW: 1, RW: 1, CAM: 2, LM: 3, RM: 3, LCM: 4, CM: 4, RCM: 4, LDM: 5, CDM: 5, RDM: 5, LB: 6, RB: 6, CB: 7, LCB: 7, RCB: 7, GK: 8 }
@@ -25,7 +26,10 @@ export function MatchDetailScreen({ matchId, onNavigate }: { matchId: string; on
   const bench = match.appearances.filter(appearance => appearance.teamId === teamId && appearance.role === 'bench').sort((a, b) => (positionOrder[a.position] ?? 99) - (positionOrder[b.position] ?? 99))
   const substitutions = match.events.filter((event): event is Extract<MatchEvent, { type: 'sub' }> => event.type === 'sub' && event.teamId === teamId)
   const outMinutesByPlayer = Object.fromEntries(substitutions.map(event => [event.playerOutId, event.minute]))
-  const slots: Best11Slot[] = starters.map((appearance, index) => ({ slot: appearance.matchPosition ?? `slot-${index}`, position: appearance.position, matchPosition: appearance.matchPosition, playerId: appearance.playerId, teamId: appearance.teamId, avgRating: ratings[appearance.playerId]?.rating ?? 0, matches: ratings[appearance.playerId] ? 1 : 0 }))
+  const slots: Best11Slot[] = starters.map((appearance) => ({ slot: appearance.matchPosition ?? appearance.position, position: appearance.position, matchPosition: appearance.matchPosition ?? appearance.position, playerId: appearance.playerId, teamId: appearance.teamId, avgRating: ratings[appearance.playerId]?.rating ?? 0, matches: ratings[appearance.playerId] ? 1 : 0 }))
+  const [deleteConfirmationStep, setDeleteConfirmationStep] = useState(0);
+  const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
+  
   const card = (id: string, position: string) => {
     const player = byId[id]; if (!player) return null
     const on = substitutions.find(event => event.playerInId === id); const off = substitutions.find(event => event.playerOutId === id)
@@ -41,6 +45,30 @@ export function MatchDetailScreen({ matchId, onNavigate }: { matchId: string; on
     <Pitch slots={slots} players={players} teams={teams} statsByPlayer={Object.fromEntries(starters.map(appearance => [appearance.playerId, statsFor(match.events, appearance.playerId)]))} motmPlayerId={getMatchManOfTheMatch(match, players)} outMinutesByPlayer={outMinutesByPlayer} />
     <h2 className="mb-2 mt-6 text-sm font-semibold">Bench / Substitutes</h2><div className="grid grid-cols-4 gap-2">{bench.map(appearance => card(appearance.playerId, appearance.position))}</div>
     <button type="button" onClick={() => onNavigate({ name: 'team', id: teamId })} className="mt-5 w-full rounded-xl bg-emerald-500 py-3 text-xs font-black text-black">BACK TO TEAM</button>
-    <button type="button" onClick={() => { deleteMatch(match.id); onNavigate({ name: 'home' }) }} className="mt-3 w-full rounded-xl border border-red-500/30 py-2 text-xs font-semibold text-red-400">Delete match</button>
+    <button type="button" onClick={() => setDeleteConfirmationStep(1)} className="mt-3 w-full rounded-xl border border-red-500/30 py-2 text-xs font-semibold text-red-400">Delete match</button>
+    {deleteConfirmationStep === 1 && (
+      <div role="dialog" aria-modal="true" aria-label="Delete Match?" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+        <div className="w-full max-w-sm rounded-2xl bg-zinc-900 p-6">
+          <h2 className="text-lg font-bold">Delete Match?</h2>
+          <p className="mt-2 text-sm text-zinc-400">This action cannot be undone. Are you sure you want to delete this match?</p>
+          <div className="mt-6 flex gap-2">
+            <button className="flex-1 rounded-xl bg-zinc-800 p-3 text-sm font-bold" onClick={() => setDeleteConfirmationStep(0)}>Cancel</button>
+            <button className="flex-1 rounded-xl bg-red-900 p-3 text-sm font-bold text-red-100" onClick={() => setDeleteConfirmationStep(2)}>Delete</button>
+          </div>
+        </div>
+      </div>
+    )}
+    {deleteConfirmationStep === 2 && (
+      <div role="dialog" aria-modal="true" aria-label="Confirm Deletion" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+        <div className="w-full max-w-sm rounded-2xl bg-zinc-900 p-6">
+          <h2 className="text-lg font-bold">For safety, enter 1001 to confirm.</h2>
+          <input type="text" placeholder="Enter 1001" value={deleteConfirmationInput} onChange={e => setDeleteConfirmationInput(e.target.value)} className="mt-4 w-full rounded-xl bg-black p-3 text-center text-lg font-black tracking-widest text-white outline-none ring-1 ring-zinc-700 focus:ring-red-500" />
+          <div className="mt-6 flex gap-2">
+            <button className="flex-1 rounded-xl bg-zinc-800 p-3 text-sm font-bold" onClick={() => { setDeleteConfirmationStep(0); setDeleteConfirmationInput(''); }}>Cancel</button>
+            <button disabled={deleteConfirmationInput !== '1001'} className="flex-1 rounded-xl bg-red-900 p-3 text-sm font-bold text-red-100 disabled:opacity-50" onClick={() => { deleteMatch(match.id); onNavigate({ name: 'home' }); }}>Delete Match</button>
+          </div>
+        </div>
+      </div>
+    )}
   </div>
 }

@@ -1,3 +1,4 @@
+import { getMostRecentStartingLineup } from '../engine/recentLineup'
 import { nextTimelineSequence } from '../engine/timeline'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FORMATION_SLOTS, Pitch, UNIVERSAL_TACTICAL_SLOTS, type TacticalSlot } from '../components/Pitch'
@@ -46,7 +47,11 @@ function fillFormationSlots(
   squad: { id: string; position: Position }[],
   slots: FormationSlotConfig[],
   existing: string[] = [],
+  recentAssignments?: Record<string, string>,
 ): string[] {
+  if (recentAssignments) {
+    return slots.map(slot => recentAssignments[slot.slot] ?? '');
+  }
   const ordered = existing.filter(Boolean).map((id) => squad.find((player) => player.id === id)).filter((player): player is { id: string; position: Position } => Boolean(player))
   const available = squad.filter((player) => !ordered.some((selected) => selected.id === player.id))
   const remaining = [...ordered, ...available]
@@ -81,9 +86,10 @@ export function NewMatchScreen({
   const season = restored ? draftMatch!.season : requestedSeason ?? nextMatch.season
   const matchDay = restored ? draftMatch!.matchDay : competitionMatches(matches, season, competitionType).filter(match => match.teamId === selectedTeamId || match.homeTeamId === selectedTeamId || match.awayTeamId === selectedTeamId).length + 1
   const date = restored ? draftMatch!.date : new Date().toISOString().split('T')[0]
-  
+  const recentAssignments = useMemo(() => restored ? null : getMostRecentStartingLineup(matches, selectedTeamId), [restored, matches, selectedTeamId]);
+
   const [step, setStep] = useState(() => restored?.draft.events.length ? 1 : 0) // 0: Lineups, 1: Events
-  
+
   // 통합된 matchDraft 상태
   const [matchDraft, setMatchDraft] = useState<MatchDraftState>(() => restored?.draft ?? {
       slotAssignments: {} as Record<string, string>,
@@ -91,19 +97,22 @@ export function NewMatchScreen({
       events: [] as MatchEvent[],
       positionHistories: {} as Record<string, PositionChange[]>,
   })
-  
+
   const championsDraw = competitionStates.find(state => state.id === `champions:${season}`)
   const tournamentTeams = useMemo(() => currentStaticTeams(teams), [teams])
   const assignment = useMemo(() => competitionAssignment(competitionType, season, selectedTeamId, tournamentTeams, matches, championsDraw), [competitionType, season, selectedTeamId, tournamentTeams, matches, championsDraw])
   const opponentId = assignment.opponentTeamId ?? `opponent:${draftId}`
   const opponentName = teams.find(team => team.id === assignment.opponentTeamId)?.shortName ?? 'OPP'
   const homeTeamId = selectedTeamId
+
   const awayTeamId = opponentId
   
   // 기타 Live Events 관련 상태들 (matchDraft 외부 유지)
   const [liveEvent, setLiveEvent] = useState<'goal' | 'conceded' | 'substitution' | null>(null)
-  const [minuteInput, setMinuteInput] = useState('')
-  const liveMinute = minuteInput === '' ? NaN : Number(minuteInput)
+  const [draftMinute, setDraftMinute] = useState('')
+  const [appliedMinute, setAppliedMinute] = useState(0)
+  const liveMinute = Number(draftMinute)
+  // Replaced direct liveMinute with appliedMinute for formation logic where needed
   const [assistChosen, setAssistChosen] = useState(false)
   const [liveScorerId, setLiveScorerId] = useState('')
   const [liveAssistId, setLiveAssistId] = useState('')
@@ -135,13 +144,13 @@ export function NewMatchScreen({
     if (initializedTeam.current === selectedTeamId || !players.length) return
     initializedTeam.current = selectedTeamId
     const squad = players.filter((p) => (p.teamIds ?? [p.teamId]).includes(selectedTeamId))
-    const initial = fillFormationSlots(squad, FORMATION_SLOTS['4-3-3'])
+    const initial = fillFormationSlots(squad, FORMATION_SLOTS['4-3-3'], [], recentAssignments ?? undefined)
     const slotAssignments = Object.fromEntries(FORMATION_SLOTS['4-3-3'].map((slot, index) => [slot.slot, initial[index]]).filter((entry) => Boolean(entry[1])))
     const starterIds = new Set(initial.filter(Boolean))
     const b = squad.filter((player) => !starterIds.has(player.id)).slice(0, 12).map((player) => player.id)
     setMatchDraft(prev => ({ ...prev, slotAssignments, homeBench: b }))
     setDraftReady(true)
-  }, [selectedTeamId, players])
+  }, [selectedTeamId, players, recentAssignments])
 
   const homeSquad = players.filter((p) => (p.teamIds ?? [p.teamId]).includes(selectedTeamId))
   const draftPlayers = homeSquad
@@ -204,12 +213,13 @@ export function NewMatchScreen({
     if (!liveEvent || !minuteIsValid) return
     const id = crypto.randomUUID()
     const writeEvent = (event: MatchEvent) => setMatchDraft(prev => ({ ...prev, events: editingEventId ? prev.events.map((e) => e.id === editingEventId ? { ...event, sequence: e.sequence } : e) : [...prev.events, { ...event, sequence: nextTimelineSequence(prev.events, prev.positionHistories) }] }))
+    const minute = Number(minuteInput); if (!Number.isInteger(minute) || minute < 0 || minute > 99) return
     if (liveEvent === 'goal') {
       if (!liveScorerId || !assistChosen || !eligibleGoalIds.includes(liveScorerId) || (liveAssistId && (!eligibleGoalIds.includes(liveAssistId) || liveScorerId === liveAssistId))) return
-      writeEvent({ id: editingEventId ?? id, type: 'goal', minute: liveMinute, teamId: selectedTeamId, playerId: liveScorerId || undefined, assistPlayerId: liveScorerId ? liveAssistId || undefined : undefined, goalType: 'normal' })
+      writeEvent({ id: editingEventId ?? id, type: 'goal', minute, teamId: selectedTeamId, playerId: liveScorerId || undefined, assistPlayerId: liveScorerId ? liveAssistId || undefined : undefined, goalType: 'normal' })
     } else if (liveEvent === 'conceded') {
       if (liveCauseId && !eligibleGoalIds.includes(liveCauseId)) return
-      writeEvent({ id: editingEventId ?? id, type: 'goal', minute: liveMinute, teamId: opponentId, playerId: undefined, concededGoalCausePlayerId: liveCauseId || undefined })
+      writeEvent({ id: editingEventId ?? id, type: 'goal', minute, teamId: opponentId, playerId: undefined, concededGoalCausePlayerId: liveCauseId || undefined })
     } else if (substitutionDraft) {
       if (substitutionError || !canConfirmSubstitution(substitutionDraft, matchDraft)) return
       setMatchDraft(prev => ({ ...prev, slotAssignments: substitutionDraft.slotAssignments, homeBench: substitutionDraft.homeBench, events: substitutionDraft.events, positionHistories: substitutionDraft.positionHistories }))
@@ -361,7 +371,7 @@ export function NewMatchScreen({
     return appearances.filter(appearance => {
       const window = pitchWindow(eventMatch, appearance)
       const offAtMinute = matchDraft.events.some(event => event.type === 'sub' && event.playerOutId === appearance.playerId && event.minute === minute)
-      return window && minute >= window.enter && (minute < window.exit || (minute === 90 && window.exit === 90 && !offAtMinute))
+      return window && minute >= window.enter && (minute < window.exit || (minute >= 90 && window.exit === 90 && !offAtMinute))
     })
   }
   const eligibleAppearances = Number.isFinite(liveMinute) ? eligibleAt(liveMinute) : appearances.filter(a => liveSlots.some(slot => slot.playerId === a.playerId))
