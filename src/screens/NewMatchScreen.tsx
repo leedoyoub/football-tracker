@@ -76,7 +76,7 @@ export function NewMatchScreen({
   requestedSeason?: string
   onNavigate: (view: View) => void
 }) {
-  const { teams, players, matches, competitionStates = [], draftMatch, addMatch, saveDraftMatch, clearDraftMatch } = useStore()
+  const { teams, players, matches, competitionStates = [], draftMatch, addMatch, updateMatch, saveDraftMatch, clearDraftMatch } = useStore()
   const selectedTeamId = teamId ?? draftMatch?.teamId ?? draftMatch?.homeTeamId ?? teams[0]?.id ?? ''
   const restored = useMemo(() => draftMatch && (draftMatch.teamId ?? draftMatch.homeTeamId) === selectedTeamId ? restoreDraft(draftMatch, players) : null, [draftMatch, players, selectedTeamId])
   const [draftId] = useState(() => restored ? draftMatch!.id : crypto.randomUUID())
@@ -447,11 +447,17 @@ export function NewMatchScreen({
   function save() {
     if (savingRef.current || liveEvent || startingIds.length !== 11) return
     savingRef.current = true
-    const id = addMatch({ id: draftId,
-      season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events,
-    })
+    const matchData = {
+      id: draftId,
+      season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, matchDay, date, formation: activeFormationName, homeAway: 'home' as const, homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events,
+    }
+    if (restored) {
+      updateMatch(draftId, matchData)
+    } else {
+      addMatch(matchData)
+    }
     clearDraftMatch()
-    onNavigate({ name: 'match', id })
+    onNavigate({ name: 'match', id: draftId })
   }
 
   return (

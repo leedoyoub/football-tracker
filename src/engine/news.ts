@@ -1,4 +1,4 @@
-import { competitionHistory, cupCompetition, championsCompetition, CHAMPIONS_ROUNDS, matchCompetitionType } from './competition'
+import { competitionHistory, cupCompetition, championsCompetition, CHAMPIONS_ROUNDS, matchCompetitionType, teamCompetitionProgress } from './competition'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
 import { seasonStandings } from './standings'
@@ -117,6 +117,17 @@ export function deriveNews(players: Player[], teams: Team[], matches: Match[], s
                     }
                 }
                 
+                // Advancement check
+                for (const team of teams) {
+                    const progress = teamCompetitionProgress(team.id, teams, matchesUpToDate, match.season, players, draw)
+                    const prevProgress = cupStatus.get(match.season + 'champions-progress' + team.id)?.[0] as string | undefined;
+                    const stageMap: Record<string, string> = { 'Round of 16': 'Quarter-finals', 'Quarter-finals': 'Semi-finals', 'Semi-finals': 'Final' }
+                    if (prevProgress && prevProgress !== progress.champions && stageMap[prevProgress as string] === progress.champions) {
+                         add({ id: `champions-advanced:${match.season}:${team.id}:${match.id}`, kind: 'team', date: match.date, matchId: match.id, teamId: team.id, eyebrow: 'ADVANCED', title: `${teamName(teams, team.id)} advances in the Champions League`, detail: `Advances to ${progress.champions}.`, context })
+                    }
+                    cupStatus.set(match.season + 'champions-progress' + team.id, [progress.champions])
+                }
+
                 // Winner check
                 if (champions.championId && !cupStatus.get(match.season + 'champions-champion')) {
                     add({ id: `champions-winner:${match.season}:${champions.championId}:${match.id}`, kind: 'team', date: match.date, matchId: match.id, teamId: champions.championId, eyebrow: 'CHAMPION', title: `${teamName(teams, champions.championId)} wins the Champions League`, detail: 'Champions League final winner.', context })
