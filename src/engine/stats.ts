@@ -415,7 +415,9 @@ export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Pla
   }
   const ranked = rows.flatMap(row => {
     const player = playerById.get(row.playerId)
-    if (!player || (metric === 'sotAllowed' && (!defenderRankingPosition(player.position) || !row.sotAllowedAppearances)) || ((metric === 'saves' || metric === 'goalsConceded' || metric === 'savePercentage') && (!goalkeeperPosition(player.position) || !row.playedGoalkeeper))) return []
+    if (!player || 
+        (metric === 'sotAllowed' && (!defenderRankingPosition(player.position) || !row.sotAllowedAppearances)) || 
+        ((metric === 'saves' || metric === 'goalsConceded' || metric === 'savePercentage' || metric === 'cleanSheets') && (!goalkeeperPosition(player.position) || !row.playedGoalkeeper))) return []
     const value = valueFor(row)
     return Number.isFinite(value) ? [{ ...row, value }] : []
   }).sort((a, b) => (metric === 'sotAllowed' || metric === 'goalsConceded' ? a.value - b.value : b.value - a.value) || b.avgRating - a.avgRating || a.playerId.localeCompare(b.playerId))
@@ -467,6 +469,11 @@ export function getLeaderboard(
     })
     .filter(s => s.matches > 0)
     .filter(s => metric !== 'sotAllowed' || defenderRankingPosition(positionByPlayerId.get(s.playerId) ?? 'ST'))
+    .filter(s => (metric !== 'cleanSheets') || (positionByPlayerId.get(s.playerId) === 'GK' && s.ratings.some(rating => {
+      const match = matches.find(item => item.id === rating.matchId)
+      const appearance = match?.appearances.find(item => item.playerId === s.playerId)
+      return match && appearance && matchPositionSegments(match, appearance).some(segment => segment.position === 'GK')
+    })))
     .filter(s => metric !== 'saves' || s.ratings.some(rating => {
       const match = matches.find(item => item.id === rating.matchId)
       const appearance = match?.appearances.find(item => item.playerId === s.playerId)

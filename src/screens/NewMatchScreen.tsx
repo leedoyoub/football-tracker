@@ -11,6 +11,7 @@ import { competitionAssignment, competitionMatches, matchCompetitionType } from 
 import type { Appearance, Best11Slot, CompetitionType, Match, MatchEvent, Player, Position, PositionChange, Team, View } from '../types'
 import { useStore } from '../store'
 import { playerDisplayName, GoalIcon, AssistIcon, StatIcons, SubstitutePlayerCard, SubstitutionSelection } from '../components/ui'
+import { MinuteInput } from '../components/MinuteInput'
 import { PlayerAvatar } from '../components/PlayerAvatar'
 
 import { rebuildLiveHistory } from './liveHistory'
@@ -110,6 +111,8 @@ export function NewMatchScreen({
   // 기타 Live Events 관련 상태들 (matchDraft 외부 유지)
   const [liveEvent, setLiveEvent] = useState<'goal' | 'conceded' | 'substitution' | null>(null)
   const [draftMinute, setDraftMinute] = useState('')
+  const minuteInput = draftMinute
+  const setMinuteInput = setDraftMinute
   const [appliedMinute, setAppliedMinute] = useState(0)
   const liveMinute = Number(draftMinute)
   // Replaced direct liveMinute with appliedMinute for formation logic where needed
@@ -214,6 +217,7 @@ export function NewMatchScreen({
     const id = crypto.randomUUID()
     const writeEvent = (event: MatchEvent) => setMatchDraft(prev => ({ ...prev, events: editingEventId ? prev.events.map((e) => e.id === editingEventId ? { ...event, sequence: e.sequence } : e) : [...prev.events, { ...event, sequence: nextTimelineSequence(prev.events, prev.positionHistories) }] }))
     const minute = Number(minuteInput); if (!Number.isInteger(minute) || minute < 0 || minute > 99) return
+    setAppliedMinute(minute)
     if (liveEvent === 'goal') {
       if (!liveScorerId || !assistChosen || !eligibleGoalIds.includes(liveScorerId) || (liveAssistId && (!eligibleGoalIds.includes(liveAssistId) || liveScorerId === liveAssistId))) return
       writeEvent({ id: editingEventId ?? id, type: 'goal', minute, teamId: selectedTeamId, playerId: liveScorerId || undefined, assistPlayerId: liveScorerId ? liveAssistId || undefined : undefined, goalType: 'normal' })
@@ -250,6 +254,7 @@ export function NewMatchScreen({
     setEditingEventId(event.id)
     if (event.type === 'save') return
     setMinuteInput(String(event.minute))
+    setAppliedMinute(event.minute)
     if (event.teamId === selectedTeamId) {
       setLiveEvent('goal'); setLiveScorerId(event.playerId ?? ''); setLiveAssistId(event.assistPlayerId ?? ''); setAssistChosen(true); setLivePicker('minute')
     } else {
@@ -289,10 +294,10 @@ export function NewMatchScreen({
       pendingMoves.current.push({ source, target })
       setSubstitutionDraft({ ...substitutionDraft, ...preview })
       setSubSelection(null)
-      if (minuteInput !== '') replayPendingMoves(liveMinute)
+      if (minuteInput !== '') replayPendingMoves(appliedMinute)
       return
     }
-    const next = moveSubstitution(substitutionDraft, source, target, startingSnapshot, slotPositions, liveMinute, selectedTeamId, () => crypto.randomUUID())
+    const next = moveSubstitution(substitutionDraft, source, target, startingSnapshot, slotPositions, appliedMinute, selectedTeamId, () => crypto.randomUUID())
     if (next === substitutionDraft) {
       setSubstitutionError('Invalid substitution or time.')
       setSubSelection(null)
@@ -374,12 +379,12 @@ export function NewMatchScreen({
       return window && minute >= window.enter && (minute < window.exit || (minute >= 90 && window.exit === 90 && !offAtMinute))
     })
   }
-  const eligibleAppearances = Number.isFinite(liveMinute) ? eligibleAt(liveMinute) : appearances.filter(a => liveSlots.some(slot => slot.playerId === a.playerId))
+  const eligibleAppearances = Number.isFinite(appliedMinute) ? eligibleAt(appliedMinute) : appearances.filter(a => liveSlots.some(slot => slot.playerId === a.playerId))
   const eligibleGoalIds = eligibleAppearances.map(a => a.playerId)
   const occupiedGoalSlots = new Set<string>()
-  const goalSlots: Best11Slot[] = Number.isFinite(liveMinute) ? eligibleAppearances.map(a => {
+  const goalSlots: Best11Slot[] = Number.isFinite(appliedMinute) ? eligibleAppearances.map(a => {
     const on = matchDraft.events.find(event => event.type === 'sub' && event.playerInId === a.playerId)
-    const history = [...(a.positionHistory ?? [])].filter(change => change.minute <= liveMinute).sort((a, b) => a.minute - b.minute)
+    const history = [...(a.positionHistory ?? [])].filter(change => change.minute <= appliedMinute).sort((a, b) => a.minute - b.minute)
     const position = history[history.length - 1]?.position ?? (a.role === 'bench' && on?.type === 'sub' ? on.position : a.matchPosition ?? a.position)
     const originalSlot = Object.keys(startingSnapshot).find(slot => startingSnapshot[slot] === a.playerId)
     const candidates = UNIVERSAL_TACTICAL_SLOTS.filter(slot => slot.matchPosition === position && !occupiedGoalSlots.has(slot.slot))
@@ -396,20 +401,26 @@ export function NewMatchScreen({
     if (!liveScorerId || (id && (id === liveScorerId || !eligibleGoalIds.includes(id)))) return
     setLiveAssistId(id); setAssistChosen(true); setLivePicker('minute')
   }
-  function changeMinute(value: string | number) {
-    const input = String(value)
-    if (!/^\d{0,2}$/.test(input)) return
-    setMinuteInput(input)
-    if (liveEvent === 'substitution' && input !== '') replayPendingMoves(Number(input))
-    if (liveCauseId && input !== '' && !eligibleAt(Number(input)).some(a => a.playerId === liveCauseId)) setLiveCauseId('')
-    if (liveEvent === 'goal' && input !== '') {
-      const ids = eligibleAt(Number(input)).map(a => a.playerId)
+  function applyMinute(value: string) {
+    const minute = Number(value)
+    if (!Number.isInteger(minute) || minute < 0 || minute > 99) return
+    setAppliedMinute(minute)
+    if (liveEvent === 'substitution' && value !== '') replayPendingMoves(minute)
+    if (liveCauseId && value !== '' && !eligibleAt(minute).some(a => a.playerId === liveCauseId)) setLiveCauseId('')
+    if (liveEvent === 'goal' && value !== '') {
+      const ids = eligibleAt(minute).map(a => a.playerId)
       if (liveScorerId && !ids.includes(liveScorerId)) {
         setLiveScorerId(''); setLiveAssistId(''); setAssistChosen(false); setLivePicker('scorer')
       } else if (liveAssistId && !ids.includes(liveAssistId)) {
         setLiveAssistId(''); setAssistChosen(false); setLivePicker('assist')
       }
     }
+  }
+
+  function changeMinute(value: string | number) {
+    const input = String(value)
+    if (!/^\d{0,2}$/.test(input)) return
+    setMinuteInput(input)
   }
 
   const startingGoalkeeperId = startingSnapshot.GK
@@ -481,11 +492,11 @@ export function NewMatchScreen({
           onSubIn={(id) => selectSubstitutionTarget({ group: 'substitute', id })}
           canConfirmSubstitutions={!substitutionError && !!substitutionDraft && canConfirmSubstitution(substitutionDraft, matchDraft)}
           liveEvent={liveEvent} liveMinute={minuteInput} liveScorerId={liveScorerId} liveAssistId={liveAssistId} liveCauseId={liveCauseId} livePicker={livePicker}
-          onOpen={openLiveEvent} onSave={saveLiveEvent} onCancel={cancelLiveEvent} onMinute={changeMinute} onScorer={chooseScorer} onAssist={chooseAssist} onCause={setLiveCauseId} onPicker={setLivePicker}
+          onOpen={openLiveEvent} onSave={saveLiveEvent} onCancel={cancelLiveEvent} onMinute={changeMinute} onCommitMinute={() => applyMinute(minuteInput)} onScorer={chooseScorer} onAssist={chooseAssist} onCause={setLiveCauseId} onPicker={setLivePicker}
           validMinute={minuteIsValid} onPitchClick={(id) => { if (liveEvent === 'goal') { if (livePicker === 'scorer') chooseScorer(id); else if (livePicker === 'assist') chooseAssist(id) }  else if (liveEvent === 'conceded' && livePicker === 'cause' && eligibleGoalIds.includes(id)) { setLiveCauseId(id === liveCauseId ? '' : id); setLivePicker('minute') } }}
           onBack={() => { cancelLiveEvent(); setStep(0) }} onFinish={save} startingGoalkeeperName={playerDisplayName(players.find(p => p.id === startingGoalkeeperId))} selectedTeamId={selectedTeamId} onEditEvent={editLiveEvent} onDeleteEvent={deleteLiveEvent} />}
       </div>
-      {subEdit && <div role="dialog" aria-modal="true" aria-label="Edit substitution" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="w-full max-w-sm space-y-3 rounded-xl bg-zinc-900 p-4 text-white"><h2>Edit substitution</h2>{historyError && <p role="alert" className="text-xs text-red-400">{historyError}</p>}<label className="block">OUT<select aria-label="OUT player" value={subEdit.playerOutId} onChange={e => setSubEdit({ ...subEdit, playerOutId: e.target.value })} className="w-full bg-black p-2">{draftPlayers.map(p => <option key={p.id} value={p.id}>{playerDisplayName(p)}</option>)}</select></label><label className="block">IN<select aria-label="IN player" value={subEdit.playerInId} onChange={e => setSubEdit({ ...subEdit, playerInId: e.target.value })} className="w-full bg-black p-2">{draftPlayers.map(p => <option key={p.id} value={p.id}>{playerDisplayName(p)}</option>)}</select></label><MinuteInput value={subEditMinute} onChange={setSubEditMinute} label="Substitution Time" /><button disabled={!/^\d{1,2}$/.test(subEditMinute) || Number(subEditMinute) > 99} onClick={saveSubEdit} className="w-full rounded-lg bg-emerald-500 p-2 font-bold text-black disabled:opacity-40">SAVE</button><button onClick={() => { setSubEdit(null); setHistoryError('') }} className="w-full p-2">CANCEL</button></div></div>}
+      {subEdit && <div role="dialog" aria-modal="true" aria-label="Edit substitution" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="w-full max-w-sm space-y-3 rounded-xl bg-zinc-900 p-4 text-white"><h2>Edit substitution</h2>{historyError && <p role="alert" className="text-xs text-red-400">{historyError}</p>}<label className="block">OUT<select aria-label="OUT player" value={subEdit.playerOutId} onChange={e => setSubEdit({ ...subEdit, playerOutId: e.target.value })} className="w-full bg-black p-2">{draftPlayers.map(p => <option key={p.id} value={p.id}>{playerDisplayName(p)}</option>)}</select></label><label className="block">IN<select aria-label="IN player" value={subEdit.playerInId} onChange={e => setSubEdit({ ...subEdit, playerInId: e.target.value })} className="w-full bg-black p-2">{draftPlayers.map(p => <option key={p.id} value={p.id}>{playerDisplayName(p)}</option>)}</select></label><MinuteInput value={subEditMinute} onChange={setSubEditMinute} onConfirm={saveSubEdit} label="Substitution Time" /><button disabled={!/^\d{1,2}$/.test(subEditMinute) || Number(subEditMinute) > 99} onClick={saveSubEdit} className="w-full rounded-lg bg-emerald-500 p-2 font-bold text-black disabled:opacity-40">SAVE</button><button onClick={() => { setSubEdit(null); setHistoryError('') }} className="w-full p-2">CANCEL</button></div></div>}
     </div>
   )
 }
@@ -497,7 +508,7 @@ function LiveMatchStep(props: {
   onSubOut: (id: string) => void; onSubIn: (id: string) => void; onSubSlot: (id: string) => void; onSubBench: () => void
   slots: Best11Slot[]; players: Player[]; benchPlayers: Player[]; stats: Record<string, { goals: number; assists: number }>; events: MatchEvent[]; selectedTeamId: string
   liveEvent: 'goal' | 'conceded' | 'substitution' | null; liveMinute: string; liveScorerId: string; liveAssistId: string; liveCauseId: string; livePicker: 'scorer' | 'assist' | 'cause' | 'minute'; validMinute: boolean
-  onOpen: (type: 'goal' | 'conceded' | 'substitution') => void; onSave: () => void; onCancel: () => void; onMinute: (value: string | number) => void; onScorer: (id: string) => void; onAssist: (id: string) => void; onCause: (id: string) => void; onPicker: (picker: 'scorer' | 'assist' | 'cause' | 'minute') => void; onPitchClick: (id: string) => void; onBack: () => void; onFinish: () => void; onEditEvent: (event: MatchEvent) => void; onDeleteEvent: (event: MatchEvent) => void
+  onOpen: (type: 'goal' | 'conceded' | 'substitution') => void; onSave: () => void; onCancel: () => void; onMinute: (value: string | number) => void; onCommitMinute: () => void; onScorer: (id: string) => void; onAssist: (id: string) => void; onCause: (id: string) => void; onPicker: (picker: 'scorer' | 'assist' | 'cause' | 'minute') => void; onPitchClick: (id: string) => void; onBack: () => void; onFinish: () => void; onEditEvent: (event: MatchEvent) => void; onDeleteEvent: (event: MatchEvent) => void
 }) {
   const [finishStage, setFinishStage] = useState<'saves' | null>(null)
   const [finishing, setFinishing] = useState(false)
@@ -512,19 +523,20 @@ function LiveMatchStep(props: {
   return <div className="space-y-3">
     <div className="sticky top-0 z-30 space-y-2 bg-black/95 py-2">
     <div className="grid grid-cols-3 gap-2">{([['goal', 'GOAL'], ['conceded', 'CONCEDED'], ['substitution', 'SUBSTITUTION']] as const).map(([type, label]) => <button key={type} type="button" disabled={!!props.liveEvent} onClick={() => props.onOpen(type)} className={`rounded-xl py-3 text-[10px] font-black ${props.liveEvent === type ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-white'}`}>{label}</button>)}</div>
-    {props.liveEvent && props.liveEvent !== 'substitution' && <div className="space-y-2 rounded-xl bg-zinc-900 p-2">{props.liveEvent !== 'goal' && <MinuteInput value={props.liveMinute} onChange={props.onMinute} label={`${eventName} Time`} />}
-      {props.liveEvent === 'goal' && <div className="space-y-3">
-        <div aria-live="polite" className="grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => props.onPicker('scorer')} className="rounded-xl bg-black p-2 text-left text-xs font-bold"><GoalIcon className="inline h-3 w-3" /> {props.liveScorerId ? playerName(props.liveScorerId) : 'Select scorer'}</button>
-          <button type="button" disabled={!props.liveScorerId} onClick={() => props.onPicker('assist')} className="rounded-xl bg-black p-3 text-left text-xs font-bold disabled:opacity-40"><AssistIcon className="inline h-3 w-3" /> {props.liveAssistId ? playerName(props.liveAssistId) : props.assistChosen ? 'No Assist' : 'Select assist'}</button>
-        </div>
-        {props.liveScorerId && props.livePicker === 'assist' && <button type="button" onClick={() => props.onAssist('')} className="w-full rounded-xl bg-black p-3 text-xs font-bold">No Assist</button>}
-        <MinuteInput value={props.liveMinute} onChange={props.onMinute} label="Goal Time" autoFocus={props.livePicker === 'minute'} />
-      </div>}
-      {props.liveEvent === 'conceded' && <><button type="button" onClick={() => props.onPicker(props.livePicker === 'cause' ? 'minute' : 'cause')} className={`w-full rounded-xl p-2 text-left text-[10px] font-bold ${props.livePicker === 'cause' ? 'bg-emerald-500 text-black' : 'bg-black'}`}>{props.liveCauseId ? 'Fault: ' + playerName(props.liveCauseId) : 'ADD FAULT PLAYER / No Fault'}</button>{(props.liveCauseId || props.livePicker === 'cause') && <button type="button" onClick={() => { props.onCause(''); props.onPicker('minute') }} className="w-full rounded-xl bg-black p-2 text-[10px] font-bold">NO FAULT</button>}</>}
-      <div className="flex gap-2"><button type="button" onClick={props.onCancel} className="flex-1 rounded-xl bg-black py-2 text-xs font-black">CANCEL</button><button type="button" disabled={!props.validMinute || (props.liveEvent === 'goal' && !props.goalReady)} onClick={props.onSave} className="flex-1 rounded-xl bg-emerald-500 py-2 text-xs font-black text-black disabled:opacity-40">SAVE {eventName.toUpperCase()}</button></div></div>}
+    {props.liveEvent && props.liveEvent !== 'substitution' && <div className="space-y-2 rounded-xl bg-zinc-900 p-2">{props.liveEvent !== 'goal' && <MinuteInput value={props.liveMinute} onChange={props.onMinute} onConfirm={props.onSave} onCommit={props.onCommitMinute} label={`${eventName} Time`} />}
+    {props.liveEvent === 'goal' && <div className="space-y-3">
+      <div aria-live="polite" className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => props.onPicker('scorer')} className="rounded-xl bg-black p-2 text-left text-xs font-bold"><GoalIcon className="inline h-3 w-3" /> {props.liveScorerId ? playerName(props.liveScorerId) : 'Select scorer'}</button>
+        <button type="button" disabled={!props.liveScorerId} onClick={() => props.onPicker('assist')} className="rounded-xl bg-black p-3 text-left text-xs font-bold disabled:opacity-40"><AssistIcon className="inline h-3 w-3" /> {props.liveAssistId ? playerName(props.liveAssistId) : props.assistChosen ? 'No Assist' : 'Select assist'}</button>
+      </div>
+      {props.liveScorerId && props.livePicker === 'assist' && <button type="button" onClick={() => props.onAssist('')} className="w-full rounded-xl bg-black p-3 text-xs font-bold">No Assist</button>}
+      <MinuteInput value={props.liveMinute} onChange={props.onMinute} onConfirm={props.onSave} onCommit={props.onCommitMinute} label="Goal Time" autoFocus={props.livePicker === 'minute'} />
+    </div>}
+    {props.liveEvent === 'conceded' && <><button type="button" onClick={() => props.onPicker(props.livePicker === 'cause' ? 'minute' : 'cause')} className={`w-full rounded-xl p-2 text-left text-[10px] font-bold ${props.livePicker === 'cause' ? 'bg-emerald-500 text-black' : 'bg-black'}`}>{props.liveCauseId ? 'Fault: ' + playerName(props.liveCauseId) : 'ADD FAULT PLAYER / No Fault'}</button>{(props.liveCauseId || props.livePicker === 'cause') && <button type="button" onClick={() => { props.onCause(''); props.onPicker('minute') }} className="w-full rounded-xl bg-black p-2 text-[10px] font-bold">NO FAULT</button>}</>}
+    <div className="flex gap-2"><button type="button" onClick={props.onCancel} className="flex-1 rounded-xl bg-black py-2 text-xs font-black">CANCEL</button><button type="button" disabled={!props.validMinute || (props.liveEvent === 'goal' && !props.goalReady)} onClick={props.onSave} className="flex-1 rounded-xl bg-emerald-500 py-2 text-xs font-black text-black disabled:opacity-40">SAVE {eventName.toUpperCase()}</button></div></div>}
     {props.liveEvent === 'substitution' && <div className="space-y-2 rounded-xl bg-zinc-900 p-2">
-      <MinuteInput value={props.liveMinute} onChange={props.onMinute} label="Substitution Time" />
+    <MinuteInput value={props.liveMinute} onChange={props.onMinute} onConfirm={props.onSave} onCommit={props.onCommitMinute} label="Substitution Time" />
+
       <div aria-live="polite" className="space-y-1 text-xs font-semibold">
         {props.subOutId && <p>{props.players.find(player => player.id === props.subOutId)?.number} {playerName(props.subOutId)} <SubstitutionSelection direction={props.substitutionSelection[props.subOutId] ?? 'out'} /></p>}
         {props.pendingSubs.length === 0 && Object.entries(props.substitutionSelection).map(([id, direction]) => <span key={id} className="mr-2 inline-flex items-center gap-1">{props.players.find(p => p.id === id)?.number} {playerName(id)} <SubstitutionSelection direction={direction} /></span>)}
@@ -563,8 +575,3 @@ function RosterPlayer({ player, group, onClick, stats, team, selection, selected
   return <button type="button" onClick={() => onClick(player.id)} className={`flex min-w-0 flex-col items-center rounded-lg bg-zinc-900 p-1 text-center ${selected ? 'ring-2 ring-emerald-400' : ''}`}><span className="relative flex h-8 w-8 items-center justify-center overflow-visible"><PlayerAvatar photoUrl={player.photoUrl || player.image} number={player.number} className="h-8 w-8 text-[10px]" /><span className="absolute -left-1 -top-1 rounded bg-zinc-800 px-0.5 text-[6px] font-black text-zinc-300">{player.position}</span></span><span className="w-full truncate text-[8px] font-semibold">{player.displayName ?? player.name}</span>{stats && <StatIcons goals={stats.goals} assists={stats.assists} className="text-[7px] text-zinc-400" />}</button>
 }
 
-function MinuteInput({ value, onChange, label, autoFocus = false }: { value: string; onChange: (value: string) => void; label: string; autoFocus?: boolean }) {
-  const input = useRef<HTMLInputElement>(null)
-  useEffect(() => { if (autoFocus) input.current?.focus() }, [autoFocus])
-  return <label className="flex items-center gap-2 text-[10px] font-black uppercase text-zinc-500">{label}<input ref={input} aria-label={label} type="text" inputMode="numeric" pattern="[0-9]{1,2}" maxLength={2} value={value} onChange={event => { if (/^\d{0,2}$/.test(event.target.value)) onChange(event.target.value) }} onFocus={event => event.currentTarget.scrollIntoView?.({ block: 'nearest' })} className="ml-auto w-16 rounded-xl bg-black px-3 py-2 text-base text-white" /></label>
-}

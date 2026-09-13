@@ -126,7 +126,7 @@ export function Pitch({ compact = false, slots, players, teams, statsByPlayer, o
             className="absolute -right-3 -top-3 z-30 shadow-lg"
             size="large"
           >
-            {slot.avgRating.toFixed(slot.matches > 1 ? 2 : 1)}{player.id === motmPlayerId ? ' ★' : ''}
+            {slot.matches > 0 ? slot.avgRating.toFixed(slot.matches > 1 ? 2 : 1) : '--'}{player.id === motmPlayerId ? ' ★' : ''}
           </Badge>
         )}
       </>
