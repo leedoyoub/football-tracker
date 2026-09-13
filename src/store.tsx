@@ -16,6 +16,7 @@ import { SyncManager } from './lib/sync'
 import { useAuth } from './lib/auth'
 import { BootstrapShell, StartupRecovery } from './components/StartupBoundary'
 import { reconcileCompetitionRevisions, reviseChangedMatch, sameRawFootballValue, sameRawMatch, type CompetitionRevisions } from './engine/competitionRevision'
+import { clearGlobalRankingCache } from './engine/stats'
 
 type StoreSnapshot = { data: AppState; competitionRevisions: CompetitionRevisions; teamCatalogRevision: number }
 
@@ -183,6 +184,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const previous = prev.matches.find(item => item.id === id)
           const replacement = { ...match, id }
           if (!previous || sameRawMatch(previous, replacement)) return prev
+          clearGlobalRankingCache()
           return { ...prev, matches: prev.matches.map((item) => item.id === id ? replacement : item) }
         }, (current, prev, next) => ({ competitionRevisions: reviseChangedMatch(current.competitionRevisions, prev.matches.find(item => item.id === id), next.matches.find(item => item.id === id)), teamCatalogRevision: current.teamCatalogRevision }))
       },

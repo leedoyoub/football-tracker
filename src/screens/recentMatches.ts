@@ -1,5 +1,5 @@
 import type { Appearance, Match } from '../types'
-import { pitchWindow } from '../engine/rating'
+import { pitchWindow } from '../engine/rating.ts'
 
 function matchTimestamp(match: Match): number | undefined {
   const metadata = match as Match & { playedAt?: unknown; createdAt?: unknown; timestamp?: unknown }

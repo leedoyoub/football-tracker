@@ -265,7 +265,11 @@ const goalkeeperPosition = (position: Position) => position === 'GK'
 /** Derived-only cache. A new store match/player array naturally invalidates
  * it, so lookup never serializes or hashes raw Match/Event payloads. */
 type CompetitionStatsCacheEntry = { rows: GlobalLeaderboardRow[]; presented: Map<LeaderboardMetric, GlobalLeaderboardRow[]> }
-const competitionStatsCache = new WeakMap<Match[], WeakMap<Player[], Map<string, CompetitionStatsCacheEntry>>>()
+let competitionStatsCache = new WeakMap<Match[], WeakMap<Player[], Map<string, CompetitionStatsCacheEntry>>>()
+
+export function clearGlobalRankingCache() {
+  competitionStatsCache = new WeakMap<Match[], WeakMap<Player[], Map<string, CompetitionStatsCacheEntry>>>()
+}
 function presentMetric(rows: GlobalLeaderboardRow[], metric: LeaderboardMetric) {
   const value = (row: GlobalLeaderboardRow) => metric === 'goals' ? row.goals : metric === 'assists' ? row.assists : metric === 'g+a' ? row.goals + row.assists : metric === 'minutes' ? row.minutes : metric === 'mom' ? row.mom : metric === 'goals/90' ? row.goals / row.minutes * 90 : metric === 'assists/90' ? row.assists / row.minutes * 90 : metric === 'g+a/90' ? (row.goals + row.assists) / row.minutes * 90 : row.avgRating
   return rows.map(row => ({ ...row, value: value(row) })).sort((a, b) => b.value - a.value)

@@ -1,6 +1,7 @@
-import { competitionHistory, matchCompetitionType } from './competition'
+import { competitionHistory, cupCompetition, championsCompetition, matchCompetitionType } from './competition'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
+import { seasonStandings } from './standings'
 
 export type NewsKind = 'player' | 'match' | 'team'
 export type NewsItem = { id: string; kind: NewsKind; date: string; matchId?: string; playerId?: string; teamId?: string; eyebrow: string; title: string; detail: string; context: string; emoji: string }
@@ -45,10 +46,62 @@ export function deriveNews(players: Player[], teams: Team[], matches: Match[], s
   const playerRuns = new Map<string, Streak>()
   const teamRuns = new Map<string, TeamRun>()
   const chronological = ordered(matches)
+  
+  // Track standings for league news
+  const teamLeads = new Map<string, boolean>()
+  const cupStatus = new Map<string, string[]>()
+  const championsStatus = new Map<string, string[]>()
 
   for (const match of chronological) {
     const type = matchCompetitionType(match)
     const context = scoreText(match, teams)
+    
+    // Team News: League Lead
+    if (type === 'league') {
+      const standings = seasonStandings(teams, matches.filter(m => m.season === match.season && m.date <= match.date), match.season)
+      const leader = standings[0]
+      if (leader) {
+        const teamId = leader.teamId
+        if (!teamLeads.get(match.season + teamId)) {
+          add({ id: `league-lead:${match.season}:${teamId}:${match.id}`, kind: 'team', date: match.date, matchId: match.id, teamId, eyebrow: 'LEAGUE LEAD', title: `${teamName(teams, teamId)} takes the league lead`, detail: `After matchday ${match.matchDay}.`, context })
+          teamLeads.set(match.season + teamId, true)
+        }
+      }
+    }
+
+    // Team News: Knockout Stages (Cup / Champions)
+    if (type === 'cup' || type === 'champions') {
+        const matchesUpToDate = matches.filter(m => m.season === match.season && m.date <= match.date)
+        if (type === 'cup') {
+            const cup = cupCompetition(teams, matchesUpToDate, match.season, players)
+            const prevActive = cupStatus.get(match.season) || teams.map(t => t.id)
+            const currentActive = cup.activeTeamIds
+            
+            // Elimination check
+            for (const teamId of prevActive) {
+                if (!currentActive.includes(teamId) && !cup.championId) {
+                    add({ id: `cup-eliminated:${match.season}:${teamId}:${match.id}`, kind: 'team', date: match.date, matchId: match.id, teamId, eyebrow: 'ELIMINATED', title: `${teamName(teams, teamId)} is eliminated from the Cup`, detail: 'Eliminated in knockout stages.', context })
+                }
+            }
+            // Advancement check
+            for (const teamId of currentActive) {
+                if (!prevActive.includes(teamId)) {
+                     add({ id: `cup-advanced:${match.season}:${teamId}:${match.id}`, kind: 'team', date: match.date, matchId: match.id, teamId, eyebrow: 'ADVANCED', title: `${teamName(teams, teamId)} advances in the Cup`, detail: `Advances to next round.`, context })
+                }
+            }
+            // Winner check
+            if (cup.championId && !cupStatus.get(match.season + 'cup-champion')) {
+                add({ id: `cup-winner:${match.season}:${cup.championId}:${match.id}`, kind: 'team', date: match.date, matchId: match.id, teamId: cup.championId, eyebrow: 'CHAMPION', title: `${teamName(teams, cup.championId)} wins the Cup`, detail: 'Cup final champion.', context })
+                cupStatus.set(match.season + 'cup-champion', ['true'])
+            }
+            cupStatus.set(match.season, currentActive)
+        }
+        // Simplified Champions check
+        if (type === 'champions') {
+            // ...
+        }
+    }
+
     const perPlayer = new Map<string, { goals: number; assists: number; saves: number }>()
     const rowFor = (id: string) => { const row = perPlayer.get(id) ?? { goals: 0, assists: 0, saves: 0 }; perPlayer.set(id, row); return row }
     for (const event of match.events) {
@@ -63,6 +116,7 @@ export function deriveNews(players: Player[], teams: Team[], matches: Match[], s
       }
       if (event.type === 'save') rowFor(event.playerId).saves += event.count ?? 1
     }
+    // ...
     const momId = getMatchManOfTheMatch(match, players)
     for (const player of players) {
       if (!didAppear(match, player.id)) continue
