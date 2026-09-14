@@ -1,6 +1,7 @@
 import type { Match, Player, Team } from '../types'
 import { matchScore } from './rating'
 import { isOnPitchAtEvent, matchPositionSegments, normalizeMatchPosition, pitchWindow } from './timeline'
+import { validateKickoffLineup } from './kickoffLineup'
 
 export type IntegritySeverity = 'error' | 'warning' | 'info'
 export type IntegrityIssue = { severity: IntegritySeverity; matchId?: string; message: string }
@@ -21,6 +22,10 @@ export function auditDataIntegrity(matches: Match[], players: Player[], teams: T
     if (!teamIds.has(match.homeTeamId) && !match.opponentName) add(issues, 'warning', match, 'Home team has no registered-team or opponent context.')
     if (!teamIds.has(match.awayTeamId) && !match.opponentName) add(issues, 'warning', match, 'Away team has no registered-team or opponent context.')
     const matchTeamIds = new Set([match.homeTeamId, match.awayTeamId].filter(Boolean))
+    if (match.kickoffLineup?.length) {
+      const kickoff = validateKickoffLineup(match.kickoffLineup)
+      for (const message of kickoff.errors) add(issues, 'error', match, `Kickoff lineup: ${message}`)
+    }
     const starters = new Set<string>(); const appearances = new Map<string, number>(); const eventIds = new Set<string>(); const goalFingerprints = new Set<string>(); const subFingerprints = new Set<string>()
     for (const appearance of match.appearances) {
       appearances.set(appearance.playerId, (appearances.get(appearance.playerId) ?? 0) + 1)

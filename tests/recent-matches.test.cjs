@@ -9,10 +9,10 @@ const { recentMatches, recentMatchPositions } = require('../src/screens/recentMa
 const game = (id, props = {}) => ({ id, season: 'S1', matchDay: 1, date: '2026-09-01', homeTeamId: 'A', awayTeamId: 'opponent', duration: 90, appearances: [], events: [], ...props })
 const ids = matches => matches.map(match => match.id)
 
-test('multi-team legacy matches follow creation order, independent of date, season and match day; inputs stay intact', () => {
+test('date-only legacy matches sort newest-first with deterministic tie breakers; inputs stay intact', () => {
   const matches = [game('A38', { matchDay: 38 }), game('B1', { homeTeamId: 'B', date: '2020-01-01' }), game('A2', { matchDay: 2 })]
   const before = JSON.stringify(matches)
-  assert.deepEqual(ids(recentMatches(matches)), ['A2', 'B1', 'A38'])
+  assert.deepEqual(ids(recentMatches(matches)), ['A38', 'A2', 'B1'])
   assert.equal(JSON.stringify(matches), before)
 })
 
@@ -22,8 +22,8 @@ test('timestamps take priority and ties preserve newest creation order', () => {
   assert.deepEqual(ids(recentMatches([game('one', { playedAt: 'invalid', createdAt: '2026-09-08' }), game('two', { timestamp: '2026-09-01' })])), ['one', 'two'])
 })
 
-test('mixed imports keep undated records in stable creation slots', () => {
-  assert.deepEqual(ids(recentMatches([game('new-time', { playedAt: '2026-09-08' }), game('legacy'), game('old-time', { playedAt: '2026-09-01' })])), ['new-time', 'legacy', 'old-time'])
+test('mixed imports use actual date-time then the date-only fallback', () => {
+  assert.deepEqual(ids(recentMatches([game('new-time', { playedAt: '2026-09-08' }), game('legacy'), game('old-time', { playedAt: '2026-09-01' })])), ['new-time', 'old-time', 'legacy'])
 })
 
 test('position display uses match position, preserves tactical labels, and never falls back to base position', () => {

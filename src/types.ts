@@ -55,8 +55,14 @@ export const TEAM_PLAY_STYLES = ['possession', 'short-pass-counter', 'long-pass-
 export type TeamPlayStyle = (typeof TEAM_PLAY_STYLES)[number]
 
 export interface FormationSlot {
+  /** Unique tactical identity (LCAM, CAM, RCAM, etc.), never a rating key. */
   id: string
+  /** Legacy rating-position field retained for persisted matches. */
   matchPosition: Position
+  /** Explicit rating semantic for modern kickoff snapshots. */
+  ratingPosition?: Position
+  /** UI label for the tactical slot (for example LCAM displays as LAM). */
+  displayPosition?: string
   playerId: string | null
   x: number
   y: number

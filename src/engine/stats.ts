@@ -1,7 +1,5 @@
 import type {
   Best11Slot,
-  Appearance,
-  FormationSlot,
   Match,
   Player,
   PlayerSeasonStats,
@@ -12,8 +10,8 @@ import type {
   PartnershipStats,
 } from '../types'
 import { ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, pitchWindow, matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './rating'
-import { FORMATION_SLOTS, formationSlotsFor, type TacticalSlot } from '../components/Pitch'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
+import { kickoffLineupForMatch } from './kickoffLineup'
 
 
 export function seasonsFromMatches(matches: Match[]): string[] {
@@ -711,99 +709,6 @@ export function formationForMatch(match: Match | undefined): string | null {
   return match?.formation || (match ? '4-3-3' : null)
 }
 
-type TacticalFamily = 'goalkeeper' | 'defender' | 'deep-midfield' | 'midfield' | 'advanced-midfield' | 'wide-attack' | 'central-attack'
-
-const POSITION_ALIASES: Partial<Record<Position, Position>> = {
-  LCB: 'CB', RCB: 'CB', LWB: 'LB', RWB: 'RB', LDM: 'CDM', RDM: 'CDM',
-  LCM: 'CM', RCM: 'CM', LST: 'ST', RST: 'ST',
-}
-
-function tacticalPosition(position: string | undefined): Position | undefined {
-  if (!position) return undefined
-  const candidate = position.toUpperCase() as Position
-  const valid: Position[] = ['GK', 'CB', 'LCB', 'RCB', 'LB', 'LWB', 'RB', 'RWB', 'LDM', 'CDM', 'RDM', 'LCM', 'CM', 'RCM', 'CAM', 'LM', 'RM', 'LW', 'LST', 'RW', 'RST', 'SS', 'ST']
-  return valid.includes(candidate) ? candidate : undefined
-}
-
-function tacticalFamily(position: Position): TacticalFamily {
-  const base = POSITION_ALIASES[position] ?? position
-  if (base === 'GK') return 'goalkeeper'
-  if (['CB', 'LB', 'RB'].includes(base)) return 'defender'
-  if (base === 'CDM') return 'deep-midfield'
-  if (['CM', 'LM', 'RM'].includes(base)) return 'midfield'
-  if (base === 'CAM') return 'advanced-midfield'
-  if (['LW', 'RW'].includes(base)) return 'wide-attack'
-  return 'central-attack'
-}
-
-function tacticalSide(position: string): -1 | 0 | 1 {
-  if (position.startsWith('L')) return -1
-  if (position.startsWith('R')) return 1
-  return 0
-}
-
-function normalizedCoordinate(value: number): number | undefined {
-  if (!Number.isFinite(value) || value < 0 || value > 100) return undefined
-  return value <= 1 ? value * 100 : value
-}
-
-function savedPoint(appearance: Appearance, saved: FormationSlot | undefined): { x: number; y: number; rawX: number; rawY: number } | undefined {
-  const rawX = saved?.x ?? appearance.kickoffX ?? appearance.x
-  const rawY = saved?.y ?? appearance.kickoffY ?? appearance.y
-  if (rawX === undefined || rawY === undefined) return undefined
-  const x = normalizedCoordinate(rawX)
-  const y = normalizedCoordinate(rawY)
-  return x === undefined || y === undefined ? undefined : { x, y, rawX, rawY }
-}
-
-function familyCost(player: TacticalFamily, slot: TacticalFamily): number {
-  if (player === slot) return 0
-  if (player === 'goalkeeper' || slot === 'goalkeeper') return 5000
-  if (player === 'defender' || slot === 'defender') return 900
-  const midfield = ['deep-midfield', 'midfield', 'advanced-midfield']
-  if (midfield.includes(player) && midfield.includes(slot)) {
-    const order = ['deep-midfield', 'midfield', 'advanced-midfield']
-    return Math.abs(order.indexOf(player) - order.indexOf(slot)) * 70
-  }
-  const attack = ['wide-attack', 'central-attack']
-  if (attack.includes(player) && attack.includes(slot)) return 45
-  if ((player === 'advanced-midfield' && attack.includes(slot)) || (slot === 'advanced-midfield' && attack.includes(player))) return 150
-  if ((player === 'midfield' && slot === 'wide-attack') || (slot === 'midfield' && player === 'wide-attack')) return 220
-  return 500
-}
-
-function assignmentCost(position: Position, slot: TacticalSlot, savedSlotId: string | undefined, point: ReturnType<typeof savedPoint>): number {
-  const slotPosition = tacticalPosition(slot.matchPosition) ?? slot.matchPosition
-  const samePosition = (POSITION_ALIASES[position] ?? position) === (POSITION_ALIASES[slotPosition] ?? slotPosition)
-  const sideDistance = Math.abs(tacticalSide(position) - tacticalSide(slot.slot))
-  let cost = samePosition ? 0 : familyCost(tacticalFamily(position), tacticalFamily(slotPosition)) + 25
-  cost += sideDistance * (samePosition ? 6 : 12)
-  // A saved slot decides between tactically compatible choices, but cannot overrule kickoff matchPosition.
-  if (savedSlotId === slot.slot && samePosition) cost -= 60
-  if (point) cost += Math.hypot(point.x - slot.x, point.y - slot.y) / 20
-  return cost
-}
-
-function minimumCostAssignment(costs: number[][]): number[] {
-  const memo = new Map<string, { cost: number; slots: number[] }>()
-  const visit = (playerIndex: number, used: number): { cost: number; slots: number[] } => {
-    if (playerIndex === costs.length) return { cost: 0, slots: [] }
-    const key = `${playerIndex}:${used}`
-    const cached = memo.get(key)
-    if (cached) return cached
-    let best = { cost: Number.POSITIVE_INFINITY, slots: [] as number[] }
-    for (let slotIndex = 0; slotIndex < costs[playerIndex].length; slotIndex += 1) {
-      if (used & (1 << slotIndex)) continue
-      const rest = visit(playerIndex + 1, used | (1 << slotIndex))
-      const cost = costs[playerIndex][slotIndex] + rest.cost
-      if (cost < best.cost) best = { cost, slots: [slotIndex, ...rest.slots] }
-    }
-    memo.set(key, best)
-    return best
-  }
-  return visit(0, 0).slots
-}
-
 export function teamBestEleven(
   players: Player[],
   matches: Match[],
@@ -812,41 +717,10 @@ export function teamBestEleven(
 ): { formation: string | null; slots: Best11Slot[]; match: Match | undefined } {
   const match = latestTeamMatch(matches, teamId, season)
   if (!match) return { formation: null, slots: [], match }
-  // Team Main is a historical match view: never manufacture an XI from roster/base positions.
-  const starters = match.appearances.filter(item => item.teamId === teamId && item.role === 'starter')
-  const unique = starters.filter((item, index) => starters.findIndex(other => other.playerId === item.playerId) === index)
-  const tacticalSlots = formationSlotsFor(match.formation) ?? FORMATION_SLOTS['4-3-3']
-  const savedKickoffSlot = (playerId: string) => match.kickoffLineup?.find(slot => slot.playerId === playerId)
-  const kickoff = unique.slice(0, tacticalSlots.length).map(appearance => {
-    const saved = savedKickoffSlot(appearance.playerId)
-    const point = savedPoint(appearance, saved)
-    const coordinatePosition = point
-      ? tacticalPosition(tacticalSlots.reduce((closest, slot) => Math.hypot(point.x - slot.x, point.y - slot.y) < Math.hypot(point.x - closest.x, point.y - closest.y) ? slot : closest).matchPosition)
-      : undefined
-    const player = players.find(item => item.id === appearance.playerId)
-    const position = tacticalPosition(appearance.matchPosition) ?? tacticalPosition(saved?.matchPosition) ?? coordinatePosition ?? tacticalPosition(appearance.position) ?? tacticalPosition(player?.position) ?? 'CM'
-    return { appearance, saved, point, player, position }
+  const slots = kickoffLineupForMatch(match, teamId).map((kickoff): Best11Slot => {
+    const player = kickoff.playerId ? players.find(item => item.id === kickoff.playerId) : undefined
+    const rating = player ? ratePlayerMatch(match, player) : null
+    return { slot: kickoff.id, position: kickoff.ratingPosition ?? kickoff.matchPosition, matchPosition: kickoff.ratingPosition ?? kickoff.matchPosition, playerId: kickoff.playerId, teamId, avgRating: rating?.rating ?? 0, matches: rating ? 1 : 0, x: kickoff.x, y: kickoff.y }
   })
-  const assignment = minimumCostAssignment(kickoff.map(item => tacticalSlots.map(slot => assignmentCost(item.position, slot, item.saved?.id, item.point))))
-  const slots = kickoff.map((item, index): Best11Slot => {
-    const tactical = tacticalSlots[assignment[index]]
-    const rating = item.player ? ratePlayerMatch(match, item.player) : null
-    return { slot: tactical.slot, position: tactical.position, matchPosition: item.position, playerId: item.appearance.playerId, teamId, avgRating: rating?.rating ?? 0, matches: 1 }
-  })
-  // Keep only valid saved points that do not collide with another saved/default rendered point.
-  const acceptedPoints = new Set<number>()
-  const collides = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.abs(a.x - b.x) < 8 && Math.abs(a.y - b.y) < 7
-  kickoff.forEach((item, index) => {
-    if (item.point && ![...acceptedPoints].some(other => collides(item.point!, kickoff[other].point!))) acceptedPoints.add(index)
-  })
-  for (const index of [...acceptedPoints]) {
-    const conflictsWithDefault = kickoff.some((_, otherIndex) => otherIndex !== index && !acceptedPoints.has(otherIndex) && collides(kickoff[index].point!, tacticalSlots[assignment[otherIndex]]))
-    if (conflictsWithDefault) acceptedPoints.delete(index)
-  }
-  for (const index of acceptedPoints) {
-    const point = kickoff[index].point!
-    slots[index].x = point.rawX
-    slots[index].y = point.rawY
-  }
   return { formation: match.formation ?? null, slots, match }
 }

@@ -1,28 +1,17 @@
 
-import type { Match } from '../types';
+import type { Match } from '../types.ts'
+import { kickoffLineupForMatch, validateKickoffLineup } from './kickoffLineup.ts'
+import { compareMatchChronology } from './matchChronology.ts'
 
 export function getMostRecentStartingLineup(matches: Match[], teamId: string): Record<string, string> | null {
   const teamMatches = matches
     .filter((m) => m.teamId === teamId || (!m.teamId && (m.homeTeamId === teamId || m.awayTeamId === teamId)))
-    .sort((a, b) => {
-      const seasonA = parseInt(a.season.replace('Season ', '')) || 0;
-      const seasonB = parseInt(b.season.replace('Season ', '')) || 0;
-      return seasonB - seasonA || b.matchDay - a.matchDay;
-    });
+    .slice().sort((a, b) => compareMatchChronology(b, a))
 
   for (const match of teamMatches) {
-    const starters = match.appearances.filter(a => a.role === 'starter' && a.teamId === teamId);
-    if (starters.length === 11) {
-      const slotAssignments: Record<string, string> = {};
-      starters.forEach(a => {
-        if (a.matchPosition) {
-          slotAssignments[a.matchPosition] = a.playerId;
-        }
-      });
-      if (Object.keys(slotAssignments).length === 11) {
-        return slotAssignments;
-      }
-    }
+    const kickoff = kickoffLineupForMatch(match, teamId)
+    if (!validateKickoffLineup(kickoff).valid) continue
+    return Object.fromEntries(kickoff.map(slot => [slot.id, slot.playerId!]))
   }
-  return null;
+  return null
 }

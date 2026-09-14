@@ -1,29 +1,9 @@
 import type { Appearance, Match } from '../types'
 import { pitchWindow } from '../engine/rating.ts'
-
-function matchTimestamp(match: Match): number | undefined {
-  const metadata = match as Match & { playedAt?: unknown; createdAt?: unknown; timestamp?: unknown }
-  for (const value of [metadata.playedAt, metadata.createdAt, metadata.timestamp]) {
-    if (typeof value !== 'string' && typeof value !== 'number') continue
-    if (typeof value === 'string' && !value.trim()) continue
-    const numeric = Number(value)
-    const time = Number.isFinite(numeric)
-      ? numeric * (Math.abs(numeric) < 1e12 ? 1000 : 1)
-      : Date.parse(String(value))
-    if (Number.isFinite(time)) return time
-  }
-}
+import { newestMatches } from '../engine/matchChronology'
 
 export function recentMatches(matches: Match[]): Match[] {
-  // The store appends new matches and edits them in place. Preserve that order
-  // for legacy records without timestamps, including ties and mixed imports.
-  const newestFirst = [...matches].reverse()
-  const dated = newestFirst.flatMap(match => {
-    const time = matchTimestamp(match)
-    return time === undefined ? [] : [{ match, time }]
-  }).sort((a, b) => b.time - a.time)
-  let datedIndex = 0
-  return newestFirst.map(match => matchTimestamp(match) === undefined ? match : dated[datedIndex++].match)
+  return newestMatches(matches)
 }
 
 export function recentMatchPositions(match: Match, appearance: Appearance): string {

@@ -17,6 +17,7 @@ import { PlayerAvatar } from '../components/PlayerAvatar'
 import { rebuildLiveHistory } from './liveHistory'
 import { sortPlayersByPosition } from '../lib/positionOrder'
 import { currentStaticTeams } from '../data/teams'
+import { kickoffFromAssignments, kickoffLineupForMatch, validateKickoffLineup } from '../engine/kickoffLineup'
 
 type FormationSlotConfig = TacticalSlot
 type MatchDraftState = { slotAssignments: Record<string, string>; homeBench: string[]; events: MatchEvent[]; positionHistories: Record<string, PositionChange[]> }
@@ -25,13 +26,10 @@ function restoreDraft(match: Match | undefined, players: Player[]): { draft: Mat
   if (!match || !Array.isArray(match.appearances) || !Array.isArray(match.events)) return null
   try {
     const playerIds = new Set(players.map(player => player.id))
-    const starters: Record<string, string> = {}
-    for (const appearance of match.appearances.filter(item => item.role === 'starter' && playerIds.has(item.playerId))) {
-      const slot = UNIVERSAL_TACTICAL_SLOTS.find(item => item.matchPosition === appearance.matchPosition && !starters[item.slot])
-        ?? UNIVERSAL_TACTICAL_SLOTS.find(item => item.matchPosition === appearance.position && !starters[item.slot])
-      if (slot) starters[slot.slot] = appearance.playerId
-    }
-    if (!Object.keys(starters).length) return null
+    const teamId = match.teamId ?? match.homeTeamId
+    const kickoff = kickoffLineupForMatch(match, teamId).filter(slot => playerIds.has(slot.playerId ?? ''))
+    if (!validateKickoffLineup(kickoff).valid) return null
+    const starters = Object.fromEntries(kickoff.map(slot => [slot.id, slot.playerId!]))
     const bench = [...new Set(match.appearances.filter(item => item.role === 'bench' && playerIds.has(item.playerId) && !Object.values(starters).includes(item.playerId)).map(item => item.playerId))]
     const histories = Object.fromEntries(match.appearances.filter(item => item.positionHistory?.length).map(item => [item.playerId, item.positionHistory!])) as Record<string, PositionChange[]>
     const positions = Object.fromEntries(UNIVERSAL_TACTICAL_SLOTS.map(slot => [slot.slot, slot.matchPosition]))
@@ -70,23 +68,27 @@ function fillFormationSlots(
 export function NewMatchScreen({
   teamId,
   requestedSeason,
+  editingMatchId,
   onNavigate,
 }: {
   teamId?: string
   requestedSeason?: string
+  editingMatchId?: string
   onNavigate: (view: View) => void
 }) {
   const { teams, players, matches, competitionStates = [], draftMatch, addMatch, updateMatch, saveDraftMatch, clearDraftMatch } = useStore()
-  const selectedTeamId = teamId ?? draftMatch?.teamId ?? draftMatch?.homeTeamId ?? teams[0]?.id ?? ''
-  const restored = useMemo(() => draftMatch && (draftMatch.teamId ?? draftMatch.homeTeamId) === selectedTeamId ? restoreDraft(draftMatch, players) : null, [draftMatch, players, selectedTeamId])
-  const [draftId] = useState(() => restored ? draftMatch!.id : crypto.randomUUID())
+  const editingMatch = editingMatchId ? matches.find(match => match.id === editingMatchId) : undefined
+  const sourceMatch = editingMatch ?? draftMatch
+  const selectedTeamId = teamId ?? sourceMatch?.teamId ?? sourceMatch?.homeTeamId ?? teams[0]?.id ?? ''
+  const restored = useMemo(() => sourceMatch && (sourceMatch.teamId ?? sourceMatch.homeTeamId) === selectedTeamId ? restoreDraft(sourceMatch, players) : null, [sourceMatch, players, selectedTeamId])
+  const [draftId] = useState(() => restored ? sourceMatch!.id : crypto.randomUUID())
   const savingRef = useRef(false)
   const completedSeasons = useMemo(() => competitionStates.filter(state => state.kind === 'season-complete').map(state => state.season), [competitionStates])
   const nextMatch = useMemo(() => getNextMatchDayForTeam(selectedTeamId, matches, completedSeasons), [selectedTeamId, matches, completedSeasons])
-  const [competitionType, setCompetitionType] = useState<CompetitionType>(() => restored ? matchCompetitionType(draftMatch!) : 'league')
-  const season = restored ? draftMatch!.season : requestedSeason ?? nextMatch.season
-  const matchDay = restored ? draftMatch!.matchDay : competitionMatches(matches, season, competitionType).filter(match => match.teamId === selectedTeamId || match.homeTeamId === selectedTeamId || match.awayTeamId === selectedTeamId).length + 1
-  const date = restored ? draftMatch!.date : new Date().toISOString().split('T')[0]
+  const [competitionType, setCompetitionType] = useState<CompetitionType>(() => restored ? matchCompetitionType(sourceMatch!) : 'league')
+  const season = restored ? sourceMatch!.season : requestedSeason ?? nextMatch.season
+  const matchDay = restored ? sourceMatch!.matchDay : competitionMatches(matches, season, competitionType).filter(match => match.teamId === selectedTeamId || match.homeTeamId === selectedTeamId || match.awayTeamId === selectedTeamId).length + 1
+  const date = restored ? sourceMatch!.date : new Date().toISOString().split('T')[0]
   const recentAssignments = useMemo(() => restored ? null : getMostRecentStartingLineup(matches, selectedTeamId), [restored, matches, selectedTeamId]);
 
   const [step, setStep] = useState(() => restored?.draft.events.length ? 1 : 0) // 0: Lineups, 1: Events
@@ -142,7 +144,7 @@ export function NewMatchScreen({
   const activeFormationName = calculateFormation(
     UNIVERSAL_TACTICAL_SLOTS.filter((slot) => Boolean(matchDraft.slotAssignments[slot.slot])).map((slot) => slot.matchPosition),
   )
-  const startingIds = UNIVERSAL_TACTICAL_SLOTS.map((slot) => matchDraft.slotAssignments[slot.slot]).filter(Boolean)
+  const startingIds = Object.values(matchDraft.slotAssignments).filter(Boolean)
   useEffect(() => {
     if (initializedTeam.current === selectedTeamId || !players.length) return
     initializedTeam.current = selectedTeamId
@@ -343,6 +345,8 @@ export function NewMatchScreen({
     setActivePlayer(null)
   }
 
+  const kickoffSnapshot = useMemo(() => kickoffFromAssignments(startingSnapshot), [startingSnapshot])
+  const kickoffIsValid = validateKickoffLineup(kickoffSnapshot).valid
   const appearances: Appearance[] = useMemo(() => {
     const res: Appearance[] = []
     const source = lineupLocked ? startingSnapshot : matchDraft.slotAssignments
@@ -424,34 +428,37 @@ export function NewMatchScreen({
   }
 
   const startingGoalkeeperId = startingSnapshot.GK
+  // End-of-match total saves belong to whoever is currently in the GK tactical
+  // slot, not automatically to the kickoff goalkeeper after a substitution.
+  const activeGoalkeeperId = matchDraft.slotAssignments.GK ?? startingGoalkeeperId
   const totalSavesEvent = matchDraft.events.find((event): event is Extract<MatchEvent, { type: 'save' }> => event.type === 'save' && event.id === totalSavesEventId.current)
   const totalSaves = totalSavesEvent ? String(totalSavesEvent.count ?? 0) : ''
   function changeTotalSaves(value: string) {
-    if (!/^\d*$/.test(value) || !startingGoalkeeperId || substitutionDraft) return
+    if (!/^\d*$/.test(value) || !activeGoalkeeperId || substitutionDraft) return
     const count = Number(value)
     if (!Number.isSafeInteger(count)) return
     if (value !== '' && !totalSavesEventId.current) totalSavesEventId.current = crypto.randomUUID()
     const eventId = totalSavesEventId.current
     setMatchDraft(prev => {
       const existing = prev.events.find(event => event.id === eventId)
-      const event: MatchEvent = { id: eventId!, type: 'save', teamId: selectedTeamId, playerId: startingGoalkeeperId, count }
+      const event: MatchEvent = { id: eventId!, type: 'save', teamId: selectedTeamId, playerId: activeGoalkeeperId, count }
       return { ...prev, events: value === '' ? prev.events.filter(event => event.id !== eventId) : existing ? prev.events.map(item => item.id === eventId ? event : item) : [...prev.events, event] }
     })
   }
 
   useEffect(() => {
     if (!draftReady) return
-    saveDraftMatch({ id: draftId, season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events })
-  }, [draftReady, draftId, season, competitionType, assignment.stage, assignment.pairingId, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, opponentName, appearances, saveDraftMatch])
+    saveDraftMatch({ id: draftId, season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot })
+  }, [draftReady, draftId, season, competitionType, assignment.stage, assignment.pairingId, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, opponentName, appearances, kickoffSnapshot, saveDraftMatch])
 
   function save() {
-    if (savingRef.current || liveEvent || startingIds.length !== 11) return
+    if (savingRef.current || liveEvent || !kickoffIsValid) return
     savingRef.current = true
     const matchData = {
       id: draftId,
-      season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, matchDay, date, formation: activeFormationName, homeAway: 'home' as const, homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events,
+      season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, matchDay, date, formation: activeFormationName, homeAway: 'home' as const, homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot,
     }
-    if (restored) {
+    if (matches.some(match => match.id === draftId)) {
       updateMatch(draftId, matchData)
     } else {
       addMatch(matchData)
@@ -482,7 +489,7 @@ export function NewMatchScreen({
 
             <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Starting XI</h2><Pitch slots={universalPitchSlots} players={draftPlayers} teams={teams} statsByPlayer={seasonStats} badgeMode="position" substitutionSelection={startingSelection} draggable={false} onEmptySlotClick={(slot) => selectStartingTarget({ group: 'starting', id: slot.slot })} onSlotClick={(slot) => selectStartingTarget({ group: 'starting', id: slot.slot })} /></section>
             <RosterPlayerGroup title="Bench (Max 12)" group="substitute" team={teams.find(team => team.id === selectedTeamId)} players={sortPlayersByPosition([...matchDraft.homeBench.filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is NonNullable<typeof player> => Boolean(player)), ...squadPlayers.slice(0, Math.max(0, 12 - matchDraft.homeBench.length))], appearances)} statsByPlayer={seasonStats} selectedPlayerId={activePlayer?.id} onClick={(id) => selectStartingTarget({ group: 'substitute', id })} />
-            <button disabled={startingIds.length !== 11 || !assignment.available} onClick={() => { if (!lineupLocked) { setStartingSnapshot({ ...matchDraft.slotAssignments }); setStartingBenchSnapshot([...matchDraft.homeBench]) } setStep(1) }} className="w-full rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl disabled:opacity-40">CONTINUE</button>
+            <button disabled={!validateKickoffLineup(kickoffFromAssignments(matchDraft.slotAssignments)).valid || !assignment.available} onClick={() => { if (!lineupLocked) { setStartingSnapshot({ ...matchDraft.slotAssignments }); setStartingBenchSnapshot([...matchDraft.homeBench]) } setStep(1) }} className="w-full rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl disabled:opacity-40">CONTINUE</button>
           </div>
         )}
 
@@ -579,4 +586,3 @@ function RosterPlayer({ player, group, onClick, stats, team, selection, selected
   if (group === 'substitute') return <div className={selected ? 'min-w-0 rounded-lg ring-2 ring-emerald-400' : 'min-w-0'}><SubstitutePlayerCard player={player} team={team} stats={stats} showRating={false} selection={selection} onClick={() => onClick(player.id)} /></div>
   return <button type="button" onClick={() => onClick(player.id)} className={`flex min-w-0 flex-col items-center rounded-lg bg-zinc-900 p-1 text-center ${selected ? 'ring-2 ring-emerald-400' : ''}`}><span className="relative flex h-8 w-8 items-center justify-center overflow-visible"><PlayerAvatar photoUrl={player.photoUrl || player.image} number={player.number} className="h-8 w-8 text-[10px]" /><span className="absolute -left-1 -top-1 rounded bg-zinc-800 px-0.5 text-[6px] font-black text-zinc-300">{player.position}</span></span><span className="w-full truncate text-[8px] font-semibold">{player.displayName ?? player.name}</span>{stats && <StatIcons goals={stats.goals} assists={stats.assists} className="text-[7px] text-zinc-400" />}</button>
 }
-
