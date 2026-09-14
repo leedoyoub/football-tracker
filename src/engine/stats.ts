@@ -12,7 +12,7 @@ import type {
 import { ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, pitchWindow, matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import { kickoffLineupForMatch } from './kickoffLineup'
-import { compareMatchChronology, newestMatches } from './matchChronology'
+import { newestMatches, oldestMatches } from './matchChronology'
 
 
 export function seasonsFromMatches(matches: Match[]): string[] {
@@ -37,7 +37,7 @@ export function aggregatePlayerStats(
   let subs = 0
   let saves = 0
 
-  for (const match of matches) {
+  for (const match of oldestMatches(matches)) {
     const appearance = match.appearances.find((a) => a.playerId === player.id)
     if (!appearance) continue
 
@@ -130,9 +130,9 @@ export function teamSeasonStats(
   matches: Match[],
   season: string,
 ): TeamSeasonStats {
-  const teamMatches = matches.filter((m) =>
+  const teamMatches = oldestMatches(matches.filter((m) =>
     m.season === season && (m.teamId === teamId || (!m.teamId && (m.homeTeamId === teamId || m.awayTeamId === teamId))),
-  )
+  ))
   
   let wins = 0
   let draws = 0
@@ -331,7 +331,7 @@ export function buildGlobalRankingData(
 
   const rows = players.flatMap(player => {
     if (filters.positions.length && !filters.positions.includes(player.position)) return []
-    const playerMatches = matchesByPlayer.get(player.id) ?? []
+    const playerMatches = oldestMatches(matchesByPlayer.get(player.id) ?? [])
     const ratingRows: RatingBreakdown[] = []
     let starts = 0; let subs = 0; let saves = 0; let wins = 0; let draws = 0; let losses = 0
     let sotAllowedTotal = 0; let sotAllowedAppearances = 0; let concededOnPitch = 0; let qualifyingGoalkeeperAppearances = 0; let qualifyingSaves = 0
@@ -376,7 +376,7 @@ export function buildGlobalRankingData(
     const assists = playerMatches.reduce((sum, match) => { const appearance = match.appearances.find(item => item.playerId === player.id); return sum + (appearance ? match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id && isOnPitchAtEvent(match, appearance, event)).length : 0) }, 0)
     const minutes = ratingRows.reduce((sum, rating) => sum + rating.minutes, 0)
     const avgRating = ratingRows.reduce((sum, rating) => sum + rating.raw, 0) / ratingRows.length
-    const latest = playerMatches.reduce<Match | undefined>((current, match) => !current || match.date > current.date || (match.date === current.date && match.matchDay > current.matchDay) ? match : current, undefined)
+    const latest = newestMatches(playerMatches)[0]
     const stats: PlayerSeasonStats = { playerId: player.id, teamId: player.teamId, season: 'All', matches: ratingRows.length, starts, subs, minutes, goals, assists, avgRating, mom: playerMatches.filter(match => momFor(match) === player.id).length, saves, wins, draws, losses, recentForm: recentForm.slice(-5).reverse(), ratings: ratingRows }
     const playedGoalkeeper = ratingRows.some(rating => {
       const match = playerMatches.find(item => item.id === rating.matchId)
@@ -519,9 +519,12 @@ export function globalRankings(
 }
 
 export function lastMatchDays(matches: Match[], season: string, count = 5): number[] {
-  const days = [...new Set(matches.filter((m) => m.season === season).map((m) => m.matchDay))]
-  days.sort((a, b) => b - a)
-  return days.slice(0, count).sort((a, b) => a - b)
+  const days: number[] = []
+  for (const match of newestMatches(matches.filter((m) => m.season === season))) {
+    if (!days.includes(match.matchDay)) days.push(match.matchDay)
+    if (days.length === count) break
+  }
+  return days
 }
 
 const FORMATION_433: { slot: string; position: Position; pool: Position[] }[] = [
@@ -583,10 +586,6 @@ function actuallyPlayed(match: Match, playerId: string): boolean {
   )
 }
 
-function compareMostRecentMatch(a: SeasonParticipation, b: SeasonParticipation): number {
-  return compareMatchChronology(b.match, a.match)
-}
-
 function candidateOrder(a: UnifiedCandidate, b: UnifiedCandidate): number {
   return b.average - a.average || b.matches - a.matches || b.latestRating - a.latestRating || (a.player.displayName ?? a.player.name).localeCompare(b.player.displayName ?? b.player.name) || a.player.id.localeCompare(b.player.id)
 }
@@ -599,11 +598,12 @@ function unifiedCandidates(players: Player[], matches: Match[], season: string, 
       return appearance && actuallyPlayed(match, player.id)
         ? [{ match, teamId: appearance.teamId, rating: ratePlayerMatch(match, player) }]
         : []
-    }).sort(compareMostRecentMatch)
+    })
+    const orderedParticipations = newestMatches(participations.map(item => item.match)).map(match => participations.find(item => item.match === match)!)
 
-    const teamIds = [...new Set(participations.map((item) => item.teamId))]
+    const teamIds = [...new Set(orderedParticipations.map((item) => item.teamId))]
     return teamIds.flatMap((teamId) => {
-      const teamParticipations = participations.filter((item) => item.teamId === teamId)
+      const teamParticipations = orderedParticipations.filter((item) => item.teamId === teamId)
       const ratings = teamParticipations.flatMap((item) => item.rating ? [item.rating] : [])
       const selectedRatings = recentOnly ? ratings.slice(0, 3) : ratings
       const completed = seasonMatches.filter((match) => matchRecordedForTeam(match, teamId)).length

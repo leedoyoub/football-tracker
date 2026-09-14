@@ -148,6 +148,8 @@ export type MatchEvent =
 
 export interface Match {
   id: string
+  /** Immutable commit-time order for same-date chronology; never changed by edits. */
+  recordedAt?: number
   season: string
   /** Legacy matches omit this and are treated as league matches. */
   competitionType?: CompetitionType

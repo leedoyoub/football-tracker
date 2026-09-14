@@ -17,6 +17,7 @@ import { useAuth } from './lib/auth'
 import { BootstrapShell, StartupRecovery } from './components/StartupBoundary'
 import { reconcileCompetitionRevisions, reviseChangedMatch, sameRawFootballValue, sameRawMatch, type CompetitionRevisions } from './engine/competitionRevision'
 import { clearGlobalRankingCache } from './engine/stats'
+import { preserveRecordedAt, recordNewMatch } from './engine/matchRecording'
 
 type StoreSnapshot = { data: AppState; competitionRevisions: CompetitionRevisions; teamCatalogRevision: number }
 
@@ -174,14 +175,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       addMatch: (match) => {
         const id = match.id ?? crypto.randomUUID()
-        const saved = { ...match, id }
+        const saved = recordNewMatch({ ...match, id })
         update((prev) => prev.matches.some(item => item.id === id) ? prev : ({ ...prev, matches: [...prev.matches, { ...saved }] }), current => ({ competitionRevisions: reviseChangedMatch(current.competitionRevisions, undefined, saved), teamCatalogRevision: current.teamCatalogRevision }))
         return id
       },
       updateMatch: (id, match) => {
         update((prev) => {
           const previous = prev.matches.find(item => item.id === id)
-          const replacement = { ...match, id }
+          const replacement = previous ? preserveRecordedAt(previous, { ...match, id }) : { ...match, id }
           if (!previous || sameRawMatch(previous, replacement)) return prev
           clearGlobalRankingCache()
           return { ...prev, matches: prev.matches.map((item) => item.id === id ? replacement : item) }

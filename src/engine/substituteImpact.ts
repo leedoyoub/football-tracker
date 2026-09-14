@@ -1,7 +1,7 @@
 import type { Match, Player, RatingBreakdown } from '../types'
 import { matchScore, ratePlayerMatch } from './rating'
 import { compareEvents, isOnPitchAtEvent, orderedEvents, scoringTeamId } from './timeline'
-import { compareMatchChronology } from './matchChronology'
+import { newestMatches } from './matchChronology'
 
 export type SubstituteImpactAppearance = {
   match: Match; teamId: string; entryMinute: number; scoreAtEntry: { home: number; away: number }; finalScore: { home: number; away: number }
@@ -41,5 +41,6 @@ export function substituteImpact(player: Player, matches: Match[]): { appearance
   if (summary.apps) summary.averageRating /= summary.apps
   summary.gaPer90 = summary.minutes ? (summary.goals + summary.assists) / summary.minutes * 90 : 0
   summary.gdPer90 = summary.minutes ? summary.goalDifference / summary.minutes * 90 : 0
-  return { appearances: rows.sort((left, right) => compareMatchChronology(right.match, left.match)), summary }
+  const orderedRows = newestMatches(rows.map(row => row.match)).map(match => rows.find(row => row.match === match)!)
+  return { appearances: orderedRows, summary }
 }

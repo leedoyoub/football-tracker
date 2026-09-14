@@ -121,5 +121,5 @@ test('Home footer reads the central version with Account last, and common layout
   assert.match(css, /\.app-content\s*\{[^}]*padding-bottom:\s*calc\(var\(--nav-height\)/)
   assert.match(css, /\.app-bottom-nav\s*\{[^}]*height:\s*var\(--nav-height\)/)
   const app = fs.readFileSync(require.resolve('../src/App.tsx'), 'utf8')
-  assert(app.includes('app-content no-scrollbar min-h-0 flex-1 overflow-y-auto'))
+  assert(app.includes('app-content no-scrollbar min-h-0 flex-1 ${appContentOverflowClass(view)}'))
 })

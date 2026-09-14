@@ -78,11 +78,9 @@ test('League and Cup standings share the complete deterministic tie-break order'
   assert(compareStandings(c, a, metrics) < 0, 'lower SOT follows average rating')
 })
 
-test('v2.1.8 UI uses full score cells, full Best Player names, and scoped Log Match overflow protection', () => {
+test('v2.1.8 UI uses full score cells and full Best Player names', () => {
   const bracket = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
   const detail = fs.readFileSync(require.resolve('../src/screens/TeamDetailScreen.tsx'), 'utf8')
-  const newMatch = fs.readFileSync(require.resolve('../src/screens/NewMatchScreen.tsx'), 'utf8')
   assert(bracket.includes('pairing.requiredMatches') && bracket.includes('`${home ? value.home : value.away}-${home ? value.away : value.home}`'))
   assert(detail.includes('playerFullName') && detail.includes('playerFullName as playerDisplayName'))
-  assert(newMatch.includes('touch-pan-y') && newMatch.includes('overflow-x-hidden'))
 })

@@ -512,7 +512,7 @@ function MatchEditor({
       </div>
 
       {historyError && <p role="alert" className="px-4 text-xs text-red-400">{historyError}</p>}
-      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+      <div className="no-scrollbar min-h-0 min-w-0 max-w-full flex-1 overflow-x-hidden overflow-y-auto overscroll-x-none touch-pan-y px-4 pb-4">
         {step === 0 && (
           <div className="space-y-6">
             <div className="space-y-3">

@@ -31,6 +31,7 @@ import { canUseApp, shouldRestoreLastRoute, startupScreen } from './lib/startup'
 import { BootstrapShell, StartupRecovery } from './components/StartupBoundary'
 import { emptyFilters, type RankingFilters } from './screens/RankingFilters'
 import { popPlayerEditHistory } from './lib/playerNavigation'
+import { appContentOverflowClass } from './lib/routeLayout'
 
 export default function App() {
   const { user, loading, startupError, signInWithGoogle, retryStartup } = useAuth()
@@ -126,7 +127,7 @@ export default function App() {
   return (
     <div className="min-h-[100dvh] bg-zinc-950">
       <div className="relative mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-black text-white shadow-2xl">
-        <div ref={scrollRef} className="app-content no-scrollbar min-h-0 flex-1 overflow-y-auto">
+        <div ref={scrollRef} className={`app-content no-scrollbar min-h-0 flex-1 ${appContentOverflowClass(view)}`}>
           {view.name === 'home' && (
             <HomeScreen season={season} onSeason={setSeason} onNavigate={onNavigate} />
           )}

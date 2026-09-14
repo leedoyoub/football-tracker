@@ -4,7 +4,7 @@ import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { combineGoalTypeTotals, goalTypeTotals, type GoalTypeTotals } from './goalTypes'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import { isOnPitchAtEvent, matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './timeline'
-import { compareMatchChronology } from './matchChronology'
+import { oldestMatches } from './matchChronology'
 
 export type PlayerScope = { season?: string; competition?: CompetitionType | 'all'; teamIds?: string[] }
 export type DerivedAppearance = { match: Match; appearance: Appearance; rating: RatingBreakdown }
@@ -18,7 +18,7 @@ export type PlayerDerived = {
 }
 
 const cache = new WeakMap<Match[], WeakMap<Player[], Map<string, Map<string, PlayerDerived>>>>()
-const ordered = (matches: Match[]) => matches.slice().sort(compareMatchChronology)
+const ordered = oldestMatches
 const scopeKey = (scope: PlayerScope) => `${scope.season ?? '*'}|${scope.competition ?? 'all'}|${(scope.teamIds ?? []).slice().sort().join(',')}`
 const scoped = (matches: Match[], scope: PlayerScope) => matches.filter(match => (!scope.season || match.season === scope.season) && (!scope.competition || scope.competition === 'all' || (match.competitionType ?? 'league') === scope.competition))
 const goalForPlayer = (match: Match, appearance: Appearance, playerId: string, event: Match['events'][number]) => event.type === 'goal' && !event.ownGoal && event.playerId === playerId && isOnPitchAtEvent(match, appearance, event)
