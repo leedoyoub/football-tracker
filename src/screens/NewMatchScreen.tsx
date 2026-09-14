@@ -7,7 +7,7 @@ import { playerSeasonStats } from '../engine/stats'
 import { matchScore, pitchWindow } from '../engine/rating'
 import { canConfirmSubstitution, moveLineup, moveSubstitution, type LineupTarget, type SubstitutionDraft } from './matchLineup'
 import { getNextMatchDayForTeam } from '../engine/match'
-import { competitionAssignment, competitionMatches, matchCompetitionType } from '../engine/competition'
+import { competitionAssignment, matchCompetitionType } from '../engine/competition'
 import type { Appearance, Best11Slot, CompetitionType, Match, MatchEvent, Player, Position, PositionChange, Team, View } from '../types'
 import { useStore } from '../store'
 import { playerDisplayName, GoalIcon, AssistIcon, StatIcons, SubstitutePlayerCard, SubstitutionSelection } from '../components/ui'
@@ -21,6 +21,10 @@ import { kickoffFromAssignments, kickoffLineupForMatch, validateKickoffLineup } 
 
 type FormationSlotConfig = TacticalSlot
 type MatchDraftState = { slotAssignments: Record<string, string>; homeBench: string[]; events: MatchEvent[]; positionHistories: Record<string, PositionChange[]> }
+const localCalendarDate = () => {
+  const now = new Date(); const offset = now.getTimezoneOffset() * 60_000
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10)
+}
 
 function restoreDraft(match: Match | undefined, players: Player[]): { draft: MatchDraftState; starters: Record<string, string>; bench: string[] } | null {
   if (!match || !Array.isArray(match.appearances) || !Array.isArray(match.events)) return null
@@ -65,30 +69,46 @@ function fillFormationSlots(
   })
 }
 
-export function NewMatchScreen({
-  teamId,
-  requestedSeason,
-  editingMatchId,
-  onNavigate,
-}: {
+type NewMatchScreenProps = {
   teamId?: string
   requestedSeason?: string
   editingMatchId?: string
   onNavigate: (view: View) => void
-}) {
-  const { teams, players, matches, competitionStates = [], draftMatch, addMatch, updateMatch, saveDraftMatch, clearDraftMatch } = useStore()
-  const editingMatch = editingMatchId ? matches.find(match => match.id === editingMatchId) : undefined
-  const sourceMatch = editingMatch ?? draftMatch
-  const selectedTeamId = teamId ?? sourceMatch?.teamId ?? sourceMatch?.homeTeamId ?? teams[0]?.id ?? ''
-  const restored = useMemo(() => sourceMatch && (sourceMatch.teamId ?? sourceMatch.homeTeamId) === selectedTeamId ? restoreDraft(sourceMatch, players) : null, [sourceMatch, players, selectedTeamId])
+}
+
+/** Resolve an editor entity before mounting the hook-heavy editor. This keeps a
+ * bad edit request fail-closed without conditionally calling editor hooks. */
+export function NewMatchScreen(props: NewMatchScreenProps) {
+  const { teams, players, matches, draftMatch } = useStore()
+  const editingMatch = props.editingMatchId ? matches.find(match => match.id === props.editingMatchId) : undefined
+  if (props.editingMatchId && !editingMatch) return <div className="p-6 text-sm text-red-400">Match unavailable. Edit was not started.</div>
+  const editDraft = props.editingMatchId && draftMatch?.id === props.editingMatchId ? draftMatch : undefined
+  const candidate = props.editingMatchId ? editDraft ?? editingMatch : draftMatch
+  const sourceMatch = !props.editingMatchId && props.teamId && candidate && (candidate.teamId ?? candidate.homeTeamId) !== props.teamId ? undefined : candidate
+  const selectedTeamId = props.teamId ?? sourceMatch?.teamId ?? sourceMatch?.homeTeamId ?? teams[0]?.id ?? ''
+  const restored = sourceMatch && (sourceMatch.teamId ?? sourceMatch.homeTeamId) === selectedTeamId ? restoreDraft(sourceMatch, players) : null
+  if (props.editingMatchId && !restored) return <div className="p-6 text-sm text-red-400">Match unavailable. Its saved lineup cannot be restored safely.</div>
+  return <MatchEditor {...props} sourceMatch={sourceMatch} selectedTeamId={selectedTeamId} restored={restored} />
+}
+
+function MatchEditor({
+  teamId,
+  requestedSeason,
+  editingMatchId,
+  onNavigate,
+  sourceMatch,
+  selectedTeamId,
+  restored,
+}: NewMatchScreenProps & { sourceMatch?: Match; selectedTeamId: string; restored: ReturnType<typeof restoreDraft> }) {
+  const { teams, players, matches, competitionStates = [], addMatch, updateMatch, saveDraftMatch, clearDraftMatch } = useStore()
   const [draftId] = useState(() => restored ? sourceMatch!.id : crypto.randomUUID())
   const savingRef = useRef(false)
   const completedSeasons = useMemo(() => competitionStates.filter(state => state.kind === 'season-complete').map(state => state.season), [competitionStates])
-  const nextMatch = useMemo(() => getNextMatchDayForTeam(selectedTeamId, matches, completedSeasons), [selectedTeamId, matches, completedSeasons])
   const [competitionType, setCompetitionType] = useState<CompetitionType>(() => restored ? matchCompetitionType(sourceMatch!) : 'league')
+  const nextMatch = useMemo(() => getNextMatchDayForTeam(selectedTeamId, matches, completedSeasons, competitionType), [selectedTeamId, matches, completedSeasons, competitionType])
   const season = restored ? sourceMatch!.season : requestedSeason ?? nextMatch.season
-  const matchDay = restored ? sourceMatch!.matchDay : competitionMatches(matches, season, competitionType).filter(match => match.teamId === selectedTeamId || match.homeTeamId === selectedTeamId || match.awayTeamId === selectedTeamId).length + 1
-  const date = restored ? sourceMatch!.date : new Date().toISOString().split('T')[0]
+  const matchDay = restored ? sourceMatch!.matchDay : nextMatch.matchDay
+  const [date, setDate] = useState(() => restored ? sourceMatch!.date : localCalendarDate())
   const recentAssignments = useMemo(() => restored ? null : getMostRecentStartingLineup(matches, selectedTeamId), [restored, matches, selectedTeamId]);
 
   const [step, setStep] = useState(() => restored?.draft.events.length ? 1 : 0) // 0: Lineups, 1: Events
@@ -217,12 +237,13 @@ export function NewMatchScreen({
   function saveLiveEvent() {
     if (!liveEvent || !minuteIsValid) return
     const id = crypto.randomUUID()
-    const writeEvent = (event: MatchEvent) => setMatchDraft(prev => ({ ...prev, events: editingEventId ? prev.events.map((e) => e.id === editingEventId ? { ...event, sequence: e.sequence } : e) : [...prev.events, { ...event, sequence: nextTimelineSequence(prev.events, prev.positionHistories) }] }))
+    const writeEvent = (event: MatchEvent) => setMatchDraft(prev => ({ ...prev, events: editingEventId ? prev.events.map((e) => e.id === editingEventId ? { ...e, ...event, sequence: e.sequence } : e) : [...prev.events, { ...event, sequence: nextTimelineSequence(prev.events, prev.positionHistories) }] }))
     const minute = Number(minuteInput); if (!Number.isInteger(minute) || minute < 0 || minute > 99) return
     setAppliedMinute(minute)
     if (liveEvent === 'goal') {
       if (!liveScorerId || !assistChosen || !eligibleGoalIds.includes(liveScorerId) || (liveAssistId && (!eligibleGoalIds.includes(liveAssistId) || liveScorerId === liveAssistId))) return
-      writeEvent({ id: editingEventId ?? id, type: 'goal', minute, teamId: selectedTeamId, playerId: liveScorerId || undefined, assistPlayerId: liveScorerId ? liveAssistId || undefined : undefined, goalType: 'normal' })
+      const existingGoal = editingEventId ? matchDraft.events.find((event): event is Extract<MatchEvent, { type: 'goal' }> => event.id === editingEventId && event.type === 'goal') : undefined
+      writeEvent({ ...existingGoal, id: editingEventId ?? id, type: 'goal', minute, teamId: selectedTeamId, playerId: liveScorerId || undefined, assistPlayerId: liveScorerId ? liveAssistId || undefined : undefined, goalType: existingGoal?.goalType ?? 'normal' })
     } else if (liveEvent === 'conceded') {
       if (liveCauseId && !eligibleGoalIds.includes(liveCauseId)) return
       writeEvent({ id: editingEventId ?? id, type: 'goal', minute, teamId: opponentId, playerId: undefined, concededGoalCausePlayerId: liveCauseId || undefined })
@@ -470,7 +491,7 @@ export function NewMatchScreen({
   return (
     <div className="flex h-full min-h-0 flex-col bg-black text-white">
       <div className="px-4 pt-3">
-        <button onClick={() => onNavigate(teamId ? { name: 'team', id: teamId } : { name: 'teams' })} className="mb-3 text-xs font-semibold text-emerald-400">← Cancel</button>
+        <button onClick={() => { if (editingMatchId) clearDraftMatch(); onNavigate(teamId ? { name: 'team', id: teamId } : { name: 'teams' }) }} className="mb-3 text-xs font-semibold text-emerald-400">← Cancel</button>
         <h1 className="text-2xl font-bold">Log Match</h1>
         <div className="mb-2 flex items-center justify-between rounded-xl bg-zinc-900 px-3 py-1">
           <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Current Matchday</p>
@@ -484,6 +505,7 @@ export function NewMatchScreen({
           <div className="space-y-6">
             <div className="space-y-3">
               <div><p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">Competition</p><div className="grid grid-cols-3 gap-1 rounded-xl bg-zinc-900 p-1">{(['league', 'cup', 'champions'] as CompetitionType[]).map(type => <button key={type} type="button" aria-pressed={competitionType === type} disabled={lineupLocked} onClick={() => setCompetitionType(type)} className={`rounded-lg py-2 text-[10px] font-black ${competitionType === type ? 'bg-emerald-500 text-black' : 'text-zinc-400'}`}>{type === 'league' ? 'League' : type === 'cup' ? 'Cup' : 'Champions'}</button>)}</div><p className="mt-2 text-xs text-zinc-400">{competitionType === 'league' ? 'Regular league match' : `${String(assignment.stage).replace(/([A-Z])/g, ' $1')} · ${opponentName}`}</p>{!assignment.available && <p role="alert" className="mt-1 text-xs font-semibold text-amber-300">{assignment.message}</p>}</div>
+              <label className="block text-[10px] font-bold uppercase text-zinc-500">Match date<input type="date" value={date} disabled={lineupLocked} onChange={event => setDate(event.target.value)} className="mt-1 w-full rounded-xl bg-zinc-900 px-3 py-2 text-sm font-black text-white disabled:opacity-60" /></label>
               <div className="text-[10px] font-bold uppercase text-zinc-500">Formation<div className="mt-1 rounded-xl bg-zinc-900 px-3 py-2 text-sm font-black text-white">{activeFormationName}</div><span className="mt-1 block text-[9px] normal-case text-zinc-500">Calculated from current tactical slots</span></div>
             </div>
 

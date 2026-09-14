@@ -40,8 +40,7 @@ export function kickoffFromAssignments(assignments: Record<string, string>, exac
     const definition = tacticalSlotById[id]
     return definition && playerId ? [{ id, playerId, matchPosition: definition.ratingPosition, ratingPosition: definition.ratingPosition, displayPosition: definition.displayPosition, x: definition.x, y: definition.y }] : []
   })
-  if (!validateKickoffLineup(lineup, exact).valid) return lineup
-  return lineup
+  return validateKickoffLineup(lineup, exact).valid ? lineup : []
 }
 
 function teamStarters(match: Match, teamId: string): Appearance[] {
@@ -102,10 +101,17 @@ export function reconstructLegacyKickoffLineup(match: Match, teamId: string): Fo
 /** Modern matches render their immutable snapshot directly; old matches have one
  * deterministic compatibility route rather than per-screen reconstruction. */
 export function kickoffLineupForMatch(match: Match, teamId: string): FormationSlot[] {
-  const modern = (match.kickoffLineup ?? []).filter(slot => Boolean(slot.playerId))
-  if (modern.length && validateKickoffLineup(modern, false).valid) return modern.map(slot => {
+  // Presence of a snapshot marks a modern match. Corruption must fail closed;
+  // falling back to legacy guessing would silently change a known kickoff XI.
+  const snapshot = match.kickoffLineup ?? []
+  const isModernSnapshot = snapshot.some(slot => slot.ratingPosition !== undefined || slot.displayPosition !== undefined)
+  if (isModernSnapshot) {
+    const modern = snapshot.filter(slot => Boolean(slot.playerId))
+    if (!validateKickoffLineup(modern).valid) return []
+    return modern.map(slot => {
     const definition = tacticalSlotById[slot.id]
     return { ...slot, matchPosition: slot.ratingPosition ?? slot.matchPosition ?? definition?.ratingPosition ?? 'CM', ratingPosition: slot.ratingPosition ?? slot.matchPosition ?? definition?.ratingPosition, displayPosition: slot.displayPosition ?? definition?.displayPosition, x: slot.x ?? definition?.x ?? 50, y: slot.y ?? definition?.y ?? 50 }
   })
+  }
   return reconstructLegacyKickoffLineup(match, teamId)
 }

@@ -12,6 +12,7 @@ import type {
 import { ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, pitchWindow, matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import { kickoffLineupForMatch } from './kickoffLineup'
+import { compareMatchChronology, newestMatches } from './matchChronology'
 
 
 export function seasonsFromMatches(matches: Match[]): string[] {
@@ -580,9 +581,7 @@ function actuallyPlayed(match: Match, playerId: string): boolean {
 }
 
 function compareMostRecentMatch(a: SeasonParticipation, b: SeasonParticipation): number {
-  return b.match.matchDay - a.match.matchDay ||
-    b.match.date.localeCompare(a.match.date) ||
-    b.match.id.localeCompare(a.match.id)
+  return compareMatchChronology(b.match, a.match)
 }
 
 function candidateOrder(a: UnifiedCandidate, b: UnifiedCandidate): number {
@@ -696,9 +695,7 @@ export function bestEleven(
 }
 
 export function teamMatches(matches: Match[], teamId: string): Match[] {
-  return matches
-    .filter((m) => m.homeTeamId === teamId || m.awayTeamId === teamId)
-    .sort((a, b) => b.matchDay - a.matchDay || b.date.localeCompare(a.date))
+  return newestMatches(matches.filter((m) => m.homeTeamId === teamId || m.awayTeamId === teamId))
 }
 
 export function latestTeamMatch(matches: Match[], teamId: string, season: string): Match | undefined {

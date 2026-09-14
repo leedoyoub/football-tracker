@@ -16,7 +16,7 @@ test('date-only legacy matches sort newest-first with deterministic tie breakers
   assert.equal(JSON.stringify(matches), before)
 })
 
-test('timestamps take priority and ties preserve newest creation order', () => {
+test('same-date timestamps break ties and preserve deterministic creation ordering', () => {
   const matches = [game('latest', { playedAt: '2026-09-08', createdAt: '2020-01-01' }), game('old', { createdAt: '2026-09-01' }), game('tie1', { timestamp: 1788825600 }), game('tie2', { timestamp: 1788825600000 })]
   assert.deepEqual(ids(recentMatches(matches)), ['tie2', 'tie1', 'latest', 'old'])
   assert.deepEqual(ids(recentMatches([game('one', { playedAt: 'invalid', createdAt: '2026-09-08' }), game('two', { timestamp: '2026-09-01' })])), ['one', 'two'])
@@ -24,6 +24,11 @@ test('timestamps take priority and ties preserve newest creation order', () => {
 
 test('mixed imports use actual date-time then the date-only fallback', () => {
   assert.deepEqual(ids(recentMatches([game('new-time', { playedAt: '2026-09-08' }), game('legacy'), game('old-time', { playedAt: '2026-09-01' })])), ['new-time', 'old-time', 'legacy'])
+})
+
+test('the canonical match date outranks unrelated metadata timestamps', () => {
+  const matches = [game('dated-newer', { date: '2026-09-08', createdAt: '2020-01-01' }), game('dated-older', { date: '2026-09-01', playedAt: '2030-01-01' })]
+  assert.deepEqual(ids(recentMatches(matches)), ['dated-newer', 'dated-older'])
 })
 
 test('position display uses match position, preserves tactical labels, and never falls back to base position', () => {

@@ -29,7 +29,7 @@ export const displayPositionForSlot = (slotId: string): string | undefined => ta
 const namedFormations: Record<string, string[]> = {
   '4-3-3': ['LB', 'LCB', 'RCB', 'RB', 'LCM', 'CM', 'RCM', 'LW', 'ST', 'RW', 'GK'],
   '4-2-1-3': ['LB', 'LCB', 'RCB', 'RB', 'LDM', 'RDM', 'CAM', 'LW', 'ST', 'RW', 'GK'],
-  '4-2-3-1': ['LB', 'LCB', 'RCB', 'RB', 'LDM', 'RDM', 'LW', 'CAM', 'RW', 'ST', 'GK'],
+  '4-2-3-1': ['LB', 'LCB', 'RCB', 'RB', 'LDM', 'RDM', 'LCAM', 'CAM', 'RCAM', 'ST', 'GK'],
   '4-4-2': ['LB', 'LCB', 'RCB', 'RB', 'LM', 'LCM', 'RCM', 'RM', 'LST', 'RST', 'GK'],
   '3-4-1-2': ['LCB', 'CB', 'RCB', 'LM', 'LCM', 'RCM', 'RM', 'CAM', 'LST', 'RST', 'GK'],
   '3-5-2': ['LCB', 'CB', 'RCB', 'LM', 'LCM', 'CM', 'RCM', 'RM', 'LST', 'RST', 'GK'],

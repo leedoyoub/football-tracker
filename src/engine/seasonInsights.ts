@@ -4,6 +4,7 @@ import { combinationStats, goalPartnerships, starterSubstituteSplits } from './a
 import { GOOD_RATING_THRESHOLD } from './constants'
 import { classifyGoalTypes } from './goalTypes'
 import type { CompetitionState, Match, MatchEvent, Player } from '../types'
+import { compareMatchChronology } from './matchChronology'
 
 /** All season insight calculations live here so none of them require extra match input. */
 export const STARTING_XI_MIN_SAMPLE = 3
@@ -12,7 +13,7 @@ type GoalEvent = Extract<MatchEvent, { type: 'goal' }>
 type OrderedGoal = { event: GoalEvent; index: number; scoringTeamId: string; homeBefore: number; awayBefore: number; homeAfter: number; awayAfter: number }
 
 function orderedMatches(matches: Match[]) {
-  return matches.slice().sort((a, b) => a.matchDay - b.matchDay || a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
+  return matches.slice().sort(compareMatchChronology)
 }
 
 function scoredBy(event: GoalEvent, match: Match) {

@@ -57,7 +57,7 @@ export function resultModifier(match: Match, teamId: string): number {
   const score = matchScore(match)
   const scored = teamId === match.homeTeamId ? score.home : score.away
   const conceded = teamId === match.homeTeamId ? score.away : score.home
-  return scored > conceded ? .1 : scored < conceded ? -.1 : 0
+  return scored > conceded ? .1 : scored < conceded ? -.3 : 0
 }
 
 function eventValue(match: Match, appearance: Appearance, event: MatchEvent, key: 'goal' | 'assist' | 'teamGoal' | 'conceded'): number {

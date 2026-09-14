@@ -90,3 +90,9 @@ test('every supported and generated formation contains eleven unique slot IDs an
     assert.equal(new Set(slots.map(slot => `${slot.x},${slot.y}`)).size, 11, name)
   }
 })
+
+test('4-2-3-1 uses the distinct attacking-midfield tactical slots', () => {
+  const slots = FORMATION_SLOTS['4-2-3-1']
+  assert.deepEqual(slots.slice(6, 9).map(slot => slot.slot), ['LCAM', 'CAM', 'RCAM'])
+  assert.deepEqual(slots.slice(6, 9).map(slot => slot.matchPosition), ['CAM', 'CAM', 'CAM'])
+})

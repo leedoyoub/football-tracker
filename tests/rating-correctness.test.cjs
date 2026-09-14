@@ -47,7 +47,7 @@ for (const [label, role, events, minutes, penalty] of [
   ['multiple goals and one result modifier', 'starter', [goal('one', 15), goal('two', 25), goal('three', 35)], 90, -1.05],
 ]) test(label, () => {
   const p = player(), m = game(p, events, { appearances: [app(p, role)] }), r = rating.ratePlayerMatch(m, p)
-  assert.equal(r.minutes, minutes); near(r.conceded, penalty); near(r.result, -.1)
+  assert.equal(r.minutes, minutes); near(r.conceded, penalty); near(r.result, -.3)
 })
 test('unused bench has no rating', () => { const p = player(); assert.equal(rating.ratePlayerMatch(game(p, [], { appearances: [app(p, 'bench')] }), p), null) })
 test('position lookup at full time does not resurrect a substituted-off player', () => {

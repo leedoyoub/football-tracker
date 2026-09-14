@@ -2,6 +2,7 @@ import { competitionHistory, cupCompetition, championsCompetition, CHAMPIONS_ROU
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
 import { seasonStandings } from './standings'
+import { compareMatchChronology } from './matchChronology'
 
 export type NewsKind = 'player' | 'match' | 'team'
 export type NewsItem = { id: string; kind: NewsKind; date: string; matchId?: string; playerId?: string; teamId?: string; eyebrow: string; title: string; detail: string; context: string; emoji: string }
@@ -11,7 +12,7 @@ type Streak = { scoring: number; contribution: number }
 type TeamRun = { wins: number; unbeaten: number; cleanSheets: number; seasonGoals: number; seasonCleanSheets: number }
 
 const emptyTotals = (): Totals => ({ goals: 0, assists: 0, apps: 0, mom: 0, saves: 0, cleanSheets: 0 })
-const ordered = (matches: Match[]) => [...new Map(matches.map(match => [match.id, match])).values()].sort((a, b) => a.date.localeCompare(b.date) || a.matchDay - b.matchDay || a.id.localeCompare(b.id))
+const ordered = (matches: Match[]) => [...new Map(matches.map(match => [match.id, match])).values()].sort(compareMatchChronology)
 const playerName = (players: Player[], id?: string) => players.find(player => player.id === id)?.displayName ?? players.find(player => player.id === id)?.name ?? 'Player'
 const teamName = (teams: Team[], id?: string) => teams.find(team => team.id === id)?.name ?? 'Team'
 const competitionName = (type: CompetitionType) => type === 'league' ? 'League' : type === 'cup' ? 'Cup' : 'Champions'

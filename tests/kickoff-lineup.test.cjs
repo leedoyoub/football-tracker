@@ -24,3 +24,12 @@ test('legacy repeated semantic positions receive unused tactical slots without m
   assert.equal(new Set(lineup.map(slot => slot.playerId)).size, 11)
   assert.equal(JSON.stringify(match), before)
 })
+
+test('an incomplete modern kickoff snapshot fails closed instead of being guessed from appearances', () => {
+  const match = {
+    id: 'broken-modern', season: 'S', matchDay: 1, date: '2026-09-01', duration: 90, homeTeamId: 'A', awayTeamId: 'B', events: [],
+    appearances: [{ playerId: 'p1', teamId: 'A', position: 'GK', matchPosition: 'GK', role: 'starter' }],
+    kickoffLineup: [{ id: 'GK', playerId: 'p1', matchPosition: 'GK', ratingPosition: 'GK', displayPosition: 'GK', x: 50, y: 88 }],
+  }
+  assert.deepEqual(kickoffLineupForMatch(match, 'A'), [])
+})

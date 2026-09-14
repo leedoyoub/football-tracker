@@ -1,4 +1,4 @@
-import type { AppState, Player } from '../types';
+import { POSITIONS, type AppState, type Player } from '../types';
 import { getFromIndexedDB, saveToIndexedDB } from './db';
 import { validateState } from './validation';
 
@@ -30,7 +30,7 @@ export const LocalRepository = {
             teams: parsed.teams,
             players: parsed.players.map((player: Player) => ({
               ...player,
-              position: player.position || 'CM',
+              position: POSITIONS.includes(player.position) ? player.position : 'CM',
               teamIds: player.teamIds ?? (player.teamId ? [player.teamId] : [])
             })),
           };
@@ -74,14 +74,5 @@ export const LocalRepository = {
     const parsed = JSON.parse(jsonString);
     if (!validateState(parsed)) throw new Error('Invalid JSON structure');
     await this.saveAppState(parsed);
-  }
-};
-
-export const SyncManager = {
-  async queueOperation(op: any): Promise<void> {
-    console.log('Queueing operation', op);
-  },
-  async sync(): Promise<void> {
-    console.log('Syncing...');
   }
 };

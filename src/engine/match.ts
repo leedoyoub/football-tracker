@@ -1,4 +1,4 @@
-import type { Match } from '../types'
+import type { CompetitionType, Match } from '../types'
 
 export function getTeamMatches(matches: Match[], teamId: string): Match[] {
   return matches
@@ -10,7 +10,8 @@ export function getTeamMatches(matches: Match[], teamId: string): Match[] {
     })
 }
 
-export function getNextMatchDayForTeam(teamId: string, matches: Match[], completedSeasons: string[] = []): { season: string; matchDay: number } {
+/** MatchDay is a competition-scoped schedule number, never actual chronology. */
+export function getNextMatchDayForTeam(teamId: string, matches: Match[], completedSeasons: string[] = [], competitionType: CompetitionType = 'league'): { season: string; matchDay: number } {
   const teamMatches = getTeamMatches(matches, teamId)
   if (teamMatches.length === 0) {
     return { season: 'Season 1', matchDay: 1 }
@@ -24,5 +25,9 @@ export function getNextMatchDayForTeam(teamId: string, matches: Match[], complet
   }
   // League MD38 alone no longer rolls the app into a new season. Cup and
   // Champions may still need matches in this season before explicit completion.
-  return { season: `Season ${lastSeasonNum}`, matchDay: lastMatch.matchDay + 1 }
+  const competitionMatchDays = teamMatches
+    .filter(match => match.season === lastMatch.season && (match.competitionType ?? 'league') === competitionType)
+    .map(match => match.matchDay)
+    .filter(Number.isInteger)
+  return { season: `Season ${lastSeasonNum}`, matchDay: Math.max(0, ...competitionMatchDays) + 1 }
 }

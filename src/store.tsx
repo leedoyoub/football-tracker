@@ -170,8 +170,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }))
       },
       importPlayers: (imports) => {
-        const nextPlayers = applySquadImport(state.players, imports, () => crypto.randomUUID())
-        update(() => ({ ...state, players: nextPlayers }))
+        update((prev) => ({ ...prev, players: applySquadImport(prev.players, imports, () => crypto.randomUUID()) }))
       },
       addMatch: (match) => {
         const id = match.id ?? crypto.randomUUID()
@@ -191,10 +190,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       saveDraftMatch,
       clearDraftMatch,
       deleteMatch: (id: string) => {
-        update((prev) => prev.matches.some(match => match.id === id) ? ({ ...prev, matches: prev.matches.filter((m) => m.id !== id) }) : prev, (current, prev) => ({ competitionRevisions: reviseChangedMatch(current.competitionRevisions, prev.matches.find(item => item.id === id), undefined), teamCatalogRevision: current.teamCatalogRevision }))
+        update((prev) => prev.matches.some(match => match.id === id) ? ({ ...prev, matches: prev.matches.filter((m) => m.id !== id), ...(prev.draftMatch?.id === id ? { draftMatch: undefined } : {}) }) : prev, (current, prev) => ({ competitionRevisions: reviseChangedMatch(current.competitionRevisions, prev.matches.find(item => item.id === id), undefined), teamCatalogRevision: current.teamCatalogRevision }))
       },
       deleteAllMatches: () => {
-        update((prev) => ({ ...prev, matches: [] }), (current, prev) => ({ competitionRevisions: reconcileCompetitionRevisions(current.competitionRevisions, prev.matches, []), teamCatalogRevision: current.teamCatalogRevision }))
+        update((prev) => ({ ...prev, matches: [], draftMatch: undefined, competitionStates: [] }), (current, prev) => ({ competitionRevisions: reconcileCompetitionRevisions(current.competitionRevisions, prev.matches, []), teamCatalogRevision: current.teamCatalogRevision }))
       },
       setChampionsDraw: (season, teamIds) => {
         const draw: CompetitionState = { id: `champions:${season}`, season, kind: 'champions-draw', teamIds: [...teamIds] }
