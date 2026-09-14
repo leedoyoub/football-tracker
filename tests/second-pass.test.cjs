@@ -19,11 +19,11 @@ test('second-pass regression: CB entering at 77 receives both later conceded-goa
   ])
   const rating = ratePlayerMatch(match, player)
   assert.equal(rating.minutes, 13)
-  assert.equal(rating.noConceded, 1.35 * .73 * 13 / 90)
+  assert.equal(rating.noConceded, 1.35 * .20 * 13 / 90)
   assert.equal(rating.conceded, -.7)
   assert.equal(rating.result, -.3)
-  assert(Math.abs(rating.raw - 5.64235) < 1e-10)
-  assert.equal(rating.rating.toFixed(1), '5.6')
+  assert(Math.abs(rating.raw - 5.539) < 1e-10)
+  assert.equal(rating.rating.toFixed(1), '5.5')
 })
 
 test('same-minute event ordering preserves saved legacy order', () => {

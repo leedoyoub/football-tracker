@@ -61,6 +61,9 @@ export function moveSubstitution(
 ): SubstitutionDraft {
   if (!Number.isInteger(minute) || minute < 0 || minute > 99 || source.group === 'squad' || target.group === 'squad') return draft
   if ([source, target].some(item => item.group === 'starting' && !positions[item.id])) return draft
+  // A goalkeeper is fixed for the match: live tactical changes can never
+  // enter, leave, or exchange the GK slot.
+  if ([source, target].some(item => item.group === 'starting' && positions[item.id] === 'GK')) return draft
   const subs = draft.events.filter((event): event is Extract<MatchEvent, { type: 'sub' }> => event.type === 'sub')
   if (subs.some(event => event.minute > minute) || Object.values(draft.positionHistories).some(history => history.some(change => change.minute > minute))) return draft
   const next = moveLineup(draft, source, target)

@@ -143,7 +143,6 @@ function MatchEditor({
   const [liveAssistId, setLiveAssistId] = useState('')
   const [liveCauseId, setLiveCauseId] = useState('')
   const [livePicker, setLivePicker] = useState<'scorer' | 'assist' | 'cause' | 'minute'>('scorer')
-  const totalSavesEventId = useRef<string | null>(matchDraft.events.find(event => event.type === 'save')?.id ?? null)
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
   const [substitutionDraft, setSubstitutionDraft] = useState<SubstitutionDraft | null>(null)
   const [subSelection, setSubSelection] = useState<LineupTarget | null>(null)
@@ -307,9 +306,22 @@ function MatchEditor({
   }
 
   const slotPositions = Object.fromEntries(UNIVERSAL_TACTICAL_SLOTS.map(slot => [slot.slot, slot.matchPosition]))
+  const isGoalkeeperPlayer = (id: string | undefined) => players.find(player => player.id === id)?.position === 'GK'
+  function allowsGoalkeeperMove(source: LineupTarget, target: LineupTarget, lineup: { slotAssignments: Record<string, string> }, live: boolean) {
+    const sourceId = source.group === 'starting' ? lineup.slotAssignments[source.id] : source.id
+    const targetId = target.group === 'starting' ? lineup.slotAssignments[target.id] : target.id
+    const sourceGKSlot = source.group === 'starting' && slotPositions[source.id] === 'GK'
+    const targetGKSlot = target.group === 'starting' && slotPositions[target.id] === 'GK'
+    if (live && (sourceGKSlot || targetGKSlot || isGoalkeeperPlayer(sourceId) || isGoalkeeperPlayer(targetId))) return false
+    if (sourceGKSlot || (sourceId && isGoalkeeperPlayer(sourceId) && !targetGKSlot)) return false
+    if (targetGKSlot && !isGoalkeeperPlayer(sourceId)) return false
+    if (targetId && isGoalkeeperPlayer(targetId)) return false
+    return true
+  }
 
   function applyLiveMove(source: LineupTarget, target: LineupTarget) {
     if (!substitutionDraft) return
+    if (!allowsGoalkeeperMove(source, target, substitutionDraft, true)) { setSubstitutionError('The goalkeeper is fixed for this match.'); setSubSelection(null); return }
     if (minuteInput === '' || pendingMoves.current.length) {
       const preview = moveLineup(substitutionDraft, source, target)
       if (preview === substitutionDraft) return
@@ -362,12 +374,13 @@ function MatchEditor({
     }
     const source: LineupTarget = { group: activePlayer.group, id: activePlayer.group === 'starting' ? activePlayer.slotId! : activePlayer.id }
     if (source.group === target.group && source.id === target.id) { setActivePlayer(null); return }
+    if (!allowsGoalkeeperMove(source, target, matchDraft, false)) { setHistoryError('Goalkeepers can only occupy the fixed GK slot.'); setActivePlayer(null); return }
     setMatchDraft(prev => ({ ...prev, ...moveLineup(prev, source, target) }))
     setActivePlayer(null)
   }
 
   const kickoffSnapshot = useMemo(() => kickoffFromAssignments(startingSnapshot), [startingSnapshot])
-  const kickoffIsValid = validateKickoffLineup(kickoffSnapshot).valid
+  const kickoffIsValid = validateKickoffLineup(kickoffSnapshot).valid && isGoalkeeperPlayer(startingSnapshot.GK) && Object.values(startingSnapshot).filter(isGoalkeeperPlayer).length === 1
   const appearances: Appearance[] = useMemo(() => {
     const res: Appearance[] = []
     const source = lineupLocked ? startingSnapshot : matchDraft.slotAssignments
@@ -449,21 +462,16 @@ function MatchEditor({
   }
 
   const startingGoalkeeperId = startingSnapshot.GK
-  // End-of-match total saves belong to whoever is currently in the GK tactical
-  // slot, not automatically to the kickoff goalkeeper after a substitution.
-  const activeGoalkeeperId = matchDraft.slotAssignments.GK ?? startingGoalkeeperId
-  const totalSavesEvent = matchDraft.events.find((event): event is Extract<MatchEvent, { type: 'save' }> => event.type === 'save' && event.id === totalSavesEventId.current)
+  const totalSavesEvent = matchDraft.events.find((event): event is Extract<MatchEvent, { type: 'save' }> => event.type === 'save' && event.teamId === selectedTeamId && event.playerId === startingGoalkeeperId)
   const totalSaves = totalSavesEvent ? String(totalSavesEvent.count ?? 0) : ''
   function changeTotalSaves(value: string) {
-    if (!/^\d*$/.test(value) || !activeGoalkeeperId || substitutionDraft) return
+    if (!/^\d*$/.test(value) || !startingGoalkeeperId || substitutionDraft) return
     const count = Number(value)
     if (!Number.isSafeInteger(count)) return
-    if (value !== '' && !totalSavesEventId.current) totalSavesEventId.current = crypto.randomUUID()
-    const eventId = totalSavesEventId.current
     setMatchDraft(prev => {
-      const existing = prev.events.find(event => event.id === eventId)
-      const event: MatchEvent = { id: eventId!, type: 'save', teamId: selectedTeamId, playerId: activeGoalkeeperId, count }
-      return { ...prev, events: value === '' ? prev.events.filter(event => event.id !== eventId) : existing ? prev.events.map(item => item.id === eventId ? event : item) : [...prev.events, event] }
+      const existing = prev.events.find((event): event is Extract<MatchEvent, { type: 'save' }> => event.type === 'save' && event.teamId === selectedTeamId && event.playerId === startingGoalkeeperId)
+      const event: MatchEvent = { id: existing?.id ?? crypto.randomUUID(), type: 'save', teamId: selectedTeamId, playerId: startingGoalkeeperId, count }
+      return { ...prev, events: value === '' ? prev.events.filter(item => item !== existing) : existing ? prev.events.map(item => item === existing ? event : item) : [...prev.events, event] }
     })
   }
 
@@ -511,7 +519,7 @@ function MatchEditor({
 
             <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Starting XI</h2><Pitch slots={universalPitchSlots} players={draftPlayers} teams={teams} statsByPlayer={seasonStats} badgeMode="position" substitutionSelection={startingSelection} draggable={false} onEmptySlotClick={(slot) => selectStartingTarget({ group: 'starting', id: slot.slot })} onSlotClick={(slot) => selectStartingTarget({ group: 'starting', id: slot.slot })} /></section>
             <RosterPlayerGroup title="Bench (Max 12)" group="substitute" team={teams.find(team => team.id === selectedTeamId)} players={sortPlayersByPosition([...matchDraft.homeBench.filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is NonNullable<typeof player> => Boolean(player)), ...squadPlayers.slice(0, Math.max(0, 12 - matchDraft.homeBench.length))], appearances)} statsByPlayer={seasonStats} selectedPlayerId={activePlayer?.id} onClick={(id) => selectStartingTarget({ group: 'substitute', id })} />
-            <button disabled={!validateKickoffLineup(kickoffFromAssignments(matchDraft.slotAssignments)).valid || !assignment.available} onClick={() => { if (!lineupLocked) { setStartingSnapshot({ ...matchDraft.slotAssignments }); setStartingBenchSnapshot([...matchDraft.homeBench]) } setStep(1) }} className="w-full rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl disabled:opacity-40">CONTINUE</button>
+            <button disabled={!validateKickoffLineup(kickoffFromAssignments(matchDraft.slotAssignments)).valid || !isGoalkeeperPlayer(matchDraft.slotAssignments.GK) || Object.values(matchDraft.slotAssignments).filter(isGoalkeeperPlayer).length !== 1 || !assignment.available} onClick={() => { if (!lineupLocked) { setStartingSnapshot({ ...matchDraft.slotAssignments }); setStartingBenchSnapshot([...matchDraft.homeBench]) } setStep(1) }} className="w-full rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl disabled:opacity-40">CONTINUE</button>
           </div>
         )}
 

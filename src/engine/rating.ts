@@ -33,7 +33,17 @@ export const POSITION_RULES: Record<Position, PositionRules> = {
 }
 
 export const SOT_MULTIPLIERS = [1, .86, .73, .62, .53, .45, .38, .32, .27, .23] as const
-export function sotMultiplier(opponentSOT: number): number { return opponentSOT >= 10 ? .20 : SOT_MULTIPLIERS[Math.max(0, Math.floor(opponentSOT))] ?? .20 }
+/** Preserves the historic table at integer SOT values while smoothly handling
+ * interval-normalised fractional SOT/90 values. */
+export function sotMultiplier(opponentSOT: number): number {
+  if (!Number.isFinite(opponentSOT) || opponentSOT <= 0) return SOT_MULTIPLIERS[0]
+  if (opponentSOT >= 10) return .20
+  const lower = Math.floor(opponentSOT)
+  const fraction = opponentSOT - lower
+  const start = SOT_MULTIPLIERS[lower] ?? .20
+  const end = SOT_MULTIPLIERS[lower + 1] ?? .20
+  return start + (end - start) * fraction
+}
 export function saveBonusPerSave(saveRate: number): number {
   if (saveRate >= .8) return .25
   if (saveRate >= .6) return .22
@@ -74,15 +84,21 @@ function saveCount(match: Match, appearance: Appearance): number {
   }, 0)
 }
 
+function validTeamSaveEvents(match: Match, teamId: string): Extract<MatchEvent, { type: 'save' }>[] {
+  return match.events.flatMap((event): Extract<MatchEvent, { type: 'save' }>[] => {
+    if (event.type !== 'save' || event.teamId !== teamId || !validCount(event.count ?? 1)) return []
+    const keeper = match.appearances.find(appearance => appearance.playerId === event.playerId && appearance.teamId === teamId)
+    if (!keeper) return []
+    const isGoalkeeper = event.minute === undefined
+      ? matchPositionSegments(match, keeper).some(segment => segment.position === 'GK')
+      : matchPositionAtEvent(match, keeper, event) === 'GK'
+    return isGoalkeeper ? [event] : []
+  })
+}
+
 /** Team-level SOT proxy: every applicable own-team GK save plus goals conceded. */
 export function opponentSotProxy(match: Match, teamId: string): number {
-  const saves = match.events.reduce((total, event) => {
-    if (event.type !== 'save' || event.teamId !== teamId) return total
-    const keeper = match.appearances.find(appearance => appearance.playerId === event.playerId && appearance.teamId === teamId)
-    if (!keeper) return total
-    if (event.minute === undefined) return matchPositionSegments(match, keeper).some(segment => segment.position === 'GK') ? total + validCount(event.count ?? 1) : total
-    return matchPositionAtEvent(match, keeper, event) === 'GK' ? total + validCount(event.count ?? 1) : total
-  }, 0)
+  const saves = validTeamSaveEvents(match, teamId).reduce((total, event) => total + validCount(event.count ?? 1), 0)
   const goals = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && scoringTeamId(match, event) !== teamId).length
   return saves + goals
 }
@@ -192,10 +208,28 @@ export function ratePlayerMatch(match: Match, player: Player, revision = RATING_
 
 function suppressionByInterval(match: Match, appearance: Appearance) {
   const segments = matchPositionSegments(match, appearance)
-  const minutes = segments.reduce((total, row) => total + row.exit - row.enter, 0)
-  const multiplier = sotMultiplier(opponentSotProxy(match, appearance.teamId))
-  // Cap the total minutes factor once, preserving each position's actual share.
-  return segments.map(row => ({ ...row, minutes: row.exit - row.enter, bonus: POSITION_RULES[row.position].suppressionMax * multiplier * (row.exit - row.enter) / Math.max(90, minutes) }))
+  const totalMinutes = segments.reduce((total, row) => total + row.exit - row.enter, 0)
+  const duration = normalizeMatchTimeline(match).end
+  const saves = validTeamSaveEvents(match, appearance.teamId)
+  const undatedSaves = saves.filter(event => event.minute === undefined).reduce((total, event) => total + validCount(event.count ?? 1), 0)
+  const opponentGoals = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && scoringTeamId(match, event) !== appearance.teamId)
+  return segments.map(row => {
+    const minutes = row.exit - row.enter
+    const contains = (event: MatchEvent) => event.minute !== undefined && event.minute >= row.enter && event.minute <= row.exit && matchPositionAtEvent(match, appearance, event) === row.position
+    const exactTimedSaves = saves.filter(contains).reduce((total, event) => total + validCount(event.count ?? 1), 0)
+    const conceded = opponentGoals.filter(contains).length
+    const sot90 = minutes > 0 ? (exactTimedSaves + undatedSaves * minutes / duration + conceded) * 90 / minutes : 0
+    const multiplier = sotMultiplier(sot90)
+    return { ...row, minutes, sot90, multiplier, bonus: POSITION_RULES[row.position].suppressionMax * multiplier * minutes / Math.max(90, totalMinutes) }
+  })
+}
+
+/** Most-played position is the effective role for display/MOM. Alphabetical
+ * position order resolves exact-minute ties deterministically. */
+function effectivePosition(segments: ReturnType<typeof matchPositionSegments>): Position | undefined {
+  const minutes = new Map<Position, number>()
+  for (const segment of segments) minutes.set(segment.position, (minutes.get(segment.position) ?? 0) + segment.exit - segment.enter)
+  return [...minutes.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0]
 }
 
 function calculatePlayerMatch(match: Match, player: Player): RatingBreakdown | null {
@@ -204,7 +238,7 @@ function calculatePlayerMatch(match: Match, player: Player): RatingBreakdown | n
   const window = pitchWindow(match, appearance)
   if (!window || window.exit <= window.enter) return null
   const segments = matchPositionSegments(match, appearance)
-  const position = segments[0]?.position
+  const position = effectivePosition(segments)
   if (!position) return null
   const teamId = appearance.teamId
   const minutes = segments.reduce((total, row) => total + row.exit - row.enter, 0)
@@ -221,6 +255,8 @@ function calculatePlayerMatch(match: Match, player: Player): RatingBreakdown | n
   const saveBonus = goalkeeperSaves ? goalkeeperSaves * saveBonusPerSave(saveRate) : 0
   const breakdown: RatingBreakdown = {
     playerId: player.id, matchId: match.id, played: true, starter: appearance.role === 'starter', enter: window.enter, exit: window.exit, minutes, position,
+    // New match flows enforce one fixed GK, so a match has one base role.
+    // Legacy mixed-role records remain readable through the effective role.
     base: position === 'GK' ? GOALKEEPER_BASE_RATING : BASE_RATING, result: resultModifier(match, teamId),
     goals: goals.reduce((total, event) => total + eventValue(match, appearance, event, 'goal'), 0),
     assists: assists.reduce((total, event) => total + eventValue(match, appearance, event, 'assist'), 0),

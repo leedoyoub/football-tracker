@@ -351,8 +351,11 @@ export function buildGlobalRankingData(
       }, 0)
       saves += matchSaves
       const window = pitchWindow(match, appearance)
-      const isDefender = defenderRankingPosition(player.position)
-      const isGoalkeeper = goalkeeperPosition(player.position)
+      // Ranking eligibility follows the historical match role, just like the
+      // rating engine; a later transfer or role change cannot rewrite it.
+      const playedPositions = matchPositionSegments(match, appearance).map(segment => segment.position)
+      const isDefender = playedPositions.some(defenderRankingPosition)
+      const isGoalkeeper = playedPositions.some(goalkeeperPosition)
       if (window && isDefender && rating.minutes >= 60) {
         const score = matchScore(match)
         const conceded = appearance.teamId === match.homeTeamId ? score.away : score.home
@@ -418,9 +421,9 @@ export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Pla
   }
   const ranked = rows.flatMap(row => {
     const player = playerById.get(row.playerId)
-    if (!player || 
-        (metric === 'sotAllowed' && (!defenderRankingPosition(player.position) || !row.sotAllowedAppearances)) || 
-        ((metric === 'saves' || metric === 'goalsConceded' || metric === 'savePercentage' || metric === 'cleanSheets') && (!goalkeeperPosition(player.position) || !row.playedGoalkeeper))) return []
+    const requiresDefensiveSample = metric === 'sotAllowed' && !row.sotAllowedAppearances
+    const requiresGoalkeeperSample = (metric === 'saves' || metric === 'goalsConceded' || metric === 'savePercentage' || metric === 'cleanSheets') && !row.playedGoalkeeper
+    if (!player || requiresDefensiveSample || requiresGoalkeeperSample) return []
     const value = valueFor(row)
     return Number.isFinite(value) ? [{ ...row, value }] : []
   }).sort((a, b) => (metric === 'sotAllowed' || metric === 'goalsConceded' ? a.value - b.value : b.value - a.value) || b.avgRating - a.avgRating || a.playerId.localeCompare(b.playerId))
