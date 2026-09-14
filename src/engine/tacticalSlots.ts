@@ -26,7 +26,7 @@ export const tacticalSlotById = Object.fromEntries(TACTICAL_SLOT_DEFINITIONS.map
 export const ratingPositionForSlot = (slotId: string): Position | undefined => tacticalSlotById[slotId]?.ratingPosition
 export const displayPositionForSlot = (slotId: string): string | undefined => tacticalSlotById[slotId]?.displayPosition
 
-const namedFormations: Record<string, string[]> = {
+export const NAMED_TACTICAL_FORMATIONS: Record<string, string[]> = {
   '4-3-3': ['LB', 'LCB', 'RCB', 'RB', 'LCM', 'CM', 'RCM', 'LW', 'ST', 'RW', 'GK'],
   '4-2-1-3': ['LB', 'LCB', 'RCB', 'RB', 'LDM', 'RDM', 'CAM', 'LW', 'ST', 'RW', 'GK'],
   '4-2-3-1': ['LB', 'LCB', 'RCB', 'RB', 'LDM', 'RDM', 'LCAM', 'CAM', 'RCAM', 'ST', 'GK'],
@@ -34,4 +34,4 @@ const namedFormations: Record<string, string[]> = {
   '3-4-1-2': ['LCB', 'CB', 'RCB', 'LM', 'LCM', 'RCM', 'RM', 'CAM', 'LST', 'RST', 'GK'],
   '3-5-2': ['LCB', 'CB', 'RCB', 'LM', 'LCM', 'CM', 'RCM', 'RM', 'LST', 'RST', 'GK'],
 }
-export function tacticalSlotsForFormation(name: string | undefined): string[] | undefined { return name ? namedFormations[name] : undefined }
+export function tacticalSlotsForFormation(name: string | undefined): string[] | undefined { return name ? NAMED_TACTICAL_FORMATIONS[name] : undefined }

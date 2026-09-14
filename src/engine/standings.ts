@@ -14,6 +14,37 @@ export type Standing = {
   points: number
 }
 
+/** The non-result metrics used only after the conventional points columns tie. */
+export type StandingTieMetrics = { averageRating: number; opponentShotsOnTarget: number }
+
+/**
+ * Canonical League/Cup ordering.  The final team-id comparison deliberately
+ * makes a fully tied table deterministic without depending on store order.
+ */
+export function compareStandings(a: Standing, b: Standing, metrics: ReadonlyMap<string, StandingTieMetrics> = new Map()): number {
+  const left = metrics.get(a.teamId) ?? { averageRating: 0, opponentShotsOnTarget: 0 }
+  const right = metrics.get(b.teamId) ?? { averageRating: 0, opponentShotsOnTarget: 0 }
+  return b.points - a.points
+    || b.goalDifference - a.goalDifference
+    || b.goalsFor - a.goalsFor
+    || b.wins - a.wins
+    || right.averageRating - left.averageRating
+    || left.opponentShotsOnTarget - right.opponentShotsOnTarget
+    || a.teamId.localeCompare(b.teamId)
+}
+
+/** Whether two rows are tied before the deterministic final team-id fallback. */
+export function sameStandingMetrics(a: Standing, b: Standing, metrics: ReadonlyMap<string, StandingTieMetrics> = new Map()): boolean {
+  const left = metrics.get(a.teamId) ?? { averageRating: 0, opponentShotsOnTarget: 0 }
+  const right = metrics.get(b.teamId) ?? { averageRating: 0, opponentShotsOnTarget: 0 }
+  return a.points === b.points
+    && a.goalDifference === b.goalDifference
+    && a.goalsFor === b.goalsFor
+    && a.wins === b.wins
+    && left.averageRating === right.averageRating
+    && left.opponentShotsOnTarget === right.opponentShotsOnTarget
+}
+
 /** Builds the table directly from saved results; no standings state is persisted. */
 export function seasonStandings(teams: Team[], matches: Match[], season: string): Standing[] {
   const rows = new Map(teams.map((team) => [team.id, {
@@ -37,10 +68,10 @@ export function seasonStandings(teams: Team[], matches: Match[], season: string)
   }
 
   const ordered = [...rows.values()].map((row) => ({ ...row, goalDifference: row.goalsFor - row.goalsAgainst }))
-    .sort((a, b) => b.points - a.points || b.goalDifference - a.goalDifference || b.goalsFor - a.goalsFor)
+    .sort(compareStandings)
   let previous: Standing | undefined
   return ordered.map((row, index) => {
-    const tied = previous && row.points === previous.points && row.goalDifference === previous.goalDifference && row.goalsFor === previous.goalsFor
+    const tied = previous && sameStandingMetrics(row, previous)
     const ranked = { ...row, rank: tied ? previous!.rank : index + 1 }
     previous = ranked
     return ranked

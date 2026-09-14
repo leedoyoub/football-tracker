@@ -154,6 +154,8 @@ export interface Match {
   competitionStage?: CompetitionStage
   /** Stable tournament tie identity, e.g. roundOf16:0. */
   competitionPairingId?: string
+  /** Per-team Champions comparison-series row. New records use 1..3 (or 1..2 in the Final). */
+  competitionSeriesGame?: number
   matchDay: number
   date: string
   formation?: string

@@ -3,7 +3,7 @@ import { PlayerIcon } from './PlayerIcon'
 import { playerCompactName, playerDisplayName, Badge, SubstitutionMarker, SubstitutionSelection, ratingBadgeColor } from './ui'
 import { useRef } from 'react'
 import { DndContext, PointerSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type CollisionDetection, type DragEndEvent } from '@dnd-kit/core'
-import { TACTICAL_SLOT_DEFINITIONS } from '../engine/tacticalSlots'
+import { NAMED_TACTICAL_FORMATIONS, TACTICAL_SLOT_DEFINITIONS } from '../engine/tacticalSlots'
 
 export type TacticalSlot = { slot: string; position: Position; matchPosition: Position; x: number; y: number }
 
@@ -11,14 +11,8 @@ const grid: Record<string, TacticalSlot> = Object.fromEntries(TACTICAL_SLOT_DEFI
 
 export const UNIVERSAL_TACTICAL_SLOTS = Object.values(grid)
 const formation = (...ids: string[]) => ids.map((id) => grid[id])
-export const FORMATION_SLOTS: Record<string, TacticalSlot[]> = {
-  '4-3-3': formation('LB', 'LCB', 'RCB', 'RB', 'LCM', 'CM', 'RCM', 'LW', 'ST', 'RW', 'GK'),
-  '4-2-1-3': formation('LB', 'LCB', 'RCB', 'RB', 'LDM', 'RDM', 'CAM', 'LW', 'ST', 'RW', 'GK'),
-  '4-2-3-1': formation('LB', 'LCB', 'RCB', 'RB', 'LDM', 'RDM', 'LCAM', 'CAM', 'RCAM', 'ST', 'GK'),
-  '4-4-2': formation('LB', 'LCB', 'RCB', 'RB', 'LM', 'LCM', 'RCM', 'RM', 'LST', 'RST', 'GK'),
-  '3-4-1-2': formation('LCB', 'CB', 'RCB', 'LM', 'LCM', 'RCM', 'RM', 'CAM', 'LST', 'RST', 'GK'),
-  '3-5-2': formation('LCB', 'CB', 'RCB', 'LM', 'LCM', 'CM', 'RCM', 'RM', 'LST', 'RST', 'GK'),
-}
+/** Compatibility projection of the one canonical tactical formation catalogue. */
+export const FORMATION_SLOTS: Record<string, TacticalSlot[]> = Object.fromEntries(Object.entries(NAMED_TACTICAL_FORMATIONS).map(([name, ids]) => [name, formation(...ids)]))
 
 const ROW_SLOTS = {
   defenders: {

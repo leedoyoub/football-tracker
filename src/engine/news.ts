@@ -1,7 +1,6 @@
-import { competitionHistory, cupCompetition, championsCompetition, CHAMPIONS_ROUNDS, matchCompetitionType, teamCompetitionProgress } from './competition'
+import { competitionHistory, cupCompetition, championsCompetition, CHAMPIONS_ROUNDS, leagueCompetition, matchCompetitionType, teamCompetitionProgress } from './competition'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
-import { seasonStandings } from './standings'
 import { compareMatchChronology } from './matchChronology'
 
 export type NewsKind = 'player' | 'match' | 'team'
@@ -58,7 +57,7 @@ export function deriveNews(players: Player[], teams: Team[], matches: Match[], s
     
     // Team News: League Lead
     if (type === 'league') {
-      const standings = seasonStandings(teams, matches.filter(m => m.season === match.season && m.date <= match.date), match.season)
+      const standings = leagueCompetition(teams, matches.filter(m => m.season === match.season && m.date <= match.date), match.season, players).standings
       const leader = standings[0]
       if (leader) {
         const teamId = leader.teamId

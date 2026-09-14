@@ -17,7 +17,7 @@ export function HomeScreen({ season, onNavigate }: { season: string; onSeason?: 
   const { players, teams, matches, competitionStates = [] } = useStore()
   const tournamentTeams = useMemo(() => currentStaticTeams(teams), [teams])
   const draw = competitionStates.find(state => state.id === `champions:${season}`)
-  const league = useMemo(() => leagueCompetition(teams, matches, season), [teams, matches, season])
+  const league = useMemo(() => leagueCompetition(teams, matches, season, players), [teams, matches, season, players])
   const cup = useMemo(() => cupCompetition(tournamentTeams, matches, season, players), [tournamentTeams, matches, season, players])
   const champions = useMemo(() => championsCompetition(draw, matches, season, players), [draw, matches, season, players])
   const recent = useMemo(() => derivedResults(matches, teams).slice(0, 5), [matches, teams])

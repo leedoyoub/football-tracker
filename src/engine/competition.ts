@@ -1,5 +1,6 @@
 import { matchScore, rateMatch } from './rating'
-import { seasonStandings, type Standing } from './standings'
+import { compareStandings, sameStandingMetrics, seasonStandings, type Standing, type StandingTieMetrics } from './standings'
+import { LEAGUE_MATCHES_PER_TEAM } from './leagueFormat'
 import type { ChampionsStage, CompetitionStage, CompetitionState, CompetitionType, CupStage, Match, Player, Team } from '../types'
 
 export const CUP_STAGES: CupStage[] = ['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'stage6', 'stage7']
@@ -31,15 +32,15 @@ function hasPlayed(match: Match, teamId: string): boolean {
 }
 
 function sameStanding(a?: Standing, b?: Standing): boolean {
-  return Boolean(a && b && a.points === b.points && a.goalDifference === b.goalDifference && a.goalsFor === b.goalsFor)
+  return Boolean(a && b && sameStandingMetrics(a, b))
 }
 
-export function leagueCompetition(teams: Team[], matches: Match[], season: string) {
+export function leagueCompetition(teams: Team[], matches: Match[], season: string, players: Player[] = []) {
   const games = competitionMatches(matches, season, 'league')
-  const standings = seasonStandings(teams, games, season)
+  const standings = stageRanking(teams.map(team => team.id), games, season, players, `${season}:league`)
   const minimumTeamMatches = standings.length ? Math.min(...standings.map(row => row.played)) : 0
-  const matchdayProgress = Math.min(minimumTeamMatches + 1, 38)
-  const complete = standings.length > 0 && minimumTeamMatches >= 38
+  const matchdayProgress = Math.min(minimumTeamMatches + 1, LEAGUE_MATCHES_PER_TEAM)
+  const complete = standings.length > 0 && minimumTeamMatches >= LEAGUE_MATCHES_PER_TEAM
   return { standings, matches: games, matchdayProgress, complete, championId: complete ? standings[0]?.teamId : undefined }
 }
 
@@ -86,7 +87,7 @@ function allowedShots(teamId: string, games: Match[]): number {
 }
 
 function metricTie(a: StageMetric, b: StageMetric): boolean {
-  return sameStanding(a, b) && a.averageRating === b.averageRating && a.opponentShotsOnTarget === b.opponentShotsOnTarget
+  return sameStandingMetrics(a, b, new Map([[a.teamId, a], [b.teamId, b]]))
 }
 
 function stableDrawValue(seed: string, id: string): number {
@@ -95,8 +96,9 @@ function stableDrawValue(seed: string, id: string): number {
 
 function stageRanking(teamIds: string[], games: Match[], season: string, players: Player[], drawSeed: string): StageMetric[] {
   const basic = seasonStandings(teamIds.map(id => ({ id } as Team)), games, season)
-  return basic.map(row => ({ ...row, averageRating: averageTeamRating(row.teamId, games, players), opponentShotsOnTarget: allowedShots(row.teamId, games) }))
-    .sort((a, b) => b.points - a.points || b.goalDifference - a.goalDifference || b.goalsFor - a.goalsFor || b.averageRating - a.averageRating || a.opponentShotsOnTarget - b.opponentShotsOnTarget || stableDrawValue(drawSeed, a.teamId) - stableDrawValue(drawSeed, b.teamId))
+  const metrics = new Map<string, StandingTieMetrics>(basic.map(row => [row.teamId, { averageRating: averageTeamRating(row.teamId, games, players), opponentShotsOnTarget: allowedShots(row.teamId, games) }]))
+  return basic.map(row => ({ ...row, ...(metrics.get(row.teamId) ?? { averageRating: 0, opponentShotsOnTarget: 0 }) }))
+    .sort((a, b) => compareStandings(a, b, metrics) || stableDrawValue(drawSeed, a.teamId) - stableDrawValue(drawSeed, b.teamId))
     .map((row, index) => ({ ...row, rank: index + 1 }))
 }
 
@@ -199,6 +201,9 @@ export type ChampionsPairing = {
   winnerId?: string
   tied: boolean
   requiredMatches: number
+  /** New comparison-series data: each side's own independently recorded matches. */
+  teamGames?: Record<string, Match[]>
+  rowWinners?: (string | undefined)[]
 }
 
 export type ChampionsCompetition = {
@@ -218,12 +223,60 @@ function comparePair(teamIds: [string, string], games: Match[], players: Player[
   return forceWinner ? first?.teamId : undefined
 }
 
+function scoreForTeam(match: Match, teamId: string) {
+  const score = matchScore(match)
+  const home = match.homeTeamId === teamId || (match.teamId === teamId && match.homeTeamId !== teamId)
+  const goalsFor = home ? score.home : score.away
+  const goalsAgainst = home ? score.away : score.home
+  return { goalsFor, goalsAgainst, result: goalsFor > goalsAgainst ? 2 : goalsFor === goalsAgainst ? 1 : 0 }
+}
+
+/** Canonical per-row Champions comparison. Pairings compare independent team matches, never a direct fixture. */
+export function compareChampionsSeriesRow(firstId: string, first: Match, secondId: string, second: Match, players: Player[]): string {
+  const left = scoreForTeam(first, firstId), right = scoreForTeam(second, secondId)
+  const rating = (match: Match, teamId: string) => averageTeamRating(teamId, [match], players)
+  const order = [
+    left.result - right.result,
+    (left.goalsFor - left.goalsAgainst) - (right.goalsFor - right.goalsAgainst),
+    left.goalsFor - right.goalsFor,
+    rating(first, firstId) - rating(second, secondId),
+    allowedShots(secondId, [second]) - allowedShots(firstId, [first]),
+  ]
+  for (const value of order) if (value) return value > 0 ? firstId : secondId
+  return firstId.localeCompare(secondId) <= 0 ? firstId : secondId
+}
+
+function makeSeriesRound(stage: Exclude<ChampionsStage, 'finalReplay'>, pair: [string, string], games: Match[], players: Player[]) {
+  const requiredMatches = stage === 'final' ? 2 : 3
+  const ordered = (teamId: string) => games.filter(match => match.teamId === teamId || (!match.teamId && hasPlayed(match, teamId)))
+    .sort((a, b) => (a.competitionSeriesGame ?? Number.MAX_SAFE_INTEGER) - (b.competitionSeriesGame ?? Number.MAX_SAFE_INTEGER) || a.id.localeCompare(b.id))
+  const [firstId, secondId] = pair; const first = ordered(firstId), second = ordered(secondId)
+  if (first.length !== requiredMatches || second.length !== requiredMatches) return { requiredMatches, teamGames: { [firstId]: first, [secondId]: second }, rowWinners: [] as (string | undefined)[] }
+  const rowWinners = Array.from({ length: requiredMatches }, (_, index) => compareChampionsSeriesRow(firstId, first[index], secondId, second[index], players))
+  const wins = (teamId: string) => rowWinners.filter(id => id === teamId).length
+  let winnerId: string | undefined
+  if (wins(firstId) !== wins(secondId)) winnerId = wins(firstId) > wins(secondId) ? firstId : secondId
+  else {
+    // Each aggregate describes only that team's independently logged matches.
+    const left = stageRanking([firstId], first, first[0]?.season ?? '', players, `${stage}:${firstId}`)[0]
+    const right = stageRanking([secondId], second, second[0]?.season ?? '', players, `${stage}:${secondId}`)[0]
+    const values = [left.goalDifference - right.goalDifference, left.goalsFor - right.goalsFor, left.averageRating - right.averageRating, right.opponentShotsOnTarget - left.opponentShotsOnTarget]
+    winnerId = values.find(value => value !== 0)! > 0 ? firstId : values.every(value => value === 0) ? (firstId.localeCompare(secondId) <= 0 ? firstId : secondId) : secondId
+  }
+  return { requiredMatches, teamGames: { [firstId]: first, [secondId]: second }, rowWinners, winnerId }
+}
+
 function makeRound(stage: Exclude<ChampionsStage, 'finalReplay'>, teamIds: string[], matches: Match[], season: string, players: Player[]): ChampionsPairing[] {
   const requiredMatches = stage === 'final' ? 1 : 2
   return Array.from({ length: teamIds.length / 2 }, (_, index) => {
     const pair = [teamIds[index * 2], teamIds[index * 2 + 1]] as [string, string]
     const id = `${stage}:${index}`
     const games = competitionStageMatches(matches, season, 'champions', stage).filter(match => match.competitionPairingId === id)
+    const seriesMode = games.length === 0 || games.some(match => Number.isInteger(match.competitionSeriesGame))
+    if (seriesMode) {
+      const series = makeSeriesRound(stage, pair, games, players)
+      return { id, stage, teamIds: pair, matches: games, winnerId: series.winnerId, tied: false, requiredMatches: series.requiredMatches, teamGames: series.teamGames, rowWinners: series.rowWinners }
+    }
     let winnerId = games.length >= requiredMatches ? comparePair(pair, games, players, stage !== 'final', stage !== 'final') : undefined
     let tied = games.length >= requiredMatches && !winnerId
     const replayMatches = stage === 'final' ? competitionStageMatches(matches, season, 'champions', 'finalReplay').filter(match => match.competitionPairingId === id) : []
@@ -256,10 +309,13 @@ export function championsCompetition(draw: CompetitionState | undefined, matches
   return { drawn: true, drawCount, currentStage, rounds, championId: final?.winnerId, runnerUpId: final?.winnerId ? final.teamIds.find(id => id !== final.winnerId) : undefined }
 }
 
-export type CompetitionAssignment = { available: boolean; stage: CompetitionStage; pairingId?: string; opponentTeamId?: string; message?: string }
+export type CompetitionAssignment = { available: boolean; stage: CompetitionStage; pairingId?: string; seriesGame?: number; opponentTeamId?: string; message?: string }
 
 export function competitionAssignment(type: CompetitionType, season: string, teamId: string, teams: Team[], matches: Match[], draw?: CompetitionState): CompetitionAssignment {
-  if (type === 'league') return { available: true, stage: 'regular' as const }
+  if (type === 'league') {
+    const played = competitionMatches(matches, season, 'league').filter(match => hasPlayed(match, teamId)).length
+    return played >= LEAGUE_MATCHES_PER_TEAM ? { available: false, stage: 'regular' as const, message: 'This team has completed its 30-match League schedule.' } : { available: true, stage: 'regular' as const }
+  }
   if (type === 'cup') {
     const cup = cupCompetition(teams, matches, season)
     if (!cup.activeTeamIds.includes(teamId) || cup.championId) return { available: false, stage: cup.stage, message: cup.championId ? 'Cup is complete.' : 'This team has been eliminated.' }
@@ -272,22 +328,28 @@ export function competitionAssignment(type: CompetitionType, season: string, tea
   const lookupStage = champions.currentStage === 'finalReplay' ? 'final' : champions.currentStage
   const pairing = champions.rounds[lookupStage].find(item => item.teamIds.includes(teamId))
   if (!pairing || pairing.winnerId) return { available: false, stage: champions.currentStage, message: 'This team is not active in the current Champions round.' }
+  if (pairing.teamGames) {
+    const games = pairing.teamGames[teamId] ?? []
+    return games.length < pairing.requiredMatches
+      ? { available: true, stage: lookupStage, pairingId: pairing.id, seriesGame: games.length + 1, message: `${lookupStage === 'final' ? 'Final' : lookupStage.replace(/([A-Z])/g, ' $1')} · Game ${games.length + 1} of ${pairing.requiredMatches}` }
+      : { available: false, stage: lookupStage, pairingId: pairing.id, message: 'This team has completed its Champions comparison series.' }
+  }
   const replayGames = champions.currentStage === 'finalReplay' ? pairing.replayMatches ?? [] : pairing.matches
   const gamesNeeded = champions.currentStage === 'finalReplay' ? 1 : pairing.requiredMatches
   return { available: replayGames.length < gamesNeeded, stage: champions.currentStage, pairingId: pairing.id, opponentTeamId: pairing.teamIds.find(id => id !== teamId), message: 'This tie already has all required matches.' }
 }
 
 export function competitionSeasonStatus(teams: Team[], matches: Match[], season: string, players: Player[], draw?: CompetitionState) {
-  const league = leagueCompetition(teams, matches, season)
+  const league = leagueCompetition(teams, matches, season, players)
   const cup = cupCompetition(teams, matches, season, players)
   const champions = championsCompetition(draw, matches, season, players)
   return { league, cup, champions, complete: league.complete && Boolean(cup.championId) && Boolean(champions.championId) }
 }
 
-/** Completion-only fast path. Most seasons are not at MD38, so do not derive
+/** Completion-only fast path. Most seasons are not at the League limit, so do not derive
  * tournament rating tie-breakers merely to prove the answer is false. */
 export function isCompetitionSeasonComplete(teams: Team[], matches: Match[], season: string, players: Player[], draw?: CompetitionState): boolean {
-  if (!leagueCompetition(teams, matches, season).complete) return false
+  if (!leagueCompetition(teams, matches, season, players).complete) return false
   if (!cupCompetition(teams, matches, season, players).championId) return false
   return Boolean(championsCompetition(draw, matches, season, players).championId)
 }
@@ -303,7 +365,7 @@ export function competitionHistory(teams: Team[], matches: Match[], players: Pla
 }
 
 export function teamCompetitionProgress(teamId: string, teams: Team[], matches: Match[], season: string, players: Player[], draw?: CompetitionState) {
-  const league = leagueCompetition(teams, matches, season)
+  const league = leagueCompetition(teams, matches, season, players)
   const cup = cupCompetition(teams, matches, season, players)
   const champions = championsCompetition(draw, matches, season, players)
   const leaguePlayed = league.standings.find(row => row.teamId === teamId)?.played ?? 0
@@ -317,5 +379,5 @@ export function teamCompetitionProgress(teamId: string, teams: Team[], matches: 
       championsLabel = loss ? `Eliminated ${labels[loss[0]]}` : ({ roundOf16: 'Round of 16', quarterFinal: 'Quarter-finals', semiFinal: 'Semi-finals', final: 'Final', finalReplay: 'Final Replay' } as Record<string, string>)[champions.currentStage]
     }
   }
-  return { league: `${leaguePlayed} / 38`, cup: cupLabel, champions: championsLabel }
+  return { league: `${leaguePlayed} / ${LEAGUE_MATCHES_PER_TEAM}`, cup: cupLabel, champions: championsLabel }
 }

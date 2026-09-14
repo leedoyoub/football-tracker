@@ -3,6 +3,7 @@ import { TeamIcon } from '../components/TeamIcon'
 import { competitionHistory, competitionSeasonStatus, type ChampionsPairing } from '../engine/competition'
 import { currentStaticTeams } from '../data/teams'
 import { drawRandomTeam } from '../lib/randomDraw'
+import { LEAGUE_MATCHES_PER_TEAM } from '../engine/leagueFormat'
 import { useStore } from '../store'
 import type { ChampionsStage, Team, View } from '../types'
 
@@ -35,7 +36,7 @@ export function TeamsScreen({ season, onNavigate }: { season: string; onNavigate
         championsLabel = loss ? `Eliminated ${short[loss[0]]}` : labels[champions.currentStage]
       }
     }
-    return { league: `${leaguePlayed} / 38`, cup: cupLabel, champions: championsLabel }
+    return { league: `${leaguePlayed} / ${LEAGUE_MATCHES_PER_TEAM}`, cup: cupLabel, champions: championsLabel }
   }
   const badges = (teamId: string) => { const count = titleCounts.get(teamId); if (!count) return null; return <span aria-label={`${count.league} League titles, ${count.cup} Cup titles, ${count.champions} Champions titles`} className="ml-1 inline-flex gap-1 text-[11px]">{count.league > 0 && <span>👑{count.league > 1 ? `×${count.league}` : ''}</span>}{count.cup > 0 && <span>🥇{count.cup > 1 ? `×${count.cup}` : ''}</span>}{count.champions > 0 && <span>🏆{count.champions > 1 ? `×${count.champions}` : ''}</span>}</span> }
 

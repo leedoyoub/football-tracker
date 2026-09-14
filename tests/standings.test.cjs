@@ -50,5 +50,5 @@ test('League competition preview and the full table are wired to the central sta
   const competition = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
   const full = fs.readFileSync(require.resolve('../src/screens/StandingsScreen.tsx'), 'utf8')
   assert(competition.includes('league.standings.slice(0, 8)') && competition.includes('StandingsTable'))
-  assert(full.includes('seasonStandings') && full.includes('StandingsTable'))
+  assert(full.includes('leagueCompetition') && full.includes('StandingsTable'))
 })

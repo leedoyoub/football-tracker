@@ -168,9 +168,13 @@ function MatchEditor({
     if (initializedTeam.current === selectedTeamId || !players.length) return
     initializedTeam.current = selectedTeamId
     const squad = players.filter((p) => (p.teamIds ?? [p.teamId]).includes(selectedTeamId))
-    const initial = fillFormationSlots(squad, FORMATION_SLOTS['4-3-3'], [], recentAssignments ?? undefined)
-    const slotAssignments = Object.fromEntries(FORMATION_SLOTS['4-3-3'].map((slot, index) => [slot.slot, initial[index]]).filter((entry) => Boolean(entry[1])))
-    const starterIds = new Set(initial.filter(Boolean))
+    // A valid modern kickoff already contains the exact tactical slot identity.
+    // Never project it through the default 4-3-3 formation.
+    const defaultLineup = fillFormationSlots(squad, FORMATION_SLOTS['4-3-3'])
+    const slotAssignments = recentAssignments
+      ? { ...recentAssignments }
+      : Object.fromEntries(FORMATION_SLOTS['4-3-3'].map((slot, index) => [slot.slot, defaultLineup[index]]).filter((entry) => Boolean(entry[1])))
+    const starterIds = new Set(Object.values(slotAssignments).filter(Boolean))
     const b = squad.filter((player) => !starterIds.has(player.id)).slice(0, 12).map((player) => player.id)
     setMatchDraft(prev => ({ ...prev, slotAssignments, homeBench: b }))
     setDraftReady(true)
@@ -477,15 +481,15 @@ function MatchEditor({
 
   useEffect(() => {
     if (!draftReady) return
-    saveDraftMatch({ id: draftId, season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot })
-  }, [draftReady, draftId, season, competitionType, assignment.stage, assignment.pairingId, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, opponentName, appearances, kickoffSnapshot, saveDraftMatch])
+    saveDraftMatch({ id: draftId, season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, competitionSeriesGame: assignment.seriesGame, matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot })
+  }, [draftReady, draftId, season, competitionType, assignment.stage, assignment.pairingId, assignment.seriesGame, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, opponentName, appearances, kickoffSnapshot, saveDraftMatch])
 
   function save() {
     if (savingRef.current || liveEvent || !kickoffIsValid) return
     savingRef.current = true
     const matchData = {
       id: draftId,
-      season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, matchDay, date, formation: activeFormationName, homeAway: 'home' as const, homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot,
+      season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, competitionSeriesGame: assignment.seriesGame, matchDay, date, formation: activeFormationName, homeAway: 'home' as const, homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot,
     }
     if (matches.some(match => match.id === draftId)) {
       updateMatch(draftId, matchData)
@@ -497,7 +501,7 @@ function MatchEditor({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-black text-white">
+    <div className="flex h-full min-h-0 max-w-full touch-pan-y flex-col overflow-x-hidden bg-black text-white">
       <div className="px-4 pt-3">
         <button onClick={() => { if (editingMatchId) clearDraftMatch(); onNavigate(teamId ? { name: 'team', id: teamId } : { name: 'teams' }) }} className="mb-3 text-xs font-semibold text-emerald-400">← Cancel</button>
         <h1 className="text-2xl font-bold">Log Match</h1>
@@ -512,7 +516,7 @@ function MatchEditor({
         {step === 0 && (
           <div className="space-y-6">
             <div className="space-y-3">
-              <div><p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">Competition</p><div className="grid grid-cols-3 gap-1 rounded-xl bg-zinc-900 p-1">{(['league', 'cup', 'champions'] as CompetitionType[]).map(type => <button key={type} type="button" aria-pressed={competitionType === type} disabled={lineupLocked} onClick={() => setCompetitionType(type)} className={`rounded-lg py-2 text-[10px] font-black ${competitionType === type ? 'bg-emerald-500 text-black' : 'text-zinc-400'}`}>{type === 'league' ? 'League' : type === 'cup' ? 'Cup' : 'Champions'}</button>)}</div><p className="mt-2 text-xs text-zinc-400">{competitionType === 'league' ? 'Regular league match' : `${String(assignment.stage).replace(/([A-Z])/g, ' $1')} · ${opponentName}`}</p>{!assignment.available && <p role="alert" className="mt-1 text-xs font-semibold text-amber-300">{assignment.message}</p>}</div>
+              <div><p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">Competition</p><div className="grid grid-cols-3 gap-1 rounded-xl bg-zinc-900 p-1">{(['league', 'cup', 'champions'] as CompetitionType[]).map(type => <button key={type} type="button" aria-pressed={competitionType === type} disabled={lineupLocked} onClick={() => setCompetitionType(type)} className={`rounded-lg py-2 text-[10px] font-black ${competitionType === type ? 'bg-emerald-500 text-black' : 'text-zinc-400'}`}>{type === 'league' ? 'League' : type === 'cup' ? 'Cup' : 'Champions'}</button>)}</div><p className="mt-2 text-xs text-zinc-400">{competitionType === 'league' ? 'Regular league match' : assignment.message ?? `${String(assignment.stage).replace(/([A-Z])/g, ' $1')} · ${opponentName}`}</p>{!assignment.available && <p role="alert" className="mt-1 text-xs font-semibold text-amber-300">{assignment.message}</p>}</div>
               <label className="block text-[10px] font-bold uppercase text-zinc-500">Match date<input type="date" value={date} disabled={lineupLocked} onChange={event => setDate(event.target.value)} className="mt-1 w-full rounded-xl bg-zinc-900 px-3 py-2 text-sm font-black text-white disabled:opacity-60" /></label>
               <div className="text-[10px] font-bold uppercase text-zinc-500">Formation<div className="mt-1 rounded-xl bg-zinc-900 px-3 py-2 text-sm font-black text-white">{activeFormationName}</div><span className="mt-1 block text-[9px] normal-case text-zinc-500">Calculated from current tactical slots</span></div>
             </div>

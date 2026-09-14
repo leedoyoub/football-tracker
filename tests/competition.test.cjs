@@ -44,11 +44,11 @@ test('League Matchday is 10 when league teams have played 10, 10, 9, and 9 match
   assert.equal(leagueCompetition(teams.slice(0, 4), matches, 'Season 1').matchdayProgress, 10)
 })
 
-test('League Matchday is capped at 38 after every team completes its schedule', () => {
+test('League Matchday is capped at 30 after every team completes its schedule', () => {
   const leagueTeams = teams.slice(0, 2)
-  const matches = Array.from({ length: 38 }, (_, index) => game(`league-${index + 1}`, 'Season 1', 'league', 'regular', 'T1', 'T2', 1, 0))
+  const matches = Array.from({ length: 30 }, (_, index) => game(`league-${index + 1}`, 'Season 1', 'league', 'regular', 'T1', 'T2', 1, 0))
   const league = leagueCompetition(leagueTeams, matches, 'Season 1')
-  assert.equal(league.matchdayProgress, 38)
+  assert.equal(league.matchdayProgress, 30)
   assert.equal(league.complete, true)
 })
 
@@ -96,10 +96,10 @@ test('Champions draw is unique, fixed, and advances winners into the fixed quart
   assert.deepEqual(draw.teamIds, drawIds, 'advancement must not redraw or mutate the persisted bracket')
 })
 
-test('Log Match assignment connects a Champions team to its fixed opponent and pairing', () => {
+test('Log Match assignment keeps the Champions pairing but not a forced actual opponent', () => {
   const draw = { id: 'champions:Season 1', season: 'Season 1', kind: 'champions-draw', teamIds: teams.map(team => team.id) }
   const assignment = competitionAssignment('champions', 'Season 1', 'T1', teams, [], draw)
-  assert.deepEqual({ available: assignment.available, stage: assignment.stage, pairingId: assignment.pairingId, opponentTeamId: assignment.opponentTeamId }, { available: true, stage: 'roundOf16', pairingId: 'roundOf16:0', opponentTeamId: 'T2' })
+  assert.deepEqual({ available: assignment.available, stage: assignment.stage, pairingId: assignment.pairingId, opponentTeamId: assignment.opponentTeamId }, { available: true, stage: 'roundOf16', pairingId: 'roundOf16:0', opponentTeamId: undefined })
 })
 
 test('Competition navigation, season selector, tabs, persistence, and Supabase migration are wired', () => {
