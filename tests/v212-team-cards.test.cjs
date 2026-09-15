@@ -54,12 +54,15 @@ test('compact Teams Champions formatter handles final, elimination, champion, an
   assert.equal(compactTeamCompetitionProgress('T0', champion).champions, 'Champ')
 })
 
-test('Teams card structure keeps a four-column grid, separate valid controls, and compact front/back content', () => {
+test('Teams uses one global mode for compact fronts/progress backs and stable card navigation', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/TeamsScreen.tsx'), 'utf8')
   assert(source.includes('grid-cols-4') && source.includes('aspect-[0.82]'))
-  assert(source.includes('teamAbbreviation(team)') && source.includes('<TeamIcon team={team}'))
+  assert(source.includes('const [showProgress, setShowProgress] = useState(false)'))
+  assert(source.includes('<TeamIcon team={team}') && source.includes('{team.name}</span>'))
   assert(source.includes('<dt className="text-zinc-400">League</dt>') && source.includes('>Cup</dt>') && source.includes('>UCL</dt>'))
-  assert(source.includes('aria-label={`Open ${team.name}`}') && source.includes('aria-label={flipLabel}'))
-  assert(source.includes('motion-reduce:transition-none') && source.includes('pointer-events-none'))
+  assert(source.includes('aria-label={`Open ${team.name} team details`}') && source.includes('aria-pressed={showProgress}'))
+  assert(source.includes("showProgress ? 'Teams' : 'Progress'") && source.includes('motion-reduce:transition-none'))
+  assert(!source.includes('flippedTeamIds') && !source.includes('onFlip') && !source.includes('rotateY'))
+  assert(source.includes('progressByTeamId = useMemo') && source.includes('[teams, status]'))
   assert(!source.includes('competitionHistory') && !source.includes('players.filter'))
 })
