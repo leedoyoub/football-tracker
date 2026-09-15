@@ -144,7 +144,7 @@ test('Recent Match cards retain green/yellow/red result colors and plain competi
   assert(!/[👑🥇🏆]/u.test(source))
 })
 
-test('competition identity emoji appear on compact Home progress cards', () => {
+test('competition identity emoji remain scoped to Home and Competition surfaces', () => {
   const competitionSource = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
   const teamsSource = fs.readFileSync(require.resolve('../src/screens/TeamsScreen.tsx'), 'utf8')
   const homeSource = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
@@ -152,15 +152,15 @@ test('competition identity emoji appear on compact Home progress cards', () => {
   const home = ''
   const result = fs.readFileSync(require.resolve('../src/components/ResultCard.tsx'), 'utf8')
   assert(competitionSource.includes('👑') && competitionSource.includes('🥇') && competitionSource.includes('🏆'))
-  assert(teamsSource.includes('👑') && teamsSource.includes('🥇') && teamsSource.includes('🏆'))
+  assert(!teamsSource.includes('competitionHistory') && !teamsSource.includes('titleCounts'))
   for (const source of [home, result]) assert(!/[👑🥇🏆]/u.test(source))
 })
 
-test('Team list replaces match count with three current progress lines and derives all-time badges without mutating names', () => {
+test('Teams uses the compact card progress read model without player-count or title work', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/TeamsScreen.tsx'), 'utf8')
-  assert(source.includes('{squad} players') && !source.includes('{played} matches'))
-  assert(source.includes('League {progress.league}') && source.includes('Cup · {progress.cup}') && source.includes('Champions · {progress.champions}'))
-  assert(source.includes('competitionHistory') && source.includes('titleCounts'))
+  assert(source.includes('grid-cols-4') && source.includes('compactTeamCompetitionProgressMap'))
+  assert(source.includes('League') && source.includes('Cup') && source.includes('UCL'))
+  assert(!source.includes('players.filter') && !source.includes('competitionHistory') && !source.includes('titleCounts'))
   assert(!source.includes('team.name =') && !source.includes('name: `${team.name}'))
 })
 
@@ -188,9 +188,9 @@ test('season completion is synchronized as backward-compatible CompetitionState 
   assert(validation.includes("'season-complete'"))
 })
 
-test('visible and package metadata version are exactly v2.1.11 / 2.1.11', () => {
-  assert.equal(APP_VERSION, '2.1.11')
-  assert.equal(require('../package.json').version, '2.1.11')
+test('visible and package metadata version are exactly v2.1.12 / 2.1.12', () => {
+  assert.equal(APP_VERSION, '2.1.12')
+  assert.equal(require('../package.json').version, '2.1.12')
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('v{APP_VERSION}'))
 })

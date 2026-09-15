@@ -339,7 +339,15 @@ export function competitionAssignment(type: CompetitionType, season: string, tea
   return { available: replayGames.length < gamesNeeded, stage: champions.currentStage, pairingId: pairing.id, opponentTeamId: pairing.teamIds.find(id => id !== teamId), message: 'This tie already has all required matches.' }
 }
 
-export function competitionSeasonStatus(teams: Team[], matches: Match[], season: string, players: Player[], draw?: CompetitionState) {
+export type CompetitionSeasonStatus = {
+  league: ReturnType<typeof leagueCompetition>
+  cup: CupCompetition
+  champions: ChampionsCompetition
+  complete: boolean
+}
+
+/** Derive each competition once, then let read-model consumers format it for their surface. */
+export function competitionSeasonStatus(teams: Team[], matches: Match[], season: string, players: Player[], draw?: CompetitionState): CompetitionSeasonStatus {
   const league = leagueCompetition(teams, matches, season, players)
   const cup = cupCompetition(teams, matches, season, players)
   const champions = championsCompetition(draw, matches, season, players)
@@ -380,6 +388,55 @@ export function teamCompetitionProgress(teamId: string, teams: Team[], matches: 
     }
   }
   return { league: `${leaguePlayed} / ${LEAGUE_MATCHES_PER_TEAM}`, cup: cupLabel, champions: championsLabel }
+}
+
+export type CompactTeamProgress = { league: string; cup: string; champions: string }
+
+const compactChampionsStage = (stage: Exclude<ChampionsStage, 'finalReplay'>) => ({ roundOf16: 'R16', quarterFinal: 'QF', semiFinal: 'SF', final: 'F' } as const)[stage]
+
+/**
+ * Presentation-only status for the compact Teams cards. It intentionally accepts
+ * an already-derived season status so a grid never recreates competition engines
+ * for every team.
+ */
+export function compactTeamCompetitionProgress(teamId: string, status: CompetitionSeasonStatus): CompactTeamProgress {
+  const leaguePlayed = status.league.standings.find(row => row.teamId === teamId)?.played ?? 0
+  const cup = status.cup
+  const cupLabel = cup.championId === teamId ? 'Champ'
+    : cup.runnerUpId === teamId ? 'Out F'
+      : cup.eliminatedAtByTeam[teamId] ? `Out S${cup.eliminatedAtByTeam[teamId]}`
+        : !cup.stageMatches.length && !cup.eliminatedTeamIds.length ? 'NS'
+          : cup.stage === 'finalReplay' ? 'FR'
+            : cup.stage === 'final' ? 'F'
+              : `S${cup.stage.replace('stage', '')}`
+
+  const champions = status.champions
+  const isDrawnTeam = champions.rounds.roundOf16.some(pairing => pairing.teamIds.includes(teamId))
+  let championsLabel = 'NS'
+  if (champions.drawn && isDrawnTeam) {
+    if (champions.championId === teamId) championsLabel = 'Champ'
+    else {
+      const loss = (Object.entries(champions.rounds) as [Exclude<ChampionsStage, 'finalReplay'>, ChampionsPairing[]][])
+        .find(([, pairings]) => pairings.some(pairing => pairing.teamIds.includes(teamId) && pairing.winnerId && pairing.winnerId !== teamId))
+      if (loss) championsLabel = `Out ${compactChampionsStage(loss[0])}`
+      else {
+        const stage = champions.currentStage === 'finalReplay' ? 'final' : champions.currentStage
+        const pairing = champions.rounds[stage].find(item => item.teamIds.includes(teamId))
+        if (pairing) {
+          const ownGames = pairing.teamGames?.[teamId] ?? pairing.matches.filter(match => match.teamId === teamId || (!match.teamId && hasPlayed(match, teamId)))
+          const completed = Math.min(ownGames.length, pairing.requiredMatches)
+          const gameNumber = completed >= pairing.requiredMatches ? pairing.requiredMatches : completed + 1
+          championsLabel = `${compactChampionsStage(stage)} ${gameNumber}/${pairing.requiredMatches}`
+        }
+      }
+    }
+  }
+  return { league: `${leaguePlayed}/${LEAGUE_MATCHES_PER_TEAM}`, cup: cupLabel, champions: championsLabel }
+}
+
+/** O(1) read model for TeamsScreen cards after deriving the season state once. */
+export function compactTeamCompetitionProgressMap(teamIds: Iterable<string>, status: CompetitionSeasonStatus): Map<string, CompactTeamProgress> {
+  return new Map([...teamIds].map(teamId => [teamId, compactTeamCompetitionProgress(teamId, status)]))
 }
 
 export type TeamCompetitionOverview = {
