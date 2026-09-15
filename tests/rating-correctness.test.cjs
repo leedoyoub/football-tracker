@@ -99,15 +99,15 @@ test('explicit event sequence overrides array order and mixed legacy events have
   const events = timeline.orderedEvents(m).map(row => row.event)
   for (let i = 0; i < events.length; i++) for (let j = i + 1; j < events.length; j++) assert(timeline.compareEvents(m, events[i], events[j]) < 0)
 })
-for (const minute of [91, 95, 99]) test(`stoppage-time goal at ${minute} remains at its real minute`, () => {
+for (const minute of [91, 95, 99]) test(`stoppage-time goal at ${minute} keeps real timing but no credited minutes`, () => {
   const p = player(), m = game(p, [sub(90), goal('end', minute)], { appearances: [app(p, 'bench')] })
   const r = rating.ratePlayerMatch(m, p)
-  assert.equal(r.minutes, minute - 90); near(r.conceded, -.35)
+  assert.equal(r.minutes, 0); near(r.conceded, -.35)
   assert.equal(timeline.normalizeMatchTimeline(m).end, minute)
 })
 test('multiple position intervals cannot exceed the 1.0 minutes factor in stoppage time', () => {
   const p = player(), m = game(p, [goal('end', 99)], { appearances: [app(p, 'starter', { positionHistory: [{ minute: 60, position: 'CDM' }] })] })
-  near(rating.ratePlayerMatch(m, p).noConceded, 1.2496969696969698)
+  near(rating.ratePlayerMatch(m, p).noConceded, 1.2986666666666666)
 })
 test('supported repeated on/off intervals exclude bench gaps from minutes and goals', () => {
   const p = player(), m = game(p, [sub(20, 'other', 'p'), goal('gap', 30), sub(40), goal('on', 50), sub(60, 'next', 'p'), goal('off', 70)])

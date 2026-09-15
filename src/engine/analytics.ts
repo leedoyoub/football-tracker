@@ -1,4 +1,4 @@
-import { isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchPositionSegments, matchScore, opponentSotProxy, ratePlayerMatch } from './rating'
+import { creditedPositionSegments, hasPitchAppearance, isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchScore, opponentSotProxy, ratePlayerMatch } from './rating'
 import type { Match, Player, Position } from '../types'
 
 export type AnalyticsFilter = { season?: string; teamId?: string }
@@ -35,7 +35,7 @@ function isScoped(match: Match, filter: AnalyticsFilter, teamId?: string) {
 
 function teamIntervals(match: Match, playerId: string, teamId: string): Interval[] {
   const appearance = match.appearances.find(item => item.playerId === playerId && item.teamId === teamId)
-  return appearance ? matchPositionSegments(match, appearance).map(segment => ({ start: segment.enter, end: segment.exit, position: segment.position })) : []
+  return appearance ? creditedPositionSegments(match, appearance).map(segment => ({ start: segment.enter, end: segment.exit, position: segment.position })) : []
 }
 
 function sharedIntervals(match: Match, playerIds: string[], teamId: string, roles: Record<string, RoleCheck> = {}): Interval[] {
@@ -140,9 +140,10 @@ export function onPitchStats(players: Player[], matches: Match[], filter: Analyt
     const totals = new Map<string, OnPitchStats>()
     for (const match of matches.filter(match => isScoped(match, filter))) for (const teamId of teamIds(match)) {
       if (filter.teamId && teamId !== filter.teamId) continue
-      const intervals = teamIntervals(match, player.id, teamId); if (!intervals.length) continue
-      const row = totals.get(teamId) ?? { playerId: player.id, teamId, minutes: 0, goalsFor: 0, goalsAgainst: 0, plusMinus: 0 }; row.minutes += minutes(intervals)
       const appearance = match.appearances.find(item => item.playerId === player.id && item.teamId === teamId)!
+      if (!appearance || !hasPitchAppearance(match, appearance)) continue
+      const intervals = teamIntervals(match, player.id, teamId)
+      const row = totals.get(teamId) ?? { playerId: player.id, teamId, minutes: 0, goalsFor: 0, goalsAgainst: 0, plusMinus: 0 }; row.minutes += minutes(intervals)
       for (const event of match.events) if (event.type === 'goal' && isOnPitchAtEvent(match, appearance, event)) {
         if (scoringTeam(event, match) === teamId) row.goalsFor++
         else row.goalsAgainst++
@@ -212,8 +213,9 @@ export function starterSubstituteSplits(player: Player, matches: Match[], filter
   const make = (): RoleSplit => ({ apps: 0, minutes: 0, averageRating: 0, goals: 0, assists: 0, combinedGA: 0, goalsPer90: 0, assistsPer90: 0, gaPer90: 0 })
   const result = { starter: make(), substitute: make() }
   for (const match of matches.filter(match => isScoped(match, filter))) for (const appearance of match.appearances.filter(appearance => appearance.playerId === player.id && (!filter.teamId || appearance.teamId === filter.teamId))) {
-    const intervals = teamIntervals(match, player.id, appearance.teamId); const totalMinutes = minutes(intervals); if (!totalMinutes) continue
-    const row = appearance.role === 'starter' ? result.starter : result.substitute; const rating = ratePlayerMatch(match, player); row.apps++; row.minutes += totalMinutes; row.averageRating += rating?.rating ?? 0
+    const intervals = teamIntervals(match, player.id, appearance.teamId); const totalMinutes = minutes(intervals)
+    const rating = ratePlayerMatch(match, player); if (!rating) continue
+    const row = appearance.role === 'starter' ? result.starter : result.substitute; row.apps++; row.minutes += totalMinutes; row.averageRating += rating.rating
     for (const event of match.events) if (event.type === 'goal' && !event.ownGoal && isOnPitchAtEvent(match, appearance, event)) { if (event.playerId === player.id) row.goals++; if (event.assistPlayerId === player.id) row.assists++ }
   }
   for (const row of Object.values(result)) { row.combinedGA = row.goals + row.assists; row.averageRating = row.apps ? row.averageRating / row.apps : 0; row.goalsPer90 = row.minutes ? row.goals / row.minutes * 90 : 0; row.assistsPer90 = row.minutes ? row.assists / row.minutes * 90 : 0; row.gaPer90 = row.minutes ? row.combinedGA / row.minutes * 90 : 0 }

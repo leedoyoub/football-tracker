@@ -15,7 +15,7 @@ const player = (id, position, rating = 1) => ({ id, name: id, displayName: id, t
 const appearance = player => ({ playerId: player.id, teamId: 'A', position: player.position, matchPosition: player.position, role: 'starter' })
 
 test('v6 has the exact finalized balance table and result modifier', () => {
-  assert.equal(revision.RATING_ENGINE_REVISION, 6)
+  assert.equal(revision.RATING_ENGINE_REVISION, 7)
   assert.equal(rating.GOALKEEPER_BASE_RATING, 7.0)
   for (const position of ['CB', 'LCB', 'RCB']) assert.equal(rating.POSITION_RULES[position].suppressionMax, 1.70)
   for (const position of ['LB', 'LWB', 'RB', 'RWB']) assert.equal(rating.POSITION_RULES[position].suppressionMax, 1.40)

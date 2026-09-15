@@ -3,7 +3,7 @@ import { GOOD_RATING_THRESHOLD, isGoodRating } from './constants'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { combineGoalTypeTotals, goalTypeTotals, type GoalTypeTotals } from './goalTypes'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
-import { isOnPitchAtEvent, matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './timeline'
+import { creditedPositionSegments, isOnPitchAtEvent, matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './timeline'
 import { oldestMatches } from './matchChronology'
 
 export type PlayerScope = { season?: string; competition?: CompetitionType | 'all'; teamIds?: string[] }
@@ -80,7 +80,7 @@ export function derivePlayerScope(player: Player, players: Player[], matches: Ma
   const positionMinutes = new Map<Position, number>(); let cleanSheets = 0
   for (const row of actual) {
     let concededAsGoalkeeper = 0
-    for (const segment of matchPositionSegments(row.match, row.appearance)) positionMinutes.set(segment.position, (positionMinutes.get(segment.position) ?? 0) + segment.exit - segment.enter)
+    for (const segment of creditedPositionSegments(row.match, row.appearance)) positionMinutes.set(segment.position, (positionMinutes.get(segment.position) ?? 0) + segment.exit - segment.enter)
     for (const event of row.match.events) {
       if (event.type === 'save' && event.playerId === player.id && event.teamId === row.appearance.teamId && (event.minute === undefined ? matchPositionSegments(row.match, row.appearance).some(segment => segment.position === 'GK') : matchPositionAtEvent(row.match, row.appearance, event) === 'GK')) saves += Number.isInteger(event.count) && (event.count ?? 0) > 0 ? event.count! : 1
       if (event.type !== 'goal' || !isOnPitchAtEvent(row.match, row.appearance, event)) continue

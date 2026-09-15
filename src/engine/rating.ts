@@ -3,6 +3,8 @@ import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 export { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import {
   isOnPitchAtEvent,
+  creditedMinutesPlayed,
+  creditedPositionSegments,
   matchPositionAtEvent,
   matchPositionSegments,
   normalizePositionFamily,
@@ -11,7 +13,7 @@ import {
   scoringTeamId,
 } from './timeline.ts'
 
-export { isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchPositionSegments, normalizeMatchPosition, normalizePositionFamily, pitchWindow, scoringTeamId } from './timeline.ts'
+export { creditedMinutesPlayed, creditedPitchIntervals, creditedPositionSegments, hasPitchAppearance, isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchPositionSegments, normalizeMatchPosition, normalizePositionFamily, pitchWindow, scoringTeamId } from './timeline.ts'
 
 export const BASE_RATING = 6.5
 export const GOALKEEPER_BASE_RATING = 7.0
@@ -209,17 +211,16 @@ export function ratePlayerMatch(match: Match, player: Player, revision = RATING_
 
 function suppressionByInterval(match: Match, appearance: Appearance) {
   const segments = matchPositionSegments(match, appearance)
-  const totalMinutes = segments.reduce((total, row) => total + row.exit - row.enter, 0)
-  const duration = normalizeMatchTimeline(match).end
+  const totalMinutes = creditedMinutesPlayed(match, appearance)
   const saves = validTeamSaveEvents(match, appearance.teamId)
   const undatedSaves = saves.filter(event => event.minute === undefined).reduce((total, event) => total + validCount(event.count ?? 1), 0)
   const opponentGoals = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && scoringTeamId(match, event) !== appearance.teamId)
   return segments.map(row => {
-    const minutes = row.exit - row.enter
+    const minutes = creditedPositionSegments(match, appearance).filter(segment => segment.position === row.position && segment.enter >= row.enter && segment.exit <= row.exit).reduce((total, segment) => total + segment.exit - segment.enter, 0)
     const contains = (event: MatchEvent) => event.minute !== undefined && event.minute >= row.enter && event.minute <= row.exit && matchPositionAtEvent(match, appearance, event) === row.position
     const exactTimedSaves = saves.filter(contains).reduce((total, event) => total + validCount(event.count ?? 1), 0)
     const conceded = opponentGoals.filter(contains).length
-    const sot90 = minutes > 0 ? (exactTimedSaves + undatedSaves * minutes / duration + conceded) * 90 / minutes : 0
+    const sot90 = minutes > 0 ? (exactTimedSaves + undatedSaves * minutes / 90 + conceded) * 90 / minutes : 0
     const multiplier = sotMultiplier(sot90)
     return { ...row, minutes, sot90, multiplier, bonus: POSITION_RULES[row.position].suppressionMax * multiplier * minutes / Math.max(90, totalMinutes) }
   })
@@ -239,11 +240,11 @@ function calculatePlayerMatch(match: Match, player: Player): RatingBreakdown | n
   const window = pitchWindow(match, appearance)
   if (!window || window.exit <= window.enter) return null
   const segments = matchPositionSegments(match, appearance)
-  const position = effectivePosition(segments)
+  const creditedSegments = creditedPositionSegments(match, appearance)
+  const position = effectivePosition(creditedSegments.length ? creditedSegments : segments)
   if (!position) return null
   const teamId = appearance.teamId
-  const minutes = segments.reduce((total, row) => total + row.exit - row.enter, 0)
-  if (!minutes) return null
+  const minutes = creditedMinutesPlayed(match, appearance)
   const goals = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && !event.ownGoal && event.playerId === player.id && isOnPitchAtEvent(match, appearance, event))
   const assists = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id && isOnPitchAtEvent(match, appearance, event))
   const teamGoals = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && scoringTeamId(match, event) === teamId && isOnPitchAtEvent(match, appearance, event) && event.playerId !== player.id && event.assistPlayerId !== player.id)

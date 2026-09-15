@@ -9,7 +9,7 @@ import type {
   TeamSeasonStats,
   PartnershipStats,
 } from '../types'
-import { ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, pitchWindow, matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './rating'
+import { hasPitchAppearance, ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, pitchWindow, matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import { kickoffLineupForMatch } from './kickoffLineup'
 import { newestMatches, oldestMatches } from './matchChronology'
@@ -67,20 +67,12 @@ export function aggregatePlayerStats(
   }
 
   const goals = matches.reduce((sum, match) => {
-    return (
-      sum +
-      match.events.filter(
-        (e) => e.type === 'goal' && !e.ownGoal && e.playerId === player.id,
-      ).length
-    )
+    const appearance = match.appearances.find(item => item.playerId === player.id)
+    return sum + (appearance ? match.events.filter(e => e.type === 'goal' && !e.ownGoal && e.playerId === player.id && isOnPitchAtEvent(match, appearance, e)).length : 0)
   }, 0)
   const assists = matches.reduce((sum, match) => {
-    return (
-      sum +
-      match.events.filter(
-        (e) => e.type === 'goal' && !e.ownGoal && e.assistPlayerId === player.id,
-      ).length
-    )
+    const appearance = match.appearances.find(item => item.playerId === player.id)
+    return sum + (appearance ? match.events.filter(e => e.type === 'goal' && !e.ownGoal && e.assistPlayerId === player.id && isOnPitchAtEvent(match, appearance, e)).length : 0)
   }, 0)
   const minutes = ratings.reduce((sum, r) => sum + r.minutes, 0)
   const avgRating =
@@ -270,7 +262,8 @@ export function clearGlobalRankingCache() {
   competitionStatsCache = new WeakMap<Match[], WeakMap<Player[], Map<string, CompetitionStatsCacheEntry>>>()
 }
 function presentMetric(rows: GlobalLeaderboardRow[], metric: LeaderboardMetric) {
-  const value = (row: GlobalLeaderboardRow) => metric === 'goals' ? row.goals : metric === 'assists' ? row.assists : metric === 'g+a' ? row.goals + row.assists : metric === 'minutes' ? row.minutes : metric === 'mom' ? row.mom : metric === 'goals/90' ? row.goals / row.minutes * 90 : metric === 'assists/90' ? row.assists / row.minutes * 90 : metric === 'g+a/90' ? (row.goals + row.assists) / row.minutes * 90 : row.avgRating
+  const per90 = (value: number, minutes: number) => minutes ? value / minutes * 90 : 0
+  const value = (row: GlobalLeaderboardRow) => metric === 'goals' ? row.goals : metric === 'assists' ? row.assists : metric === 'g+a' ? row.goals + row.assists : metric === 'minutes' ? row.minutes : metric === 'mom' ? row.mom : metric === 'goals/90' ? per90(row.goals, row.minutes) : metric === 'assists/90' ? per90(row.assists, row.minutes) : metric === 'g+a/90' ? per90(row.goals + row.assists, row.minutes) : row.avgRating
   return rows.map(row => ({ ...row, value: value(row) })).sort((a, b) => b.value - a.value)
 }
 
@@ -378,7 +371,8 @@ export function buildGlobalRankingData(
       const appearance = match?.appearances.find(item => item.playerId === player.id)
       return match && appearance && matchPositionSegments(match, appearance).some(segment => segment.position === 'GK')
     })
-    const value = _metric === 'goals' ? stats.goals : _metric === 'assists' ? stats.assists : _metric === 'g+a' ? stats.goals + stats.assists : _metric === 'minutes' ? stats.minutes : _metric === 'mom' ? stats.mom : _metric === 'goals/90' ? stats.goals / stats.minutes * 90 : _metric === 'assists/90' ? stats.assists / stats.minutes * 90 : _metric === 'g+a/90' ? (stats.goals + stats.assists) / stats.minutes * 90 : stats.avgRating
+    const per90 = (value: number) => stats.minutes ? value / stats.minutes * 90 : 0
+    const value = _metric === 'goals' ? stats.goals : _metric === 'assists' ? stats.assists : _metric === 'g+a' ? stats.goals + stats.assists : _metric === 'minutes' ? stats.minutes : _metric === 'mom' ? stats.mom : _metric === 'goals/90' ? per90(stats.goals) : _metric === 'assists/90' ? per90(stats.assists) : _metric === 'g+a/90' ? per90(stats.goals + stats.assists) : stats.avgRating
     return [{ ...stats, value, historicalTeamId: latest?.appearances.find(item => item.playerId === player.id)?.teamId, playedGoalkeeper, sotAllowedAppearances, sotAllowedTotal, concededOnPitch, qualifyingGoalkeeperAppearances, qualifyingSaves }]
   })
   const presented = presentMetric(rows, _metric)
@@ -572,13 +566,7 @@ function matchRecordedForTeam(match: Match, teamId: string): boolean {
 /** A bench listing is not an appearance until the player has a recorded sub-on. */
 function actuallyPlayed(match: Match, playerId: string): boolean {
   const appearance = match.appearances.find((item) => item.playerId === playerId)
-  if (!appearance) return false
-  if (appearance.role === 'starter') return true
-  return match.events.some((event) =>
-    event.type === 'sub' &&
-    event.playerInId === playerId &&
-    event.teamId === appearance.teamId,
-  )
+  return Boolean(appearance && hasPitchAppearance(match, appearance))
 }
 
 function candidateOrder(a: UnifiedCandidate, b: UnifiedCandidate): number {

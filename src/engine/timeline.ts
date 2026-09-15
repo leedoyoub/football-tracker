@@ -8,6 +8,9 @@ export type PitchInterval = { enter: number; exit: number; on?: SubEvent; off?: 
 type Change = { minute: number; position: Position; order: number; index: number }
 export type NormalizedPlayerTimeline = { appearance: Appearance; intervals: PitchInterval[]; positions: PositionSegment[]; changes: Change[] }
 export type NormalizedMatchTimeline = { end: number; events: OrderedEvent[]; order: Map<MatchEvent, number>; players: Map<string, NormalizedPlayerTimeline> }
+/** Official player time is limited to regulation, while the raw timeline keeps
+ * recording and attributing every real stoppage-time event. */
+export const REGULATION_MINUTES = 90
 const cache = new WeakMap<Match, { revision: number; events: MatchEvent[]; appearances: Appearance[]; duration: number; value: NormalizedMatchTimeline }>()
 const key = (appearance: Appearance) => JSON.stringify([appearance.teamId, appearance.playerId])
 const eventMinute = (event: MatchEvent) => Number.isFinite(event.minute) ? event.minute! : -1
@@ -116,6 +119,34 @@ export function pitchIntervals(match: Match, appearance: Appearance): PitchInter
   if (saved) return saved.intervals
   // Preview helpers may pass an appearance before adding it to the raw lineup.
   return normalizeMatchTimeline({ ...match, appearances: [appearance] }).players.get(key(appearance))?.intervals ?? []
+}
+function clippedRegulationInterval<T extends { enter: number; exit: number }>(interval: T): T | null {
+  const enter = Math.max(0, Math.min(REGULATION_MINUTES, interval.enter))
+  const exit = Math.max(0, Math.min(REGULATION_MINUTES, interval.exit))
+  return exit > enter ? { ...interval, enter, exit } : null
+}
+/** Canonical read-time projection used by every official minutes calculation. */
+export function creditedPitchIntervals(match: Match, appearance: Appearance): PitchInterval[] {
+  return pitchIntervals(match, appearance).flatMap(interval => {
+    const clipped = clippedRegulationInterval(interval)
+    return clipped ? [clipped] : []
+  })
+}
+/** Regulation projection of true position history. Keep matchPositionSegments
+ * for event-time position lookup, including after minute 90. */
+export function creditedPositionSegments(match: Match, appearance: Appearance): PositionSegment[] {
+  return matchPositionSegments(match, appearance).flatMap(segment => {
+    const clipped = clippedRegulationInterval(segment)
+    return clipped ? [clipped] : []
+  })
+}
+export function creditedMinutesPlayed(match: Match, appearance: Appearance): number {
+  return creditedPositionSegments(match, appearance).reduce((total, segment) => total + segment.exit - segment.enter, 0)
+}
+/** A real pitch interval is an appearance even when it projects to zero
+ * regulation minutes (for example, a 92' substitute). */
+export function hasPitchAppearance(match: Match, appearance: Appearance): boolean {
+  return pitchIntervals(match, appearance).some(interval => interval.exit > interval.enter)
 }
 /** Envelope for entry/exit labels only; actual minutes sum the position intervals. */
 export function pitchWindow(match: Match, appearance: Appearance): { enter: number; exit: number } | null {

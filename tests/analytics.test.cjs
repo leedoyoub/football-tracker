@@ -38,10 +38,10 @@ test('duo, goal partnerships, trios, CB pairs and back fours only count shared e
   assert.deepEqual([backFour.togetherMinutes, backFour.matches, backFour.goalsAgainst], [270, 3, 3])
 })
 
-test('sample eligibility requires three matches or 180 shared minutes', () => {
+test('sample eligibility never credits more than 90 shared minutes from one match', () => {
   const long = match('long', [], [appearance(A), appearance(C)]); long.duration = 180
   const eligible = analytics.combinationStats(players, [long], { season: 'S1' }, 'duo').find(row => row.playerIds.join(':') === 'A:C')
-  assert.equal(eligible.eligible, true)
+  assert.equal(eligible.eligible, false)
   const short = match('short', [], [appearance(A), appearance(C)])
   assert.equal(analytics.combinationStats(players, [short], { season: 'S1' }, 'duo').find(row => row.playerIds.join(':') === 'A:C').eligible, false)
 })
