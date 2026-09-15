@@ -65,9 +65,9 @@ test('Home keeps stable source arrays for ranking and reuses News for immutable 
   assert.notStrictEqual(deriveNews(players, teams, [...matches], states), deriveNews(players, teams, matches, states))
 })
 
-test('v2.1.10 version is consistent and rating revision stays fixed', () => {
-  assert.equal(APP_VERSION, '2.1.10')
-  assert.equal(require('../package.json').version, '2.1.10')
-  assert.equal(require('../package-lock.json').version, '2.1.10')
+test('v2.1.11 version is consistent and rating revision stays fixed', () => {
+  assert.equal(APP_VERSION, '2.1.11')
+  assert.equal(require('../package.json').version, '2.1.11')
+  assert.equal(require('../package-lock.json').version, '2.1.11')
   assert.equal(RATING_ENGINE_REVISION, 6)
 })

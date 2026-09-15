@@ -12,12 +12,16 @@ const cache = new WeakMap<Match, { revision: number; events: MatchEvent[]; appea
 const key = (appearance: Appearance) => JSON.stringify([appearance.teamId, appearance.playerId])
 const eventMinute = (event: MatchEvent) => Number.isFinite(event.minute) ? event.minute! : -1
 
-export function normalizeMatchPosition(value?: string): Position | undefined {
+/** The single semantic position-family normalizer. Tactical display aliases
+ * resolve here before ratings, MOM, rankings, and position statistics run. */
+export function normalizePositionFamily(value?: string): Position | undefined {
   if (!value) return undefined
-  const aliases: Record<string, Position> = { LST: 'ST', RST: 'ST', LCAM: 'CAM', RCAM: 'CAM', LDM: 'CDM', RDM: 'CDM', LCM: 'CM', RCM: 'CM', LCB: 'CB', RCB: 'CB' }
-  const normalized = aliases[value] ?? value
+  const aliases: Record<string, Position> = { LST: 'ST', RST: 'ST', LCAM: 'CAM', LAM: 'CAM', RCAM: 'CAM', RAM: 'CAM', LDM: 'CDM', RDM: 'CDM', LCM: 'CM', RCM: 'CM', LCB: 'CB', RCB: 'CB' }
+  const normalized = aliases[value.toUpperCase()] ?? value.toUpperCase()
   return ['GK', 'CB', 'LB', 'LWB', 'RB', 'RWB', 'CDM', 'CM', 'CAM', 'LM', 'RM', 'LW', 'RW', 'SS', 'ST'].includes(normalized) ? normalized as Position : undefined
 }
+/** Compatibility name for callers that normalize a position inside Match data. */
+export const normalizeMatchPosition = normalizePositionFamily
 
 /** Total order, even with partly sequenced legacy arrays: sort explicit events
  * within their saved slots, retain unsequenced slots, then assign ordinal ranks. */

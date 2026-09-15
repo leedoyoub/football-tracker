@@ -715,7 +715,7 @@ export function teamBestEleven(
   const slots = kickoffLineupForMatch(match, teamId).map((kickoff): Best11Slot => {
     const player = kickoff.playerId ? players.find(item => item.id === kickoff.playerId) : undefined
     const rating = player ? ratePlayerMatch(match, player) : null
-    return { slot: kickoff.id, position: kickoff.ratingPosition ?? kickoff.matchPosition, matchPosition: kickoff.ratingPosition ?? kickoff.matchPosition, playerId: kickoff.playerId, teamId, avgRating: rating?.rating ?? 0, matches: rating ? 1 : 0, x: kickoff.x, y: kickoff.y }
+    return { slot: kickoff.id, position: kickoff.ratingPosition ?? kickoff.matchPosition, matchPosition: kickoff.ratingPosition ?? kickoff.matchPosition, displayPosition: kickoff.displayPosition, playerId: kickoff.playerId, teamId, avgRating: rating?.rating ?? 0, matches: rating ? 1 : 0, x: kickoff.x, y: kickoff.y }
   })
   return { formation: match.formation ?? null, slots, match }
 }

@@ -5,12 +5,13 @@ import {
   isOnPitchAtEvent,
   matchPositionAtEvent,
   matchPositionSegments,
+  normalizePositionFamily,
   pitchWindow,
   normalizeMatchTimeline,
   scoringTeamId,
 } from './timeline.ts'
 
-export { isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchPositionSegments, normalizeMatchPosition, pitchWindow, scoringTeamId } from './timeline.ts'
+export { isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchPositionSegments, normalizeMatchPosition, normalizePositionFamily, pitchWindow, scoringTeamId } from './timeline.ts'
 
 export const BASE_RATING = 6.5
 export const GOALKEEPER_BASE_RATING = 7.0
@@ -276,6 +277,10 @@ const MOM_POSITION_PRIORITY: Record<Position, number> = {
   CDM: 3, LDM: 3, RDM: 3, CM: 4, LCM: 4, RCM: 4, LM: 5, RM: 5,
   CAM: 6, LW: 7, RW: 7, SS: 8, ST: 9, LST: 9, RST: 9,
 }
+export function momPositionPriority(position?: string): number | undefined {
+  const family = normalizePositionFamily(position)
+  return family ? MOM_POSITION_PRIORITY[family] : undefined
+}
 function momEventCount(match: Match, playerId: string, key: 'playerId' | 'assistPlayerId'): number {
   const appearance = match.appearances.find(item => item.playerId === playerId)
   return appearance ? match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && !event.ownGoal && event[key] === playerId && isOnPitchAtEvent(match, appearance, event)).length : 0
@@ -293,7 +298,7 @@ function seededTieIndex(matchId: string, playerIds: string[]): number {
 export function getMatchManOfTheMatch(match: Match, players: Player[]): string | undefined {
   const candidates = rateMatch(match, players).map(rating => ({
     rating,
-    priority: MOM_POSITION_PRIORITY[rating.position],
+    priority: momPositionPriority(rating.position)!,
     goals: momEventCount(match, rating.playerId, 'playerId'),
     assists: momEventCount(match, rating.playerId, 'assistPlayerId'),
   }))

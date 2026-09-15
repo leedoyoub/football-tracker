@@ -5,9 +5,9 @@ import { useRef } from 'react'
 import { DndContext, PointerSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type CollisionDetection, type DragEndEvent } from '@dnd-kit/core'
 import { NAMED_TACTICAL_FORMATIONS, TACTICAL_SLOT_DEFINITIONS } from '../engine/tacticalSlots'
 
-export type TacticalSlot = { slot: string; position: Position; matchPosition: Position; x: number; y: number }
+export type TacticalSlot = { slot: string; position: Position; matchPosition: Position; displayPosition: string; x: number; y: number }
 
-const grid: Record<string, TacticalSlot> = Object.fromEntries(TACTICAL_SLOT_DEFINITIONS.map(definition => [definition.id, { slot: definition.id, position: definition.ratingPosition, matchPosition: definition.ratingPosition, x: definition.x, y: definition.y }]))
+const grid: Record<string, TacticalSlot> = Object.fromEntries(TACTICAL_SLOT_DEFINITIONS.map(definition => [definition.id, { slot: definition.id, position: definition.ratingPosition, matchPosition: definition.ratingPosition, displayPosition: definition.displayPosition, x: definition.x, y: definition.y }]))
 
 export const UNIVERSAL_TACTICAL_SLOTS = Object.values(grid)
 const formation = (...ids: string[]) => ids.map((id) => grid[id])
@@ -75,6 +75,10 @@ const homePositions: Record<string, { x: number; y: number }> = {
   LW: { x: 20, y: 22 }, ST: { x: 50, y: 22 }, RW: { x: 80, y: 22 }, LCM: { x: 25, y: 46 }, CM: { x: 50, y: 46 }, RCM: { x: 75, y: 46 }, LB: { x: 13, y: 69 }, LCB: { x: 38, y: 69 }, RCB: { x: 62, y: 69 }, RB: { x: 87, y: 69 }, GK: { x: 50, y: 88 },
 }
 const ratingColor = ratingBadgeColor
+const HISTORY_SLOT_OFFSETS: Record<string, { x?: number; y?: number }> = {
+  GK: { y: 3 }, CAM: { y: -3 }, LCAM: { x: 3 }, RCAM: { x: -3 },
+}
+const clampCoordinate = (value: number) => Math.max(4, Math.min(96, value))
 
 function GoalIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-2.5 w-2.5 fill-none stroke-current stroke-2"><circle cx="12" cy="12" r="9" /><path d="m12 7 3 2.2-1.1 3.5h-3.8L9 9.2 12 7Zm-6 4 3 1m9-1 3 1m-10 8 1-3m2 3-1-3" /></svg>
@@ -84,7 +88,7 @@ function AssistIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-2.5 w-2.5 fill-none stroke-current stroke-2"><path d="M4 15.5c2.5-2.8 5.2-4.6 8.1-5.4l3.2.8 3.1 3.1-1.9 2.7-4.1.2-2.2 2.3-4.8-.4L4 15.5Z" /><path d="m12.1 10.1 1.1-3 2.2.5 1.1 3.3M7.4 14.5l1.8 1.1" /></svg>
 }
 
-export function Pitch({ compact = false, slots, players, teams, statsByPlayer, outMinutesByPlayer, substitutionSelection, goalSelection, disabledPlayerIds, badgeMode = 'rating', showPositionBadge = true, showGoalkeeperSaves = false, motmPlayerId, onSlotClick, onEmptySlotClick, layout = 'tactical', draggable = false, externalDnd = false, onSlotDrop }: { compact?: boolean; slots: Best11Slot[]; players: Player[]; teams?: Team[]; statsByPlayer?: Record<string, { goals: number; assists: number; saves?: number }>; outMinutesByPlayer?: Record<string, number>; substitutionSelection?: Record<string, 'in' | 'out'>; goalSelection?: Record<string, 'scorer' | 'assist' | 'fault'>; disabledPlayerIds?: string[]; badgeMode?: 'rating' | 'position'; showPositionBadge?: boolean; showGoalkeeperSaves?: boolean; motmPlayerId?: string; onSlotClick?: (slot: Best11Slot) => void; onEmptySlotClick?: (slot: Best11Slot) => void; layout?: 'tactical' | 'free'; draggable?: boolean; externalDnd?: boolean; onSlotDrop?: (activeSlot: string, targetSlot: string) => void }) {
+export function Pitch({ compact = false, slots, players, teams, statsByPlayer, outMinutesByPlayer, substitutionSelection, goalSelection, disabledPlayerIds, badgeMode = 'rating', showPositionBadge = true, showGoalkeeperSaves = false, motmPlayerId, onSlotClick, onEmptySlotClick, layout = 'tactical', presentation = 'editable', draggable = false, externalDnd = false, onSlotDrop }: { compact?: boolean; slots: Best11Slot[]; players: Player[]; teams?: Team[]; statsByPlayer?: Record<string, { goals: number; assists: number; saves?: number }>; outMinutesByPlayer?: Record<string, number>; substitutionSelection?: Record<string, 'in' | 'out'>; goalSelection?: Record<string, 'scorer' | 'assist' | 'fault'>; disabledPlayerIds?: string[]; badgeMode?: 'rating' | 'position'; showPositionBadge?: boolean; showGoalkeeperSaves?: boolean; motmPlayerId?: string; onSlotClick?: (slot: Best11Slot) => void; onEmptySlotClick?: (slot: Best11Slot) => void; layout?: 'tactical' | 'free'; presentation?: 'editable' | 'history'; draggable?: boolean; externalDnd?: boolean; onSlotDrop?: (activeSlot: string, targetSlot: string) => void }) {
   const byId = Object.fromEntries(players.map((player) => [player.id, player]))
   const teamById = Object.fromEntries((teams ?? []).map((team) => [team.id, team]))
   const suppressClick = useRef(false)
@@ -100,10 +104,12 @@ export function Pitch({ compact = false, slots, players, teams, statsByPlayer, o
     const tactical = grid[slot.slot]
     // Saved historical coordinates can be normalized (0..1) or percentages.
     // Do not use `||`: zero is a valid edge coordinate.
-    const coordinate = (value: number | undefined) => value === undefined ? undefined : Math.max(4, Math.min(96, value <= 1 ? value * 100 : value))
+    const coordinate = (value: number | undefined) => value === undefined ? undefined : clampCoordinate(value <= 1 ? value * 100 : value)
     const savedX = coordinate(slot.x); const savedY = coordinate(slot.y)
-    const point = savedX !== undefined && savedY !== undefined ? { x: savedX, y: savedY } : layout === 'free' ? homePositions[slot.slot] ?? tactical ?? { x: 50, y: 50 } : tactical ?? { x: 50, y: 50 }
-    const player = slot.playerId ? byId[slot.playerId] : undefined; if (!player) return draggable ? <EmptyPitchSlotDrop key={slot.slot} slot={slot} point={point} onClick={onEmptySlotClick ? () => onEmptySlotClick(slot) : undefined} /> : onEmptySlotClick ? <EmptyPitchSlot key={slot.slot} slot={slot} point={point} onClick={() => onEmptySlotClick(slot)} /> : null; const stats = statsByPlayer?.[player.id]; const matchPosition = (slot.matchPosition ?? tactical?.matchPosition ?? 'CM') as Position
+    const basePoint = savedX !== undefined && savedY !== undefined ? { x: savedX, y: savedY } : layout === 'free' ? homePositions[slot.slot] ?? tactical ?? { x: 50, y: 50 } : tactical ?? { x: 50, y: 50 }
+    const offset = presentation === 'history' ? HISTORY_SLOT_OFFSETS[slot.slot] : undefined
+    const point = offset ? { x: clampCoordinate(basePoint.x + (offset.x ?? 0)), y: clampCoordinate(basePoint.y + (offset.y ?? 0)) } : basePoint
+    const player = slot.playerId ? byId[slot.playerId] : undefined; if (!player) return draggable ? <EmptyPitchSlotDrop key={slot.slot} slot={slot} point={point} onClick={onEmptySlotClick ? () => onEmptySlotClick(slot) : undefined} /> : onEmptySlotClick ? <EmptyPitchSlot key={slot.slot} slot={slot} point={point} onClick={() => onEmptySlotClick(slot)} /> : null; const stats = statsByPlayer?.[player.id]; const matchPosition = (slot.matchPosition ?? tactical?.matchPosition ?? 'CM') as Position; const displayPosition = slot.displayPosition ?? tactical?.displayPosition ?? matchPosition
     const representativeTeam = teamById[slot.teamId ?? '']
     const badges = (
       <>
@@ -130,8 +136,8 @@ export function Pitch({ compact = false, slots, players, teams, statsByPlayer, o
         }}
       >
         {draggable ? <PitchSlotDrop slot={slot} draggable={draggable}>
-          <PlayerIcon player={player} team={representativeTeam} position={showPositionBadge ? matchPosition : undefined} badges={badges} className="h-10 w-10 text-[11px]" />
-        </PitchSlotDrop> : <PlayerIcon player={player} team={representativeTeam} position={showPositionBadge ? matchPosition : undefined} badges={badges} className="h-10 w-10 text-[11px]" />}
+          <PlayerIcon player={player} team={representativeTeam} position={showPositionBadge ? displayPosition : undefined} badges={badges} className="h-10 w-10 text-[11px]" />
+        </PitchSlotDrop> : <PlayerIcon player={player} team={representativeTeam} position={showPositionBadge ? displayPosition : undefined} badges={badges} className="h-10 w-10 text-[11px]" />}
         {((stats?.goals ?? 0) > 0 || (stats?.assists ?? 0) > 0 || (showGoalkeeperSaves && matchPosition === 'GK')) && <div className="relative z-10 -mt-1 grid h-3.5 w-16 grid-cols-2 items-center text-[8px] font-bold leading-none text-white">
           <span className="justify-self-start">{(stats?.assists ?? 0) > 0 && <span className="flex items-center gap-0.5 rounded-full bg-black/80 px-1 py-0.5"><AssistIcon />{stats?.assists}</span>}</span>
           <span className="justify-self-end">{(stats?.goals ?? 0) > 0 ? <span className="flex items-center gap-0.5 rounded-full bg-black/80 px-1 py-0.5"><GoalIcon />{stats?.goals}</span> : showGoalkeeperSaves && matchPosition === 'GK' ? <span className="rounded-full bg-black/80 px-1 py-0.5">🧤 {stats?.saves ?? 0}</span> : null}</span>

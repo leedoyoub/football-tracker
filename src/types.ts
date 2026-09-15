@@ -218,6 +218,8 @@ export interface Best11Slot {
   slot: string
   position: Position
   matchPosition?: string
+  /** Tactical-only label for a slot whose semantic position is broader. */
+  displayPosition?: string
   playerId: string | null
   teamId?: string
   avgRating: number
