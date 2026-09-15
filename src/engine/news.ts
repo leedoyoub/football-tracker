@@ -1,5 +1,6 @@
-import { competitionHistory, cupCompetition, championsCompetition, CHAMPIONS_ROUNDS, leagueCompetition, matchCompetitionType, teamCompetitionProgress } from './competition'
+import { competitionHistory, cupCompetition, championsCompetition, CHAMPIONS_ROUNDS, leagueCompetition, matchCompetitionType } from './competition'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
+import { seasonStandings } from './standings'
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
 import { oldestMatches } from './matchChronology'
 
@@ -9,6 +10,9 @@ type NewsDraft = Omit<NewsItem, 'emoji'>
 type Totals = { goals: number; assists: number; apps: number; mom: number; saves: number; cleanSheets: number }
 type Streak = { scoring: number; contribution: number }
 type TeamRun = { wins: number; unbeaten: number; cleanSheets: number; seasonGoals: number; seasonCleanSheets: number }
+
+const EMPTY_STATES: CompetitionState[] = []
+const newsCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], NewsItem[]>>>>()
 
 const emptyTotals = (): Totals => ({ goals: 0, assists: 0, apps: 0, mom: 0, saves: 0, cleanSheets: 0 })
 const ordered = (matches: Match[]) => oldestMatches([...new Map(matches.map(match => [match.id, match])).values()])
@@ -36,7 +40,7 @@ const newsEmoji = (item: NewsDraft) => {
  * Deterministic milestone projection from raw Match/Event data. Stable IDs make
  * rerenders, hydration, sync and reopening an old match naturally idempotent.
  */
-export function deriveNews(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = []): NewsItem[] {
+function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[]): NewsItem[] {
   const items = new Map<string, NewsItem>()
   const add = (item: NewsDraft) => { if (!items.has(item.id)) items.set(item.id, { ...item, emoji: newsEmoji(item) }) }
   const career = new Map<string, Totals>()
@@ -46,6 +50,25 @@ export function deriveNews(players: Player[], teams: Team[], matches: Match[], s
   const playerRuns = new Map<string, Streak>()
   const teamRuns = new Map<string, TeamRun>()
   const chronological = ordered(matches)
+  const matchesThroughDate = new Map<string, Match[]>()
+  const matchesUpTo = (season: string, date: string) => {
+    const key = `${season}\u0000${date}`
+    const cached = matchesThroughDate.get(key)
+    if (cached) return cached
+    const selected = matches.filter(item => item.season === season && item.date <= date)
+    matchesThroughDate.set(key, selected)
+    return selected
+  }
+  const leagueLeaderAt = (season: string, date: string) => {
+    const games = matchesUpTo(season, date)
+    const basic = seasonStandings(teams, games, season)
+    const first = basic[0]
+    if (!first) return undefined
+    // Ratings/SOT are canonical late tie-breakers. Do not pay for their
+    // rating derivation unless the ordinary table columns genuinely tie.
+    const tiedForFirst = basic.filter(row => row.points === first.points && row.goalDifference === first.goalDifference && row.goalsFor === first.goalsFor && row.wins === first.wins)
+    return tiedForFirst.length === 1 ? first : leagueCompetition(teams, games, season, players).standings[0]
+  }
   
   // Track standings for league news
   const teamLeads = new Map<string, boolean>()
@@ -57,8 +80,7 @@ export function deriveNews(players: Player[], teams: Team[], matches: Match[], s
     
     // Team News: League Lead
     if (type === 'league') {
-      const standings = leagueCompetition(teams, matches.filter(m => m.season === match.season && m.date <= match.date), match.season, players).standings
-      const leader = standings[0]
+      const leader = leagueLeaderAt(match.season, match.date)
       if (leader) {
         const teamId = leader.teamId
         if (!teamLeads.get(match.season + teamId)) {
@@ -70,7 +92,7 @@ export function deriveNews(players: Player[], teams: Team[], matches: Match[], s
 
     // Team News: Knockout Stages (Cup / Champions)
     if (type === 'cup' || type === 'champions') {
-        const matchesUpToDate = matches.filter(m => m.season === match.season && m.date <= match.date)
+        const matchesUpToDate = matchesUpTo(match.season, match.date)
         if (type === 'cup') {
             const cup = cupCompetition(teams, matchesUpToDate, match.season, players)
             const prevActive = cupStatus.get(match.season) || teams.map(t => t.id)
@@ -117,15 +139,23 @@ export function deriveNews(players: Player[], teams: Team[], matches: Match[], s
                     }
                 }
                 
-                // Advancement check
+                // Advancement check. The Champions snapshot above is already
+                // canonical for this historical checkpoint; do not rebuild all
+                // three competitions once per team.
+                const compactProgress = (teamId: string) => {
+                    if (champions.championId === teamId) return 'Winner'
+                    const loss = CHAMPIONS_ROUNDS.find(round => champions.rounds[round].some(pair => pair.teamIds.includes(teamId) && pair.winnerId && pair.winnerId !== teamId))
+                    if (loss) return `Eliminated ${{ roundOf16: 'R16', quarterFinal: 'QF', semiFinal: 'SF', final: 'Final' }[loss]}`
+                    return ({ roundOf16: 'Round of 16', quarterFinal: 'Quarter-finals', semiFinal: 'Semi-finals', final: 'Final', finalReplay: 'Final Replay' } as Record<string, string>)[champions.currentStage]
+                }
                 for (const team of teams) {
-                    const progress = teamCompetitionProgress(team.id, teams, matchesUpToDate, match.season, players, draw)
+                    const progress = compactProgress(team.id)
                     const prevProgress = cupStatus.get(match.season + 'champions-progress' + team.id)?.[0] as string | undefined;
                     const stageMap: Record<string, string> = { 'Round of 16': 'Quarter-finals', 'Quarter-finals': 'Semi-finals', 'Semi-finals': 'Final' }
-                    if (prevProgress && prevProgress !== progress.champions && stageMap[prevProgress as string] === progress.champions) {
-                         add({ id: `champions-advanced:${match.season}:${team.id}:${match.id}`, kind: 'team', date: match.date, matchId: match.id, teamId: team.id, eyebrow: 'ADVANCED', title: `${teamName(teams, team.id)} advances in the Champions League`, detail: `Advances to ${progress.champions}.`, context })
+                    if (prevProgress && prevProgress !== progress && stageMap[prevProgress as string] === progress) {
+                         add({ id: `champions-advanced:${match.season}:${team.id}:${match.id}`, kind: 'team', date: match.date, matchId: match.id, teamId: team.id, eyebrow: 'ADVANCED', title: `${teamName(teams, team.id)} advances in the Champions League`, detail: `Advances to ${progress}.`, context })
                     }
-                    cupStatus.set(match.season + 'champions-progress' + team.id, [progress.champions])
+                    cupStatus.set(match.season + 'champions-progress' + team.id, [progress])
                 }
 
                 // Winner check
@@ -256,6 +286,20 @@ export function deriveNews(players: Player[], teams: Team[], matches: Match[], s
   return [...items.values()].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
 }
 
-export function homeMilestoneNews(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = []): NewsItem[] {
+export function deriveNews(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES): NewsItem[] {
+  let byPlayers = newsCache.get(matches)
+  if (!byPlayers) { byPlayers = new WeakMap(); newsCache.set(matches, byPlayers) }
+  let byTeams = byPlayers.get(players)
+  if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
+  let byStates = byTeams.get(teams)
+  if (!byStates) { byStates = new WeakMap(); byTeams.set(teams, byStates) }
+  const cached = byStates.get(states)
+  if (cached) return cached
+  const result = deriveNewsUncached(players, teams, matches, states)
+  byStates.set(states, result)
+  return result
+}
+
+export function homeMilestoneNews(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES): NewsItem[] {
   return deriveNews(players, teams, matches, states).slice(0, 5)
 }

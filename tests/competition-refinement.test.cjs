@@ -188,9 +188,9 @@ test('season completion is synchronized as backward-compatible CompetitionState 
   assert(validation.includes("'season-complete'"))
 })
 
-test('visible and package metadata version are exactly v2.1.8 / 2.1.8', () => {
-  assert.equal(APP_VERSION, '2.1.8')
-  assert.equal(require('../package.json').version, '2.1.8')
+test('visible and package metadata version are exactly v2.1.9 / 2.1.9', () => {
+  assert.equal(APP_VERSION, '2.1.9')
+  assert.equal(require('../package.json').version, '2.1.9')
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('v{APP_VERSION}'))
 })

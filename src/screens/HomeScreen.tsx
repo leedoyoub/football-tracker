@@ -23,7 +23,9 @@ export function HomeScreen({ season, onNavigate }: { season: string; onSeason?: 
   const recent = useMemo(() => derivedResults(matches, teams).slice(0, 5), [matches, teams])
   const news = useMemo(() => homeMilestoneNews(players, teams, matches, competitionStates), [players, teams, matches, competitionStates])
   const playStylePerformance = useMemo(() => trackedTeamPlayStylePerformance(matches, teams), [matches, teams])
-  const seasonStats = useMemo(() => buildGlobalRankingData(players, matches.filter(match => match.season === season), { seasons: [season], teams: [], positions: [] }, 'rating'), [players, matches, season])
+  // Keep the Store-owned matches identity so the engine-level ranking cache
+  // survives Home remounts; the selector already applies the season scope.
+  const seasonStats = useMemo(() => buildGlobalRankingData(players, matches, { seasons: [season], teams: [], positions: [] }, 'rating'), [players, matches, season])
   const leaders = useMemo(() => {
     const eligible = seasonStats.filter(row => row.matches > 0)
     return [

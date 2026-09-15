@@ -6,14 +6,13 @@ import { formatDate, playerFullName, playerFullName as playerDisplayName, Substi
 import { PlayerAvatar } from '../components/PlayerAvatar'
 import { matchScore } from '../engine/rating'
 import { buildGlobalRankingData, rankGlobalRankingRows, playerSeasonStats, seasonsFromMatches, teamBestEleven, type LeaderboardMetric } from '../engine/stats'
-import { standingForTeam } from '../engine/standings'
-import { leagueCompetition, matchCompetitionType } from '../engine/competition'
+import { matchCompetitionType, teamCompetitionOverview } from '../engine/competition'
 import { useStore } from '../store'
 import { sortPlayersByPosition } from '../lib/positionOrder'
 import type { CompetitionType, View } from '../types'
 
 export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamId: string; season: string; onNavigate: (view: View) => void; onBack: () => void }) {
-  const { teams, players, matches } = useStore()
+  const { teams, players, matches, competitionStates = [] } = useStore()
   const [expandedContext, setExpandedContext] = useState<string | null>(null)
   const [bestSeason, setBestSeason] = useState(season)
   const [bestCompetition, setBestCompetition] = useState<CompetitionType | 'all'>('all')
@@ -21,10 +20,10 @@ export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamI
   const seasons = seasonsFromMatches(matches)
   const activeSeason = seasons.includes(season) ? season : seasons[0] ?? season
   const selectedBestSeason = seasons.includes(bestSeason) ? bestSeason : activeSeason
+  const overview = useMemo(() => teamCompetitionOverview(teamId, teams, matches, activeSeason, players, competitionStates), [teamId, teams, matches, activeSeason, players, competitionStates])
   if (!team) return <div className="p-6 text-sm text-zinc-400">Team not found.</div>
 
   const best = teamBestEleven(players, matches, teamId, activeSeason)
-  const standing = standingForTeam(leagueCompetition(teams, matches, activeSeason, players).standings, teamId)
   const statsByPlayer = Object.fromEntries(players.filter((player) => (player.teamIds ?? [player.teamId]).includes(teamId)).map((player) => {
     const stats = playerSeasonStats(player, players, matches, activeSeason, teamId)
     return [player.id, { goals: stats.goals, assists: stats.assists, avgRating: stats.avgRating, matches: stats.matches }]
@@ -43,18 +42,6 @@ export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamI
   const visibleMatches = showAll ? recent : recent.slice(0, 5)
   const starterIds = new Set(best.slots.flatMap(slot => slot.playerId ? [slot.playerId] : []))
   const allTeamPlayers = sortPlayersByPosition(players.filter((player) => (player.teamIds ?? [player.teamId]).includes(teamId)), [])
-  const record = recent.reduce((acc, match) => {
-    const score = matchScore(match)
-    const won = match.homeTeamId === teamId ? score.home > score.away : score.away > score.home
-    const drawn = score.home === score.away
-    if (won) acc.wins += 1
-    else if (drawn) acc.draws += 1
-    else acc.losses += 1
-    acc.for += match.homeTeamId === teamId ? score.home : score.away
-    acc.against += match.homeTeamId === teamId ? score.away : score.home
-    return acc
-  }, { wins: 0, draws: 0, losses: 0, for: 0, against: 0 })
-
   return <div className="px-4 pb-8 pt-6">
     <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">← Back</button>
     <header className="mb-5 flex items-center gap-3">
@@ -64,8 +51,10 @@ export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamI
     </header>
     <section aria-label="Roster management" className="mb-5 rounded-xl border border-white/10 bg-zinc-900 p-3"><div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold">Roster management</h2><p className="mt-0.5 text-[11px] text-zinc-400">Import official squad and player photos</p></div><button type="button" onClick={() => onNavigate({ name: 'import-squad', teamId })} className="shrink-0 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300">Import Squad</button></div></section>
     <div className="mb-5 grid grid-cols-4 gap-2 text-center">
-      {[['Position', standing ? `${standing.rank}${standing.rank === 1 ? 'st' : standing.rank === 2 ? 'nd' : standing.rank === 3 ? 'rd' : 'th'}` : '—'], ['Matches', recent.length], ['W-D-L', `${record.wins}-${record.draws}-${record.losses}`], ['Pts', standing?.points ?? 0]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{value}</div><div className="text-[9px] uppercase text-zinc-500">{label}</div></div>)}
+      {[['Rank', overview.league.rank ? `${overview.league.rank}${overview.league.rank === 1 ? 'st' : overview.league.rank === 2 ? 'nd' : overview.league.rank === 3 ? 'rd' : 'th'}` : '—'], ['W-D-L', `${overview.league.wins}-${overview.league.draws}-${overview.league.losses}`], ['GF-GA', `${overview.league.goalsFor}-${overview.league.goalsAgainst}`], ['Pts', overview.league.points]].map(([label, value]) => <div key={String(label)} className="min-w-0 rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{value}</div><div className="text-[9px] uppercase text-zinc-500">{label}</div></div>)}
     </div>
+    <div className="mb-2 grid grid-cols-4 gap-2 text-center"><div className="col-span-3 min-w-0 rounded-xl bg-zinc-900 px-2 py-2"><div className="truncate text-sm font-black">{overview.champions.status}</div><div className="text-[9px] uppercase text-zinc-500">Champions</div></div><div className="min-w-0 rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{overview.champions.goalsFor}-{overview.champions.goalsAgainst}</div><div className="text-[9px] uppercase text-zinc-500">GF-GA</div></div></div>
+    <div className="mb-5 grid grid-cols-4 gap-2 text-center"><div className="col-span-3 min-w-0 rounded-xl bg-zinc-900 px-2 py-2"><div className="truncate text-sm font-black">{overview.cup.status}</div><div className="text-[9px] uppercase text-zinc-500">Cup</div></div><div className="min-w-0 rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{overview.cup.goalsFor}-{overview.cup.goalsAgainst}</div><div className="text-[9px] uppercase text-zinc-500">GF-GA</div></div></div>
     <TeamBestPlayers teamId={teamId} selectedSeason={selectedBestSeason} competition={bestCompetition} seasons={seasons.length ? seasons : [activeSeason]} players={players} matches={matches} onSeason={setBestSeason} onCompetition={setBestCompetition} onPlayer={id => onNavigate({ name: 'player', id })} />
     <div className="mb-3 flex items-end justify-between"><div><h2 className="text-lg font-semibold">Starting XI</h2><p className="text-xs text-zinc-400">Latest match kickoff XI · {best.formation ?? 'Saved formation unavailable'}</p></div><span className="text-[10px] text-zinc-500">Season Avg</span></div>
     {best.match && best.slots.length ? <Pitch slots={best.slots} players={players} teams={teams} statsByPlayer={statsByPlayer} showPositionBadge={false} onSlotClick={(slot) => { if (slot.playerId) onNavigate({ name: 'player', id: slot.playerId }) }} /> : <div className="rounded-2xl bg-zinc-900 p-6 text-center text-sm text-zinc-500">No match data yet</div>}

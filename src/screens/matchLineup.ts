@@ -9,6 +9,39 @@ export type SubstitutionDraft = Lineup & {
   checkpoint: Lineup
 }
 
+export type GoalkeeperMovePhase = 'pre-kickoff' | 'in-match'
+
+/**
+ * The starting goalkeeper can be selected before kickoff, but the committed
+ * match has one immutable goalkeeper. Keeping this rule here makes both tap
+ * orders use the same domain check rather than screen-specific exceptions.
+ */
+export function allowsGoalkeeperLineupMove(
+  source: LineupTarget,
+  target: LineupTarget,
+  lineup: Lineup,
+  slotPositions: Record<string, Position>,
+  playerPositions: Record<string, Position | undefined>,
+  phase: GoalkeeperMovePhase,
+): boolean {
+  const sourceId = source.group === 'starting' ? lineup.slotAssignments[source.id] : source.id
+  const targetId = target.group === 'starting' ? lineup.slotAssignments[target.id] : target.id
+  const sourceGKSlot = source.group === 'starting' && slotPositions[source.id] === 'GK'
+  const targetGKSlot = target.group === 'starting' && slotPositions[target.id] === 'GK'
+  const sourceIsGK = playerPositions[sourceId] === 'GK'
+  const targetIsGK = playerPositions[targetId] === 'GK'
+  const involvesGoalkeeper = sourceGKSlot || targetGKSlot || sourceIsGK || targetIsGK
+
+  if (!involvesGoalkeeper) return true
+  if (phase === 'in-match') return false
+
+  // Before kickoff, the only legal keeper movement is exchanging the GK slot
+  // with another real goalkeeper from the match-day bench/candidates.
+  return sourceIsGK
+    && targetIsGK
+    && ((sourceGKSlot && target.group !== 'starting') || (targetGKSlot && source.group !== 'starting'))
+}
+
 export function lineupTarget(id: string): LineupTarget | undefined {
   const slot = id.match(/^(?:player|target):(.+)$/)
   if (slot) return { group: 'starting', id: slot[1] }

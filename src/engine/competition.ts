@@ -381,3 +381,59 @@ export function teamCompetitionProgress(teamId: string, teams: Team[], matches: 
   }
   return { league: `${leaguePlayed} / ${LEAGUE_MATCHES_PER_TEAM}`, cup: cupLabel, champions: championsLabel }
 }
+
+export type TeamCompetitionOverview = {
+  league: Standing
+  champions: { status: string; goalsFor: number; goalsAgainst: number }
+  cup: { status: string; goalsFor: number; goalsAgainst: number }
+}
+
+const championsRoundLabel = (stage: ChampionsStage) => ({ roundOf16: 'Round of 16', quarterFinal: 'Quarter-finals', semiFinal: 'Semi-finals', final: 'Final', finalReplay: 'Final Replay' } as Record<ChampionsStage, string>)[stage]
+const cupStageLabel = (stage: CupStage) => stage === 'final' ? 'Final' : stage === 'finalReplay' ? 'Final Replay' : `Stage ${stage.replace('stage', '')}`
+
+/** Actual recorded competition scores from the tracked team's perspective.
+ * Champions comparison opponents are never used as a score source. */
+export function teamCompetitionGoals(teamId: string, matches: Match[], season: string, type: CompetitionType) {
+  return competitionMatches(matches, season, type).reduce((total, match) => {
+    if (!hasPlayed(match, teamId)) return total
+    const score = matchScore(match)
+    const home = match.homeTeamId === teamId || (match.teamId === teamId && match.homeTeamId !== teamId)
+    return { goalsFor: total.goalsFor + (home ? score.home : score.away), goalsAgainst: total.goalsAgainst + (home ? score.away : score.home) }
+  }, { goalsFor: 0, goalsAgainst: 0 })
+}
+
+/** Canonical compact competition data shared by Team Detail consumers. */
+export function teamCompetitionOverview(teamId: string, teams: Team[], matches: Match[], season: string, players: Player[], states: CompetitionState[] = []): TeamCompetitionOverview {
+  const draw = states.find(state => state.id === `champions:${season}` && state.kind === 'champions-draw')
+  const league = leagueCompetition(teams, matches, season, players).standings.find(row => row.teamId === teamId) ?? emptyStanding(teamId)
+  const cup = cupCompetition(teams, matches, season, players)
+  const cupGoals = teamCompetitionGoals(teamId, matches, season, 'cup')
+  const cupPlayed = competitionMatches(matches, season, 'cup').some(match => hasPlayed(match, teamId))
+  const cupStatus = cup.championId === teamId ? 'Champion'
+    : cup.eliminatedAtByTeam[teamId] ? `Eliminated · Stage ${cup.eliminatedAtByTeam[teamId]}`
+      : cupPlayed ? cupStageLabel(cup.stage) : 'Not Started'
+
+  const champions = championsCompetition(draw, matches, season, players)
+  const championsGoals = teamCompetitionGoals(teamId, matches, season, 'champions')
+  let championsStatus = 'Not Started'
+  if (draw?.teamIds.includes(teamId)) {
+    if (champions.championId === teamId) championsStatus = 'Champion'
+    else {
+      const loss = (Object.entries(champions.rounds) as [Exclude<ChampionsStage, 'finalReplay'>, ChampionsPairing[]][])
+        .find(([, pairings]) => pairings.some(pairing => pairing.teamIds.includes(teamId) && pairing.winnerId && pairing.winnerId !== teamId))
+      if (loss) championsStatus = `Eliminated · ${championsRoundLabel(loss[0])}`
+      else {
+        const stage = champions.currentStage === 'finalReplay' ? 'final' : champions.currentStage
+        const pairing = champions.rounds[stage].find(item => item.teamIds.includes(teamId))
+        if (pairing) {
+          const ownGames = pairing.teamGames?.[teamId] ?? pairing.matches.filter(match => match.teamId === teamId || (!match.teamId && hasPlayed(match, teamId)))
+          const required = pairing.requiredMatches
+          championsStatus = ownGames.length >= required
+            ? `${championsRoundLabel(stage)} · ${required}/${required} Played`
+            : `${championsRoundLabel(stage)} · Game ${ownGames.length + 1}/${required}`
+        }
+      }
+    }
+  }
+  return { league, champions: { status: championsStatus, ...championsGoals }, cup: { status: cupStatus, ...cupGoals } }
+}
