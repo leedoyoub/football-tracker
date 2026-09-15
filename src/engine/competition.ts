@@ -71,7 +71,7 @@ export type CupCompetition = {
 function averageTeamRating(teamId: string, games: Match[], players: Player[]): number {
   const values = games.flatMap(match => rateMatch(match, players)
     .filter(row => match.appearances.some(appearance => appearance.playerId === row.playerId && appearance.teamId === teamId))
-    .map(row => row.rating))
+    .map(row => row.raw))
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
 }
 

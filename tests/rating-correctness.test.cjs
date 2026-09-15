@@ -32,8 +32,8 @@ test('Gerard Martín: both 89 and 90 count after entering CB at 77 in a 4–2 wi
   assert.deepEqual(rating.matchScore(m), { home: 4, away: 2 })
   assert.deepEqual(trace.concededGoals.map(row => [row.minute, row.onPitch, row.position, row.penalty]), [[89, true, 'CB', -.35], [90, true, 'CB', -.35]])
   assert.deepEqual([result.enter, result.exit, result.minutes], [77, 90, 13])
-  near(result.conceded, -.7); near(result.result, .1); near(result.noConceded, .039)
-  near(result.raw, 5.939); near(trace.componentSum, result.preClamp)
+  near(result.conceded, -.7); near(result.result, .1); near(result.noConceded, 1.7 * .2 * 13 / 90)
+  near(result.raw, 5.949111111111111); near(trace.componentSum, result.preClamp)
   assert.equal(result.rating.toFixed(1), '5.9'); assert.equal(trace.opponentSot, 2)
   assert.equal(JSON.stringify({ p, m }), before)
 })
@@ -76,7 +76,7 @@ test('uninvolved goal bonus changes with position and excludes scorer/assister',
 test('SOT suppression splits 60 CB / 30 CDM with full precision', () => {
   const p = player(), m = game(p, [goal('g', 80)], { appearances: [app(p, 'starter', { positionHistory: [{ minute: 60, position: 'CDM' }] })] })
   const trace = rating.tracePlayerMatchRating(m, p)
-  near(trace.sotBonus, 1.0033333333333334)
+  near(trace.sotBonus, 1.2986666666666666)
   near(trace.suppressionIntervals.reduce((sum, row) => sum + row.bonus, 0), trace.sotBonus)
 })
 for (const first of [true, false]) test(`same-minute substitution ${first ? 'before' : 'after'} goal`, () => {
@@ -107,7 +107,7 @@ for (const minute of [91, 95, 99]) test(`stoppage-time goal at ${minute} remains
 })
 test('multiple position intervals cannot exceed the 1.0 minutes factor in stoppage time', () => {
   const p = player(), m = game(p, [goal('end', 99)], { appearances: [app(p, 'starter', { positionHistory: [{ minute: 60, position: 'CDM' }] })] })
-  near(rating.ratePlayerMatch(m, p).noConceded, .9553030303030303)
+  near(rating.ratePlayerMatch(m, p).noConceded, 1.2496969696969698)
 })
 test('supported repeated on/off intervals exclude bench gaps from minutes and goals', () => {
   const p = player(), m = game(p, [sub(20, 'other', 'p'), goal('gap', 30), sub(40), goal('on', 50), sub(60, 'next', 'p'), goal('off', 70)])
@@ -120,15 +120,15 @@ test('multi-GK match uses each keeper’s on-pitch GA and all own-team untimed s
   const m = game(a, [goal('early', 20), sub(60, 'b', 'a', { position: 'GK' }), goal('late', 90), { id: 's1', type: 'save', teamId: 'A', playerId: 'a', count: 4 }, { id: 's2', type: 'save', teamId: 'A', playerId: 'b', count: 3 }], { appearances: [app(a), app(b, 'bench'), app(defender)] })
   const before = JSON.stringify(m)
   near(rating.ratePlayerMatch(m, a).conceded, -.35); near(rating.ratePlayerMatch(m, b).conceded, -.35)
-  near(rating.ratePlayerMatch(m, a).saves, 1); near(rating.ratePlayerMatch(m, b).saves, .66)
+  near(rating.ratePlayerMatch(m, a).saves, 1.2); near(rating.ratePlayerMatch(m, b).saves, .81)
   assert.equal(rating.opponentSotProxy(m, 'A'), 9)
-  near(rating.ratePlayerMatch(m, defender).noConceded, 1.35 * .23)
+  near(rating.ratePlayerMatch(m, defender).noConceded, 1.7 * .23)
   assert.equal(JSON.stringify(m), before)
 })
-for (const [saves, conceded, perSave] of [[4, 1, .25], [3, 2, .22], [2, 3, .20], [1, 4, .16], [1, 5, .12], [0, 0, 0]]) test(`GK save band ${saves}/${saves + conceded} is finite`, () => {
+for (const [saves, conceded, perSave] of [[4, 1, .30], [3, 2, .27], [2, 3, .25], [1, 4, .21], [1, 5, .17], [0, 0, 0]]) test(`GK save band ${saves}/${saves + conceded} is finite`, () => {
   const p = player('p', 'GK'), m = game(p, Array.from({ length: conceded }, (_, i) => goal(`g${i}`, i + 1)).concat(saves ? [{ id: 's', type: 'save', teamId: 'A', playerId: 'p', count: saves }] : []))
   const r = rating.ratePlayerMatch(m, p)
-  near(r.saves, saves * perSave); near(r.base, 7.1); assert(Number.isFinite(r.raw))
+  near(r.saves, saves * perSave); near(r.base, 7.0); assert(Number.isFinite(r.raw))
 })
 test('legacy tactical appearance aliases, missing matchPosition, minimal goals and stored ratings normalize without writes', () => {
   const p = player(), m = game(p, [sub(77, 'p', 'out', { position: 'LCB' }), goal('g89', 89), goal('g90', 90)], { appearances: [{ playerId: 'p', teamId: 'A', position: 'LB', role: 'bench' }] })
@@ -168,7 +168,7 @@ test('all historical consumers reuse the same precise Gerard rating despite obso
   const { p, m } = gerardFixture(), players = [p], matches = [m], r = rating.ratePlayerMatch(m, p)
   const scope = derivePlayerScope(p, players, matches), global = stats.buildGlobalRankingData(players, matches, filters, 'rating')[0]
   assert.strictEqual(rating.rateMatch(m, players)[0], r); assert.strictEqual(scope.appearances[0].rating, r); assert.strictEqual(global.ratings[0], r)
-  for (const number of [scope.averageRating, global.avgRating, stats.aggregatePlayerStats(p, players, matches).avgRating, rating.tracePlayerMatchRating(m, p).raw, playerForm(p, matches).last5Average, substituteImpact(p, matches).summary.averageRating]) near(number, 5.939)
+  for (const number of [scope.averageRating, global.avgRating, stats.aggregatePlayerStats(p, players, matches).avgRating, rating.tracePlayerMatchRating(m, p).raw, playerForm(p, matches).last5Average, substituteImpact(p, matches).summary.averageRating]) near(number, 5.949111111111111)
   assert.equal(rating.getMatchManOfTheMatch(m, players), p.id)
   near(stats.unifiedBestEleven(players, matches, 'S1').slots.find(row => row.playerId === p.id).avgRating, r.raw)
 })
@@ -192,7 +192,7 @@ test('legacy partnership statistics attribute final-minute goals and reject off-
   const result = stats.partnershipStats('p', 'mate', [m], 'S1')
   assert.equal(result.goalsTogether, 1); assert.equal(result.assistsBtoA, 1)
 })
-test('historical Match and Player Detail actually render the same 5.9 single-match value', () => {
+test('historical Match and Player Detail actually render the same v6 single-match value', () => {
   const { p, m } = gerardFixture(), React = require('react'), { renderToStaticMarkup } = require('react-dom/server')
   const path = require.resolve('../src/store.tsx'), previous = require.cache[path]
   require.cache[path] = { id: path, filename: path, loaded: true, exports: { useStore: () => ({ players: [p], matches: [m], teams: [], deleteMatch() {} }) } }
@@ -201,7 +201,7 @@ test('historical Match and Player Detail actually render the same 5.9 single-mat
     const { PlayerDetailScreen } = require('../src/screens/PlayerDetailScreen.tsx')
     const matchHtml = renderToStaticMarkup(React.createElement(MatchDetailScreen, { matchId: m.id, onNavigate() {} }))
     const playerHtml = renderToStaticMarkup(React.createElement(PlayerDetailScreen, { playerId: p.id, season: 'S1', onNavigate() {}, onBack() {} }))
-    assert.match(matchHtml, />5\.9</); assert.match(playerHtml, />5\.9</); assert.match(playerHtml, />5\.94</)
+    assert.match(matchHtml, />5\.9</); assert.match(playerHtml, />5\.9</); assert.match(playerHtml, />5\.95</)
   } finally { if (previous) require.cache[path] = previous; else delete require.cache[path] }
 })
 test('live history accepts stoppage-time subs and validates goals in saved order', () => {

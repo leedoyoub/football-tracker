@@ -29,7 +29,7 @@ test('uninvolved team goals exclude scorer and assister and use event-time posit
 
 test('SOT curve and minute-prorated suppression use the finalized values', () => {
   assert.deepEqual([0, 1, 2, 3, 5, 10].map(sotMultiplier), [1, .86, .73, .62, .45, .20])
-  for (const [minutes, expected] of [[30, .45], [45, .675], [60, .9], [90, 1.35]]) {
+  for (const [minutes, expected] of [[30, 1.7 / 3], [45, .85], [60, 1.7 * 2 / 3], [90, 1.7]]) {
     const cb = player(`cb${minutes}`, 'CB'); const match = game(cb); match.appearances[0].role = 'bench'; match.events = [{ id: 'on', type: 'sub', minute: 90 - minutes, teamId: 'A', playerOutId: 'out', playerInId: cb.id, position: 'CB' }]
     near(ratePlayerMatch(match, cb).noConceded, expected)
   }
@@ -58,9 +58,9 @@ test('v2.1.2 per-goal conceded coefficients scale for fullbacks, centre-backs, a
 test('GK base and save-rate bands are derived safely from saves and conceded goals', () => {
   const gk = player('gk', 'GK'); const empty = game(gk)
   assert.equal(ratePlayerMatch(empty, gk).base, GOALKEEPER_BASE_RATING); near(ratePlayerMatch(empty, gk).saves, 0)
-  assert.deepEqual([.8, .6, .4, .2, 0].map(saveBonusPerSave), [.25, .22, .20, .16, .12])
+  assert.deepEqual([.8, .6, .4, .2, 0].map(saveBonusPerSave), [.30, .27, .25, .21, .17])
   const match = game(gk); match.events = [{ id: 's', type: 'save', teamId: 'A', playerId: 'gk', minute: 20, count: 4 }, goal(30, { teamId: 'B' })]
-  near(ratePlayerMatch(match, gk).saves, 1); near(ratePlayerMatch(match, gk).conceded, -.35)
+  near(ratePlayerMatch(match, gk).base, 7.0); near(ratePlayerMatch(match, gk).saves, 1.2); near(ratePlayerMatch(match, gk).conceded, -.35)
 })
 
 test('historical rating derivation is raw-data-safe, clamped, and drives averages and MOM', () => {

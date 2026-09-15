@@ -17,7 +17,7 @@ test('interval SOT quality is normalized while total CB suppression remains prop
   const starter = player('starter'), substitute = player('substitute')
   const match = game([appearance(starter), appearance(substitute, 'bench')], [{ id: 'sub', type: 'sub', minute: 60, teamId: 'A', playerOutId: 'starter', playerInId: 'substitute', position: 'CB' }])
   const first = tracePlayerMatchRating(match, starter), second = tracePlayerMatchRating(match, substitute)
-  near(first.sotBonus, .9); near(second.sotBonus, .45); near(first.sotBonus / second.sotBonus, 2)
+  near(first.sotBonus, 1.7 * 2 / 3); near(second.sotBonus, 1.7 / 3); near(first.sotBonus / second.sotBonus, 2)
 })
 
 test('conceded goals affect only the position segment in which they occurred', () => {
@@ -25,7 +25,7 @@ test('conceded goals affect only the position segment in which they occurred', (
   const match = game([appearance(p, 'starter', { positionHistory: [{ minute: 60, position: 'CDM' }] })], [goal('late', 80)])
   const trace = tracePlayerMatchRating(match, p)
   assert.deepEqual(trace.suppressionIntervals.map(row => [row.position, row.minutes, row.sot90]), [['CB', 60, 0], ['CDM', 30, 3]])
-  near(trace.sotBonus, 1.0033333333333334)
+  near(trace.sotBonus, 1.2986666666666666)
 })
 
 test('fractional SOT values interpolate and preserve every integer table value', () => {

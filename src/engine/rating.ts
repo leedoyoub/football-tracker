@@ -13,7 +13,7 @@ import {
 export { isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchPositionSegments, normalizeMatchPosition, pitchWindow, scoringTeamId } from './timeline.ts'
 
 export const BASE_RATING = 6.5
-export const GOALKEEPER_BASE_RATING = 7.1
+export const GOALKEEPER_BASE_RATING = 7.0
 export const MIN_RATING = 3.0
 export const MAX_RATING = 10.0
 
@@ -24,11 +24,11 @@ const RULE = (goal: number, assist: number, teamGoal: number, suppressionMax: nu
 export const POSITION_RULES: Record<Position, PositionRules> = {
   ST: RULE(.85, .50, 0, 0, 0), LST: RULE(.85, .50, 0, 0, 0), RST: RULE(.85, .50, 0, 0, 0),
   SS: RULE(.90, .55, 0, 0, 0), LW: RULE(1, .65, 0, 0, 0), RW: RULE(1, .65, 0, 0, 0), CAM: RULE(1, .65, 0, 0, 0),
-  LM: RULE(1.05, .65, .05, .10, -.04), RM: RULE(1.05, .65, .05, .10, -.04),
-  CM: RULE(1.05, .65, .10, .10, -.08), LCM: RULE(1.05, .65, .10, .10, -.08), RCM: RULE(1.05, .65, .10, .10, -.08),
-  CDM: RULE(1.15, .70, .10, .50, -.10), LDM: RULE(1.15, .70, .10, .50, -.10), RDM: RULE(1.15, .70, .10, .50, -.10),
-  LB: RULE(1.25, .70, .05, 1, -.30), LWB: RULE(1.25, .70, .05, 1, -.30), RB: RULE(1.25, .70, .05, 1, -.30), RWB: RULE(1.25, .70, .05, 1, -.30),
-  CB: RULE(1.35, .75, 0, 1.35, -.35), LCB: RULE(1.35, .75, 0, 1.35, -.35), RCB: RULE(1.35, .75, 0, 1.35, -.35),
+  LM: RULE(1.05, .65, .05, .30, -.04), RM: RULE(1.05, .65, .05, .30, -.04),
+  CM: RULE(1.05, .65, .10, .30, -.08), LCM: RULE(1.05, .65, .10, .30, -.08), RCM: RULE(1.05, .65, .10, .30, -.08),
+  CDM: RULE(1.15, .70, .10, .80, -.10), LDM: RULE(1.15, .70, .10, .80, -.10), RDM: RULE(1.15, .70, .10, .80, -.10),
+  LB: RULE(1.25, .70, .05, 1.40, -.30), LWB: RULE(1.25, .70, .05, 1.40, -.30), RB: RULE(1.25, .70, .05, 1.40, -.30), RWB: RULE(1.25, .70, .05, 1.40, -.30),
+  CB: RULE(1.35, .75, 0, 1.70, -.35), LCB: RULE(1.35, .75, 0, 1.70, -.35), RCB: RULE(1.35, .75, 0, 1.70, -.35),
   GK: RULE(1.50, 1, 0, 0, -.35),
 }
 
@@ -45,11 +45,11 @@ export function sotMultiplier(opponentSOT: number): number {
   return start + (end - start) * fraction
 }
 export function saveBonusPerSave(saveRate: number): number {
-  if (saveRate >= .8) return .25
-  if (saveRate >= .6) return .22
-  if (saveRate >= .4) return .20
-  if (saveRate >= .2) return .16
-  return .12
+  if (saveRate >= .8) return .30
+  if (saveRate >= .6) return .27
+  if (saveRate >= .4) return .25
+  if (saveRate >= .2) return .21
+  return .17
 }
 export function clampRating(value: number): number { return Math.min(MAX_RATING, Math.max(MIN_RATING, value)) }
 
@@ -280,17 +280,43 @@ function momEventCount(match: Match, playerId: string, key: 'playerId' | 'assist
   const appearance = match.appearances.find(item => item.playerId === playerId)
   return appearance ? match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && !event.ownGoal && event[key] === playerId && isOnPitchAtEvent(match, appearance, event)).length : 0
 }
+function seededTieIndex(matchId: string, playerIds: string[]): number {
+  const seed = `${matchId}:${playerIds.slice().sort().join(',')}`
+  let hash = 2166136261
+  for (let index = 0; index < seed.length; index++) {
+    hash ^= seed.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0) % playerIds.length
+}
 /** Uses the same effective match position exposed by the authoritative rating breakdown. */
 export function getMatchManOfTheMatch(match: Match, players: Player[]): string | undefined {
-  return rateMatch(match, players).sort((left, right) => {
-    if (left.raw !== right.raw) return right.raw - left.raw
-    const positionPriority = MOM_POSITION_PRIORITY[left.position] - MOM_POSITION_PRIORITY[right.position]
+  const candidates = rateMatch(match, players).map(rating => ({
+    rating,
+    priority: MOM_POSITION_PRIORITY[rating.position],
+    goals: momEventCount(match, rating.playerId, 'playerId'),
+    assists: momEventCount(match, rating.playerId, 'assistPlayerId'),
+  }))
+  const ordered = candidates.sort((left, right) => {
+    const leftRating = left.rating; const rightRating = right.rating
+    if (leftRating.raw !== rightRating.raw) return rightRating.raw - leftRating.raw
+    const positionPriority = left.priority - right.priority
     if (positionPriority) return positionPriority
-    const goals = momEventCount(match, right.playerId, 'playerId') - momEventCount(match, left.playerId, 'playerId')
+    const goals = right.goals - left.goals
     if (goals) return goals
-    const assists = momEventCount(match, right.playerId, 'assistPlayerId') - momEventCount(match, left.playerId, 'assistPlayerId')
+    const assists = right.assists - left.assists
     if (assists) return assists
-    if (left.minutes !== right.minutes) return right.minutes - left.minutes
-    return left.playerId.localeCompare(right.playerId)
-  })[0]?.playerId
+    return rightRating.minutes - leftRating.minutes
+  })
+  const best = ordered[0]
+  if (!best) return undefined
+  const tied = ordered.filter(candidate =>
+    candidate.rating.raw === best.rating.raw &&
+    candidate.priority === best.priority &&
+    candidate.goals === best.goals &&
+    candidate.assists === best.assists &&
+    candidate.rating.minutes === best.rating.minutes,
+  )
+  const tiedIds = tied.map(candidate => candidate.rating.playerId).sort()
+  return tiedIds[seededTieIndex(match.id, tiedIds)]
 }

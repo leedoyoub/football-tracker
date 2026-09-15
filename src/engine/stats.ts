@@ -319,12 +319,7 @@ export function buildGlobalRankingData(
   const moms = new Map<string, string | undefined>()
   const momFor = (match: Match): string | undefined => {
     if (moms.has(match.id)) return moms.get(match.id)
-    const rows = match.appearances.flatMap(appearance => {
-      const player = playerById.get(appearance.playerId)
-      const rating = player ? ratingFor(match, player) : null
-      return rating ? [rating] : []
-    })
-    const winner = rows.sort((a, b) => b.raw - a.raw || b.minutes - a.minutes || a.playerId.localeCompare(b.playerId))[0]?.playerId
+    const winner = getMatchManOfTheMatch(match, players)
     moms.set(match.id, winner)
     return winner
   }
@@ -609,7 +604,7 @@ function unifiedCandidates(players: Player[], matches: Match[], season: string, 
       const completed = seasonMatches.filter((match) => matchRecordedForTeam(match, teamId)).length
       const eligible = teamParticipations.length >= Math.ceil(completed * 0.5)
       if ((recentOnly && selectedRatings.length < 3) || (!recentOnly && !eligible)) return []
-      return [{ player, teamId, average: selectedRatings.reduce((sum, row) => sum + row.rating, 0) / selectedRatings.length, matches: selectedRatings.length, latestRating: selectedRatings[0]?.rating ?? 0 }]
+      return [{ player, teamId, average: selectedRatings.reduce((sum, row) => sum + row.raw, 0) / selectedRatings.length, matches: selectedRatings.length, latestRating: selectedRatings[0]?.raw ?? 0 }]
     })
   }).filter((candidate) => candidate.matches > 0).sort(candidateOrder)
 }
@@ -669,7 +664,7 @@ export function bestEleven(
       const avg =
         ratings.length === 0
           ? 0
-          : ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
+          : ratings.reduce((sum, r) => sum + r.raw, 0) / ratings.length
       return { player, avg, matches: ratings.length }
     })
     .filter((row) => row.matches > 0)

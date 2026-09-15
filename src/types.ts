@@ -168,7 +168,7 @@ export interface Match {
   teamId?: string
   /** A lightweight, match-only opponent. It is never a registered Team. */
   opponentName?: string
-  /** Saved once when the match is committed; enables durable MOM statistics. */
+  /** Legacy compatibility only. Current UI and statistics derive MOM from raw match facts. */
   manOfMatchPlayerId?: string
   duration: number
   appearances: Appearance[]

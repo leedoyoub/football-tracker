@@ -1,5 +1,6 @@
 import { competitionHistory, cupCompetition, championsCompetition, CHAMPIONS_ROUNDS, leagueCompetition, matchCompetitionType } from './competition'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
+import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import { seasonStandings } from './standings'
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
 import { oldestMatches } from './matchChronology'
@@ -12,7 +13,8 @@ type Streak = { scoring: number; contribution: number }
 type TeamRun = { wins: number; unbeaten: number; cleanSheets: number; seasonGoals: number; seasonCleanSheets: number }
 
 const EMPTY_STATES: CompetitionState[] = []
-const newsCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], NewsItem[]>>>>()
+type NewsCacheEntry = { revision: number; items: NewsItem[] }
+const newsCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], NewsCacheEntry>>>>()
 
 const emptyTotals = (): Totals => ({ goals: 0, assists: 0, apps: 0, mom: 0, saves: 0, cleanSheets: 0 })
 const ordered = (matches: Match[]) => oldestMatches([...new Map(matches.map(match => [match.id, match])).values()])
@@ -294,9 +296,9 @@ export function deriveNews(players: Player[], teams: Team[], matches: Match[], s
   let byStates = byTeams.get(teams)
   if (!byStates) { byStates = new WeakMap(); byTeams.set(teams, byStates) }
   const cached = byStates.get(states)
-  if (cached) return cached
+  if (cached?.revision === RATING_ENGINE_REVISION) return cached.items
   const result = deriveNewsUncached(players, teams, matches, states)
-  byStates.set(states, result)
+  byStates.set(states, { revision: RATING_ENGINE_REVISION, items: result })
   return result
 }
 

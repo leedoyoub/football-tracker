@@ -11,15 +11,41 @@ import { buildGlobalRankingData } from '../engine/stats'
 import { currentStaticTeams } from '../data/teams'
 import { derivedResults } from '../lib/results'
 import { useStore } from '../store'
-import type { CompetitionType, View } from '../types'
+import type { CompetitionState, CompetitionType, Match, Player, Team, View } from '../types'
+
+type HomeCompetitions = {
+  league: ReturnType<typeof leagueCompetition>
+  cup: ReturnType<typeof cupCompetition>
+  champions: ReturnType<typeof championsCompetition>
+}
+const homeCompetitionCache = new WeakMap<Match[], WeakMap<Team[], WeakMap<Player[], WeakMap<CompetitionState[], Map<string, HomeCompetitions>>>>>()
+
+/** Store arrays are immutable snapshots, so this survives a Home remount without
+ * serialising raw history and invalidates whenever a relevant snapshot changes. */
+function homeCompetitions(teams: Team[], matches: Match[], players: Player[], states: CompetitionState[], season: string): HomeCompetitions {
+  let byTeams = homeCompetitionCache.get(matches)
+  if (!byTeams) { byTeams = new WeakMap(); homeCompetitionCache.set(matches, byTeams) }
+  let byPlayers = byTeams.get(teams)
+  if (!byPlayers) { byPlayers = new WeakMap(); byTeams.set(teams, byPlayers) }
+  let byStates = byPlayers.get(players)
+  if (!byStates) { byStates = new WeakMap(); byPlayers.set(players, byStates) }
+  let bySeason = byStates.get(states)
+  if (!bySeason) { bySeason = new Map(); byStates.set(states, bySeason) }
+  const cached = bySeason.get(season)
+  if (cached) return cached
+  const draw = states.find(state => state.id === `champions:${season}`)
+  const result = {
+    league: leagueCompetition(teams, matches, season, players),
+    cup: cupCompetition(currentStaticTeams(teams), matches, season, players),
+    champions: championsCompetition(draw, matches, season, players),
+  }
+  bySeason.set(season, result)
+  return result
+}
 
 export function HomeScreen({ season, onNavigate }: { season: string; onSeason?: (season: string) => void; onNavigate: (view: View) => void }) {
   const { players, teams, matches, competitionStates = [] } = useStore()
-  const tournamentTeams = useMemo(() => currentStaticTeams(teams), [teams])
-  const draw = competitionStates.find(state => state.id === `champions:${season}`)
-  const league = useMemo(() => leagueCompetition(teams, matches, season, players), [teams, matches, season, players])
-  const cup = useMemo(() => cupCompetition(tournamentTeams, matches, season, players), [tournamentTeams, matches, season, players])
-  const champions = useMemo(() => championsCompetition(draw, matches, season, players), [draw, matches, season, players])
+  const { league, cup, champions } = useMemo(() => homeCompetitions(teams, matches, players, competitionStates, season), [teams, matches, players, competitionStates, season])
   const recent = useMemo(() => derivedResults(matches, teams).slice(0, 5), [matches, teams])
   const news = useMemo(() => homeMilestoneNews(players, teams, matches, competitionStates), [players, teams, matches, competitionStates])
   const playStylePerformance = useMemo(() => trackedTeamPlayStylePerformance(matches, teams), [matches, teams])

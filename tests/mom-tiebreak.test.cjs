@@ -39,7 +39,9 @@ test('MOM equal-priority tie uses minutes after goals and assists', () => {
   assert.equal(getMatchManOfTheMatch(match, players), 'right')
 })
 
-test('MOM technical fallback is deterministic by player ID', () => {
+test('MOM final tie is stable, order-independent, and seeded rather than lexicographic', () => {
   const { match, players } = fixture('CB', 'CB', 4, 4)
-  assert.equal(getMatchManOfTheMatch(match, players), 'left')
+  match.id = 'm'
+  assert.equal(getMatchManOfTheMatch(match, players), 'right')
+  assert.equal(getMatchManOfTheMatch(match, [...players].reverse()), 'right')
 })
