@@ -59,6 +59,7 @@ test('Teams uses one global mode for compact fronts/progress backs and stable ca
   assert(source.includes('grid-cols-4') && source.includes('aspect-[0.82]'))
   assert(source.includes('const [showProgress, setShowProgress] = useState(false)'))
   assert(source.includes('<TeamIcon team={team}') && source.includes('{team.name}</span>'))
+  assert(source.includes('{team.abbreviation}</div>') && source.includes('border-t border-white/10'))
   assert(source.includes('<dt className="text-zinc-400">League</dt>') && source.includes('>Cup</dt>') && source.includes('>UCL</dt>'))
   assert(source.includes('aria-label={`Open ${team.name} team details`}') && source.includes('aria-pressed={showProgress}'))
   assert(source.includes("showProgress ? 'Teams' : 'Progress'") && source.includes('motion-reduce:transition-none'))

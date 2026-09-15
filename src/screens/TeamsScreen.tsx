@@ -9,11 +9,14 @@ import type { Team, View } from '../types'
 
 function TeamGridCard({ team, progress, showProgress, onNavigate }: { team: Team; progress: CompactTeamProgress; showProgress: boolean; onNavigate: () => void }) {
   return <button type="button" onClick={onNavigate} aria-label={`Open ${team.name} team details`} className="flex min-w-0 aspect-[0.82] w-full flex-col items-center justify-center rounded-xl border border-white/10 bg-zinc-900 p-1.5 text-center transition-colors duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-300">
-    {showProgress ? <dl className="w-full space-y-1 text-[9px] leading-tight sm:text-[10px]">
-      <div className="flex items-center justify-between gap-1"><dt className="text-zinc-400">League</dt><dd className="font-bold text-zinc-100">{progress.league}</dd></div>
-      <div className="flex items-center justify-between gap-1"><dt className="text-zinc-400">Cup</dt><dd className="font-bold text-zinc-100">{progress.cup}</dd></div>
-      <div className="flex items-center justify-between gap-1"><dt className="text-zinc-400">UCL</dt><dd className="font-bold text-zinc-100">{progress.champions}</dd></div>
-    </dl> : <>
+    {showProgress ? <div className="w-full">
+      <div className="text-center text-[11px] font-black tracking-wide text-emerald-300 sm:text-xs">{team.abbreviation}</div>
+      <dl className="mt-1 space-y-1 border-t border-white/10 pt-1 text-[9px] leading-tight sm:text-[10px]">
+        <div className="flex items-center justify-between gap-1"><dt className="text-zinc-400">League</dt><dd className="font-bold text-zinc-100">{progress.league}</dd></div>
+        <div className="flex items-center justify-between gap-1"><dt className="text-zinc-400">Cup</dt><dd className="font-bold text-zinc-100">{progress.cup}</dd></div>
+        <div className="flex items-center justify-between gap-1"><dt className="text-zinc-400">UCL</dt><dd className="font-bold text-zinc-100">{progress.champions}</dd></div>
+      </dl>
+    </div> : <>
       <TeamIcon team={team} className="mb-1 h-8 w-8 text-[8px] sm:h-10 sm:w-10" />
       <span className="line-clamp-2 max-w-full text-[10px] font-bold leading-tight text-zinc-100 sm:text-[11px]">{team.name}</span>
     </>}
