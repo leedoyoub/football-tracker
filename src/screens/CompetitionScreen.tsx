@@ -65,7 +65,7 @@ function reportLeagueCache(diagnostic: LeagueCacheDiagnostic) {
   console.debug(`[Football Tracker performance] League derived cache: ${diagnostic.hit ? 'HIT' : 'MISS'} · ${diagnostic.key} · ${diagnostic.reason} · ${diagnostic.durationMs.toFixed(3)}ms`)
 }
 
-export function CompetitionScreen({ season, initialType = 'league', onSeason, onNavigate }: { season: string; initialType?: CompetitionType; onSeason: (season: string) => void; onNavigate: (view: View) => void }) {
+export function CompetitionScreen({ season, initialType = 'league', initialMetric, onSeason, onNavigate }: { season: string; initialType?: CompetitionType; initialMetric?: 'rating' | 'goals' | 'assists' | 'mom'; onSeason: (season: string) => void; onNavigate: (view: View) => void }) {
   const { teams, players, matches, competitionStates = [], competitionRevisions = {}, competitionCacheOwner, teamCatalogRevision = 0, setChampionsDraw, completeSeason } = useStore()
   const [type, setType] = useState<CompetitionType>(() => initialType !== 'league' ? initialType : competitionTypeMemory.get(season) ?? initialType)
   useEffect(() => { competitionTypeMemory.set(season, type) }, [season, type])
@@ -104,13 +104,13 @@ export function CompetitionScreen({ season, initialType = 'league', onSeason, on
       {!champions.drawn ? <DrawPanel teams={tournamentTeams} drawnIds={draw?.kind === 'champions-draw' ? draw.teamIds : []} teamById={teamById} onDraw={ids => setChampionsDraw(season, ids)} /> : <ChampionsBracket teams={teamById} rounds={champions.rounds} championId={champions.championId} currentStage={champions.currentStage} />}</>}
     </section>}
 
-    <DeferredCompetitionPanels key={`${season}:${type}`} season={season} type={type} players={players} teams={teams} tournamentTeams={tournamentTeams} matches={matches} leagueMatches={league?.matches} draw={draw} cup={cup} champions={champions} finalized={finalized} nextSeason={nextSeason} onComplete={() => { completeSeason(season); onSeason(nextSeason) }} onNavigate={onNavigate} />
+    <DeferredCompetitionPanels key={`${season}:${type}`} season={season} type={type} initialMetric={initialMetric} players={players} teams={teams} tournamentTeams={tournamentTeams} matches={matches} leagueMatches={league?.matches} draw={draw} cup={cup} champions={champions} finalized={finalized} nextSeason={nextSeason} onComplete={() => { completeSeason(season); onSeason(nextSeason) }} onNavigate={onNavigate} />
   </div>
 }
 
 /** Leave standings/header on the first paint. Each stage gets a separate idle
  * turn so Rankings, Best XI, and completion checks cannot form one long task. */
-function DeferredCompetitionPanels({ season, type, players, teams, tournamentTeams, matches, leagueMatches, draw, cup, champions, finalized, nextSeason, onComplete, onNavigate }: { season: string; type: CompetitionType; players: Player[]; teams: Team[]; tournamentTeams: Team[]; matches: Match[]; leagueMatches?: Match[]; draw?: CompetitionState; cup: CupCompetition | null; champions: ReturnType<typeof championsCompetition> | null; finalized: boolean; nextSeason: string; onComplete: () => void; onNavigate: (view: View) => void }) {
+function DeferredCompetitionPanels({ season, type, initialMetric, players, teams, tournamentTeams, matches, leagueMatches, draw, cup, champions, finalized, nextSeason, onComplete, onNavigate }: { season: string; type: CompetitionType; initialMetric?: 'rating' | 'goals' | 'assists' | 'mom'; players: Player[]; teams: Team[]; tournamentTeams: Team[]; matches: Match[]; leagueMatches?: Match[]; draw?: CompetitionState; cup: CupCompetition | null; champions: ReturnType<typeof championsCompetition> | null; finalized: boolean; nextSeason: string; onComplete: () => void; onNavigate: (view: View) => void }) {
   const [stage, setStage] = useState(0)
   useEffect(() => {
     if (stage >= 3) return
@@ -120,15 +120,15 @@ function DeferredCompetitionPanels({ season, type, players, teams, tournamentTea
   }, [stage])
   return <>
     {stage === 0 && <section aria-label="Competition summaries" className="mt-7 h-14 rounded-2xl bg-zinc-900/60" />}
-    {stage >= 1 && <DeferredCompetitionRankings season={season} type={type} players={players} teams={teams} allMatches={matches} leagueMatches={leagueMatches} onNavigate={onNavigate} />}
+    {stage >= 1 && <DeferredCompetitionRankings season={season} type={type} initialMetric={initialMetric} players={players} teams={teams} allMatches={matches} leagueMatches={leagueMatches} onNavigate={onNavigate} />}
     {stage >= 2 && <DeferredCompetitionBestElevens season={season} type={type} players={players} teams={teams} allMatches={matches} leagueMatches={leagueMatches} cup={cup} champions={champions} onNavigate={onNavigate} />}
     {stage >= 3 && <DeferredSeasonCompletion season={season} teams={tournamentTeams} players={players} matches={matches} draw={draw} finalized={finalized} nextSeason={nextSeason} onComplete={onComplete} />}
   </>
 }
 
-function DeferredCompetitionRankings({ season, type, players, teams, allMatches, leagueMatches, onNavigate }: { season: string; type: CompetitionType; players: Player[]; teams: Team[]; allMatches: Match[]; leagueMatches?: Match[]; onNavigate: (view: View) => void }) {
+function DeferredCompetitionRankings({ season, type, initialMetric, players, teams, allMatches, leagueMatches, onNavigate }: { season: string; type: CompetitionType; initialMetric?: 'rating' | 'goals' | 'assists' | 'mom'; players: Player[]; teams: Team[]; allMatches: Match[]; leagueMatches?: Match[]; onNavigate: (view: View) => void }) {
   const matches = useMemo(() => measuredInDevelopment('Competition match filtering/index lookup', () => type === 'league' && leagueMatches ? leagueMatches : competitionMatches(allMatches, season, type)), [type, leagueMatches, allMatches, season])
-  return <CompetitionRankings season={season} type={type} players={players} teams={teams} matches={matches} onNavigate={onNavigate} />
+  return <CompetitionRankings season={season} type={type} initialMetric={initialMetric} players={players} teams={teams} matches={matches} onNavigate={onNavigate} />
 }
 
 function DeferredCompetitionBestElevens({ season, type, players, teams, allMatches, leagueMatches, cup, champions, onNavigate }: { season: string; type: CompetitionType; players: Player[]; teams: Team[]; allMatches: Match[]; leagueMatches?: Match[]; cup: CupCompetition | null; champions: ReturnType<typeof championsCompetition> | null; onNavigate: (view: View) => void }) {
@@ -213,8 +213,8 @@ function Round({ title, pairs, card, side }: { title: string; pairs: ChampionsPa
   return <div className="relative"><span aria-hidden className={`absolute top-1/2 h-px w-4 bg-cyan-300/20 ${side === 'left' ? '-right-4' : '-left-4'}`} /><p className="mb-2 text-center text-[9px] font-black uppercase tracking-wide text-cyan-200/50">{title}</p><div className="space-y-3">{pairs.map(card)}</div></div>
 }
 
-function CompetitionRankings({ season, type, players, teams, matches, onNavigate }: { season: string; type: CompetitionType; players: Player[]; teams: Team[]; matches: Match[]; onNavigate: (view: View) => void }) {
-  const [metric, setMetric] = useState<LeaderboardMetric>(() => rankingMetricMemory.get(`${season}:${type}`) ?? 'rating')
+function CompetitionRankings({ season, type, initialMetric, players, teams, matches, onNavigate }: { season: string; type: CompetitionType; initialMetric?: 'rating' | 'goals' | 'assists' | 'mom'; players: Player[]; teams: Team[]; matches: Match[]; onNavigate: (view: View) => void }) {
+  const [metric, setMetric] = useState<LeaderboardMetric>(() => initialMetric ?? rankingMetricMemory.get(`${season}:${type}`) ?? 'rating')
   useEffect(() => { rankingMetricMemory.set(`${season}:${type}`, metric) }, [season, type, metric])
   const [filters, setFilters] = useState<RankingFilters>({ ...emptyFilters, seasons: [season] })
   const [all, setAll] = useState(false)

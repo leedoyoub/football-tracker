@@ -56,7 +56,7 @@ test('Champions Final uses its two-game format and competition GF-GA stays indep
 
 test('Home keeps stable source arrays for ranking and reuses News for immutable inputs', () => {
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
-  assert(home.includes('buildGlobalRankingData(players, matches, { seasons: [season]'))
+  assert(home.includes('buildGlobalRankingData(players, analytics.leagueMatches, { seasons: [season]'))
   assert(!home.includes('buildGlobalRankingData(players, matches.filter'))
   const players = [{ id: 'p', name: 'Player', displayName: 'Player', position: 'ST', number: 9, teamId: 't0' }]
   const matches = [game('news', 't0', 'league', 'regular', undefined, 1)]

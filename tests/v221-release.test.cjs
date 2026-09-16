@@ -144,10 +144,10 @@ test('mobile screen hierarchy, compare mode, cached snapshots and navigation mem
   const team = fs.readFileSync(require.resolve('../src/screens/TeamDetailScreen.tsx'), 'utf8')
   const playerDetail = fs.readFileSync(require.resolve('../src/screens/PlayerDetailScreen.tsx'), 'utf8')
   const matchDetail = fs.readFileSync(require.resolve('../src/screens/MatchDetailScreen.tsx'), 'utf8')
-  for (const token of ['homePresentationMemory', 'Season Leaders', 'Monthly XI', 'Matchday Review']) assert(home.includes(token), token)
+  for (const token of ['homeLeaderMemory', 'Season Leaders', 'Highlights', 'Monthly Best XI', 'slice(0, 3)']) assert(home.includes(token), token)
   for (const token of ['leagueViewMemory', 'rankingMetricMemory', "label: 'Table'", "label: 'Form'", "label: 'History'", 'Compare', 'Race History']) assert(competition.includes(token), token)
   for (const token of ['teamTabMemory', "label: 'Overview'", "label: 'Matches'", "label: 'Players'", "label: 'Stats'", 'Top Rated', 'Top Scorer', 'Top Assister']) assert(team.includes(token), token)
-  for (const token of ['Overall rank', 'Position rank', 'Team rank', 'Season avg', 'Last 5 avg', 'Active Streaks', 'Awards']) assert(playerDetail.includes(token), token)
+  for (const token of ['RankedMetric', 'Overall rank', 'Position rank', 'Team rank', 'Season avg', 'Last 5 avg', 'Active Streaks', 'Awards']) assert(playerDetail.includes(token), token)
   for (const token of ['Match Facts', 'Lineup', 'Ratings', 'What Changed', 'Top 3 Ratings']) assert(matchDetail.includes(token), token)
   const p = player('cached')
   const players = [p]

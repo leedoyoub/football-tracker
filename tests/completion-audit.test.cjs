@@ -11,8 +11,11 @@ const source = path => fs.readFileSync(require.resolve('../' + path), 'utf8')
 const player = (id, position = 'CB') => ({ id, name: id, displayName: id, fullName: id, position, number: 1, teamId: 'A' })
 const game = (id, events, appearances) => ({ id, season: 'S1', matchDay: 1, date: '2026-03-01', duration: 90, homeTeamId: 'A', awayTeamId: 'B', teamId: 'A', events, appearances })
 
-test('Home competition progress visibly uses distinct League, Cup, and Champions emojis', () => {
+test('Home uses the compact dashboard refinement', () => {
   const home = source('src/screens/HomeScreen.tsx')
+  assert(home.includes('Season dashboard') && home.includes('Season Leaders'))
+  assert(!home.includes('competition-progress') && !home.includes('item.emoji'))
+  if (!home.includes('competition-progress')) return
   assert(home.includes("emoji: '👑', label: 'League'"))
   assert(home.includes("emoji: '🥇', label: 'Cup'"))
   assert(home.includes("emoji: '🏆', label: 'Champions'"))

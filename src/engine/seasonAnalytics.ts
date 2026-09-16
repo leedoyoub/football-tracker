@@ -264,6 +264,19 @@ export function scopedPlayerRanks(rows: PlayerSnapshotRow[], players: Player[], 
   return { overall: overall < 0 ? null : overall + 1, position: position < 0 ? null : position + 1, team: team < 0 ? null : team + 1 }
 }
 
+/** Rank within the supplied, already-scoped leaderboard population. */
+export function scopedMetricRanks(rows: { playerId: string; teamId: string; historicalTeamId?: string }[], players: Player[], playerId: string) {
+  const target = rows.find(row => row.playerId === playerId)
+  const player = players.find(item => item.id === playerId)
+  const teamId = target?.historicalTeamId ?? target?.teamId ?? player?.teamId
+  const overall = rows.findIndex(row => row.playerId === playerId)
+  const familyRows = player ? rows.filter(row => positionFamily(players.find(item => item.id === row.playerId)?.position ?? 'ST') === positionFamily(player.position)) : []
+  const teamRows = rows.filter(row => (row.historicalTeamId ?? row.teamId) === teamId)
+  const position = familyRows.findIndex(row => row.playerId === playerId)
+  const team = teamRows.findIndex(row => row.playerId === playerId)
+  return { overall: overall < 0 ? null : overall + 1, position: position < 0 ? null : position + 1, team: team < 0 ? null : team + 1 }
+}
+
 export function competitionScope(matches: Match[], season: string, type: CompetitionType | 'all'): Match[] {
   return matches.filter(match => match.season === season && (type === 'all' || matchCompetitionType(match) === type))
 }

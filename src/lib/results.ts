@@ -3,6 +3,10 @@ import { recentMatches } from '../screens/recentMatches'
 import type { Match, Team } from '../types'
 
 export type DerivedResult = { match: Match; teamId: string; opponentId?: string; teamName: string; opponentName: string; goalsFor: number; goalsAgainst: number; outcome: 'W' | 'D' | 'L' }
+/** Valid saved results are shared by Results and Home; legacy extra fields are ignored. */
+export function isCompletedRecordedMatch(match: Match): boolean {
+  return Boolean(match.id && match.homeTeamId && match.awayTeamId && match.homeTeamId !== match.awayTeamId && Array.isArray(match.events) && Array.isArray(match.appearances))
+}
 export function derivedResults(matches: Match[], teams: Team[]): DerivedResult[] {
   const byId = new Map(teams.map(team => [team.id, team]))
   const unique = [...new Map(matches.map(match => [match.id, match])).values()]

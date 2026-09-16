@@ -45,14 +45,10 @@ export interface Team {
   primaryColor: TeamColor
   secondaryColor?: TeamColor | null
   jerseyNumberColor: TeamColor
-  /** User-managed opponent classification used for derived performance summaries. */
-  playStyle?: TeamPlayStyle
 }
 
 export type TeamColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'purple' | 'black' | 'white'
 export const TEAM_COLORS: TeamColor[] = ['red', 'orange', 'yellow', 'green', 'blue', 'indigo', 'purple', 'black', 'white']
-export const TEAM_PLAY_STYLES = ['possession', 'short-pass-counter', 'long-pass-counter'] as const
-export type TeamPlayStyle = (typeof TEAM_PLAY_STYLES)[number]
 
 export interface FormationSlot {
   /** Unique tactical identity (LCAM, CAM, RCAM, etc.), never a rating key. */
@@ -187,12 +183,12 @@ export interface AppState {
 
 export type View =
   | { name: 'home' }
-  | { name: 'competition'; season?: string; competitionType?: CompetitionType }
+  | { name: 'competition'; season?: string; competitionType?: CompetitionType; rankingMetric?: 'rating' | 'goals' | 'assists' | 'mom' }
   | { name: 'results' }
-  | { name: 'play-style'; style: TeamPlayStyle }
   | { name: 'records' }
   | { name: 'standings' }
   | { name: 'season-recap'; season: string }
+  | { name: 'season-highlight'; season: string; kind: 'monthly' | 'review' | 'news' }
   | { name: 'chemistry' }
   | { name: 'comparison'; leftId?: string; rightId?: string; season?: string; competitionType?: CompetitionType | 'all' }
   | { name: 'teams' }

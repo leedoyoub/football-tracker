@@ -1,4 +1,4 @@
-import type { Team, TeamPlayStyle } from '../types'
+import type { Team } from '../types'
 const team = (id: string, name: string, abbreviation: string, externalTeamId: number, primaryColor: Team['primaryColor']): Team => ({ id, name, shortName: abbreviation, abbreviation, externalTeamId, logo: `https://media.api-sports.io/football/teams/${externalTeamId}.png`, visualStyle: 'solid', primaryColor, jerseyNumberColor: 'white' })
 export const STATIC_TEAMS: Team[] = [
   team('real-madrid','Real Madrid','RMA',541,'white'), team('barcelona','Barcelona','BAR',529,'blue'), team('atletico-madrid','Atlético Madrid','ATM',530,'red'),
@@ -6,23 +6,6 @@ export const STATIC_TEAMS: Team[] = [
   team('bayern-munich','Bayern Munich','BAY',157,'red'), team('borussia-dortmund','Borussia Dortmund','BVB',165,'yellow'), team('ac-milan','AC Milan','MIL',489,'red'), team('inter-milan','Inter Milan','INT',505,'blue'), team('juventus','Juventus','JUV',496,'black'), team('paris-saint-germain','Paris Saint-Germain','PSG',85,'blue'),
   team('inter-miami','Inter Miami CF','MIA',9568,'red'),
 ]
-
-const CATALOG_PLAY_STYLES: Record<string, TeamPlayStyle> = {
-  barcelona: 'possession', arsenal: 'possession', 'manchester-city': 'possession', chelsea: 'possession', 'bayern-munich': 'possession', 'paris-saint-germain': 'possession',
-  liverpool: 'short-pass-counter', 'manchester-united': 'short-pass-counter', 'tottenham-hotspur': 'short-pass-counter', 'inter-milan': 'short-pass-counter', 'inter-miami': 'short-pass-counter',
-  'real-madrid': 'long-pass-counter', 'atletico-madrid': 'long-pass-counter', 'borussia-dortmund': 'long-pass-counter', 'ac-milan': 'long-pass-counter', juventus: 'long-pass-counter',
-}
-
-/**
- * The catalog is authoritative for its 16 real teams, including old saved
- * snapshots whose playStyle field predates a catalog correction. Custom teams
- * continue to use their saved value.
- */
-export function teamPlayStyle(team: Team | undefined): TeamPlayStyle | undefined {
-  if (!team) return undefined
-  const catalog = STATIC_TEAMS.find(item => item.id === team.id || (team.externalTeamId !== undefined && item.externalTeamId === team.externalTeamId))
-  return catalog ? CATALOG_PLAY_STYLES[catalog.id] : team.playStyle
-}
 
 /**
  * Adds catalog entries without replacing a user's existing teams or their

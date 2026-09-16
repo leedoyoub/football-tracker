@@ -120,13 +120,13 @@ test('Champions bracket keeps native horizontal scrolling while hiding its brows
   assert.doesNotMatch(bracketSource, /on(?:Touch|Pointer)[A-Z]/)
 })
 
-test('Home has only the ordered dashboard responsibilities and no full ranking, standings or Best XI', () => {
+test('Home has the four compact dashboard responsibilities and no active play-style product', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
-  const order = ['competition-progress', 'recent-matches', 'news', 'season-leaders', 'play-style-performance', 'account'].map(token => source.indexOf(`data-home-section="${token}"`))
+  const order = ['recent-matches', 'highlights', 'season-leaders'].map(token => source.indexOf(`data-home-section="${token}"`))
   assert(order.every((value, index) => value >= 0 && (!index || value > order[index - 1])))
   assert(!source.includes('Global Rankings') && !source.includes('Team of the Week') && !source.includes('Team of the Season') && !source.includes('StandingsTable'))
-  assert(source.includes('derivedResults(matches, teams).slice(0, 5)') && source.includes('showCompetition'))
-  assert.equal((source.match(/data-home-section="account"/g) || []).length, 1)
+  assert(source.includes('derivedResults(matches, teams).slice(0, 3)') && source.includes("kind: 'news'"))
+  assert(!/play.?style/i.test(source) && !source.includes('Show More'))
 })
 
 test('Competition Best XI labels and sources are scoped to League, Cup stages and Champions rounds', () => {
@@ -144,11 +144,11 @@ test('Recent Match cards retain green/yellow/red result colors and plain competi
   assert(!/[👑🥇🏆]/u.test(source))
 })
 
-test('competition identity emoji remain scoped to Home and Competition surfaces', () => {
+test('competition identity remains scoped to Competition surfaces after Home is simplified', () => {
   const competitionSource = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
   const teamsSource = fs.readFileSync(require.resolve('../src/screens/TeamsScreen.tsx'), 'utf8')
   const homeSource = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
-  assert(homeSource.includes('🏆'))
+  assert(!homeSource.includes('🏆'))
   const home = ''
   const result = fs.readFileSync(require.resolve('../src/components/ResultCard.tsx'), 'utf8')
   assert(competitionSource.includes('👑') && competitionSource.includes('🥇') && competitionSource.includes('🏆'))
