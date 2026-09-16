@@ -138,7 +138,7 @@ export default function App() {
           {view.name === 'standings' && <StandingsScreen season={season} onNavigate={onNavigate} />}
           {view.name === 'season-recap' && <SeasonRecapScreen season={view.season} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'chemistry' && <ChemistryScreen season={season} onNavigate={onNavigate} />}
-          {view.name === 'comparison' && <ComparisonScreen season={season} onNavigate={onNavigate} />}
+          {view.name === 'comparison' && <ComparisonScreen season={view.season ?? season} initialLeftId={view.leftId} initialRightId={view.rightId} initialCompetition={view.competitionType} onNavigate={onNavigate} />}
 
           {view.name === 'teams' && <TeamsScreen season={season} onNavigate={onNavigate} />}
           {view.name === 'team' && <TeamDetailScreen teamId={view.id} season={season} onNavigate={onNavigate} onBack={onBack} />}

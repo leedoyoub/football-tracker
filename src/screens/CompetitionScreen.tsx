@@ -22,6 +22,8 @@ import { selectLeagueCompetition, type LeagueCacheDiagnostic } from '../engine/c
 import { matchScore } from '../engine/rating'
 import { LEAGUE_MATCHES_PER_TEAM } from '../engine/leagueFormat'
 import { buildGlobalRankingData, rankGlobalRankingRows, seasonsFromMatches, unifiedBestEleven, type LeaderboardMetric } from '../engine/stats'
+import { buildSeasonAnalytics, raceHistory, rankingMovement, type SeasonAnalytics } from '../engine/seasonAnalytics'
+import { RankDelta, SectionHeader, SegmentedControl } from '../components/SeasonUI'
 import { currentStaticTeams } from '../data/teams'
 import { useStore } from '../store'
 import { emptyFilters, RankingFilterButton, type RankingFilters } from './RankingFilters'
@@ -41,6 +43,9 @@ const METRICS: { id: LeaderboardMetric; label: string }[] = [
 ]
 
 let diagnosticSequence = 0
+const competitionTypeMemory = new Map<string, CompetitionType>()
+const leagueViewMemory = new Map<string, { tab: 'table' | 'form' | 'history'; day: number; compared: string[] }>()
+const rankingMetricMemory = new Map<string, LeaderboardMetric>()
 function measuredInDevelopment<T>(label: string, operation: () => T): T {
   if (!import.meta.env.DEV || typeof performance === 'undefined') return operation()
   const id = `football-tracker:${label}:${diagnosticSequence++}`
@@ -62,7 +67,8 @@ function reportLeagueCache(diagnostic: LeagueCacheDiagnostic) {
 
 export function CompetitionScreen({ season, initialType = 'league', onSeason, onNavigate }: { season: string; initialType?: CompetitionType; onSeason: (season: string) => void; onNavigate: (view: View) => void }) {
   const { teams, players, matches, competitionStates = [], competitionRevisions = {}, competitionCacheOwner, teamCatalogRevision = 0, setChampionsDraw, completeSeason } = useStore()
-  const [type, setType] = useState<CompetitionType>(initialType)
+  const [type, setType] = useState<CompetitionType>(() => initialType !== 'league' ? initialType : competitionTypeMemory.get(season) ?? initialType)
+  useEffect(() => { competitionTypeMemory.set(season, type) }, [season, type])
   const renderMark = `football-tracker:CompetitionScreen:${diagnosticSequence++}:start`
   if (import.meta.env.DEV && typeof performance !== 'undefined') performance.mark(renderMark)
   const tournamentTeams = useMemo(() => currentStaticTeams(teams), [teams])
@@ -91,7 +97,7 @@ export function CompetitionScreen({ season, initialType = 'league', onSeason, on
     <div className="mb-3 flex items-center justify-between gap-3"><div><h1 className="text-2xl font-semibold">Competitions</h1><p className="text-xs text-zinc-500">Season and tournament detail</p></div><select aria-label="Competition season" value={season} onChange={event => onSeason(event.target.value)} className="rounded-full border border-white/10 bg-zinc-900 px-3 py-1.5 text-xs font-bold">{seasons.map(item => <option key={item}>{item}</option>)}</select></div>
     <div role="tablist" aria-label="Competition type" className="mb-5 grid grid-cols-3 gap-1 rounded-xl bg-zinc-900 p-1">{(['league', 'cup', 'champions'] as CompetitionType[]).map(item => <button key={item} role="tab" aria-selected={type === item} type="button" onClick={() => setType(item)} className={`rounded-lg py-2 text-xs font-black ${type === item ? 'bg-emerald-500 text-black' : 'text-zinc-400'}`}><span aria-hidden>{SYMBOLS[item]}</span> {LABELS[item]}</button>)}</div>
 
-    {type === 'league' && league && <LeagueView season={season} teams={teams} league={league} onNavigate={onNavigate} />}
+    {type === 'league' && league && <LeagueView season={season} teams={teams} players={players} matches={matches} league={league} onNavigate={onNavigate} />}
     {type === 'cup' && cup && <CupView season={season} teams={teams} cup={cup} onNavigate={onNavigate} />}
     {type === 'champions' && <section>
       {champions && <><CompetitionHeader type="champions" label={champions.currentStage} season={season} champion={champions.championId ? teamById[champions.championId] : undefined} />
@@ -140,9 +146,36 @@ function CompetitionHeader({ type, label, season, champion }: { type: Competitio
   return <header className="mb-4 rounded-2xl border border-white/10 bg-gradient-to-br from-zinc-900 to-black p-4"><p className="text-[10px] font-black uppercase tracking-[.2em] text-emerald-400">{SYMBOLS[type]} {LABELS[type]} · {season}</p><div className="mt-1 flex items-center justify-between"><h2 className="text-xl font-black">{STAGE_LABELS[label] ?? label}</h2>{champion && <span className="flex items-center gap-2 text-xs font-black text-amber-300"><TeamIcon team={champion} className="h-8 w-8 text-[8px]" /> Champion</span>}</div></header>
 }
 
-function LeagueView({ season, teams, league, onNavigate }: { season: string; teams: Team[]; league: ReturnType<typeof leagueCompetition>; onNavigate: (view: View) => void }) {
+function LeagueView({ season, teams, players, matches, league, onNavigate }: { season: string; teams: Team[]; players: Player[]; matches: Match[]; league: ReturnType<typeof leagueCompetition>; onNavigate: (view: View) => void }) {
   const [all, setAll] = useState(false)
-  return <section><CompetitionHeader type="league" label="League" season={season} champion={league.championId ? teams.find(team => team.id === league.championId) : undefined} /><div className="mb-4 flex items-center justify-between rounded-xl bg-zinc-900 px-3 py-2.5"><span className="text-xs text-zinc-400">League progress</span><b className="text-sm text-emerald-400">MD {league.matchdayProgress} / {LEAGUE_MATCHES_PER_TEAM}</b></div>{league.standings.length ? <><StandingsTable standings={all ? league.standings : league.standings.slice(0, 8)} teams={teams} compact onTeamNavigate={id => onNavigate({ name: 'team', id })} />{league.standings.length > 8 && <button type="button" onClick={() => setAll(value => !value)} className="secondary-view-all mt-3 w-full">{all ? 'Show Top 8' : 'View All'}</button>}</> : <Empty text="No League data for this season." />}</section>
+  const [tab, setTab] = useState<'table' | 'form' | 'history'>(() => leagueViewMemory.get(season)?.tab ?? 'table')
+  const analytics = useMemo(() => buildSeasonAnalytics(teams, players, matches, season), [teams, players, matches, season])
+  useEffect(() => { const prior = leagueViewMemory.get(season); leagueViewMemory.set(season, { tab, day: prior?.day ?? Math.max(1, analytics.currentMatchDay), compared: prior?.compared ?? [] }) }, [season, tab, analytics.currentMatchDay])
+  const current = analytics.leagueSnapshots.get(analytics.currentMatchDay)?.standings ?? league.standings
+  return <section><CompetitionHeader type="league" label="League" season={season} champion={league.championId ? teams.find(team => team.id === league.championId) : undefined} /><div className="mb-4 flex items-center justify-between rounded-xl bg-zinc-900 px-3 py-2.5"><span className="text-xs text-zinc-400">League progress</span><b className="text-sm text-emerald-400">MD {Math.min(analytics.currentMatchDay + 1, LEAGUE_MATCHES_PER_TEAM)} / {LEAGUE_MATCHES_PER_TEAM}</b></div><SegmentedControl label="League view" value={tab} onChange={setTab} options={[{ value: 'table', label: 'Table' }, { value: 'form', label: 'Form' }, { value: 'history', label: 'History' }]} />
+    <div className="mt-3">{tab === 'table' && (current.length ? <><StandingsTable standings={all ? current : current.slice(0, 8)} teams={teams} compact onTeamNavigate={id => onNavigate({ name: 'team', id })} />{current.length > 8 && <button type="button" onClick={() => setAll(value => !value)} className="secondary-view-all mt-3 w-full">{all ? 'Show Top 8' : 'View All'}</button>}</> : <Empty text="No League data for this season." />)}
+    {tab === 'form' && <><p className="mb-2 text-xs text-zinc-500">Last 5 League matches only. This is not the official table.</p>{analytics.formTable.some(row => row.played) ? <StandingsTable standings={analytics.formTable} teams={teams} compact onTeamNavigate={id => onNavigate({ name: 'team', id })} /> : <Empty text="Not enough matches for Last 5." />}</>}
+    {tab === 'history' && <LeagueHistory analytics={analytics} teams={teams} onNavigate={onNavigate} />}</div></section>
+}
+
+function LeagueHistory({ analytics, teams, onNavigate }: { analytics: SeasonAnalytics; teams: Team[]; onNavigate: (view: View) => void }) {
+  const remembered = leagueViewMemory.get(analytics.season)
+  const [day, setDay] = useState(remembered?.day ?? Math.max(1, analytics.currentMatchDay))
+  const [compared, setCompared] = useState<string[]>(() => remembered?.compared ?? analytics.leagueSnapshots.get(analytics.currentMatchDay)?.standings.slice(0, 1).map(row => row.teamId) ?? [])
+  useEffect(() => { leagueViewMemory.set(analytics.season, { tab: 'history', day, compared }) }, [analytics.season, day, compared])
+  const snapshot = analytics.leagueSnapshots.get(Math.min(day, analytics.currentMatchDay))
+  const toggle = (id: string) => setCompared(current => current.includes(id) ? current.filter(item => item !== id) : current.length < 4 ? [...current, id] : current)
+  if (!analytics.currentMatchDay || !snapshot) return <Empty text="No League history available yet." />
+  return <div><div className="rounded-xl bg-zinc-900 p-3"><div className="flex items-center justify-between text-xs"><b>MD {snapshot.matchDay}</b><span className={snapshot.complete ? 'text-emerald-400' : 'text-amber-300'}>{snapshot.complete ? 'Complete' : 'Incomplete Matchday'}</span></div><input aria-label="Historical League Matchday" type="range" min="1" max={analytics.currentMatchDay} value={snapshot.matchDay} onChange={event => setDay(Number(event.target.value))} className="mt-3 w-full accent-emerald-500" /><div className="mt-1 flex justify-between text-[9px] text-zinc-600"><span>MD1</span><span>MD{analytics.currentMatchDay}</span></div></div>
+    <div className="no-scrollbar my-3 flex gap-1 overflow-x-auto">{teams.map(team => <button key={team.id} type="button" aria-pressed={compared.includes(team.id)} onClick={() => toggle(team.id)} className={`min-h-10 shrink-0 rounded-full px-3 text-[10px] font-bold ${compared.includes(team.id) ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-zinc-400'}`}>{team.shortName}</button>)}</div>
+    <PositionHistory analytics={analytics} teamIds={compared} teams={teams} />
+    <div className="mt-3"><StandingsTable standings={snapshot.standings} teams={teams} compact onTeamNavigate={id => onNavigate({ name: 'team', id })} /></div></div>
+}
+
+function PositionHistory({ analytics, teamIds, teams }: { analytics: SeasonAnalytics; teamIds: string[]; teams: Team[] }) {
+  if (!teamIds.length) return <p className="rounded-xl bg-zinc-900 p-3 text-xs text-zinc-500">Select up to four teams to compare position history.</p>
+  const days = [...analytics.leagueSnapshots.keys()]
+  return <div className="rounded-xl bg-zinc-900 p-3" aria-label="League position history"><div className="space-y-2">{teamIds.map(teamId => { const positions = days.map(day => analytics.leagueSnapshots.get(day)?.standings.find(row => row.teamId === teamId)?.rank).filter((rank): rank is number => Boolean(rank)); return <div key={teamId} className="grid grid-cols-[68px_1fr_auto] items-center gap-2 text-[10px]"><b className="truncate">{teams.find(team => team.id === teamId)?.shortName}</b><span className="flex h-8 items-end gap-px">{positions.map((rank, index) => <i key={index} title={`MD${days[index]}: #${rank}`} className="min-w-px flex-1 rounded-t bg-emerald-400/70" style={{ height: `${Math.max(10, (17 - rank) / 16 * 100)}%` }} />)}</span><b>#{positions[positions.length - 1]}</b></div> })}</div><p className="mt-2 text-[9px] text-zinc-600">Higher bars indicate a higher League position.</p></div>
 }
 
 function CupView({ season, teams, cup, onNavigate }: { season: string; teams: Team[]; cup: CupCompetition; onNavigate: (view: View) => void }) {
@@ -181,21 +214,40 @@ function Round({ title, pairs, card, side }: { title: string; pairs: ChampionsPa
 }
 
 function CompetitionRankings({ season, type, players, teams, matches, onNavigate }: { season: string; type: CompetitionType; players: Player[]; teams: Team[]; matches: Match[]; onNavigate: (view: View) => void }) {
-  const [metric, setMetric] = useState<LeaderboardMetric>('rating')
+  const [metric, setMetric] = useState<LeaderboardMetric>(() => rankingMetricMemory.get(`${season}:${type}`) ?? 'rating')
+  useEffect(() => { rankingMetricMemory.set(`${season}:${type}`, metric) }, [season, type, metric])
   const [filters, setFilters] = useState<RankingFilters>({ ...emptyFilters, seasons: [season] })
   const [all, setAll] = useState(false)
+  const [compareMode, setCompareMode] = useState(false)
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([])
   const drag = useRef({ x: 0, left: 0, active: false })
   const effective = useMemo(() => ({ ...filters, seasons: [season] }), [filters, season])
   const rankingIndex = useMemo(() => measuredInDevelopment('Deferred Global Rankings/player stats/rating derivation', () => buildGlobalRankingData(players, matches, effective, 'rating')), [players, matches, effective])
   const rows = useMemo(() => measuredInDevelopment('Global Rankings metric ordering', () => rankGlobalRankingRows(rankingIndex, players, metric)), [rankingIndex, players, metric])
   const playerById = useMemo(() => Object.fromEntries(players.map(player => [player.id, player])), [players])
   const teamById = useMemo(() => Object.fromEntries(teams.map(team => [team.id, team])), [teams])
+  const analytics = useMemo(() => type === 'league' ? buildSeasonAnalytics(teams, players, matches, season) : null, [type, teams, players, matches, season])
+  const playerMovement = useMemo(() => analytics ? rankingMovement(analytics.playerSnapshots.get(analytics.currentMatchDay), analytics.playerSnapshots.get(analytics.currentMatchDay - 1), metric) : new Map<string, number | null>(), [analytics, metric])
   const format = (value: number) => value.toFixed(metric === 'rating' || metric.endsWith('/90') || metric === 'sotAllowed' || metric === 'goalsConceded' || metric === 'savePercentage' ? 2 : 0) + (metric === 'savePercentage' ? '%' : '')
-  return <section className="mt-7"><div className="mb-2 flex items-end justify-between"><div><h2 className="text-lg font-semibold">Global Rankings</h2><p className="text-xs text-zinc-500">{season} · {LABELS[type]} only</p></div><RankingFilterButton applied={effective} onApply={next => { setFilters({ ...next, seasons: [season] }); setAll(false) }} seasons={[season]} teams={teams} /></div>
+  const choosePlayer = (playerId: string) => {
+    if (!compareMode) { onNavigate({ name: 'player', id: playerId }); return }
+    const next = selectedPlayers.includes(playerId) ? selectedPlayers.filter(id => id !== playerId) : [...selectedPlayers, playerId].slice(-2)
+    setSelectedPlayers(next)
+    if (next.length === 2) onNavigate({ name: 'comparison', leftId: next[0], rightId: next[1], season, competitionType: type })
+  }
+  return <section className="mt-7"><SectionHeader title="Global Rankings" subtitle={`${season} · ${LABELS[type]} only`} action={<div className="flex items-center gap-1"><button type="button" aria-pressed={compareMode} onClick={() => { setCompareMode(value => !value); setSelectedPlayers([]) }} className={`min-h-9 rounded-lg px-2 text-[10px] font-black ${compareMode ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-emerald-300'}`}>{compareMode ? 'Cancel' : 'Compare'}</button><RankingFilterButton applied={effective} onApply={next => { setFilters({ ...next, seasons: [season] }); setAll(false) }} seasons={[season]} teams={teams} /></div>} />
+    {compareMode && <p className="mb-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-[10px] text-emerald-200">Select exactly two players ({selectedPlayers.length}/2). Ranking order stays unchanged.</p>}
     <div className="no-scrollbar mb-3 flex gap-1.5 overflow-x-auto pb-1 touch-pan-x" onPointerDown={event => { if (event.pointerType === 'mouse') drag.current = { x: event.clientX, left: event.currentTarget.scrollLeft, active: true } }} onPointerMove={event => { if (drag.current.active) event.currentTarget.scrollLeft = drag.current.left - (event.clientX - drag.current.x) }} onPointerUp={() => { drag.current.active = false }}>{METRICS.map(item => <button key={item.id} type="button" onClick={() => { setMetric(item.id); setAll(false) }} className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold ${metric === item.id ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-zinc-400'}`}>{item.label}</button>)}</div>
-    <div className="overflow-hidden rounded-xl bg-zinc-900">{rows.slice(0, all ? 50 : 3).map((row, index) => { const player = playerById[row.playerId]; const team = teamById[row.historicalTeamId ?? row.teamId]; return <button key={row.playerId} type="button" onClick={() => onNavigate({ name: 'player', id: row.playerId })} className="flex w-full items-center gap-2 border-b border-white/5 px-3 py-2.5 text-left last:border-0"><b className="w-5 text-xs text-zinc-500">{index + 1}</b><PlayerIcon player={player} team={team} className="h-8 w-8 text-[8px]" /><span className="min-w-0 flex-1"><b className="block truncate text-xs">{playerFullName(player)}</b><small className="text-zinc-500">{team?.shortName} · {player?.position}</small></span><b className="text-sm text-emerald-300">{format(row.value)}</b></button>})}{!rows.length && <p className="p-3 text-xs text-zinc-500">No qualifying players yet.</p>}</div>
+    <div className="overflow-hidden rounded-xl bg-zinc-900">{rows.slice(0, all ? 50 : 3).map((row, index) => { const player = playerById[row.playerId]; const team = teamById[row.historicalTeamId ?? row.teamId]; const selected = selectedPlayers.includes(row.playerId); return <button key={row.playerId} type="button" aria-pressed={compareMode ? selected : undefined} onClick={() => choosePlayer(row.playerId)} className={`flex min-h-12 w-full items-center gap-2 border-b border-white/5 px-3 py-2.5 text-left last:border-0 ${selected ? 'bg-emerald-500/10' : ''}`}><b className="w-5 text-xs text-zinc-500">{index + 1}</b>{type === 'league' && <RankDelta value={playerMovement.get(row.playerId) ?? null} />}<PlayerIcon player={player} team={team} className="h-8 w-8 text-[8px]" /><span className="min-w-0 flex-1"><b className="block truncate text-xs">{playerFullName(player)}</b><small className="text-zinc-500">{team?.shortName} · {player?.position}</small></span><b className="text-sm text-emerald-300">{format(row.value)}</b></button>})}{!rows.length && <p className="p-3 text-xs text-zinc-500">No qualifying players yet.</p>}</div>
     {rows.length > 3 && <button type="button" onClick={() => setAll(value => !value)} className="secondary-view-all mt-3 w-full">{all ? 'Show Top 3' : 'View All'}</button>}
+    {analytics && ['goals', 'assists', 'mom', 'rating'].includes(metric) && <RaceHistoryPanel analytics={analytics} metric={metric as 'goals' | 'assists' | 'mom' | 'rating'} players={playerById} />}
   </section>
+}
+
+function RaceHistoryPanel({ analytics, metric, players }: { analytics: SeasonAnalytics; metric: 'goals' | 'assists' | 'mom' | 'rating'; players: Record<string, Player> }) {
+  const series = raceHistory(analytics, metric)
+  const max = Math.max(1, ...series.flatMap(row => row.points.map(point => point.value)))
+  return <details className="mt-3 rounded-xl bg-zinc-900 p-3"><summary className="min-h-8 cursor-pointer text-xs font-black">Race History · {metric === 'rating' ? 'Cumulative average' : 'Cumulative total'}</summary>{series.length ? <div className="mt-3 space-y-3">{series.map(row => <div key={row.playerId} className="grid grid-cols-[76px_1fr_auto] items-center gap-2 text-[10px]"><b className="truncate">{playerFullName(players[row.playerId])}</b><span className="flex h-8 items-end gap-px">{row.points.map(point => <i key={point.matchDay} title={`MD${point.matchDay}: ${point.value.toFixed(metric === 'rating' ? 2 : 0)}`} className="min-w-px flex-1 rounded-t bg-emerald-400/70" style={{ height: `${Math.max(6, point.value / max * 100)}%` }} />)}</span><b>{row.points[row.points.length - 1]?.value.toFixed(metric === 'rating' ? 2 : 0)}</b></div>)}</div> : <p className="mt-2 text-xs text-zinc-500">No race history available yet.</p>}</details>
 }
 
 function CompetitionBestElevens({ season, type, players, teams, matches, allMatches, cup, champions, onNavigate }: { season: string; type: CompetitionType; players: Player[]; teams: Team[]; matches: Match[]; allMatches: Match[]; cup: CupCompetition | null; champions: ReturnType<typeof championsCompetition> | null; onNavigate: (view: View) => void }) {

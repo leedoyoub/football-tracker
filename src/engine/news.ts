@@ -1,12 +1,13 @@
-import { competitionHistory, cupCompetition, championsCompetition, CHAMPIONS_ROUNDS, leagueCompetition, matchCompetitionType } from './competition'
+import { competitionHistory, cupCompetition, championsCompetition, CHAMPIONS_ROUNDS, matchCompetitionType } from './competition'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
-import { seasonStandings } from './standings'
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
 import { oldestMatches } from './matchChronology'
+import { buildSeasonAnalytics, rankingMovement } from './seasonAnalytics'
 
 export type NewsKind = 'player' | 'match' | 'team'
-export type NewsItem = { id: string; kind: NewsKind; date: string; matchId?: string; playerId?: string; teamId?: string; eyebrow: string; title: string; detail: string; context: string; emoji: string }
+export type NewsImportance = 'major' | 'medium' | 'minor'
+export type NewsItem = { id: string; kind: NewsKind; importance?: NewsImportance; date: string; matchId?: string; playerId?: string; teamId?: string; eyebrow: string; title: string; detail: string; context: string; emoji: string }
 type NewsDraft = Omit<NewsItem, 'emoji'>
 type Totals = { goals: number; assists: number; apps: number; mom: number; saves: number; cleanSheets: number }
 type Streak = { scoring: number; contribution: number }
@@ -52,6 +53,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
   const playerRuns = new Map<string, Streak>()
   const teamRuns = new Map<string, TeamRun>()
   const chronological = ordered(matches)
+  const analyticsBySeason = new Map([...new Set(matches.map(match => match.season))].map(seasonName => [seasonName, buildSeasonAnalytics(teams, players, matches, seasonName)]))
   const matchesThroughDate = new Map<string, Match[]>()
   const matchesUpTo = (season: string, date: string) => {
     const key = `${season}\u0000${date}`
@@ -61,18 +63,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
     matchesThroughDate.set(key, selected)
     return selected
   }
-  const leagueLeaderAt = (season: string, date: string) => {
-    const games = matchesUpTo(season, date)
-    const basic = seasonStandings(teams, games, season)
-    const first = basic[0]
-    if (!first) return undefined
-    // Ratings/SOT are canonical late tie-breakers. Do not pay for their
-    // rating derivation unless the ordinary table columns genuinely tie.
-    const tiedForFirst = basic.filter(row => row.points === first.points && row.goalDifference === first.goalDifference && row.goalsFor === first.goalsFor && row.wins === first.wins)
-    return tiedForFirst.length === 1 ? first : leagueCompetition(teams, games, season, players).standings[0]
-  }
-  
-  // Track standings for league news
+  // Track canonical snapshot and knockout transitions for News.
   const teamLeads = new Map<string, boolean>()
   const cupStatus = new Map<string, string[]>()
 
@@ -80,18 +71,6 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
     const type = matchCompetitionType(match)
     const context = scoreText(match, teams)
     
-    // Team News: League Lead
-    if (type === 'league') {
-      const leader = leagueLeaderAt(match.season, match.date)
-      if (leader) {
-        const teamId = leader.teamId
-        if (!teamLeads.get(match.season + teamId)) {
-          add({ id: `league-lead:${match.season}:${teamId}:${match.id}`, kind: 'team', date: match.date, matchId: match.id, teamId, eyebrow: 'LEAGUE LEAD', title: `${teamName(teams, teamId)} takes the league lead`, detail: `After matchday ${match.matchDay}.`, context })
-          teamLeads.set(match.season + teamId, true)
-        }
-      }
-    }
-
     // Team News: Knockout Stages (Cup / Champions)
     if (type === 'cup' || type === 'champions') {
         const matchesUpToDate = matchesUpTo(match.season, match.date)
@@ -219,14 +198,19 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
       }
 
       const contributions = performance.goals + performance.assists
+      const matchRating = ratePlayerMatch(match, player)?.rating ?? 0
+      const isSubstitute = appearance.role === 'bench' && match.events.some(event => event.type === 'sub' && event.playerInId === player.id)
+      const isDefender = ['CB', 'LCB', 'RCB', 'LB', 'LWB', 'RB', 'RWB'].includes(appearance.position)
       let rare: { key: string; title: string } | undefined
       if (performance.goals >= 4) rare = { key: `goals-${performance.goals}`, title: `${playerName(players, player.id)} scores ${performance.goals} in one match` }
-      else if (contributions >= 5) rare = { key: `contributions-${contributions}`, title: `${playerName(players, player.id)} delivers ${contributions} goal contributions` }
+      else if (contributions >= 4) rare = { key: `contributions-${contributions}`, title: `${playerName(players, player.id)} delivers ${contributions} goal contributions` }
       else if (performance.goals === 3) rare = { key: 'hat-trick', title: `${playerName(players, player.id)} completes a hat-trick` }
       else if (performance.assists >= 3) rare = { key: `assists-${performance.assists}`, title: `${playerName(players, player.id)} creates ${performance.assists} goals` }
-      else if (isGoalkeeper && performance.saves >= 10) rare = { key: 'saves-10', title: `${playerName(players, player.id)} makes ${performance.saves} saves` }
-      else if (isGoalkeeper && performance.saves >= 7) rare = { key: 'saves-7', title: `${playerName(players, player.id)} produces a ${performance.saves}-save performance` }
-      if (rare) add({ id: `rare:${match.id}:${player.id}:${rare.key}`, kind: 'match', date: match.date, matchId: match.id, playerId: player.id, eyebrow: 'RARE PERFORMANCE', title: rare.title, detail: ratePlayerMatch(match, player)?.rating.toFixed(1) ?? 'Match achievement', context })
+      else if (isGoalkeeper && performance.saves >= 5 && cleanSheet) rare = { key: `saves-clean-${performance.saves}`, title: `${playerName(players, player.id)} makes ${performance.saves} saves in a clean sheet` }
+      else if (isSubstitute && performance.goals >= 2) rare = { key: `super-sub-${performance.goals}`, title: `${playerName(players, player.id)} scores ${performance.goals} from the bench` }
+      else if (isDefender && contributions >= 2 && conceded === 0) rare = { key: `defender-${contributions}`, title: `${playerName(players, player.id)} combines ${contributions} contributions with a clean sheet` }
+      else if (matchRating >= 9) rare = { key: 'rating-9', title: `${playerName(players, player.id)} produces a ${matchRating.toFixed(1)} performance` }
+      if (rare) add({ id: `rare:${match.id}:${player.id}:performance`, kind: 'match', importance: matchRating >= 9 || performance.goals >= 3 ? 'major' : 'medium', date: match.date, matchId: match.id, playerId: player.id, eyebrow: 'RARE PERFORMANCE', title: rare.title, detail: matchRating ? matchRating.toFixed(1) : 'Match achievement', context })
 
       const run = playerRuns.get(player.id) ?? { scoring: 0, contribution: 0 }
       run.scoring = performance.goals ? run.scoring + 1 : 0; run.contribution = contributions ? run.contribution + 1 : 0; playerRuns.set(player.id, run)
@@ -245,6 +229,34 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
       if (run.cleanSheets === 5) add({ id: `team-clean-streak:${match.season}:${teamId}:${match.id}:5`, kind: 'team', date: match.date, matchId: match.id, teamId, eyebrow: 'DEFENSIVE STREAK', title: `${teamName(teams, teamId)} keep 5 consecutive clean sheets`, detail: 'All competitions combined.', context })
       for (const value of crossed(priorGoals, run.seasonGoals, [50, 100, 150, ...multiples(50, run.seasonGoals, 200)])) add({ id: `team-season-goals:${match.season}:${teamId}:${value}`, kind: 'team', date: match.date, matchId: match.id, teamId, eyebrow: 'TEAM MILESTONE', title: `${teamName(teams, teamId)} reach ${value} goals this season`, detail: 'All competitions combined.', context })
       for (const value of crossed(priorCleanSheets, run.seasonCleanSheets, [10, 20])) add({ id: `team-season-clean-sheets:${match.season}:${teamId}:${value}`, kind: 'team', date: match.date, matchId: match.id, teamId, eyebrow: 'TEAM MILESTONE', title: `${teamName(teams, teamId)} reach ${value} clean sheets this season`, detail: 'All competitions combined.', context })
+    }
+  }
+
+  // Rank and Monthly Award stories consume the shared season snapshots. They
+  // never rebuild historical tables or player leaderboards inside this feed.
+  for (const [seasonName, analytics] of analyticsBySeason) {
+    for (const [day, snapshot] of analytics.leagueSnapshots) {
+      if (!snapshot.complete) continue
+      const lastMatch = ordered(snapshot.matches)[snapshot.matches.length - 1]
+      if (!lastMatch) continue
+      const leader = snapshot.standings[0]
+      if (leader && !teamLeads.get(`${seasonName}:${leader.teamId}`)) {
+        add({ id: `league-lead:${seasonName}:${leader.teamId}:${day}`, kind: 'team', date: lastMatch.date, matchId: lastMatch.id, teamId: leader.teamId, eyebrow: 'LEAGUE LEAD', title: `${teamName(teams, leader.teamId)} takes the league lead`, detail: `After matchday ${day}.`, context: scoreText(lastMatch, teams) })
+        teamLeads.set(`${seasonName}:${leader.teamId}`, true)
+      }
+      for (const row of snapshot.standings) if (row.movement && Math.abs(row.movement) >= 2) add({ id: `rank:team:${seasonName}:${day}:${row.teamId}`, kind: 'team', importance: row.rank === 1 ? 'major' : 'medium', date: lastMatch.date, matchId: lastMatch.id, teamId: row.teamId, eyebrow: 'LEAGUE MOVEMENT', title: `${teamName(teams, row.teamId)} ${row.movement > 0 ? 'climb' : 'drop'} ${Math.abs(row.movement)} places to #${row.rank}`, detail: `League table after MD${day}.`, context: scoreText(lastMatch, teams) })
+      const currentPlayers = analytics.playerSnapshots.get(day)
+      const previousPlayers = analytics.playerSnapshots.get(day - 1)
+      for (const metric of ['goals', 'assists', 'mom', 'rating'] as const) {
+        const movement = rankingMovement(currentPlayers, previousPlayers, metric)
+        const rows = currentPlayers?.rows.get(metric) ?? []
+        for (const [index, row] of rows.slice(0, 5).entries()) { const delta = movement.get(row.playerId); if (!delta || (Math.abs(delta) < 2 && index > 0)) continue; add({ id: `rank:player:${seasonName}:${day}:${metric}:${row.playerId}`, kind: 'player', importance: index === 0 ? 'major' : 'minor', date: lastMatch.date, matchId: lastMatch.id, playerId: row.playerId, eyebrow: `${metric.toUpperCase()} RACE`, title: `${playerName(players, row.playerId)} moves to #${index + 1} in ${metric === 'rating' ? 'Avg Rating' : metric}`, detail: `${delta > 0 ? 'Up' : 'Down'} ${Math.abs(delta)} place${Math.abs(delta) === 1 ? '' : 's'}.`, context: `League · MD${day}` }) }
+      }
+    }
+    for (const award of analytics.monthlyAwards.values()) {
+      const finalMatch = analytics.leagueSnapshots.get(award.block.endMatchDay)?.matches.slice(-1)[0]
+      if (!finalMatch || !award.playerOfMonth) continue
+      add({ id: `award:monthly:${seasonName}:${award.block.id}`, kind: 'player', importance: 'major', date: finalMatch.date, matchId: finalMatch.id, playerId: award.playerOfMonth.playerId, eyebrow: 'MONTHLY AWARDS', title: `${playerName(players, award.playerOfMonth.playerId)} is Player of the Month`, detail: `Monthly Best XI finalized for MD${award.block.startMatchDay}–${award.block.endMatchDay}.`, context: `${seasonName} · Month ${award.block.id}` })
     }
   }
 
@@ -303,5 +315,6 @@ export function deriveNews(players: Player[], teams: Team[], matches: Match[], s
 }
 
 export function homeMilestoneNews(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES): NewsItem[] {
-  return deriveNews(players, teams, matches, states).slice(0, 5)
+  const priority = { major: 0, medium: 1, minor: 2 }
+  return deriveNews(players, teams, matches, states).slice().sort((a, b) => (priority[a.importance ?? 'medium'] - priority[b.importance ?? 'medium']) || b.date.localeCompare(a.date) || b.id.localeCompare(a.id)).slice(0, 5)
 }

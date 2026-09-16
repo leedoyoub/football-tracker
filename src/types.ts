@@ -194,7 +194,7 @@ export type View =
   | { name: 'standings' }
   | { name: 'season-recap'; season: string }
   | { name: 'chemistry' }
-  | { name: 'comparison' }
+  | { name: 'comparison'; leftId?: string; rightId?: string; season?: string; competitionType?: CompetitionType | 'all' }
   | { name: 'teams' }
   | { name: 'team'; id: string }
   | { name: 'import-squad'; teamId: string }

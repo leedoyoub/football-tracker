@@ -532,16 +532,16 @@ const FORMATION_433: { slot: string; position: Position; pool: Position[] }[] = 
 
 const UNIFIED_433: { slot: string; position: Position; group: Position[]; fallback?: Position[] }[] = [
   { slot: 'GK', position: 'GK', group: ['GK'] },
-  { slot: 'LB', position: 'LB', group: ['LB'] },
+  { slot: 'LB', position: 'LB', group: ['LB', 'LWB'] },
   { slot: 'LCB', position: 'CB', group: ['CB', 'LCB', 'RCB'] },
   { slot: 'RCB', position: 'CB', group: ['CB', 'LCB', 'RCB'] },
-  { slot: 'RB', position: 'RB', group: ['RB'] },
-  { slot: 'LCM', position: 'CM', group: ['CDM', 'CM', 'CAM', 'LM', 'RM'] },
-  { slot: 'CM', position: 'CM', group: ['CDM', 'CM', 'CAM', 'LM', 'RM'] },
-  { slot: 'RCM', position: 'CM', group: ['CDM', 'CM', 'CAM', 'LM', 'RM'] },
-  { slot: 'LW', position: 'LW', group: ['ST', 'LW', 'RW'] },
-  { slot: 'ST', position: 'ST', group: ['ST', 'LW', 'RW'] },
-  { slot: 'RW', position: 'RW', group: ['ST', 'LW', 'RW'] },
+  { slot: 'RB', position: 'RB', group: ['RB', 'RWB'] },
+  { slot: 'LCM', position: 'CM', group: ['CDM', 'LDM', 'RDM', 'CM', 'LCM', 'RCM', 'CAM', 'LM', 'RM'] },
+  { slot: 'CM', position: 'CM', group: ['CDM', 'LDM', 'RDM', 'CM', 'LCM', 'RCM', 'CAM', 'LM', 'RM'] },
+  { slot: 'RCM', position: 'CM', group: ['CDM', 'LDM', 'RDM', 'CM', 'LCM', 'RCM', 'CAM', 'LM', 'RM'] },
+  { slot: 'LW', position: 'LW', group: ['ST', 'LST', 'RST', 'SS', 'LW', 'RW'] },
+  { slot: 'ST', position: 'ST', group: ['ST', 'LST', 'RST', 'SS', 'LW', 'RW'] },
+  { slot: 'RW', position: 'RW', group: ['ST', 'LST', 'RST', 'SS', 'LW', 'RW'] },
 ]
 
 type UnifiedCandidate = {

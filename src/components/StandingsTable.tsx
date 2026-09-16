@@ -2,6 +2,7 @@ import type { Team } from '../types'
 import type { Standing } from '../engine/standings'
 import { TeamIcon } from './TeamIcon'
 import { TeamLink } from './TeamLink'
+import { RankDelta } from './SeasonUI'
 
 export function StandingsTable({ standings, teams, compact = false, onTeamNavigate }: { standings: Standing[]; teams: Team[]; compact?: boolean; onTeamNavigate?: (teamId: string) => void }) {
   const byId = Object.fromEntries(teams.map((team) => [team.id, team]))
@@ -13,7 +14,7 @@ export function StandingsTable({ standings, teams, compact = false, onTeamNaviga
         <th className="w-11 text-center font-semibold">GF-GA</th><th className="w-8 text-center font-semibold">GD</th><th className="w-8 pr-1 text-center font-semibold">Pts</th>
       </tr></thead>
       <tbody>{standings.map((row) => { const team = byId[row.teamId]; return <tr key={row.teamId} className="border-b border-white/[.06] last:border-0">
-        <td className="py-2.5 text-center font-bold text-zinc-500">{row.rank}</td>
+        <td className="py-2.5 text-center font-bold text-zinc-500"><span className="block">{row.rank}</span>{'movement' in row && <RankDelta value={(row as Standing & { movement: number | null }).movement} />}</td>
         <td className="min-w-0 py-2.5">{onTeamNavigate ? <TeamLink team={team} compact={compact} onNavigate={onTeamNavigate} /> : <span className="flex min-w-0 items-center gap-1.5"><TeamIcon team={team} className="h-5 w-5 text-[7px]" /><span className="truncate font-semibold">{team?.name}</span></span>}</td>
         <td className="text-center text-zinc-300">{row.played}</td><td className="text-center text-zinc-300">{row.wins}</td><td className="text-center text-zinc-300">{row.draws}</td><td className="text-center text-zinc-300">{row.losses}</td>
         <td className="text-center text-zinc-300">{row.goalsFor}-{row.goalsAgainst}</td><td className={`text-center ${row.goalDifference > 0 ? 'text-emerald-400' : row.goalDifference < 0 ? 'text-red-400' : 'text-zinc-400'}`}>{row.goalDifference > 0 ? '+' : ''}{row.goalDifference}</td><td className="pr-1 text-center font-black text-white">{row.points}</td>

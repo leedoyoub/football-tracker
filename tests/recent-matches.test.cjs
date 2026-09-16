@@ -124,7 +124,7 @@ test('position history is chronological, clips to playing time, and resolves sam
   assert.equal(recentMatchPositions(match, bench), 'CM → CAM')
 })
 
-test('Team Main renders five matches, hides View All at five, and expands all six newest first', () => {
+test('Team Overview renders five matches and routes the full list through the Matches tab', () => {
   const React = require('react')
   const { renderToStaticMarkup } = require('react-dom/server')
   const state = { teams: [{ id: 'A', name: 'A', shortName: 'A' }], players: [], matches: [] }
@@ -138,12 +138,9 @@ test('Team Main renders five matches, hides View All at five, and expands all si
   state.matches.push(game('6', { matchDay: 6 }))
   assert(render().includes('View All'))
   assert.deepEqual(render().match(/MD\d/g), ['MD6', 'MD5', 'MD4', 'MD3', 'MD2'])
-  const original = React.useState
-  try {
-    React.useState = () => [JSON.stringify(['A', 'S1']), () => {}]
-    assert.deepEqual(render().match(/MD\d/g), ['MD6', 'MD5', 'MD4', 'MD3', 'MD2', 'MD1'])
-    assert(render().includes('Show Less'))
-  } finally { React.useState = original }
+  const source = fs.readFileSync(require.resolve('../src/screens/TeamDetailScreen.tsx'), 'utf8')
+  assert(source.includes("value: 'overview', label: 'Overview'") && source.includes("value: 'matches', label: 'Matches'"))
+  assert(source.includes('visibleMatches'))
 })
 
 test('Team Detail always renders an Import Squad action and routes the selected team ID', () => {

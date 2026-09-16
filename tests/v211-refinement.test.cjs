@@ -7,11 +7,11 @@ for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module
 const { APP_VERSION } = require('../src/config.ts')
 const { deriveNews } = require('../src/engine/news.ts')
 
-test('v2.1.11 central version and focused Player Detail refinement are current', () => {
+test('central version and focused Player Detail refinement are current', () => {
   const detail = fs.readFileSync(require.resolve('../src/screens/PlayerDetailScreen.tsx'), 'utf8')
-  assert.equal(APP_VERSION, '2.1.14')
-  assert.equal(require('../package.json').version, '2.1.14')
-  for (const label of ['Overview', 'Recent Form', 'Position Stats', 'Positions Played', 'Team Performance When Starting', 'Role Impact', 'Goal Types', 'Player Chemistry', 'Career Timeline', 'Personal Records', 'Matches', 'Overall avg', 'Rating Details']) assert(detail.includes(label))
+  assert.equal(APP_VERSION, '2.2.1')
+  assert.equal(require('../package.json').version, '2.2.1')
+  for (const label of ['Overview', 'Recent Form', 'Position Stats', 'Positions Played', 'Team Performance When Starting', 'Role Impact', 'Goal Types', 'Player Chemistry', 'Career Timeline', 'Personal Records', 'Matches', 'Overall rank', 'Position rank', 'Team rank', 'Active Streaks', 'Awards', 'Rating Details']) assert(detail.includes(label))
   assert(!detail.includes('Previous matches') && !detail.includes('Starter / Substitute') && !detail.includes('Scope avg'))
   assert(detail.includes('share >= 10') && detail.includes('Clean sheets'))
 })
