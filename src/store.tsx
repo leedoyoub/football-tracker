@@ -19,6 +19,7 @@ import { BootstrapShell, StartupRecovery } from './components/StartupBoundary'
 import { reconcileCompetitionRevisions, reviseChangedMatch, sameRawFootballValue, sameRawMatch, type CompetitionRevisions } from './engine/competitionRevision'
 import { clearGlobalRankingCache } from './engine/stats'
 import { preserveRecordedAt, recordNewMatch } from './engine/matchRecording'
+import { createPersistenceQueue } from './lib/persistenceQueue'
 
 type StoreSnapshot = { data: AppState; competitionRevisions: CompetitionRevisions; teamCatalogRevision: number }
 
@@ -74,13 +75,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [hydration, setHydration] = useState<'loading' | 'ready' | 'error'>('loading')
   const [attempt, setAttempt] = useState(0)
   const snapshotRef = useRef(snapshot)
-  const persistenceQueue = useRef<Promise<void>>(Promise.resolve())
+  const persistenceQueue = useRef(createPersistenceQueue(LocalRepository.saveAppState))
+  const draftTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const draftEpoch = useRef(0)
   snapshotRef.current = snapshot
 
-  const persistLocal = useCallback((next: AppState) => {
-    const operation = persistenceQueue.current.then(() => LocalRepository.saveAppState(next))
-    persistenceQueue.current = operation.then(() => undefined, () => undefined)
-    return operation
+  const persistLocal = useCallback((next: AppState, valid?: () => boolean) => {
+    return persistenceQueue.current.enqueue(next, valid)
   }, [])
 
   useEffect(() => {
@@ -143,6 +144,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [persistLocal])
 
   const saveMatchDurably = useCallback(async (match: Match) => {
+    if (draftTimer.current) { clearTimeout(draftTimer.current); draftTimer.current = undefined }
+    draftEpoch.current++
     const before = snapshotRef.current
     const prior = before.data
     const previousMatch = prior.matches.find(item => item.id === match.id)
@@ -164,8 +167,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return durability
   }, [persistLocal])
   const saveDraftMatch = useCallback((match: Match) => {
-    update((prev) => ({ ...prev, draftMatch: match }))
-  }, [update])
+    setSnapshot(current => {
+      const next = { ...current.data, draftMatch: match }
+      if (draftTimer.current) clearTimeout(draftTimer.current)
+      const epoch = ++draftEpoch.current
+      draftTimer.current = setTimeout(() => { draftTimer.current = undefined; void persistLocal(next, () => draftEpoch.current === epoch).catch(() => undefined) }, 450)
+      return { ...current, data: next }
+    })
+  }, [persistLocal])
   const clearDraftMatch = useCallback(() => {
     update((prev) => ({ ...prev, draftMatch: undefined }))
   }, [update])

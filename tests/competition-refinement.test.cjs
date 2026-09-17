@@ -136,11 +136,11 @@ test('Competition Best XI labels and sources are scoped to League, Cup stages an
   assert(!source.includes('Team of the Year'))
 })
 
-test('Recent Match cards use the compact result-colored five-card grid and competition abbreviations', () => {
+test('Recent Match cards use the compact result-colored five-card grid and full competition labels', () => {
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('grid-cols-5') && home.includes('Latest five recent matches'))
-  assert(home.includes("'border-emerald-400/30 bg-emerald-500/10'") && home.includes("'border-red-400/30 bg-red-500/10'") && home.includes("'border-white/10 bg-zinc-900'"))
-  assert(home.includes("? 'UCL' : result.match.competitionType === 'cup' ? 'CUP' : 'LGE'"))
+  assert(home.includes("'border-emerald-300/50 bg-emerald-500/20'") && home.includes("'border-red-300/50 bg-red-500/20'") && home.includes("'border-zinc-400/30 bg-zinc-700/50'"))
+  assert(home.includes("? 'Champions' : result.match.competitionType === 'cup' ? 'Cup' : 'League'"))
   assert(!home.includes('snap-x') && !home.includes('Recent matches carousel'))
 })
 test('competition identity remains scoped to Competition surfaces after Home is simplified', () => {
@@ -183,9 +183,9 @@ test('season completion is synchronized as backward-compatible CompetitionState 
   assert(validation.includes("'season-complete'"))
 })
 
-test('visible and package metadata version are exactly v2.2.4 / 2.2.4', () => {
-  assert.equal(APP_VERSION, '2.2.4')
-  assert.equal(require('../package.json').version, '2.2.4')
+test('visible and package metadata version are exactly v2.2.5 / 2.2.5', () => {
+  assert.equal(APP_VERSION, '2.2.5')
+  assert.equal(require('../package.json').version, '2.2.5')
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('v{APP_VERSION}'))
 })

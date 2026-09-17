@@ -76,6 +76,26 @@ test('Records exposes only the approved pair-based combination record menu', () 
   for (const label of ['Most Goal Combinations', 'Most Mutual Goal Combinations', 'Most Matches Both Scored', 'Most Matches Both Had G+A', 'Best Duo Combined G+A', 'Best CB Partnership · Shot Suppression']) assert(records.includes(label))
 })
 
+test('all ranking surfaces share metric pills and ranking rows while League View All keeps scope', () => {
+  for (const file of ['src/screens/HomeScreen.tsx', 'src/screens/TeamDetailScreen.tsx', 'src/screens/GlobalRankingScreen.tsx', 'src/screens/CompetitionScreen.tsx']) {
+    const screen = source(file); assert(screen.includes('RankingMetricTabs')); assert(screen.includes('RankingRow'))
+  }
+  const global = source('src/screens/GlobalRankingScreen.tsx')
+  for (const label of ['Rating', 'Goals', 'Assists', 'G+A', 'Minutes', 'MOM', 'Goals/90', 'Assists/90', 'G+A/90', 'Clean Sheets', 'Saves', 'Save %']) assert(global.includes(label))
+  const league = source('src/screens/CompetitionScreen.tsx')
+  assert(league.includes("competitionType: 'league', rankingMetric: playerMetric"))
+})
+
+test('Combination leaders reuse the canonical Records first-place highlight and preserve pair notation', () => {
+  const records = source('src/screens/RecordsScreen.tsx')
+  const labels = ['Most Goal Combinations', 'Most Mutual Goal Combinations', 'Most Matches Both Scored', 'Most Matches Both Had G+A', 'Best Duo Combined G+A', 'Best CB Partnership · Shot Suppression']
+  assert.equal((records.match(/<FirstPlaceHighlight name=\{name\(leader\.ids, group\.connector\)\}/g) ?? []).length, 1)
+  assert(records.includes('rows.slice(1).map'))
+  assert(records.includes("connector: '→'") && records.includes("connector: '↔'") && records.includes("connector: '+'"))
+  for (const label of labels) assert(records.includes(label))
+  assert(records.includes('filter(row => row.togetherMinutes >= 180)') && records.includes('entries(cb, true)'))
+})
+
 test('Player Detail, Match Story, Match Log, and Data Integrity remain reachable from rendered screens', () => {
   const detail = source('src/screens/PlayerDetailScreen.tsx')
   const match = source('src/screens/MatchDetailScreen.tsx')

@@ -482,6 +482,7 @@ function MatchEditor({
     if (savingRef.current || liveEvent || !kickoffIsValid) return false
     savingRef.current = true
     setSaveError('')
+    setSaveStatus('Saving…')
     const matchData = {
       id: draftId,
       season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, competitionSeriesGame: assignment.seriesGame, matchDay, date, formation: activeFormationName, homeAway: 'home' as const, homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot,

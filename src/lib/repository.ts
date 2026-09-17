@@ -84,7 +84,6 @@ export const LocalRepository = {
     try { serialized = JSON.stringify(state) } catch { throw new Error('Primary storage serialization failed.') }
 
     const current = safelyRead(STORAGE_KEY)
-    preserveRecoveryCopies(current)
     try {
       localStorage.setItem(STORAGE_KEY, serialized)
       const readBack = localStorage.getItem(STORAGE_KEY)
@@ -92,17 +91,19 @@ export const LocalRepository = {
       const parsed = JSON.parse(readBack)
       if (!validateState(parsed)) throw new Error('Primary storage verification failed.')
     } catch (error) {
+      preserveRecoveryCopies(current)
       throw new Error(error instanceof Error ? `Primary storage save failed: ${error.message}` : 'Primary storage save failed.')
     }
 
+    // Recovery is deliberately after the verified primary write. Safari
+    // localStorage quota is shared with unrelated auth keys; recovery copies
+    // are expendable and must never consume the room required by a Match save.
+    preserveRecoveryCopies(current)
+
     // IndexedDB is a mirror only. A blocked transaction must not turn an
     // already verified localStorage save into a user-visible failed save.
-    try {
-      await saveToIndexedDB(STORAGE_KEY, state)
-      return { primarySaved: true, mirrorSaved: true }
-    } catch (error) {
-      return { primarySaved: true, mirrorSaved: false, mirrorError: error instanceof Error ? error.message : 'IndexedDB mirror unavailable.' }
-    }
+    void saveToIndexedDB(STORAGE_KEY, state).catch(() => { /* Mirror is best-effort. */ })
+    return { primarySaved: true, mirrorSaved: false, mirrorError: 'IndexedDB mirror pending.' }
   },
 
   async exportData(): Promise<string> {
