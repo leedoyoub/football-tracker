@@ -33,7 +33,7 @@ function game(day, options = {}) {
 }
 
 test('v2.2.1 metadata and the finalized revision-8 position table are exact', () => {
-  assert.equal(APP_VERSION, '2.2.1'); assert.equal(require('../package.json').version, '2.2.1'); assert.equal(RATING_ENGINE_REVISION, 8)
+  assert.equal(APP_VERSION, '2.2.2'); assert.equal(require('../package.json').version, '2.2.2'); assert.equal(RATING_ENGINE_REVISION, 8)
   const expected = {
     LB: [.03, 1.2], LWB: [.03, 1.2], RB: [.03, 1.2], RWB: [.03, 1.2],
     CDM: [.05, .65], LDM: [.05, .65], RDM: [.05, .65],
@@ -144,9 +144,9 @@ test('mobile screen hierarchy, compare mode, cached snapshots and navigation mem
   const team = fs.readFileSync(require.resolve('../src/screens/TeamDetailScreen.tsx'), 'utf8')
   const playerDetail = fs.readFileSync(require.resolve('../src/screens/PlayerDetailScreen.tsx'), 'utf8')
   const matchDetail = fs.readFileSync(require.resolve('../src/screens/MatchDetailScreen.tsx'), 'utf8')
-  for (const token of ['homeLeaderMemory', 'Season Leaders', 'Highlights', 'Monthly Best XI', 'slice(0, 3)']) assert(home.includes(token), token)
-  for (const token of ['leagueViewMemory', 'rankingMetricMemory', "label: 'Table'", "label: 'Form'", "label: 'History'", 'Compare', 'Race History']) assert(competition.includes(token), token)
-  for (const token of ['teamTabMemory', "label: 'Overview'", "label: 'Matches'", "label: 'Players'", "label: 'Stats'", 'Top Rated', 'Top Scorer', 'Top Assister']) assert(team.includes(token), token)
+  for (const token of ['homeLeaderMemory', 'Season Leaders', 'News', 'slice(0, 5)', 'slice(0, 4)', 'seasonMatches']) assert(home.includes(token), token)
+  for (const token of ['leagueViewMemory', 'rankingMetricMemory', "label: 'Players'", "label: 'Table'", "label: 'Form'", "label: 'History'", 'Team of the Month', 'Race History']) assert(competition.includes(token), token)
+  for (const token of ['teamTabMemory', "label: 'Overview'", "label: 'Matches'", "label: 'Players'", 'Roster management', 'Latest XI', 'Bench', "'rating' | 'goals' | 'assists' | 'mom'"]) assert(team.includes(token), token)
   for (const token of ['RankedMetric', 'Overall rank', 'Position-family rank', 'Team rank', 'Season avg', 'Last 5 avg', 'Active Streaks', 'Awards']) assert(playerDetail.includes(token), token)
   for (const token of ['Match Facts', 'Lineup', 'Ratings', 'What Changed', 'Top 3 Ratings']) assert(matchDetail.includes(token), token)
   const p = player('cached')

@@ -56,8 +56,8 @@ test('Champions Final uses its two-game format and competition GF-GA stays indep
 
 test('Home keeps stable source arrays for ranking and reuses News for immutable inputs', () => {
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
-  assert(home.includes('buildGlobalRankingData(players, analytics.leagueMatches, { seasons: [season]'))
-  assert(!home.includes('buildGlobalRankingData(players, matches.filter'))
+  assert(home.includes('const seasonMatches = useMemo(() => matches.filter(match => match.season === season)'))
+  assert(home.includes('buildGlobalRankingData(players, seasonMatches, { seasons: [season]'))
   const players = [{ id: 'p', name: 'Player', displayName: 'Player', position: 'ST', number: 9, teamId: 't0' }]
   const matches = [game('news', 't0', 'league', 'regular', undefined, 1)]
   const states = [draw]
@@ -66,8 +66,8 @@ test('Home keeps stable source arrays for ranking and reuses News for immutable 
 })
 
 test('v2.2.1 version is consistent and rating revision advances once', () => {
-  assert.equal(APP_VERSION, '2.2.1')
-  assert.equal(require('../package.json').version, '2.2.1')
-  assert.equal(require('../package-lock.json').version, '2.2.1')
+  assert.equal(APP_VERSION, '2.2.2')
+  assert.equal(require('../package.json').version, '2.2.2')
+  assert.equal(require('../package-lock.json').version, '2.2.2')
   assert.equal(RATING_ENGINE_REVISION, 8)
 })

@@ -60,7 +60,7 @@ test('finalized rating constants replace legacy values', () => {
   assert.equal(POSITION_RULES.CM.goal, 1.05); assert.equal(POSITION_RULES.GK.goal, 1.50)
 })
 
-test('DataManagementScreen has Delete All Matches button', () => {
+test('DataManagementScreen deliberately has no destructive Delete All Matches button', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/DataManagementScreen.tsx'), 'utf8')
-  assert(source.includes('Delete All Matches'))
+  assert(!source.includes('Delete All Matches') && !source.includes('deleteAllMatches'))
 })

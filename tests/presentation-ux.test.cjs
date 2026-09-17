@@ -113,7 +113,7 @@ test('Home footer reads the central version and common layout reserves nav plus 
   const footer = nodes(tree, n => n.type === 'footer')[0]
   assert(text(footer).includes('Football Tracker \u00b7 v' + APP_VERSION))
   const sections = nodes(tree, n => n.props?.['data-home-section']).map(n => n.props['data-home-section'])
-  assert.deepEqual(sections, ['recent-matches', 'highlights', 'season-leaders'])
+  assert.deepEqual(sections, ['recent-matches', 'news', 'season-leaders'])
   assert(nodes(tree, n => n.type === 'footer').includes(footer))
   const css = fs.readFileSync(require.resolve('../src/index.css'), 'utf8')
   assert(css.includes('env(safe-area-inset-bottom, 0px)'))

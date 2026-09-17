@@ -124,36 +124,17 @@ test('position history is chronological, clips to playing time, and resolves sam
   assert.equal(recentMatchPositions(match, bench), 'CM → CAM')
 })
 
-test('Team Overview renders five matches and routes the full list through the Matches tab', () => {
-  const React = require('react')
-  const { renderToStaticMarkup } = require('react-dom/server')
-  const state = { teams: [{ id: 'A', name: 'A', shortName: 'A' }], players: [], matches: [] }
-  const storePath = require.resolve('../src/store.tsx')
-  require.cache[storePath] = { id: storePath, filename: storePath, loaded: true, exports: { useStore: () => state } }
-  const { TeamDetailScreen } = require('../src/screens/TeamDetailScreen.tsx')
-  const render = () => renderToStaticMarkup(React.createElement(TeamDetailScreen, { teamId: 'A', season: 'S1', onNavigate() {}, onBack() {} })).split('Recent matches')[1]
-  for (let i = 1; i <= 5; i++) state.matches.push(game(String(i), { matchDay: i }))
-  assert.equal((render().match(/MD\d/g) || []).length, 5)
-  assert(!render().includes('View All'))
-  state.matches.push(game('6', { matchDay: 6 }))
-  assert(render().includes('View All'))
-  assert.deepEqual(render().match(/MD\d/g), ['MD6', 'MD5', 'MD4', 'MD3', 'MD2'])
+test('Team Detail reserves roster and lineup management for the Players tab', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/TeamDetailScreen.tsx'), 'utf8')
   assert(source.includes("value: 'overview', label: 'Overview'") && source.includes("value: 'matches', label: 'Matches'"))
-  assert(source.includes('visibleMatches'))
+  assert(source.includes("value: 'players', label: 'Players'"))
+  assert(source.includes("tab === 'players' && <section aria-label=\"Roster management\"") && source.includes('Latest XI') && source.includes('Bench'))
+  assert(source.includes("tab === 'matches' && <section"))
 })
 
-test('Team Detail always renders an Import Squad action and routes the selected team ID', () => {
-  const React = require('react')
-  const { renderToStaticMarkup } = require('react-dom/server')
-  const state = { teams: [{ id: 'arsenal', name: 'Arsenal', shortName: 'ARS', abbreviation: 'ARS', externalTeamId: 42 }], players: [], matches: [] }
-  const storePath = require.resolve('../src/store.tsx')
-  require.cache[storePath] = { id: storePath, filename: storePath, loaded: true, exports: { useStore: () => state } }
-  delete require.cache[require.resolve('../src/screens/TeamDetailScreen.tsx')]
-  const { TeamDetailScreen } = require('../src/screens/TeamDetailScreen.tsx')
-  const markup = renderToStaticMarkup(React.createElement(TeamDetailScreen, { teamId: 'arsenal', season: 'S1', onNavigate() {}, onBack() {} }))
+test('Team Detail keeps Import Squad in the Players-only roster section', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/TeamDetailScreen.tsx'), 'utf8')
-  assert(markup.includes('Roster management') && markup.includes('Import Squad'))
+  assert(source.includes("tab === 'players' && <section aria-label=\"Roster management\"") && source.includes('Import Squad'))
   assert(source.includes("onNavigate({ name: 'import-squad', teamId })"))
   assert(!source.includes('useAuth'))
 })

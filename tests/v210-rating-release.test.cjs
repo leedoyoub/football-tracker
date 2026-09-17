@@ -70,7 +70,7 @@ test('historical v6 rating and MOM feed every derived stats surface, not saved f
 
   const homeSource = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   const teamSource = fs.readFileSync(require.resolve('../src/screens/TeamDetailScreen.tsx'), 'utf8')
-  assert(homeSource.includes('buildGlobalRankingData(players, analytics.leagueMatches'))
+  assert(homeSource.includes('buildGlobalRankingData(players, seasonMatches'))
   assert(teamSource.includes('scopedTeamRanking(players, matches'))
   assert(teamSource.includes('return buildGlobalRankingData(players'))
 })
