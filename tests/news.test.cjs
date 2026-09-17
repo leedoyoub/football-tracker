@@ -10,12 +10,12 @@ const teams = [{ id: 'A', name: 'Alpha', shortName: 'ALP', logo: '' }, { id: 'B'
 const appearance = { playerId: 'p', teamId: 'A', role: 'starter', position: 'ST', matchPosition: 'ST' }
 const game = (id, day, goals) => ({ id, season: 'S1', matchDay: day, date: `2026-01-${String(day).padStart(2, '0')}`, duration: 90, homeTeamId: 'A', awayTeamId: 'B', teamId: 'A', appearances: [appearance], events: Array.from({ length: goals }, (_, index) => ({ id: `${id}:${index}`, type: 'goal', teamId: 'A', minute: index + 1, playerId: 'p' })) })
 
-test('news is derived, chronological, and combines multiple crossed career milestones in one item', () => {
+test('news is derived, chronological, and gives a crossed career milestone a stable canonical identity', () => {
   const matches = [game('late', 2, 2), game('early', 1, 9)]
   const news = deriveNews([player], teams, matches)
-  const milestone = news.find(item => item.id === 'player:milestone:late:p:goals')
+  const milestone = news.find(item => item.id === 'milestone:p:goals:career:10')
   assert(milestone)
-  assert.match(milestone.title, /10 career goals/)
+  assert.match(milestone.title, /Career 10 Goals/)
   assert.equal(news.filter(item => item.id === milestone.id).length, 1)
   assert.equal(news[0].date, '2026-01-02')
 })

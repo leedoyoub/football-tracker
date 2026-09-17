@@ -24,7 +24,7 @@ test('season, competition, career and 10–10 milestone IDs fire once under dupl
   combo.events = Array.from({ length: 10 }, (_, index) => ({ id: `combo:g${index}`, type: 'goal', minute: index + 1, teamId: 'A', playerId: 'Q', assistPlayerId: 'P' }))
   const games = [match('one', 1, { goals: 10, assists: 10, type: 'champions' }), combo, match('career', 3, { goals: 40, assists: 0 })]
   const items = deriveNews(players, teams, [...games, games[2]])
-  for (const id of ['season-goals:Season 1:P:10', 'competition-goals:Season 1:champions:P:5', 'season-combo:Season 1:P:10', 'career-goals:P:50']) assert.equal(items.filter(item => item.id === id).length, 1, id)
+  for (const id of ['milestone:P:goals:season:Season 1:10', 'milestone:P:goals:champions:champions:Season 1:10', 'milestone:P:balanced:season:Season 1:10', 'milestone:P:goals:career:50']) assert.equal(items.filter(item => item.id === id).length, 1, id)
 })
 
 test('player partnership uses stable unordered IDs and reaches its 10-goal combination once', () => {

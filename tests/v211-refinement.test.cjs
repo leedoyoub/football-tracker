@@ -11,7 +11,7 @@ test('central version and focused Player Detail refinement are current', () => {
   const detail = fs.readFileSync(require.resolve('../src/screens/PlayerDetailScreen.tsx'), 'utf8')
   assert.equal(APP_VERSION, '2.2.1')
   assert.equal(require('../package.json').version, '2.2.1')
-  for (const label of ['Overview', 'RankedMetric', 'Recent Form', 'Position Stats', 'Positions Played', 'Team Performance When Starting', 'Role Impact', 'Goal Types', 'Player Chemistry', 'Career Timeline', 'Personal Records', 'Matches', 'Overall rank', 'Position rank', 'Team rank', 'Active Streaks', 'Awards', 'Rating Details']) assert(detail.includes(label))
+  for (const label of ['Overview', 'RankedMetric', 'Recent Form', 'Position Stats', 'Positions Played', 'Team Performance When Starting', 'Role Impact', 'Goal Types', 'Player Chemistry', 'Career Timeline', 'Personal Records', 'Matches', 'Overall rank', 'Position-family rank', 'Team rank', 'Active Streaks', 'Awards', 'Rating Details']) assert(detail.includes(label))
   assert(!detail.includes('Previous matches') && !detail.includes('Starter / Substitute') && !detail.includes('Scope avg'))
   assert(detail.includes('share >= 10') && detail.includes('Clean sheets'))
 })
@@ -21,7 +21,8 @@ test('news adds exactly one classified leading emoji and title types retain comp
   const teams = [{ id: 'A', name: 'Alpha' }, { id: 'B', name: 'Beta' }]
   const match = { id: 'm', season: 'Season 1', competitionType: 'league', competitionStage: 'regular', matchDay: 1, date: '2026-01-01', duration: 90, homeTeamId: 'A', awayTeamId: 'B', appearances: [{ playerId: 'p', teamId: 'A', role: 'starter', position: 'ST', matchPosition: 'ST' }], events: [{ id: 'g', type: 'goal', minute: 2, teamId: 'A', playerId: 'p' }] }
   const items = deriveNews(players, teams, Array.from({ length: 10 }, (_, index) => ({ ...match, id: `m${index}`, date: `2026-01-${String(index + 1).padStart(2, '0')}`, events: [{ ...match.events[0], id: `g${index}` }] })))
-  const goal = items.find(item => item.title.includes('reaches 10 goals'))
+  const goal = items.find(item => item.title.includes('Career 10 Goals'))
+  assert(goal)
   assert.equal(goal.emoji, '⚽')
   assert(items.every(item => typeof item.emoji === 'string' && [...item.emoji].length >= 1))
 })

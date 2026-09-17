@@ -4,7 +4,7 @@ import { formatDate, SubstitutePlayerCard } from '../components/ui'
 import { getMatchManOfTheMatch, matchScore, rateMatch } from '../engine/rating'
 import { matchCompetitionType } from '../engine/competition'
 import { matchStory } from '../engine/matchStory'
-import { deriveNews } from '../engine/news'
+import { deriveNews, groupMatchChanges } from '../engine/news'
 import { useStore } from '../store'
 import { useState } from 'react'
 import { SegmentedControl } from '../components/SeasonUI'
@@ -31,7 +31,7 @@ export function MatchDetailScreen({ matchId, onNavigate }: { matchId: string; on
   const sortedRatings = Object.values(ratings).sort((a, b) => b.raw - a.raw || a.playerId.localeCompare(b.playerId))
   const momId = getMatchManOfTheMatch(match, players)
   const story = matchStory(match, players)
-  const changes = deriveNews(players, teams, matches, competitionStates).filter(item => item.matchId === match.id).slice(0, 6)
+  const changes = groupMatchChanges(deriveNews(players, teams, matches, competitionStates).filter(item => item.matchId === match.id), players).slice(0, 6)
   const kickoff = kickoffLineupForMatch(match, teamId)
   const starters = match.appearances.filter(appearance => appearance.teamId === teamId && appearance.role === 'starter')
   const bench = match.appearances.filter(appearance => appearance.teamId === teamId && appearance.role === 'bench').sort((a, b) => (positionOrder[a.position] ?? 99) - (positionOrder[b.position] ?? 99))

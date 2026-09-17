@@ -7,7 +7,10 @@ import { buildSeasonAnalytics, rankingMovement } from './seasonAnalytics'
 
 export type NewsKind = 'player' | 'match' | 'team'
 export type NewsImportance = 'major' | 'medium' | 'minor'
-export type NewsItem = { id: string; kind: NewsKind; importance?: NewsImportance; date: string; matchId?: string; playerId?: string; teamId?: string; eyebrow: string; title: string; detail: string; context: string; emoji: string }
+export type MilestoneScope = 'league' | 'cup' | 'champions' | 'season' | 'career'
+export type AttackingMilestoneType = 'goals' | 'assists' | 'goal-contributions' | 'balanced'
+export type MilestoneMetadata = { scope: MilestoneScope; type: AttackingMilestoneType; threshold: number; season?: string; competition?: CompetitionType }
+export type NewsItem = { id: string; kind: NewsKind; importance?: NewsImportance; date: string; matchId?: string; playerId?: string; teamId?: string; eyebrow: string; title: string; detail: string; context: string; emoji: string; milestone?: MilestoneMetadata }
 type NewsDraft = Omit<NewsItem, 'emoji'>
 type Totals = { goals: number; assists: number; apps: number; mom: number; saves: number; cleanSheets: number }
 type Streak = { scoring: number; contribution: number }
@@ -25,6 +28,16 @@ const competitionName = (type: CompetitionType) => type === 'league' ? 'League' 
 const scoreText = (match: Match, teams: Team[]) => { const score = matchScore(match); return `${teamName(teams, match.homeTeamId)} ${score.home}-${score.away} ${teamName(teams, match.awayTeamId)} · ${competitionName(matchCompetitionType(match))}` }
 const crossed = (before: number, after: number, values: number[]) => values.filter(value => before < value && after >= value)
 const multiples = (step: number, max: number, start = step) => Array.from({ length: Math.max(0, Math.floor((max - start) / step) + 1) }, (_, index) => start + index * step)
+/** Dynamic, chronology-safe threshold crossing; no fixed maximum threshold list. */
+export const crossedThresholds = (before: number, after: number, start: number, step: number) => crossed(before, after, multiples(step, after, start))
+const attackingScopeLabel = (scope: MilestoneScope) => scope === 'career' ? 'Career' : scope === 'season' ? 'Season' : scope === 'league' ? 'League' : scope === 'cup' ? 'Cup' : 'Champions'
+const attackingImportance = (scope: MilestoneScope, threshold: number, type: AttackingMilestoneType): NewsImportance => {
+  if (scope === 'career' && threshold >= 50) return 'major'
+  if (type === 'balanced' && threshold >= 20) return threshold >= 25 ? 'major' : 'medium'
+  if (scope === 'season') return threshold >= 30 ? 'medium' : 'minor'
+  if (scope === 'champions' || scope === 'cup') return threshold >= 10 ? 'medium' : 'minor'
+  return threshold >= 30 ? 'medium' : 'minor'
+}
 const didAppear = (match: Match, playerId: string) => { const appearance = match.appearances.find(item => item.playerId === playerId); return Boolean(appearance && (appearance.role === 'starter' || match.events.some(event => event.type === 'sub' && event.playerInId === playerId))) }
 const newsEmoji = (item: NewsDraft) => {
   const text = `${item.eyebrow} ${item.title}`.toLowerCase()
@@ -37,6 +50,26 @@ const newsEmoji = (item: NewsDraft) => {
   if (text.includes('mom') || text.includes('rare performance')) return '🌟'
   if (text.includes('goal') || text.includes('scoring')) return '⚽'
   return '🏅'
+}
+
+/** Adds canonical attacking milestone events to the existing derived change feed.
+ * Scope and season are part of the identity, so historical edits simply rebuild
+ * the correct chronological event rather than leaving persisted stale state. */
+function addAttackingMilestones(add: (item: NewsDraft) => void, player: Player, match: Match, scope: MilestoneScope, before: Totals, after: Totals, context: string, competition?: CompetitionType) {
+  const seasonPart = scope === 'career' ? '' : `:${match.season}`
+  const scopePart = competition ? `:${competition}` : ''
+  const label = attackingScopeLabel(scope)
+  const emit = (type: AttackingMilestoneType, threshold: number, text: string) => add({
+    id: `milestone:${player.id}:${type}:${scope}${scopePart}${seasonPart}:${threshold}`,
+    kind: 'player', importance: attackingImportance(scope, threshold, type), date: match.date, matchId: match.id, playerId: player.id,
+    eyebrow: `${label.toUpperCase()} MILESTONE`, title: `${playerName([player], player.id)} · ${label} ${text}`,
+    detail: scope === 'career' ? 'Across all valid saved matches.' : scope === 'season' ? 'All competitions in this season.' : `${label} matches only in ${match.season}.`, context,
+    milestone: { scope, type, threshold, ...(scope === 'career' ? {} : { season: match.season }), ...(competition ? { competition } : {}) },
+  })
+  for (const threshold of crossedThresholds(before.goals, after.goals, 10, 10)) emit('goals', threshold, `${threshold} Goals`)
+  for (const threshold of crossedThresholds(before.assists, after.assists, 10, 10)) emit('assists', threshold, `${threshold} Assists`)
+  for (const threshold of crossedThresholds(before.goals + before.assists, after.goals + after.assists, 20, 20)) emit('goal-contributions', threshold, `${threshold} G+A`)
+  for (const threshold of crossedThresholds(Math.min(before.goals, before.assists), Math.min(after.goals, after.assists), 10, 5)) emit('balanced', threshold, `${threshold} Goals + ${threshold} Assists`)
 }
 
 /**
@@ -180,17 +213,13 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
       const careerAfter = sum(careerBefore); const seasonAfter = sum(seasonBefore); const competitionAfter = sum(competitionBefore)
       career.set(player.id, careerAfter); season.set(seasonKey, seasonAfter); competition.set(competitionKey, competitionAfter)
 
-      for (const value of crossed(seasonBefore.goals, seasonAfter.goals, multiples(10, seasonAfter.goals))) add({ id: `season-goals:${match.season}:${player.id}:${value}`, kind: 'player', date: match.date, matchId: match.id, playerId: player.id, eyebrow: 'SEASON MILESTONE', title: `${playerName(players, player.id)} reaches ${value} goals this season`, detail: 'All competitions combined.', context })
-      for (const value of crossed(seasonBefore.assists, seasonAfter.assists, multiples(10, seasonAfter.assists))) add({ id: `season-assists:${match.season}:${player.id}:${value}`, kind: 'player', date: match.date, matchId: match.id, playerId: player.id, eyebrow: 'SEASON MILESTONE', title: `${playerName(players, player.id)} reaches ${value} assists this season`, detail: 'All competitions combined.', context })
-      for (const value of [10, 20]) if ((seasonBefore.goals < value || seasonBefore.assists < value) && seasonAfter.goals >= value && seasonAfter.assists >= value) add({ id: `season-combo:${match.season}:${player.id}:${value}`, kind: 'player', date: match.date, matchId: match.id, playerId: player.id, eyebrow: 'COMPLETE SEASON', title: `${playerName(players, player.id)} completes a ${value}–${value} season`, detail: `${seasonAfter.goals} goals and ${seasonAfter.assists} assists.`, context })
+      addAttackingMilestones(add, player, match, 'season', seasonBefore, seasonAfter, context)
       for (const value of crossed(seasonBefore.mom, seasonAfter.mom, multiples(10, seasonAfter.mom))) add({ id: `season-mom:${match.season}:${player.id}:${value}`, kind: 'player', date: match.date, matchId: match.id, playerId: player.id, eyebrow: 'MOM MILESTONE', title: `${playerName(players, player.id)} records a ${value}th MOM this season`, detail: 'Calculated from saved match ratings.', context })
 
-      const competitionStep = type === 'league' ? 10 : 5
-      for (const field of ['goals', 'assists'] as const) for (const value of crossed(competitionBefore[field], competitionAfter[field], multiples(competitionStep, competitionAfter[field]))) add({ id: `competition-${field}:${match.season}:${type}:${player.id}:${value}`, kind: 'player', date: match.date, matchId: match.id, playerId: player.id, eyebrow: `${competitionName(type).toUpperCase()} MILESTONE`, title: `${playerName(players, player.id)} reaches ${value} ${competitionName(type)} ${field} this season`, detail: `${competitionName(type)} matches only.`, context })
+      addAttackingMilestones(add, player, match, type, competitionBefore, competitionAfter, context, type)
+      addAttackingMilestones(add, player, match, 'career', careerBefore, careerAfter, context)
 
-      for (const [field, step, start] of [['goals', 50, 50], ['assists', 50, 50], ['apps', 100, 100], ['mom', 50, 50]] as const) for (const value of crossed(careerBefore[field], careerAfter[field], multiples(step, careerAfter[field], start))) add({ id: `career-${field}:${player.id}:${value}`, kind: 'player', date: match.date, matchId: match.id, playerId: player.id, eyebrow: 'CAREER MILESTONE', title: `${playerName(players, player.id)} reaches ${value} career ${field === 'apps' ? 'appearances' : field}`, detail: 'Across all seasons and competitions.', context })
-      // Retain the established first landmark without creating repeated low-value career news.
-      for (const value of crossed(careerBefore.goals, careerAfter.goals, [10])) add({ id: `player:milestone:${match.id}:${player.id}:goals`, kind: 'player', date: match.date, matchId: match.id, playerId: player.id, eyebrow: 'CAREER MILESTONE', title: `${playerName(players, player.id)} reaches ${value} career goals`, detail: 'Across all saved matches.', context })
+      for (const [field, step, start] of [['apps', 100, 100], ['mom', 50, 50]] as const) for (const value of crossed(careerBefore[field], careerAfter[field], multiples(step, careerAfter[field], start))) add({ id: `career-${field}:${player.id}:${value}`, kind: 'player', date: match.date, matchId: match.id, playerId: player.id, eyebrow: 'CAREER MILESTONE', title: `${playerName(players, player.id)} reaches ${value} career ${field === 'apps' ? 'appearances' : field}`, detail: 'Across all seasons and competitions.', context })
       if (isGoalkeeper) {
         for (const value of crossed(seasonBefore.cleanSheets, seasonAfter.cleanSheets, [10, 20])) add({ id: `season-clean-sheets:${match.season}:${player.id}:${value}`, kind: 'player', date: match.date, matchId: match.id, playerId: player.id, eyebrow: 'GOALKEEPER MILESTONE', title: `${playerName(players, player.id)} reaches ${value} clean sheets this season`, detail: 'Goalkeeper appearances only.', context })
         for (const value of crossed(careerBefore.cleanSheets, careerAfter.cleanSheets, multiples(50, careerAfter.cleanSheets))) add({ id: `career-clean-sheets:${player.id}:${value}`, kind: 'player', date: match.date, matchId: match.id, playerId: player.id, eyebrow: 'GOALKEEPER MILESTONE', title: `${playerName(players, player.id)} records a ${value}th career clean sheet`, detail: 'Across all saved matches.', context })
@@ -317,4 +346,16 @@ export function deriveNews(players: Player[], teams: Team[], matches: Match[], s
 export function homeMilestoneNews(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES): NewsItem[] {
   const priority = { major: 0, medium: 1, minor: 2 }
   return deriveNews(players, teams, matches, states).slice().sort((a, b) => (priority[a.importance ?? 'medium'] - priority[b.importance ?? 'medium']) || b.date.localeCompare(a.date) || b.id.localeCompare(a.id)).slice(0, 5)
+}
+
+/** Presentation-only grouping for Match Detail. Canonical milestone events stay
+ * separate in deriveNews so history, deduplication and edit reversal remain exact. */
+export function groupMatchChanges(items: NewsItem[], players: Player[]) {
+  const grouped = new Map<string, NewsItem[]>()
+  const ordinary: { id: string; title: string; detail: string }[] = []
+  for (const item of items) {
+    if (!item.milestone || !item.playerId) { ordinary.push(item); continue }
+    const rows = grouped.get(item.playerId) ?? []; rows.push(item); grouped.set(item.playerId, rows)
+  }
+  return [...grouped.entries()].map(([playerId, rows]) => ({ id: `milestones:${rows[0].matchId}:${playerId}`, title: `${playerName(players, playerId)} · Milestones`, detail: rows.map(row => row.title.replace(/^.*? · /, '')).join(' · ') })).concat(ordinary)
 }

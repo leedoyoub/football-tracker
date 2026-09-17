@@ -2,7 +2,12 @@ import { POSITIONS, type AppState, type Player } from '../types';
 import { getFromIndexedDB, saveToIndexedDB } from './db';
 import { validateState } from './validation';
 
-const STORAGE_KEY = 'football-tracker-v1';
+// This is a durable data namespace, deliberately independent from app and
+// derived-engine versions.  Never turn a release number into a storage key.
+export const STORAGE_KEY = 'football-tracker-v1';
+// Read-only compatibility aliases for early/local development builds.  A valid
+// payload is never deleted or rewritten at its original key during recovery.
+export const LEGACY_STORAGE_KEYS = ['football-tracker-data', 'football-tracker', 'football-tracker-v2'] as const;
 const BACKUP_KEY = 'football-tracker-v1-backup';
 const EMERGENCY_PREFIX = 'football-tracker-emergency-';
 const MAX_SNAPSHOTS = 5;
@@ -15,7 +20,8 @@ export const LocalRepository = {
       () => Promise.resolve(localStorage.getItem(STORAGE_KEY)),
       () => getFromIndexedDB(STORAGE_KEY),
       () => Promise.resolve(localStorage.getItem(BACKUP_KEY)),
-      ...Array.from({ length: MAX_SNAPSHOTS }, (_, i) => () => Promise.resolve(localStorage.getItem(`${EMERGENCY_PREFIX}${i + 1}`)))
+      ...Array.from({ length: MAX_SNAPSHOTS }, (_, i) => () => Promise.resolve(localStorage.getItem(`${EMERGENCY_PREFIX}${i + 1}`))),
+      ...LEGACY_STORAGE_KEYS.map(key => () => Promise.resolve(localStorage.getItem(key))),
     ];
 
     for (const getSource of sources) {
@@ -34,8 +40,14 @@ export const LocalRepository = {
               teamIds: player.teamIds ?? (player.teamId ? [player.teamId] : [])
             })),
           };
-          // If recovered from non-IDB, sync to IDB
-          if (typeof raw === 'string') await saveToIndexedDB(STORAGE_KEY, migratedState);
+          // Mirroring a recovered browser-storage payload into IndexedDB is a
+          // resilience enhancement, never a prerequisite for reading history.
+          // Private mode, quota pressure, or a blocked database must not make a
+          // valid local Match history look like an empty app.
+          if (typeof raw === 'string') {
+            try { await saveToIndexedDB(STORAGE_KEY, migratedState); }
+            catch { /* The already-validated source remains the durable read. */ }
+          }
           return migratedState;
         }
       } catch (e) {
