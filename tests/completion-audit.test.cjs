@@ -70,12 +70,10 @@ test('starting-combination metrics exclude matches where the unit did not start 
   assert.deepEqual([row.onPitchGoalsFor, row.onPitchGoalsAgainst], [2, 2])
 })
 
-test('Records exposes attacking, midfield, and each defensive combination unit with separated on-pitch rates', () => {
+test('Records exposes only the approved pair-based combination record menu', () => {
   const records = source('src/screens/RecordsScreen.tsx')
-  const combinations = source('src/components/CombinationRecords.tsx')
-  assert(records.includes('<CombinationRecords players={players} matches={scoped} />'))
-  for (const label of ['ATTACKING', 'MIDFIELD', 'DEFENSIVE', 'CB Pair', 'Fullback Pair', 'Back Four', 'Starts Together', 'Matches Together', 'Minutes Together', 'On-Pitch GF / 90', 'On-Pitch GA / 90', 'On-Pitch GD / 90']) assert(combinations.includes(label))
-  assert(combinations.includes('SOT Allowed is full-match only.'))
+  assert(records.includes('<ApprovedCombinationRecords players={players} matches={scoped} />'))
+  for (const label of ['Most Goal Combinations', 'Most Mutual Goal Combinations', 'Most Matches Both Scored', 'Most Matches Both Had G+A', 'Best Duo Combined G+A', 'Best CB Partnership · Shot Suppression']) assert(records.includes(label))
 })
 
 test('Player Detail, Match Story, Match Log, and Data Integrity remain reachable from rendered screens', () => {

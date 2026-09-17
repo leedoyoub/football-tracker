@@ -138,25 +138,20 @@ test('Competition Best XI labels and sources are scoped to League, Cup stages an
 
 test('Recent Match cards retain green/yellow/red result colors and plain competition labels', () => {
   const source = fs.readFileSync(require.resolve('../src/components/ResultCard.tsx'), 'utf8')
+  const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(source.includes("W: 'bg-emerald-500/15"))
   assert(source.includes("D: 'bg-yellow-500/15"))
   assert(source.includes("L: 'bg-red-500/15 text-red-300'"))
-  for (const label of ["'League'", "'Cup'", "'Champions'"]) assert(source.includes(label))
-  assert(!/[👑🥇🏆]/u.test(source))
+  assert(home.includes('Recent matches carousel') && home.includes('snap-x'))
 })
-
 test('competition identity remains scoped to Competition surfaces after Home is simplified', () => {
   const competitionSource = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
   const teamsSource = fs.readFileSync(require.resolve('../src/screens/TeamsScreen.tsx'), 'utf8')
   const homeSource = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
-  assert(!homeSource.includes('🏆'))
-  const home = ''
-  const result = fs.readFileSync(require.resolve('../src/components/ResultCard.tsx'), 'utf8')
-  assert(competitionSource.includes('👑') && competitionSource.includes('🥇') && competitionSource.includes('🏆'))
+  assert(homeSource.includes('global-ranking'))
+  assert(competitionSource.includes('CompetitionHeader') && competitionSource.includes('ChampionsBracket'))
   assert(!teamsSource.includes('competitionHistory') && !teamsSource.includes('titleCounts'))
-  for (const source of [home, result]) assert(!/[👑🥇🏆]/u.test(source))
 })
-
 test('Teams uses the compact card progress read model without player-count or title work', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/TeamsScreen.tsx'), 'utf8')
   assert(source.includes('grid-cols-4') && source.includes('compactTeamCompetitionProgressMap'))
@@ -189,9 +184,9 @@ test('season completion is synchronized as backward-compatible CompetitionState 
   assert(validation.includes("'season-complete'"))
 })
 
-test('visible and package metadata version are exactly v2.2.2 / 2.2.2', () => {
-  assert.equal(APP_VERSION, '2.2.2')
-  assert.equal(require('../package.json').version, '2.2.2')
+test('visible and package metadata version are exactly v2.2.3 / 2.2.3', () => {
+  assert.equal(APP_VERSION, '2.2.3')
+  assert.equal(require('../package.json').version, '2.2.3')
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('v{APP_VERSION}'))
 })

@@ -6,7 +6,7 @@ import { AWARD_433, awardPositionFamily, isAwardEligible } from './awardRules'
 export { AWARD_433, awardPositionFamily, isAwardEligible } from './awardRules'
 
 export type AwardWinner = { playerId: string; value: number; label: string; awardScore?: number }
-export type CompetitionAwards = { complete: boolean; championId?: string; scorer?: AwardWinner; assists?: AwardWinner; mvp?: AwardWinner; bestXI?: Best11Slot[] }
+export type CompetitionAwards = { complete: boolean; championId?: string; scorer?: AwardWinner; assists?: AwardWinner; mvp?: AwardWinner; goalkeeper?: AwardWinner; bestXI?: Best11Slot[] }
 
 const rawAverage = (row: GlobalLeaderboardRow) => row.ratings.length ? row.ratings.reduce((sum, rating) => sum + rating.raw, 0) / row.ratings.length : 0
 const appearances = (row: GlobalLeaderboardRow) => row.ratings.length
@@ -52,6 +52,40 @@ export function buildAwardBestXI(players: Player[], ranked: { row: GlobalLeaderb
 
 function teamIdFor(row: GlobalLeaderboardRow) { return row.historicalTeamId ?? row.teamId }
 
+const goalkeeperRatings = (row: GlobalLeaderboardRow) => row.ratings.filter(rating => rating.position === 'GK')
+const goalkeeperMinutes = (row: GlobalLeaderboardRow) => goalkeeperRatings(row).reduce((total, rating) => total + rating.minutes, 0)
+const goalkeeperAverage = (row: GlobalLeaderboardRow) => {
+  const ratings = goalkeeperRatings(row)
+  return ratings.length ? ratings.reduce((total, rating) => total + rating.raw, 0) / ratings.length : 0
+}
+const goalkeeperCleanSheets = (row: GlobalLeaderboardRow) => goalkeeperRatings(row).filter(rating => rating.minutes > 0 && rating.conceded === 0).length
+const goalkeeperSavePercentage = (row: GlobalLeaderboardRow) => {
+  const saves = row.qualifyingSaves ?? 0
+  const faced = saves + (row.concededOnPitch ?? 0)
+  return faced ? saves / faced : 0
+}
+const goalkeeperSavesPer90 = (row: GlobalLeaderboardRow) => {
+  const minutes = goalkeeperMinutes(row)
+  return minutes ? (row.qualifyingSaves ?? 0) / minutes * 90 : 0
+}
+const goalkeeperGoalsAgainstPer90 = (row: GlobalLeaderboardRow) => {
+  const minutes = goalkeeperMinutes(row)
+  return minutes ? (row.concededOnPitch ?? 0) / minutes * 90 : Number.POSITIVE_INFINITY
+}
+
+function goalkeeperWinner(rows: { row: GlobalLeaderboardRow; score: number }[], label: string): AwardWinner | undefined {
+  const best = rows.filter(candidate => candidate.row.playedGoalkeeper).slice().sort((a, b) =>
+    b.score - a.score ||
+    goalkeeperCleanSheets(b.row) - goalkeeperCleanSheets(a.row) ||
+    goalkeeperSavePercentage(b.row) - goalkeeperSavePercentage(a.row) ||
+    goalkeeperSavesPer90(b.row) - goalkeeperSavesPer90(a.row) ||
+    goalkeeperGoalsAgainstPer90(a.row) - goalkeeperGoalsAgainstPer90(b.row) ||
+    goalkeeperMinutes(b.row) - goalkeeperMinutes(a.row) ||
+    a.row.playerId.localeCompare(b.row.playerId),
+  )[0]
+  return best ? { playerId: best.row.playerId, value: goalkeeperAverage(best.row), awardScore: best.score, label } : undefined
+}
+
 export function awardsForCompetition(type: CompetitionType, season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[]): CompetitionAwards {
   const games = competitionMatches(matches, season, type)
   const stats = buildGlobalRankingData(players, games, { seasons: [season], teams: [], positions: [] }, 'rating')
@@ -85,7 +119,9 @@ export function awardsForCompetition(type: CompetitionType, season: string, team
   }).sort((a, b) => b.score - a.score || rawAverage(b.row) - rawAverage(a.row) || appearances(b.row) - appearances(a.row) || b.row.minutes - a.row.minutes || a.row.playerId.localeCompare(b.row.playerId))
   const best = eligible[0]
   const mvp = best ? { playerId: best.row.playerId, value: rawAverage(best.row), awardScore: best.score, label: 'Avg Rating' } : undefined
-  return { complete, championId, scorer: winner(stats, row => row.goals, 'Goals'), assists: winner(stats, row => row.assists, 'Assists'), mvp, bestXI: buildAwardBestXI(players, eligible) }
+  const goalkeeperLabel = type === 'league' ? 'Goalkeeper of the Season' : type === 'cup' ? 'Goalkeeper of the Cup' : 'Goalkeeper of the Tournament'
+  const goalkeeperEligible = eligible.map(candidate => ({ ...candidate, score: ratingAwardScore(goalkeeperAverage(candidate.row), bonusFor(teamIdFor(candidate.row)), goalkeeperMinutes(candidate.row), games.filter(match => match.teamId ? match.teamId === teamIdFor(candidate.row) : match.homeTeamId === teamIdFor(candidate.row) || match.awayTeamId === teamIdFor(candidate.row)).length) }))
+  return { complete, championId, scorer: winner(stats, row => row.goals, 'Goals'), assists: winner(stats, row => row.assists, 'Assists'), mvp, goalkeeper: goalkeeperWinner(goalkeeperEligible, goalkeeperLabel), bestXI: buildAwardBestXI(players, eligible) }
 }
 
 export function seasonAwards(season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[]) {
@@ -99,5 +135,14 @@ export function seasonAwards(season: string, teams: Team[], players: Player[], m
     return isAwardEligible(appearances(row), teamMatches)
   }).sort((a, b) => rawAverage(b) - rawAverage(a) || appearances(b) - appearances(a) || b.minutes - a.minutes || a.playerId.localeCompare(b.playerId))
   const ballon = eligible[0] ? { playerId: eligible[0].playerId, value: rawAverage(eligible[0]), label: 'Avg Rating' } : undefined
-  return { complete, goldenBoot: winner(stats, row => row.goals, 'Goals'), assistLeader: winner(stats, row => row.assists, 'Assists'), ballon }
+  const goldenGlove = stats.filter(row => row.playedGoalkeeper).slice().sort((a, b) =>
+    goalkeeperCleanSheets(b) - goalkeeperCleanSheets(a) ||
+    goalkeeperCleanSheets(b) / Math.max(1, goalkeeperRatings(b).length) - goalkeeperCleanSheets(a) / Math.max(1, goalkeeperRatings(a).length) ||
+    goalkeeperSavePercentage(b) - goalkeeperSavePercentage(a) ||
+    goalkeeperGoalsAgainstPer90(a) - goalkeeperGoalsAgainstPer90(b) ||
+    goalkeeperSavesPer90(b) - goalkeeperSavesPer90(a) ||
+    goalkeeperMinutes(b) - goalkeeperMinutes(a) ||
+    a.playerId.localeCompare(b.playerId),
+  )[0]
+  return { complete, goldenBoot: winner(stats, row => row.goals, 'Goals'), assistLeader: winner(stats, row => row.assists, 'Assists'), ballon, goldenGlove: goldenGlove ? { playerId: goldenGlove.playerId, value: goalkeeperCleanSheets(goldenGlove), label: 'Golden Glove' } : undefined }
 }

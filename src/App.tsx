@@ -19,6 +19,7 @@ import { SeasonHighlightScreen } from './screens/SeasonHighlightScreen'
 import { CompetitionScreen } from './screens/CompetitionScreen'
 import { RecordsScreen } from './screens/RecordsScreen'
 import { ResultsScreen } from './screens/ResultsScreen'
+import { GlobalRankingScreen } from './screens/GlobalRankingScreen'
 import { SquadImportScreen } from './screens/SquadImportScreen'
 import { useStore } from './store'
 import type { Tab, View } from './types'
@@ -32,6 +33,7 @@ import { BootstrapShell, StartupRecovery } from './components/StartupBoundary'
 import { emptyFilters, type RankingFilters } from './screens/RankingFilters'
 import { popPlayerEditHistory } from './lib/playerNavigation'
 import { appContentOverflowClass } from './lib/routeLayout'
+import { loadLocalModePreference, saveLocalModePreference } from './lib/localMode'
 
 export default function App() {
   const { user, loading, startupError, signInWithGoogle, retryStartup } = useAuth()
@@ -42,7 +44,7 @@ export default function App() {
   const [season, setSeason] = useState(seasons[0] ?? 'Season 1')
   const [history, setHistory] = useState<View[]>([{ name: 'home' }])
   const [playerFilters, setPlayerFilters] = useState<RankingFilters>(emptyFilters)
-  const [localOnly, setLocalOnly] = useState(false)
+  const [localOnly, setLocalOnly] = useState(loadLocalModePreference)
   const [routeRestored, setRouteRestored] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const scrollPositions = useRef<Record<number, number>>({})
@@ -76,6 +78,12 @@ export default function App() {
   }, [loading, user, localOnly, routeRestored])
 
   useEffect(() => {
+    const refresh = () => setLocalOnly(loadLocalModePreference())
+    window.addEventListener('football-tracker-local-mode', refresh)
+    return () => window.removeEventListener('football-tracker-local-mode', refresh)
+  }, [])
+
+  useEffect(() => {
     const container = scrollRef.current
     if (!container) return
     const index = history.length - 1
@@ -89,7 +97,7 @@ export default function App() {
     if (view.name === 'players' || view.name === 'player' || view.name === 'new-player' || view.name === 'edit-player') {
       return 'players'
     }
-    if (view.name === 'competition') return 'competition'
+    if (view.name === 'competition' || view.name === 'global-ranking') return 'competition'
     if (view.name === 'records' || view.name === 'chemistry' || view.name === 'comparison') return 'records'
     return 'home'
   }, [view])
@@ -122,7 +130,7 @@ export default function App() {
   const screen = startupScreen(startup)
   if (screen === 'loading') return <StartupLoading />
   if (screen === 'error') return <StartupError onRetry={retryStartup} />
-  if (screen === 'auth-entry') return <AuthEntryScreen onSignIn={() => { void signInWithGoogle() }} onContinue={() => setLocalOnly(true)} />
+  if (screen === 'auth-entry') return <AuthEntryScreen onSignIn={() => { void signInWithGoogle() }} onContinue={() => { saveLocalModePreference(); setLocalOnly(true) }} />
 
   return (
     <div className="min-h-[100dvh] bg-zinc-950">
@@ -132,6 +140,7 @@ export default function App() {
             <HomeScreen season={season} onSeason={setSeason} onNavigate={onNavigate} />
           )}
           {view.name === 'competition' && <CompetitionScreen season={view.season ?? season} initialType={view.competitionType ?? 'league'} initialMetric={view.rankingMetric} onSeason={(nextSeason) => { setSeason(nextSeason); setHistory(previous => previous.map((item, index) => index === previous.length - 1 && item.name === 'competition' ? { ...item, season: nextSeason } : item)) }} onNavigate={onNavigate} />}
+          {view.name === 'global-ranking' && <GlobalRankingScreen season={view.season ?? season} initialMetric={view.rankingMetric} initialScope={view.competitionType ?? 'all'} teamId={view.teamId} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'results' && <ResultsScreen onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'records' && <RecordsScreen season={season} onNavigate={onNavigate} />}
           {view.name === 'standings' && <StandingsScreen season={season} onNavigate={onNavigate} />}

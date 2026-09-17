@@ -188,6 +188,15 @@ function monthlyAwardsFor(block: MonthlyBlock, teams: Team[], players: Player[],
   return { block, finalized, playerOfMonth: ordered[0], bestXI: slots, statsByPlayer: Object.fromEntries(ordered.map(row => [row.playerId, { goals: row.goals, assists: row.assists }])) }
 }
 
+/** Lazily derives one finalized monthly award block without materializing the full season. */
+export function monthlyAwardForBlock(teams: Team[], players: Player[], matches: Match[], season: string, blockId: number): MonthlyAwards | undefined {
+  const block = monthlyBlockRange(blockId)
+  if (!block) return undefined
+  const leagueMatches = competitionMatches(matches, season, 'league')
+  if (!isLeagueMatchdayComplete(teams, leagueMatches, season, block.endMatchDay)) return undefined
+  return monthlyAwardsFor(block, teams, players, leagueMatches, true)
+}
+
 function buildReview(day: number, snapshots: Map<number, LeagueSnapshot>, playerSnapshots: Map<number, PlayerRankingSnapshot>): MatchdayReview {
   const snapshot = snapshots.get(day)
   const ratings = playerSnapshots.get(day)?.rows.get('rating') ?? []

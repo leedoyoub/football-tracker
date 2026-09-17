@@ -184,6 +184,7 @@ export interface AppState {
 export type View =
   | { name: 'home' }
   | { name: 'competition'; season?: string; competitionType?: CompetitionType; rankingMetric?: 'rating' | 'goals' | 'assists' | 'mom' }
+  | { name: 'global-ranking'; season?: string; competitionType?: CompetitionType | 'all'; rankingMetric?: RankSort; teamId?: string }
   | { name: 'results' }
   | { name: 'records' }
   | { name: 'standings' }

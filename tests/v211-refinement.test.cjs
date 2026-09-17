@@ -9,8 +9,8 @@ const { deriveNews } = require('../src/engine/news.ts')
 
 test('central version and focused Player Detail refinement are current', () => {
   const detail = fs.readFileSync(require.resolve('../src/screens/PlayerDetailScreen.tsx'), 'utf8')
-  assert.equal(APP_VERSION, '2.2.2')
-  assert.equal(require('../package.json').version, '2.2.2')
+  assert.equal(APP_VERSION, '2.2.3')
+  assert.equal(require('../package.json').version, '2.2.3')
   for (const label of ['Overview', 'RankedMetric', 'Recent Form', 'Position Stats', 'Positions Played', 'Team Performance When Starting', 'Role Impact', 'Goal Types', 'Player Chemistry', 'Career Timeline', 'Personal Records', 'Matches', 'Overall rank', 'Position-family rank', 'Team rank', 'Active Streaks', 'Awards', 'Rating Details']) assert(detail.includes(label))
   assert(!detail.includes('Previous matches') && !detail.includes('Starter / Substitute') && !detail.includes('Scope avg'))
   assert(detail.includes('share >= 10') && detail.includes('Clean sheets'))
@@ -30,7 +30,7 @@ test('news adds exactly one classified leading emoji and title types retain comp
 test('Records defers inactive derivation tabs and Combination only sorts prepared data', () => {
   const records = fs.readFileSync(require.resolve('../src/screens/RecordsScreen.tsx'), 'utf8')
   const combinations = fs.readFileSync(require.resolve('../src/components/CombinationRecords.tsx'), 'utf8')
-  assert(records.includes("category === 'history' && <HistoryRecords") && records.includes("category === 'integrity' && <IntegrityRecords"))
+  assert(records.includes("category === 'history' && <RecordsHistory") && records.includes("category === 'integrity' && <IntegrityRecords"))
   assert(records.includes('function HistoryRecords') && records.includes('function IntegrityRecords'))
   assert(combinations.includes('const prepared = useMemo(() => combinationStats') && combinations.includes('}, [prepared, sort])'))
 })
