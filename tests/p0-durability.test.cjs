@@ -126,11 +126,58 @@ test('quota recovery prioritizes a fitting primary save and preserves unrelated 
   try { await LocalRepository.saveAppState(state(['A', 'B', 'C', 'D'])); assert.deepEqual(JSON.parse(entries['football-tracker-v1']).matches.map(row => row.id), ['A', 'B', 'C', 'D']); assert.equal(entries['sb-auth-token'], 'session') } finally { global.localStorage = previousStorage; global.indexedDB = previousIndexedDB }
 })
 
+test('legacy full recovery footprint is compacted before one quota retry and canonical save succeeds', async () => {
+  const previousStorage = global.localStorage; const previousIndexedDB = global.indexedDB; const old = JSON.stringify(state(['A', 'B', 'C'])); const fresh = JSON.stringify(state(['A', 'B', 'C', 'D']))
+  const entries = { 'football-tracker-v1': old, 'football-tracker-v1-backup': old, 'football-tracker-emergency-1': old, 'football-tracker-emergency-2': old, 'football-tracker-emergency-3': old, 'football-tracker-emergency-4': old, 'football-tracker-emergency-5': old, 'sb-test-project-auth-token': 'session', unrelated: 'keep' }; const quota = fresh.length + 32
+  const used = () => Object.values(entries).reduce((sum, value) => sum + String(value).length, 0)
+  global.localStorage = { getItem: key => entries[key] ?? null, setItem: (key, value) => { const prior = entries[key] ?? ''; if (used() - prior.length + value.length > quota) { const error = new Error('QuotaExceededError'); error.name = 'QuotaExceededError'; throw error } entries[key] = value }, removeItem: key => delete entries[key] }; delete global.indexedDB
+  delete require.cache[require.resolve('../src/lib/repository.ts')]; const { LocalRepository } = require('../src/lib/repository.ts')
+  try { await LocalRepository.saveAppState(state(['A', 'B', 'C', 'D'])); assert.equal(entries['football-tracker-v1'], fresh); assert.equal(entries['sb-test-project-auth-token'], 'session'); assert.equal(entries.unrelated, 'keep'); for (const key of ['football-tracker-v1-backup', ...Array.from({ length: 5 }, (_, index) => `football-tracker-emergency-${index + 1}`)]) assert.equal(entries[key], undefined) } finally { global.localStorage = previousStorage; global.indexedDB = previousIndexedDB }
+})
+
+test('legacy recovery compaction preserves snapshots when canonical primary is missing or invalid', () => {
+  const previousStorage = global.localStorage; const valid = JSON.stringify(state(['A'])); const entries = { 'football-tracker-v1-backup': valid, 'football-tracker-emergency-1': valid, 'football-tracker-emergency-2': valid, 'sb-test-project-auth-token': 'session', unrelated: 'keep' }
+  global.localStorage = memoryStorage(entries); delete require.cache[require.resolve('../src/lib/repository.ts')]; const { compactLegacyRecoveryStorage } = require('../src/lib/repository.ts')
+  try { assert.equal(compactLegacyRecoveryStorage(), false); entries['football-tracker-v1'] = '{bad'; assert.equal(compactLegacyRecoveryStorage(), false); for (const key of ['football-tracker-v1-backup', 'football-tracker-emergency-1', 'football-tracker-emergency-2', 'sb-test-project-auth-token', 'unrelated']) assert.notEqual(entries[key], undefined) } finally { global.localStorage = previousStorage }
+})
+
+test('startup compaction frees headroom for a growing auth token without changing canonical football data', () => {
+  const previousStorage = global.localStorage; const valid = JSON.stringify(state(['A', 'B'])); const entries = { 'football-tracker-v1': valid, 'football-tracker-v1-backup': valid, 'football-tracker-emergency-1': valid, 'football-tracker-emergency-2': valid, 'football-tracker-emergency-3': valid, 'football-tracker-emergency-4': valid, 'football-tracker-emergency-5': valid, 'sb-test-project-auth-token': 'old', unrelated: 'keep' }; const quota = valid.length + 100
+  const used = () => Object.values(entries).reduce((n, value) => n + String(value).length, 0); global.localStorage = { getItem: key => entries[key] ?? null, setItem: (key, value) => { const old = entries[key] ?? ''; if (used() - old.length + value.length > quota) throw new Error('QuotaExceededError'); entries[key] = value }, removeItem: key => delete entries[key] }
+  delete require.cache[require.resolve('../src/lib/repository.ts')]; const { compactLegacyRecoveryStorage } = require('../src/lib/repository.ts')
+  try { assert.throws(() => localStorage.setItem('sb-test-project-auth-token', 'new-session-that-is-larger')); assert(compactLegacyRecoveryStorage()); localStorage.setItem('sb-test-project-auth-token', 'new-session-that-is-larger'); assert.equal(entries['football-tracker-v1'], valid); assert.equal(entries.unrelated, 'keep') } finally { global.localStorage = previousStorage }
+})
+
 test('verified primary save resolves while the IndexedDB mirror never resolves', async () => {
   const Module = require('node:module'); const originalLoad = Module._load; const previousStorage = global.localStorage
   global.localStorage = memoryStorage({}); Module._load = function(request, parent, isMain) { if (request === './db') return { getFromIndexedDB: async () => null, saveToIndexedDB: () => new Promise(() => {}) }; return originalLoad.call(this, request, parent, isMain) }
   delete require.cache[require.resolve('../src/lib/repository.ts')]; const { LocalRepository } = require('../src/lib/repository.ts')
   try { const result = await Promise.race([LocalRepository.saveAppState(state(['D'])), new Promise((_, reject) => setTimeout(() => reject(new Error('blocked')), 50))]); assert.equal(result.primarySaved, true) } finally { Module._load = originalLoad; global.localStorage = previousStorage }
+})
+
+test('verified primary getAppState resolves while the IndexedDB mirror never resolves', async () => {
+  const Module = require('node:module'); const originalLoad = Module._load; const previousStorage = global.localStorage
+  const canonical = state(['A', 'B', 'C', 'D'])
+  global.localStorage = memoryStorage({ 'football-tracker-v1': JSON.stringify(canonical) })
+  Module._load = function(request, parent, isMain) { if (request === './db') return { getFromIndexedDB: async () => null, saveToIndexedDB: () => new Promise(() => {}) }; return originalLoad.call(this, request, parent, isMain) }
+  delete require.cache[require.resolve('../src/lib/repository.ts')]; const { LocalRepository } = require('../src/lib/repository.ts')
+  try { const restored = await Promise.race([LocalRepository.getAppState(), new Promise((_, reject) => setTimeout(() => reject(new Error('blocked')), 50))]); assert.deepEqual(restored.matches.map(match => match.id), ['A', 'B', 'C', 'D']) } finally { Module._load = originalLoad; global.localStorage = previousStorage }
+})
+
+test('all four ranking surfaces consume the one canonical twelve-metric catalog', () => {
+  const metrics = require('../src/lib/rankingMetrics.ts').RANKING_METRICS
+  assert.deepEqual(metrics.map(metric => metric.label), ['Rating', 'Goals', 'Assists', 'G+A', 'Minutes', 'MOM', 'Goals/90', 'Assists/90', 'G+A/90', 'Clean Sheets', 'Saves', 'Save %'])
+  for (const file of ['HomeScreen.tsx', 'TeamDetailScreen.tsx', 'CompetitionScreen.tsx', 'GlobalRankingScreen.tsx']) {
+    const screen = fs.readFileSync(`src/screens/${file}`, 'utf8')
+    assert(screen.includes("from '../lib/rankingMetrics'"))
+    assert(screen.includes('RANKING_METRICS'))
+    assert(screen.includes('RankingMetricTabs'))
+    assert(screen.includes('RankingRow'))
+  }
+  const home = fs.readFileSync('src/screens/HomeScreen.tsx', 'utf8'); const team = fs.readFileSync('src/screens/TeamDetailScreen.tsx', 'utf8'); const league = fs.readFileSync('src/screens/CompetitionScreen.tsx', 'utf8')
+  assert(home.includes('leaderRows.slice(0, 5)')); assert(home.includes("competitionType: 'all', rankingMetric: metric"))
+  assert(team.includes('slice(0, 5)')); assert(team.includes('competitionType: bestCompetition, rankingMetric: metric, teamId'))
+  assert(league.includes('slice(0, 7)')); assert(league.includes("competitionType: 'league', rankingMetric: playerMetric"))
 })
 
 test('integration: final save waits for an in-flight draft and remains canonical after reload', async () => {

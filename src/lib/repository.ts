@@ -30,6 +30,16 @@ function preserveRecoveryCopies(current: string | null) {
     localStorage.setItem(BACKUP_KEY, current)
   } catch { /* Primary storage verification below remains authoritative. */ }
 }
+export function compactLegacyRecoveryStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw || !validateState(JSON.parse(raw))) return false
+    localStorage.removeItem(BACKUP_KEY)
+    for (let i = 1; i <= MAX_SNAPSHOTS; i++) localStorage.removeItem(`${EMERGENCY_PREFIX}${i}`)
+    return true
+  } catch { return false }
+}
+function isQuotaError(error: unknown) { return error instanceof Error && /quota|capacity|storage/i.test(error.name + error.message) }
 export const LocalRepository = {
   async getAppState(): Promise<AppState | null> {
     // localStorage is written synchronously before IndexedDB. Prefer it on a
@@ -63,10 +73,7 @@ export const LocalRepository = {
           // resilience enhancement, never a prerequisite for reading history.
           // Private mode, quota pressure, or a blocked database must not make a
           // valid local Match history look like an empty app.
-          if (typeof raw === 'string') {
-            try { await saveToIndexedDB(STORAGE_KEY, migratedState); }
-            catch { /* The already-validated source remains the durable read. */ }
-          }
+          if (typeof raw === 'string') void saveToIndexedDB(STORAGE_KEY, migratedState).catch(() => {})
           return migratedState;
         }
       } catch (e) {
@@ -84,21 +91,29 @@ export const LocalRepository = {
     try { serialized = JSON.stringify(state) } catch { throw new Error('Primary storage serialization failed.') }
 
     const current = safelyRead(STORAGE_KEY)
-    try {
+    const writePrimary = () => {
       localStorage.setItem(STORAGE_KEY, serialized)
       const readBack = localStorage.getItem(STORAGE_KEY)
       if (readBack !== serialized) throw new Error('Primary storage read-back did not match the saved state.')
       const parsed = JSON.parse(readBack)
       if (!validateState(parsed)) throw new Error('Primary storage verification failed.')
+    }
+    try {
+      writePrimary()
     } catch (error) {
-      preserveRecoveryCopies(current)
+      if (isQuotaError(error) && compactLegacyRecoveryStorage()) {
+        try { writePrimary() } catch (retry) { throw new Error(`Primary storage save failed: ${retry instanceof Error ? retry.message : 'storage full'}`) }
+      } else {
+        preserveRecoveryCopies(current)
       throw new Error(error instanceof Error ? `Primary storage save failed: ${error.message}` : 'Primary storage save failed.')
+      }
     }
 
     // Recovery is deliberately after the verified primary write. Safari
     // localStorage quota is shared with unrelated auth keys; recovery copies
     // are expendable and must never consume the room required by a Match save.
-    preserveRecoveryCopies(current)
+    // Legacy snapshots are recovery-only. Do not recreate a full-state ring in
+    // localStorage after successful saves; it can starve iOS auth storage.
 
     // IndexedDB is a mirror only. A blocked transaction must not turn an
     // already verified localStorage save into a user-visible failed save.

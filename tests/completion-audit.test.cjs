@@ -80,8 +80,9 @@ test('all ranking surfaces share metric pills and ranking rows while League View
   for (const file of ['src/screens/HomeScreen.tsx', 'src/screens/TeamDetailScreen.tsx', 'src/screens/GlobalRankingScreen.tsx', 'src/screens/CompetitionScreen.tsx']) {
     const screen = source(file); assert(screen.includes('RankingMetricTabs')); assert(screen.includes('RankingRow'))
   }
-  const global = source('src/screens/GlobalRankingScreen.tsx')
-  for (const label of ['Rating', 'Goals', 'Assists', 'G+A', 'Minutes', 'MOM', 'Goals/90', 'Assists/90', 'G+A/90', 'Clean Sheets', 'Saves', 'Save %']) assert(global.includes(label))
+  const metrics = source('src/lib/rankingMetrics.ts')
+  for (const label of ['Rating', 'Goals', 'Assists', 'G+A', 'Minutes', 'MOM', 'Goals/90', 'Assists/90', 'G+A/90', 'Clean Sheets', 'Saves', 'Save %']) assert(metrics.includes(label))
+  assert(source('src/screens/GlobalRankingScreen.tsx').includes('RANKING_METRICS'))
   const league = source('src/screens/CompetitionScreen.tsx')
   assert(league.includes("competitionType: 'league', rankingMetric: playerMetric"))
 })
