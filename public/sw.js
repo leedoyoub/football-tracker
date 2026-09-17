@@ -2,7 +2,9 @@
 // server). A stale cached index can reference incompatible hashed chunks and
 // leave an iPhone Safari tab blank, so navigation is network-first.
 const CACHE_PREFIX = 'football-tracker-';
-const CACHE_NAME = `${CACHE_PREFIX}v4`;
+// main.tsx registers this worker with the deployed app version. A release
+// therefore gets a distinct cache without touching football/auth storage.
+const CACHE_NAME = `${CACHE_PREFIX}${new URL(self.location.href).searchParams.get('v') || 'runtime'}`;
 const BASE_PATH = '/football-tracker/';
 const APP_SHELL = `${BASE_PATH}index.html`;
 const STATIC_ASSETS = [

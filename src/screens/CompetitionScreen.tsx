@@ -36,12 +36,7 @@ const STAGE_LABELS: Record<string, string> = {
   stage1: 'Stage 1', stage2: 'Stage 2', stage3: 'Stage 3', stage4: 'Stage 4', stage5: 'Stage 5', stage6: 'Stage 6', stage7: 'Stage 7',
   final: 'Final', finalReplay: 'Final Replay', roundOf16: 'Round of 16', quarterFinal: 'Quarter-finals', semiFinal: 'Semi-finals',
 }
-const METRICS: { id: LeaderboardMetric; label: string }[] = [
-  { id: 'rating', label: 'Rating' }, { id: 'goals', label: 'Goals' }, { id: 'assists', label: 'Assists' }, { id: 'g+a', label: 'G+A' },
-  { id: 'minutes', label: 'Minutes' }, { id: 'mom', label: 'MOM' }, { id: 'goals/90', label: 'Goals/90' }, { id: 'assists/90', label: 'Assists/90' },
-  { id: 'g+a/90', label: 'G+A/90' }, { id: 'sotAllowed', label: 'SOT Allowed/Match' }, { id: 'cleanSheets', label: 'Clean Sheets' }, { id: 'saves', label: 'Saves' },
-  { id: 'goalsConceded', label: 'Goals Conceded/Match' }, { id: 'savePercentage', label: 'Save %' },
-]
+const METRICS = RANKING_METRICS.map(({ value: id, label }) => ({ id, label }))
 
 let diagnosticSequence = 0
 const competitionTypeMemory = new Map<string, CompetitionType>()
@@ -251,8 +246,8 @@ function CompetitionRankings({ season, type, initialMetric, players, teams, matc
   return <section className="mt-7"><SectionHeader title="Global Rankings" subtitle={`${season} · ${LABELS[type]} only`} action={<div className="flex items-center gap-1"><button type="button" aria-pressed={compareMode} onClick={() => { setCompareMode(value => !value); setSelectedPlayers([]) }} className={`min-h-9 rounded-lg px-2 text-[10px] font-black ${compareMode ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-emerald-300'}`}>{compareMode ? 'Cancel' : 'Compare'}</button><RankingFilterButton applied={effective} onApply={next => { setFilters({ ...next, seasons: [season] }); setAll(false) }} seasons={[season]} teams={teams} /></div>} />
     {compareMode && <p className="mb-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-[10px] text-emerald-200">Select exactly two players ({selectedPlayers.length}/2). Ranking order stays unchanged.</p>}
     <div className="no-scrollbar mb-3 flex gap-1.5 overflow-x-auto pb-1 touch-pan-x" onPointerDown={event => { if (event.pointerType === 'mouse') drag.current = { x: event.clientX, left: event.currentTarget.scrollLeft, active: true } }} onPointerMove={event => { if (drag.current.active) event.currentTarget.scrollLeft = drag.current.left - (event.clientX - drag.current.x) }} onPointerUp={() => { drag.current.active = false }}>{METRICS.map(item => <button key={item.id} type="button" onClick={() => { setMetric(item.id); setAll(false) }} className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold ${metric === item.id ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-zinc-400'}`}>{item.label}</button>)}</div>
-    <div {...rankingSwipe} className="overflow-hidden rounded-xl bg-zinc-900 touch-pan-y" aria-label="Swipe competition ranking metrics">{rows.slice(0, all ? 50 : 3).map((row, index) => { const player = playerById[row.playerId]; const team = teamById[row.historicalTeamId ?? row.teamId]; const selected = selectedPlayers.includes(row.playerId); return <div key={row.playerId} className="border-b border-white/5 last:border-0"><RankingRow rank={index + 1} player={player} team={team} movement={type === 'league' ? playerMovement.get(row.playerId) ?? null : null} value={format(row.value)} selected={compareMode && selected} onClick={() => choosePlayer(row.playerId)} /></div> })}{!rows.length && <p className="p-3 text-xs text-zinc-500">No qualifying players yet.</p>}</div>
-    {rows.length > 3 && <button type="button" onClick={() => setAll(value => !value)} className="secondary-view-all mt-3 w-full">{all ? 'Show Top 3' : 'View All'}</button>}
+    <div {...rankingSwipe} className="overflow-hidden rounded-xl bg-zinc-900 touch-pan-y" aria-label="Swipe competition ranking metrics">{rows.slice(0, all ? 50 : 10).map((row, index) => { const player = playerById[row.playerId]; const team = teamById[row.historicalTeamId ?? row.teamId]; const selected = selectedPlayers.includes(row.playerId); return <div key={row.playerId} className="border-b border-white/5 last:border-0"><RankingRow rank={index + 1} player={player} team={team} movement={type === 'league' ? playerMovement.get(row.playerId) ?? null : null} value={format(row.value)} selected={compareMode && selected} onClick={() => choosePlayer(row.playerId)} /></div> })}{!rows.length && <p className="p-3 text-xs text-zinc-500">No qualifying players yet.</p>}</div>
+    {rows.length > 10 && <button type="button" onClick={() => setAll(value => !value)} className="secondary-view-all mt-3 w-full">{all ? 'Show Top 10' : 'View All'}</button>}
     {analytics && ['goals', 'assists', 'mom', 'rating'].includes(metric) && <RaceHistoryPanel analytics={analytics} metric={metric as 'goals' | 'assists' | 'mom' | 'rating'} players={playerById} />}
   </section>
 }

@@ -44,6 +44,9 @@ test('squad-first cache, No Team filtering, and No Team display remain real UI b
   assert(filters.includes("NO_TEAM_FILTER = '__no-team__'") && filters.includes('>No Team</label>'))
   assert(players.includes("appliedFilters.teams.includes('__no-team__') && playerHasNoCurrentTeam(player)"))
   assert(players.includes("playerHasNoCurrentTeam(player) ? 'No Team'"))
+  assert(!players.includes('aggregatePlayerStats'))
+  assert(!players.includes('ratingTone('))
+  assert(!players.includes('avgRating.toFixed'))
 })
 
 test('starting-combination metrics exclude matches where the unit did not start together', () => {

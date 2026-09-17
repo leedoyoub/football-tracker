@@ -4,10 +4,11 @@ import './index.css'
 import App from './App.tsx'
 import { StoreProvider } from './store.tsx'
 import { StartupBoundary } from './components/StartupBoundary.tsx'
+import { APP_VERSION } from './config'
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL })
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js?v=${APP_VERSION}`, { scope: import.meta.env.BASE_URL })
   })
 }
 

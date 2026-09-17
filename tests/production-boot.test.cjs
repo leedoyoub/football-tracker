@@ -47,4 +47,6 @@ test('the service worker serves navigations network-first and only removes its o
   assert(serviceWorker.includes('fetch(event.request).then'))
   assert(serviceWorker.includes('key.startsWith(CACHE_PREFIX)'))
   assert(serviceWorker.includes("const APP_SHELL = `${BASE_PATH}index.html`"))
+  assert(serviceWorker.includes("new URL(self.location.href).searchParams.get('v')"))
+  assert(read('src/main.tsx').includes('sw.js?v=${APP_VERSION}'))
 })
