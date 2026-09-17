@@ -51,12 +51,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // storage exception becomes recovery UI instead of a pre-React crash.
         const client = getSupabase()
         if (!client) throw new Error('Supabase client is unavailable')
-        const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
           if (!active) return
-          setSession(session)
-          // getSession() is the single initial OAuth resolution path. Events
-          // received while it is still running must not remove the hash first.
-          if (initialSessionResolved && session) clearSupabaseAuthCallbackHash()
+          // getSession() is the only startup authority. In particular, an
+          // INITIAL_SESSION null is not a confirmed logout while Safari/PWA
+          // storage and an OAuth callback are still settling.
+          if (!initialSessionResolved) return
+          if (event === 'SIGNED_OUT') setSession(null)
+          else if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') setSession(session)
+          if (session) clearSupabaseAuthCallbackHash()
         })
         unsubscribe = () => subscription.unsubscribe()
         // In supabase-js v2 this awaits detectSessionInUrl initialization,

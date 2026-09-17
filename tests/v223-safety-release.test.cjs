@@ -9,10 +9,10 @@ const { RATING_ENGINE_REVISION } = require('../src/engine/ratingRevision.ts')
 const { LOCAL_MODE_PREFERENCE_KEY, loadLocalModePreference, saveLocalModePreference } = require('../src/lib/localMode.ts')
 const { leagueCompetition } = require('../src/engine/competition.ts')
 
-test('v2.2.3 retains the durable football namespace and isolates local-mode preference', () => {
+test('v2.2.4 retains the durable football namespace and isolates local-mode preference', () => {
   const repository = fs.readFileSync(require.resolve('../src/lib/repository.ts'), 'utf8')
   const auth = fs.readFileSync(require.resolve('../src/lib/auth.tsx'), 'utf8')
-  assert.equal(APP_VERSION, '2.2.3'); assert.equal(require('../package.json').version, '2.2.3'); assert.equal(RATING_ENGINE_REVISION, 8)
+  assert.equal(APP_VERSION, '2.2.4'); assert.equal(require('../package.json').version, '2.2.4'); assert.equal(RATING_ENGINE_REVISION, 8)
   assert(repository.includes("STORAGE_KEY = 'football-tracker-v1'"))
   assert(repository.includes('BACKUP_KEY') && repository.includes('EMERGENCY_PREFIX'))
   assert(!repository.includes('APP_VERSION'))

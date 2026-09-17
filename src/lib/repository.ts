@@ -11,6 +11,25 @@ export const LEGACY_STORAGE_KEYS = ['football-tracker-data', 'football-tracker',
 const BACKUP_KEY = 'football-tracker-v1-backup';
 const EMERGENCY_PREFIX = 'football-tracker-emergency-';
 const MAX_SNAPSHOTS = 5;
+export type DurableSaveResult = { primarySaved: true; mirrorSaved: boolean; mirrorError?: string }
+
+function safelyRead(key: string): string | null {
+  try { return localStorage.getItem(key) } catch { return null }
+}
+
+function preserveRecoveryCopies(current: string | null) {
+  if (!current) return
+  // Recovery copies are best-effort. Their failure must never prevent the
+  // primary write that makes the user's new match durable.
+  try {
+    for (let i = MAX_SNAPSHOTS - 1; i > 0; i--) {
+      const old = safelyRead(`${EMERGENCY_PREFIX}${i}`)
+      if (old) localStorage.setItem(`${EMERGENCY_PREFIX}${i + 1}`, old)
+    }
+    localStorage.setItem(`${EMERGENCY_PREFIX}1`, current)
+    localStorage.setItem(BACKUP_KEY, current)
+  } catch { /* Primary storage verification below remains authoritative. */ }
+}
 export const LocalRepository = {
   async getAppState(): Promise<AppState | null> {
     // localStorage is written synchronously before IndexedDB. Prefer it on a
@@ -57,24 +76,33 @@ export const LocalRepository = {
     return null;
   },
 
-  async saveAppState(state: AppState): Promise<void> {
-    // 1. Validation before any write
+  async saveAppState(state: AppState): Promise<DurableSaveResult> {
+    // Serialize and validate before touching any durable source. This makes a
+    // reported successful match save mean primary browser storage was proven.
     if (!validateState(state)) throw new Error('Invalid state structure, saving aborted.');
+    let serialized: string
+    try { serialized = JSON.stringify(state) } catch { throw new Error('Primary storage serialization failed.') }
 
-    // 2. Rotate Emergency Snapshots
-    for (let i = MAX_SNAPSHOTS - 1; i > 0; i--) {
-        const old = localStorage.getItem(`${EMERGENCY_PREFIX}${i}`);
-        if (old) localStorage.setItem(`${EMERGENCY_PREFIX}${i + 1}`, old);
+    const current = safelyRead(STORAGE_KEY)
+    preserveRecoveryCopies(current)
+    try {
+      localStorage.setItem(STORAGE_KEY, serialized)
+      const readBack = localStorage.getItem(STORAGE_KEY)
+      if (readBack !== serialized) throw new Error('Primary storage read-back did not match the saved state.')
+      const parsed = JSON.parse(readBack)
+      if (!validateState(parsed)) throw new Error('Primary storage verification failed.')
+    } catch (error) {
+      throw new Error(error instanceof Error ? `Primary storage save failed: ${error.message}` : 'Primary storage save failed.')
     }
-    const current = localStorage.getItem(STORAGE_KEY);
-    if (current) localStorage.setItem(`${EMERGENCY_PREFIX}1`, current);
-    
-    // 3. Backup current
-    if (current) localStorage.setItem(BACKUP_KEY, current);
-    
-    // 4. Atomic Save
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    await saveToIndexedDB(STORAGE_KEY, state);
+
+    // IndexedDB is a mirror only. A blocked transaction must not turn an
+    // already verified localStorage save into a user-visible failed save.
+    try {
+      await saveToIndexedDB(STORAGE_KEY, state)
+      return { primarySaved: true, mirrorSaved: true }
+    } catch (error) {
+      return { primarySaved: true, mirrorSaved: false, mirrorError: error instanceof Error ? error.message : 'IndexedDB mirror unavailable.' }
+    }
   },
 
   async exportData(): Promise<string> {

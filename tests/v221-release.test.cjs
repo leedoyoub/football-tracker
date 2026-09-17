@@ -33,7 +33,7 @@ function game(day, options = {}) {
 }
 
 test('v2.2.1 metadata and the finalized revision-8 position table are exact', () => {
-  assert.equal(APP_VERSION, '2.2.3'); assert.equal(require('../package.json').version, '2.2.3'); assert.equal(RATING_ENGINE_REVISION, 8)
+  assert.equal(APP_VERSION, '2.2.4'); assert.equal(require('../package.json').version, '2.2.4'); assert.equal(RATING_ENGINE_REVISION, 8)
   const expected = {
     LB: [.03, 1.2], LWB: [.03, 1.2], RB: [.03, 1.2], RWB: [.03, 1.2],
     CDM: [.05, .65], LDM: [.05, .65], RDM: [.05, .65],
@@ -112,7 +112,7 @@ test('historical standings, form and race snapshots exclude future or wrong-comp
   const analytics = buildSeasonAnalytics(teams, [p], [...league, cup], 'S1')
   assert.equal(analytics.leagueSnapshots.get(1).standings.find(row => row.teamId === 'A').points, 0)
   assert.equal(analytics.leagueSnapshots.get(2).standings.find(row => row.teamId === 'A').points, 3)
-  assert.deepEqual([analytics.formTable.find(row => row.teamId === 'A').played, analytics.formTable.find(row => row.teamId === 'A').points], [5, 15])
+  assert.deepEqual([analytics.formTable.find(row => row.teamId === 'A').played, analytics.formTable.find(row => row.teamId === 'A').points], [3, 9])
   const goals = raceHistory(analytics, 'goals', [p.id])[0].points
   assert.deepEqual(goals.map(point => point.value), [0, 1, 2, 3, 4, 5])
   const averages = raceHistory(analytics, 'rating', [p.id])[0].points

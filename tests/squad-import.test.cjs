@@ -67,7 +67,7 @@ test('API field mapping preserves photo and ID while avoiding invented tactical 
 test('import store path is atomic and normal local-first sync observes imported player changes', () => {
   const source = fs.readFileSync(require.resolve('../src/store.tsx'), 'utf8')
   assert(source.includes('players: applySquadImport(prev.players, imports'))
-  assert(source.includes('LocalRepository.saveAppState(next).then(() => SyncManager.queueStateChange(prev, next))'))
+  assert(source.includes('persistLocal(next).then(() => SyncManager.queueStateChange(prev, next))'))
 })
 
 test('import metadata has an explicit Supabase serialization and restore path', () => {

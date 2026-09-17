@@ -4,11 +4,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
 import type { AppState, CompetitionState, Match, Player, Team } from './types'
-import { LocalRepository } from './lib/repository'
+import { LocalRepository, type DurableSaveResult } from './lib/repository'
 import { STATIC_TEAMS, withStaticTeams } from './data/teams'
 import { assertRosterCapacity, currentTeamIds } from './lib/roster'
 import { applySquadImport, type SquadImportItem } from './lib/squadImport'
@@ -31,6 +32,7 @@ interface StoreValue extends AppState {
   updatePlayer: (id: string, player: Partial<Player>) => void
   importPlayers: (players: SquadImportItem[]) => void
   addMatch: (match: Omit<Match, 'id'> & { id?: string }) => string
+  saveMatchDurably: (match: Match) => Promise<DurableSaveResult>
   updateMatch: (id: string, match: Match) => void
   saveDraftMatch: (match: Match) => void
   clearDraftMatch: () => void
@@ -71,6 +73,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const state = snapshot.data
   const [hydration, setHydration] = useState<'loading' | 'ready' | 'error'>('loading')
   const [attempt, setAttempt] = useState(0)
+  const snapshotRef = useRef(snapshot)
+  const persistenceQueue = useRef<Promise<void>>(Promise.resolve())
+  snapshotRef.current = snapshot
+
+  const persistLocal = useCallback((next: AppState) => {
+    const operation = persistenceQueue.current.then(() => LocalRepository.saveAppState(next))
+    persistenceQueue.current = operation.then(() => undefined, () => undefined)
+    return operation
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -81,7 +92,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (active && saved) {
           const reconciled = reconcileTeamCatalog(saved)
           setSnapshot(current => reconcileRepositorySnapshot(current, reconciled))
-          if (reconciled !== saved) void LocalRepository.saveAppState(reconciled).then(() => SyncManager.queueStateChange(saved, reconciled)).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker storage] Catalog update deferred.'))
+          if (reconciled !== saved) void persistLocal(reconciled).then(() => SyncManager.queueStateChange(saved, reconciled)).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker storage] Catalog update deferred.'))
         }
       } catch {
         // Do not replace potentially recoverable durable data with an empty
@@ -106,7 +117,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (restored) {
           const reconciled = reconcileTeamCatalog(restored)
           setSnapshot(current => reconcileRepositorySnapshot(current, reconciled))
-          if (reconciled !== restored) void LocalRepository.saveAppState(reconciled).then(() => SyncManager.queueStateChange(restored, reconciled)).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker sync] Catalog update deferred.'))
+          if (reconciled !== restored) void persistLocal(reconciled).then(() => SyncManager.queueStateChange(restored, reconciled)).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker sync] Catalog update deferred.'))
         }
       } catch {
         // Cloud backup is non-critical to local startup.
@@ -117,7 +128,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const onOnline = () => { void sync() }
     window.addEventListener('online', onOnline)
     return () => window.removeEventListener('online', onOnline)
-  }, [hydration, user?.id])
+  }, [hydration, user?.id, persistLocal])
 
   const update = useCallback((fn: (prev: AppState) => AppState, revise?: (current: StoreSnapshot, prev: AppState, next: AppState) => Pick<StoreSnapshot, 'competitionRevisions' | 'teamCatalogRevision'>) => {
     setSnapshot((current) => {
@@ -126,10 +137,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (next === prev) return current
       // Local persistence is always first. Cloud queueing is deliberately
       // detached so offline/auth/network failures never affect match recording.
-      void LocalRepository.saveAppState(next).then(() => SyncManager.queueStateChange(prev, next)).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker storage] Local save deferred.'))
+      void persistLocal(next).then(() => SyncManager.queueStateChange(prev, next)).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker storage] Primary save failed; changes remain visible for retry.'))
       return { data: next, ...(revise?.(current, prev, next) ?? { competitionRevisions: current.competitionRevisions, teamCatalogRevision: current.teamCatalogRevision }) }
     })
-  }, [])
+  }, [persistLocal])
+
+  const saveMatchDurably = useCallback(async (match: Match) => {
+    const before = snapshotRef.current
+    const prior = before.data
+    const previousMatch = prior.matches.find(item => item.id === match.id)
+    const saved = previousMatch ? preserveRecordedAt(previousMatch, match) : recordNewMatch(match)
+    const next: AppState = previousMatch
+      ? { ...prior, matches: prior.matches.map(item => item.id === saved.id ? saved : item) }
+      : { ...prior, matches: [...prior.matches, saved] }
+    const durability = await persistLocal(next)
+    setSnapshot(current => {
+      const currentPrevious = current.data.matches.find(item => item.id === saved.id)
+      const currentData: AppState = currentPrevious
+        ? { ...current.data, matches: current.data.matches.map(item => item.id === saved.id ? saved : item) }
+        : { ...current.data, matches: [...current.data.matches, saved] }
+      return { data: currentData, competitionRevisions: reviseChangedMatch(current.competitionRevisions, currentPrevious, saved), teamCatalogRevision: current.teamCatalogRevision }
+    })
+    // Upload remains optional; a queue/cloud failure cannot negate durable
+    // primary success or the navigation that follows it.
+    void SyncManager.queueStateChange(prior, next).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker sync] Cloud sync pending after verified local save.'))
+    return durability
+  }, [persistLocal])
   const saveDraftMatch = useCallback((match: Match) => {
     update((prev) => ({ ...prev, draftMatch: match }))
   }, [update])
@@ -179,6 +212,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         update((prev) => prev.matches.some(item => item.id === id) ? prev : ({ ...prev, matches: [...prev.matches, { ...saved }] }), current => ({ competitionRevisions: reviseChangedMatch(current.competitionRevisions, undefined, saved), teamCatalogRevision: current.teamCatalogRevision }))
         return id
       },
+      saveMatchDurably,
       updateMatch: (id, match) => {
         update((prev) => {
           const previous = prev.matches.find(item => item.id === id)
@@ -205,7 +239,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         update(prev => ({ ...prev, competitionStates: [...(prev.competitionStates ?? []).filter(item => item.id !== completion.id), completion] }))
       },
     }),
-    [state, snapshot.competitionRevisions, snapshot.teamCatalogRevision, competitionCacheOwner, update, saveDraftMatch, clearDraftMatch],
+    [state, snapshot.competitionRevisions, snapshot.teamCatalogRevision, competitionCacheOwner, update, saveDraftMatch, clearDraftMatch, saveMatchDurably],
   )
 
   if (hydration === 'loading') return <BootstrapShell />

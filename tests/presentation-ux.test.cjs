@@ -79,12 +79,15 @@ test('list and ranking names use Full Name, compact helpers retain Display Name,
   const p = player('p'), store = { teams, players: [p], matches: [match('m', [p])] }
   assert.equal(playerFullName(p), 'Complete Name p'); assert.equal(playerDisplayName(p), 'Short p')
   assert.equal(playerFullName({ ...p, fullName: ' ' }), 'Legacy p')
-  for (const Component of [PlayersScreen, HomeScreen, PlayerDetailScreen]) {
+  for (const Component of [PlayersScreen, PlayerDetailScreen]) {
     const tree = screen(Component, store, { playerId: p.id }).render()
     assert(text(tree).includes('Complete Name p'), Component.name)
     assert(!text(tree).includes('Short p'), Component.name)
   }
-  assert(fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8').includes('playerFullName(player)'))
+  const rankingRow = fs.readFileSync(require.resolve('../src/components/RankingRow.tsx'), 'utf8')
+  assert(rankingRow.includes('playerFullName(player)'))
+  assert(fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8').includes('<RankingRow'))
+  assert(fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8').includes('<RankingRow'))
   const h = screen(PlayersScreen, store)
   for (const query of ['oMpLeTe nA', 'HORT P', 'not found']) {
     const input = nodes(h.render(), n => n.props?.['aria-label'] === 'Search players')[0]

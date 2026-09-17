@@ -100,9 +100,11 @@ function MatchEditor({
   selectedTeamId,
   restored,
 }: NewMatchScreenProps & { sourceMatch?: Match; selectedTeamId: string; restored: ReturnType<typeof restoreDraft> }) {
-  const { teams, players, matches, competitionStates = [], addMatch, updateMatch, saveDraftMatch, clearDraftMatch } = useStore()
+  const { teams, players, matches, competitionStates = [], saveMatchDurably, saveDraftMatch, clearDraftMatch } = useStore()
   const [draftId] = useState(() => restored ? sourceMatch!.id : crypto.randomUUID())
   const savingRef = useRef(false)
+  const [saveError, setSaveError] = useState('')
+  const [saveStatus, setSaveStatus] = useState('')
   const completedSeasons = useMemo(() => competitionStates.filter(state => state.kind === 'season-complete').map(state => state.season), [competitionStates])
   const [competitionType, setCompetitionType] = useState<CompetitionType>(() => restored ? matchCompetitionType(sourceMatch!) : 'league')
   const nextMatch = useMemo(() => getNextMatchDayForTeam(selectedTeamId, matches, completedSeasons, competitionType), [selectedTeamId, matches, completedSeasons, competitionType])
@@ -476,20 +478,27 @@ function MatchEditor({
     saveDraftMatch({ id: draftId, season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, competitionSeriesGame: assignment.seriesGame, matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot })
   }, [draftReady, draftId, season, competitionType, assignment.stage, assignment.pairingId, assignment.seriesGame, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, opponentName, appearances, kickoffSnapshot, saveDraftMatch])
 
-  function save() {
-    if (savingRef.current || liveEvent || !kickoffIsValid) return
+  async function save(): Promise<boolean> {
+    if (savingRef.current || liveEvent || !kickoffIsValid) return false
     savingRef.current = true
+    setSaveError('')
     const matchData = {
       id: draftId,
       season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, competitionSeriesGame: assignment.seriesGame, matchDay, date, formation: activeFormationName, homeAway: 'home' as const, homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot,
     }
-    if (matches.some(match => match.id === draftId)) {
-      updateMatch(draftId, matchData)
-    } else {
-      addMatch(matchData)
+    try {
+      const result = await saveMatchDurably(matchData)
+      clearDraftMatch()
+      setSaveStatus(result.mirrorSaved ? 'Saved' : 'Saved locally · mirror pending')
+      window.setTimeout(() => onNavigate({ name: 'match', id: draftId }), 350)
+      return true
+    } catch {
+      // Keep the in-memory editor and its draft intact. Navigation is allowed
+      // only after LocalRepository has verified primary read-back.
+      savingRef.current = false
+      setSaveError('Save failed. Your match was not safely stored. Please retry.')
+      return false
     }
-    clearDraftMatch()
-    onNavigate({ name: 'match', id: draftId })
   }
 
   return (
@@ -503,7 +512,7 @@ function MatchEditor({
         </div>
       </div>
 
-      {historyError && <p role="alert" className="px-4 text-xs text-red-400">{historyError}</p>}
+      {historyError && <p role="alert" className="px-4 text-xs text-red-400">{historyError}</p>}{saveError && <p role="alert" className="mx-4 rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-200">{saveError}</p>}{saveStatus && <p aria-live="polite" className="mx-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-200">{saveStatus}</p>}
       <div className="no-scrollbar min-h-0 min-w-0 w-full max-w-full flex-1 overflow-x-clip overflow-y-auto overscroll-x-none touch-pan-y px-4 pb-4">
         {step === 0 && (
           <div className="space-y-6">
@@ -546,15 +555,15 @@ function LiveMatchStep(props: {
   onSubOut: (id: string) => void; onSubIn: (id: string) => void; onSubSlot: (id: string) => void; onSubBench: () => void
   slots: Best11Slot[]; players: Player[]; benchPlayers: Player[]; stats: Record<string, { goals: number; assists: number }>; events: MatchEvent[]; selectedTeamId: string
   liveEvent: 'goal' | 'conceded' | 'substitution' | null; liveMinute: string; liveScorerId: string; liveAssistId: string; liveCauseId: string; livePicker: 'scorer' | 'assist' | 'cause' | 'minute'; validMinute: boolean
-  onOpen: (type: 'goal' | 'conceded' | 'substitution') => void; onSave: () => void; onCancel: () => void; onMinute: (value: string | number) => void; onCommitMinute: () => void; onScorer: (id: string) => void; onAssist: (id: string) => void; onCause: (id: string) => void; onPicker: (picker: 'scorer' | 'assist' | 'cause' | 'minute') => void; onPitchClick: (id: string) => void; onBack: () => void; onFinish: () => void; onEditEvent: (event: MatchEvent) => void; onDeleteEvent: (event: MatchEvent) => void
+  onOpen: (type: 'goal' | 'conceded' | 'substitution') => void; onSave: () => void; onCancel: () => void; onMinute: (value: string | number) => void; onCommitMinute: () => void; onScorer: (id: string) => void; onAssist: (id: string) => void; onCause: (id: string) => void; onPicker: (picker: 'scorer' | 'assist' | 'cause' | 'minute') => void; onPitchClick: (id: string) => void; onBack: () => void; onFinish: () => Promise<boolean>; onEditEvent: (event: MatchEvent) => void; onDeleteEvent: (event: MatchEvent) => void
 }) {
   const [finishStage, setFinishStage] = useState<'saves' | null>(null)
   const [finishing, setFinishing] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<MatchEvent | null>(null)
-  const finishMatch = () => {
+  const finishMatch = async () => {
     if (finishing) return
     setFinishing(true)
-    props.onFinish()
+    if (!await props.onFinish()) setFinishing(false)
   }
   const eventName = props.liveEvent === 'conceded' ? 'Conceded Goal' : 'Goal'
   const playerName = (id: string) => playerDisplayName(props.players.find((player) => player.id === id))

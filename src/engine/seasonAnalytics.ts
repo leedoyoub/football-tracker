@@ -112,7 +112,7 @@ function emptyStanding(teamId: string): Standing {
 
 function formTable(teams: Team[], leagueMatches: Match[]): Standing[] {
   const rows = teams.map(team => {
-    const recent = newestMatches(leagueMatches.filter(match => recordedTeams(match, new Set([team.id])).includes(team.id))).slice(0, 5)
+    const recent = newestMatches(leagueMatches.filter(match => recordedTeams(match, new Set([team.id])).includes(team.id))).slice(0, 3)
     const row = emptyStanding(team.id)
     for (const match of recent) {
       const score = matchScore(match)
