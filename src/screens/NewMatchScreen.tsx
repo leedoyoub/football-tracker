@@ -524,10 +524,9 @@ function MatchEditor({
       <div className="px-4 pt-3">
         <button onClick={() => { if (editingMatchId) clearDraftMatch(); onNavigate(teamId ? { name: 'team', id: teamId } : { name: 'teams' }) }} className="mb-3 text-xs font-semibold text-emerald-400">← Cancel</button>
         <h1 className="text-2xl font-bold">Log Match</h1>
-        <div className="mb-2 grid min-w-0 grid-cols-[1fr_auto_1fr] items-center rounded-xl bg-zinc-900 px-3 py-2">
-          <div className="min-w-0"><p className="truncate text-[10px] font-bold uppercase tracking-widest text-zinc-500">{competitionContextParts(activeAssignment).primary}</p><p className="truncate text-xs font-black text-emerald-400">{competitionContextParts(activeAssignment).secondary}</p></div>
-          <p aria-label="Live score" className="px-3 text-center text-xl font-black tabular-nums text-white">{matchScore(eventMatch).home} - {matchScore(eventMatch).away}</p>
-          <div />
+        <div className="mb-2 flex min-w-0 items-center justify-between gap-3 rounded-xl bg-zinc-900 px-3 py-2">
+          <div className="min-w-0"><p className="text-sm font-bold leading-tight text-zinc-300">{competitionContextParts(activeAssignment).primary}</p><p className="mt-0.5 text-xs font-black leading-tight text-emerald-400">{competitionContextParts(activeAssignment).secondary}</p></div>
+          <p aria-label="Live score" className="shrink-0 text-right text-xl font-black tabular-nums text-white">{matchScore(eventMatch).home} - {matchScore(eventMatch).away}</p>
       </div>
       </div>
 
