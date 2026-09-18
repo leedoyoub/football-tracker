@@ -18,9 +18,10 @@ import { useAuth } from './lib/auth'
 import { BootstrapShell, StartupRecovery } from './components/StartupBoundary'
 import { reconcileCompetitionRevisions, reviseChangedMatch, sameRawFootballValue, sameRawMatch, type CompetitionRevisions } from './engine/competitionRevision'
 import { clearGlobalRankingCache } from './engine/stats'
-import { competitionMutationSafety, reconcileSeasonCompletionMarkers } from './engine/competition'
+import { competitionMutationSafety, reconcileChampionsPairingIds, reconcileSeasonCompletionMarkers } from './engine/competition'
 import { preserveRecordedAt, recordNewMatch } from './engine/matchRecording'
 import { createPersistenceQueue } from './lib/persistenceQueue'
+import { sanitizeDraftLifecycle } from './lib/draftLifecycle'
 
 type StoreSnapshot = { data: AppState; competitionRevisions: CompetitionRevisions; teamCatalogRevision: number }
 
@@ -51,11 +52,17 @@ function reconcileTeamCatalog(snapshot: AppState): AppState {
   return teams === snapshot.teams ? snapshot : { ...snapshot, teams }
 }
 
+function reconcilePersistedState(snapshot: AppState): AppState {
+  const matches = reconcileChampionsPairingIds(snapshot.matches, snapshot.competitionStates)
+  return matches === snapshot.matches ? snapshot : { ...snapshot, matches }
+}
+
 function sameTeamCatalog(left: Team[], right: Team[]): boolean {
   return left.length === right.length && left.every((team, index) => team.id === right[index]?.id)
 }
 
 function reconcileRepositorySnapshot(current: StoreSnapshot, incoming: AppState): StoreSnapshot {
+  incoming = sanitizeDraftLifecycle(incoming)
   const competitionRevisions = reconcileCompetitionRevisions(current.competitionRevisions, current.data.matches, incoming.matches)
   const data: AppState = {
     ...incoming,
@@ -79,6 +86,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const persistenceQueue = useRef(createPersistenceQueue(LocalRepository.saveAppState))
   const draftTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const draftEpoch = useRef(0)
+  /** Finalised IDs reject any late editor-effect checkpoint for that draft. */
+  const finalizingDraftIds = useRef(new Set<string>())
   snapshotRef.current = snapshot
 
   const persistLocal = useCallback((next: AppState, valid?: () => boolean) => {
@@ -92,7 +101,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         const saved = await LocalRepository.getAppState()
         if (active && saved) {
-          const reconciled = reconcileTeamCatalog(saved)
+          const reconciled = sanitizeDraftLifecycle(reconcilePersistedState(reconcileTeamCatalog(saved)))
           setSnapshot(current => reconcileRepositorySnapshot(current, reconciled))
           if (reconciled !== saved) void persistLocal(reconciled).then(() => SyncManager.queueStateChange(saved, reconciled)).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker storage] Catalog update deferred.'))
         }
@@ -117,7 +126,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         await SyncManager.syncNow()
         const restored = await LocalRepository.getAppState()
         if (restored) {
-          const reconciled = reconcileTeamCatalog(restored)
+          const reconciled = sanitizeDraftLifecycle(reconcilePersistedState(reconcileTeamCatalog(restored)))
           setSnapshot(current => reconcileRepositorySnapshot(current, reconciled))
           if (reconciled !== restored) void persistLocal(reconciled).then(() => SyncManager.queueStateChange(restored, reconciled)).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker sync] Catalog update deferred.'))
         }
@@ -145,8 +154,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [persistLocal])
 
   const saveMatchDurably = useCallback(async (match: Match) => {
-    if (draftTimer.current) { clearTimeout(draftTimer.current); draftTimer.current = undefined }
-    draftEpoch.current++
     const before = snapshotRef.current
     const prior = before.data
     const previousMatch = prior.matches.find(item => item.id === match.id)
@@ -155,16 +162,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const safety = competitionMutationSafety(prior.matches, previousMatch, saved, prior.teams, prior.players, prior.competitionStates?.find(state => state.kind === 'champions-draw' && state.season === previousMatch.season))
       if (!safety.safe) throw new Error(safety.message)
     }
+    if (draftTimer.current) { clearTimeout(draftTimer.current); draftTimer.current = undefined }
+    draftEpoch.current++
+    finalizingDraftIds.current.add(saved.id)
     const nextWithoutMarkers: AppState = previousMatch
       ? { ...prior, matches: prior.matches.map(item => item.id === saved.id ? saved : item) }
       : { ...prior, matches: [...prior.matches, saved] }
-    const next: AppState = { ...nextWithoutMarkers, competitionStates: reconcileSeasonCompletionMarkers(nextWithoutMarkers.competitionStates ?? [], nextWithoutMarkers.teams, nextWithoutMarkers.matches, nextWithoutMarkers.players) }
-    const durability = await persistLocal(next)
+    // The final Match and removal of its matching checkpoint share one
+    // authoritative primary write. An unrelated draft is intentionally kept.
+    const next: AppState = sanitizeDraftLifecycle({ ...nextWithoutMarkers, competitionStates: reconcileSeasonCompletionMarkers(nextWithoutMarkers.competitionStates ?? [], nextWithoutMarkers.teams, nextWithoutMarkers.matches, nextWithoutMarkers.players) })
+    let durability: DurableSaveResult
+    try {
+      durability = await persistLocal(next)
+    } catch (error) {
+      finalizingDraftIds.current.delete(saved.id)
+      throw error
+    }
     setSnapshot(current => {
       const currentPrevious = current.data.matches.find(item => item.id === saved.id)
-      const currentData: AppState = currentPrevious
+      const currentData = sanitizeDraftLifecycle(currentPrevious
         ? { ...current.data, matches: current.data.matches.map(item => item.id === saved.id ? saved : item) }
-        : { ...current.data, matches: [...current.data.matches, saved] }
+        : { ...current.data, matches: [...current.data.matches, saved] })
       return { data: currentData, competitionRevisions: reviseChangedMatch(current.competitionRevisions, currentPrevious, saved), teamCatalogRevision: current.teamCatalogRevision }
     })
     // Upload remains optional; a queue/cloud failure cannot negate durable
@@ -173,7 +191,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return durability
   }, [persistLocal])
   const saveDraftMatch = useCallback((match: Match) => {
+    if (finalizingDraftIds.current.has(match.id)) return
     setSnapshot(current => {
+      if (finalizingDraftIds.current.has(match.id)) return current
       const next = { ...current.data, draftMatch: match }
       if (draftTimer.current) clearTimeout(draftTimer.current)
       const epoch = ++draftEpoch.current

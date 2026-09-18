@@ -35,6 +35,27 @@ function sameStanding(a?: Standing, b?: Standing): boolean {
   return Boolean(a && b && sameStandingMetrics(a, b))
 }
 
+/**
+ * Persist only pairing repairs that are mechanically unique from the fixed
+ * R16 draw. Later-round identities are resolved against the live bracket in
+ * `makeRound`, where a frozen assignment must agree with that bracket first.
+ */
+export function reconcileChampionsPairingIds(matches: Match[], states: CompetitionState[] = []): Match[] {
+  let changed = false
+  const repaired = matches.map(match => {
+    if (matchCompetitionType(match) !== 'champions' || match.competitionStage !== 'roundOf16') return match
+    const draw = states.find(state => state.kind === 'champions-draw' && state.season === match.season)
+    const teamId = match.teamId ?? match.homeTeamId
+    const index = draw?.teamIds.indexOf(teamId) ?? -1
+    if (index < 0) return match
+    const pairingId = `roundOf16:${Math.floor(index / 2)}`
+    if (match.competitionPairingId === pairingId) return match
+    changed = true
+    return { ...match, competitionPairingId: pairingId }
+  })
+  return changed ? repaired : matches
+}
+
 export function leagueCompetition(teams: Team[], matches: Match[], season: string, players: Player[] = []) {
   const games = competitionMatches(matches, season, 'league')
   const standings = stageRanking(teams.map(team => team.id), games, season, players, `${season}:league`)
@@ -281,12 +302,35 @@ function makeSeriesRound(stage: Exclude<ChampionsStage, 'finalReplay'>, pair: [s
   return { requiredMatches, teamGames: { [firstId]: first, [secondId]: second }, rowWinners, winnerId }
 }
 
-function makeRound(stage: Exclude<ChampionsStage, 'finalReplay'>, teamIds: string[], matches: Match[], season: string, players: Player[]): ChampionsPairing[] {
+function repairChampionsPairing(match: Match, stage: Exclude<ChampionsStage, 'finalReplay'>, pair: [string, string], pairingId: string, draw: CompetitionState): Match | undefined {
+  if (match.competitionPairingId === pairingId) return match
+  const teamId = match.teamId ?? match.homeTeamId
+  if (!pair.includes(teamId) || match.competitionStage !== stage) return undefined
+  const frozen = match.competitionAssignment
+  const frozenAgrees = frozen?.competitionType === 'champions' && frozen.season === match.season && frozen.teamId === teamId && frozen.stage === stage && frozen.pairingId === pairingId
+  // R16 has a fixed draw slot, so it can be inferred safely even for records
+  // from before frozen assignments existed. Later rounds additionally require
+  // a frozen snapshot that agrees with the bracket derived above.
+  const drawnAgrees = stage === 'roundOf16' && draw.teamIds.includes(teamId) && Math.floor(draw.teamIds.indexOf(teamId) / 2) === Number(pairingId.split(':')[1])
+  return frozenAgrees || drawnAgrees ? { ...match, competitionPairingId: pairingId } : undefined
+}
+
+function makeRound(stage: Exclude<ChampionsStage, 'finalReplay'>, teamIds: string[], matches: Match[], season: string, players: Player[], draw: CompetitionState): ChampionsPairing[] {
   const requiredMatches = stage === 'final' ? 1 : 2
   return Array.from({ length: teamIds.length / 2 }, (_, index) => {
     const pair = [teamIds[index * 2], teamIds[index * 2 + 1]] as [string, string]
     const id = `${stage}:${index}`
-    const games = competitionStageMatches(matches, season, 'champions', stage).filter(match => match.competitionPairingId === id)
+    const stageGames = competitionStageMatches(matches, season, 'champions', stage)
+    const resolved = stageGames.map(match => repairChampionsPairing(match, stage, pair, id, draw) ?? match)
+    const games = resolved.filter(match => match.competitionPairingId === id)
+    // Never silently ignore a same-team record from this stage. Without a
+    // unique repair it is ambiguous whether it belongs to this pairing, so
+    // reopening Game 1 would risk duplicating an already-recorded slot.
+    const unresolved = stageGames.some(match => {
+      if (!hasPlayed(match, pair[0]) && !hasPlayed(match, pair[1])) return false
+      return match.competitionPairingId !== id && !repairChampionsPairing(match, stage, pair, id, draw)
+    })
+    if (unresolved) return { id, stage, teamIds: pair, matches: [], tied: false, requiredMatches: stage === 'final' ? 2 : 3, integrityError: 'Champions data-integrity warning: pairing identity is missing or ambiguous.' }
     const seriesMode = games.length === 0 || games.some(match => Number.isInteger(match.competitionSeriesGame))
     if (seriesMode) {
       const series = makeSeriesRound(stage, pair, games, players)
@@ -308,13 +352,13 @@ export function championsCompetition(draw: CompetitionState | undefined, matches
   const drawCount = draw?.kind === 'champions-draw' ? new Set(draw.teamIds).size : 0
   if (!draw || draw.kind !== 'champions-draw' || draw.teamIds.length !== 16 || drawCount !== 16) return { drawn: false, drawCount, currentStage: 'roundOf16', rounds: empty }
   const rounds = { ...empty }
-  rounds.roundOf16 = makeRound('roundOf16', draw.teamIds, matches, season, players)
+  rounds.roundOf16 = makeRound('roundOf16', draw.teamIds, matches, season, players, draw)
   let currentStage: ChampionsStage = 'roundOf16'
   for (const stage of CHAMPIONS_ROUNDS.slice(1) as Exclude<ChampionsStage, 'finalReplay'>[]) {
     const previousStage = CHAMPIONS_ROUNDS[CHAMPIONS_ROUNDS.indexOf(stage) - 1] as Exclude<ChampionsStage, 'finalReplay'>
     const winners = rounds[previousStage].map(pairing => pairing.winnerId).filter((id): id is string => Boolean(id))
     if (winners.length !== rounds[previousStage].length) break
-    rounds[stage] = makeRound(stage, winners, matches, season, players)
+    rounds[stage] = makeRound(stage, winners, matches, season, players, draw)
     currentStage = stage
   }
   const final = rounds.final[0]

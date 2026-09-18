@@ -8,7 +8,8 @@ import { matchScore, pitchWindow } from '../engine/rating'
 import { allowsGoalkeeperLineupMove, canConfirmSubstitution, moveLineup, moveSubstitution, type LineupTarget, type SubstitutionDraft } from './matchLineup'
 import { getNextMatchDayForTeam } from '../engine/match'
 import { competitionAssignment, matchCompetitionType } from '../engine/competition'
-import { assignmentSnapshotForMatch, formatCompetitionContext, freezeCompetitionAssignment } from '../engine/competitionContext'
+import { assignmentSnapshotForMatch, competitionContextParts, formatCompetitionContext, freezeCompetitionAssignment } from '../engine/competitionContext'
+import { draftContext, draftMatchesContext, isResumableDraft } from '../lib/draftLifecycle'
 import type { Appearance, Best11Slot, CompetitionType, Match, MatchEvent, Player, Position, PositionChange, Team, View } from '../types'
 import { useStore } from '../store'
 import { playerDisplayName, GoalIcon, AssistIcon, StatIcons, SubstitutePlayerCard, SubstitutionSelection } from '../components/ui'
@@ -81,12 +82,23 @@ type NewMatchScreenProps = {
 /** Resolve an editor entity before mounting the hook-heavy editor. This keeps a
  * bad edit request fail-closed without conditionally calling editor hooks. */
 export function NewMatchScreen(props: NewMatchScreenProps) {
-  const { teams, players, matches, draftMatch } = useStore()
+  const { teams, players, matches, draftMatch, clearDraftMatch } = useStore()
   const editingMatch = props.editingMatchId ? matches.find(match => match.id === props.editingMatchId) : undefined
   if (props.editingMatchId && !editingMatch) return <div className="p-6 text-sm text-red-400">Match unavailable. Edit was not started.</div>
-  const editDraft = props.editingMatchId && draftMatch?.id === props.editingMatchId ? draftMatch : undefined
-  const candidate = props.editingMatchId ? editDraft ?? editingMatch : draftMatch
-  const sourceMatch = !props.editingMatchId && props.teamId && candidate && (candidate.teamId ?? candidate.homeTeamId) !== props.teamId ? undefined : candidate
+  // Editing restores the durable match explicitly. Normal creation restores
+  // only a lifecycle-valid draft and never a completed Match by accident.
+  const resumableDraft = !props.editingMatchId && isResumableDraft({ matches, draftMatch }) ? draftMatch : undefined
+  const requested = props.teamId ? { teamId: props.teamId, season: props.requestedSeason, competitionType: props.competitionType } : undefined
+  const conflict = resumableDraft && requested && !draftMatchesContext(resumableDraft, {
+    teamId: requested.teamId,
+    season: requested.season ?? draftContext(resumableDraft)!.season,
+    competitionType: requested.competitionType ?? draftContext(resumableDraft)!.competitionType,
+  })
+  if (conflict) {
+    const context = draftContext(resumableDraft)!
+    return <div className="space-y-4 p-6"><h1 className="text-xl font-black">Unfinished match found</h1><p className="text-sm text-zinc-400">{context.season} · {context.competitionType} for this saved draft differs from the match you requested.</p><button type="button" onClick={() => props.onNavigate({ name: 'new-match', ...context })} className="w-full rounded-xl bg-emerald-500 p-3 font-black text-black">Resume Draft</button><button type="button" onClick={clearDraftMatch} className="w-full rounded-xl border border-zinc-600 p-3 font-black">Discard Draft &amp; Start New</button><button type="button" onClick={() => props.onNavigate({ name: 'team', id: props.teamId! })} className="w-full p-3 text-sm text-zinc-400">Cancel</button></div>
+  }
+  const sourceMatch = props.editingMatchId ? editingMatch : resumableDraft
   const selectedTeamId = props.teamId ?? sourceMatch?.teamId ?? sourceMatch?.homeTeamId ?? teams[0]?.id ?? ''
   const restored = sourceMatch && (sourceMatch.teamId ?? sourceMatch.homeTeamId) === selectedTeamId ? restoreDraft(sourceMatch, players) : null
   if (props.editingMatchId && !restored) return <div className="p-6 text-sm text-red-400">Match unavailable. Its saved lineup cannot be restored safely.</div>
@@ -480,9 +492,9 @@ function MatchEditor({
   }
 
   useEffect(() => {
-    if (!draftReady) return
+    if (!draftReady || editingMatchId || savingRef.current) return
     saveDraftMatch({ id: draftId, season, competitionType: activeAssignment.competitionType, competitionStage: activeAssignment.stage, competitionPairingId: activeAssignment.pairingId, competitionSeriesGame: activeAssignment.seriesGame, ...(frozenAssignment ? { competitionAssignment: frozenAssignment } : {}), matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot })
-  }, [draftReady, draftId, season, activeAssignment, frozenAssignment, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, opponentName, appearances, kickoffSnapshot, saveDraftMatch])
+  }, [draftReady, editingMatchId, draftId, season, activeAssignment, frozenAssignment, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, opponentName, appearances, kickoffSnapshot, saveDraftMatch])
 
   async function save(): Promise<boolean> {
     if (savingRef.current || liveEvent || !kickoffIsValid) return false
@@ -495,7 +507,6 @@ function MatchEditor({
     }
     try {
       const result = await saveMatchDurably(matchData)
-      clearDraftMatch()
       setSaveStatus(result.mirrorSaved ? 'Saved' : 'Saved locally · mirror pending')
       window.setTimeout(() => onNavigate({ name: 'match', id: draftId }), 350)
       return true
@@ -513,13 +524,10 @@ function MatchEditor({
       <div className="px-4 pt-3">
         <button onClick={() => { if (editingMatchId) clearDraftMatch(); onNavigate(teamId ? { name: 'team', id: teamId } : { name: 'teams' }) }} className="mb-3 text-xs font-semibold text-emerald-400">← Cancel</button>
         <h1 className="text-2xl font-bold">Log Match</h1>
-        <div className="mb-2 flex items-center justify-between rounded-xl bg-zinc-900 px-3 py-1">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Current Matchday</p>
-          {/*
-          <p className="text-sm font-black text-emerald-400">{season} · MD {matchDay}</p><p aria-label="Live score" className="text-xl font-black tabular-nums text-white">{matchScore(eventMatch).home} - {matchScore(eventMatch).away}</p>
-        </div>
-          */}
-          <p className="text-sm font-black text-emerald-400">{formatCompetitionContext(activeAssignment)}</p><p aria-label="Live score" className="text-xl font-black tabular-nums text-white">{matchScore(eventMatch).home} - {matchScore(eventMatch).away}</p>
+        <div className="mb-2 grid min-w-0 grid-cols-[1fr_auto_1fr] items-center rounded-xl bg-zinc-900 px-3 py-2">
+          <div className="min-w-0"><p className="truncate text-[10px] font-bold uppercase tracking-widest text-zinc-500">{competitionContextParts(activeAssignment).primary}</p><p className="truncate text-xs font-black text-emerald-400">{competitionContextParts(activeAssignment).secondary}</p></div>
+          <p aria-label="Live score" className="px-3 text-center text-xl font-black tabular-nums text-white">{matchScore(eventMatch).home} - {matchScore(eventMatch).away}</p>
+          <div />
       </div>
       </div>
 

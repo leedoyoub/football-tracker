@@ -31,6 +31,14 @@ export function formatCompetitionContext(snapshot: CompetitionAssignmentSnapshot
   return `${snapshot.season} · Champions · ${championsStageLabel[snapshot.stage] ?? 'Round'}${game}`
 }
 
+/** Shared display parts keep compact headers from reconstructing tournament wording. */
+export function competitionContextParts(snapshot: CompetitionAssignmentSnapshot): { primary: string; secondary: string } {
+  if (snapshot.competitionType === 'league') return { primary: `${snapshot.season} · League`, secondary: `MD ${snapshot.matchDay}` }
+  if (snapshot.competitionType === 'cup') return { primary: `${snapshot.season} · Cup`, secondary: cupLabel(snapshot.stage) }
+  const game = snapshot.seriesGame ? ` · Game ${snapshot.seriesGame}/${championsRequiredGames(snapshot.stage)}` : ''
+  return { primary: `${snapshot.season} · Champions`, secondary: `${championsStageLabel[snapshot.stage] ?? 'Round'}${game}` }
+}
+
 export function formatCompactCompetitionContext(snapshot: CompetitionAssignmentSnapshot): string {
   if (snapshot.competitionType === 'league') return `MD${snapshot.matchDay}`
   if (snapshot.competitionType === 'cup') return snapshot.stage === 'finalReplay' ? 'Final Replay' : snapshot.stage === 'final' ? 'Final' : `S${String(snapshot.stage).replace('stage', '')}`

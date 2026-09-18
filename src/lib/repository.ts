@@ -1,6 +1,8 @@
 import { POSITIONS, type AppState, type Player } from '../types';
 import { getFromIndexedDB, saveToIndexedDB } from './db';
 import { validateState } from './validation';
+import { sanitizeDraftLifecycle } from './draftLifecycle';
+import { reconcileChampionsPairingIds } from '../engine/competition';
 
 // This is a durable data namespace, deliberately independent from app and
 // derived-engine versions.  Never turn a release number into a storage key.
@@ -60,7 +62,7 @@ export const LocalRepository = {
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (validateState(parsed)) {
           // Migration: Ensure player position is valid
-          const migratedState: AppState = {
+          const migrated = sanitizeDraftLifecycle({
             ...parsed,
             teams: parsed.teams,
             players: parsed.players.map((player: Player) => ({
@@ -68,7 +70,8 @@ export const LocalRepository = {
               position: POSITIONS.includes(player.position) ? player.position : 'CM',
               teamIds: player.teamIds ?? (player.teamId ? [player.teamId] : [])
             })),
-          };
+          });
+          const migratedState: AppState = { ...migrated, matches: reconcileChampionsPairingIds(migrated.matches, migrated.competitionStates) };
           // Mirroring a recovered browser-storage payload into IndexedDB is a
           // resilience enhancement, never a prerequisite for reading history.
           // Private mode, quota pressure, or a blocked database must not make a

@@ -27,8 +27,8 @@ test('last route uses stable IDs and restores valid team, player, results, and d
   assert.deepEqual(loadLastRoute(state, storage), { name: 'player', id: 'player-7' })
   saveLastRoute({ name: 'results' }, undefined, storage)
   assert.deepEqual(loadLastRoute(state, storage), { name: 'results' })
-  saveLastRoute({ name: 'new-match' }, { id: 'draft-1', teamId: 'real-madrid', homeTeamId: 'real-madrid', appearances: [], events: [] }, storage)
-  assert.deepEqual(loadLastRoute(state, storage), { name: 'new-match', teamId: 'real-madrid' })
+  saveLastRoute({ name: 'new-match' }, { id: 'draft-1', teamId: 'real-madrid', homeTeamId: 'real-madrid', season: 'Season 1', competitionType: 'champions', appearances: [], events: [] }, storage)
+  assert.deepEqual(loadLastRoute(state, storage), { name: 'new-match', teamId: 'real-madrid', season: 'Season 1', competitionType: 'champions' })
 })
 
 test('corrupt, unknown, and missing-reference routes safely return Home', () => {

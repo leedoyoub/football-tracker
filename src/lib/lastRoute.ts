@@ -1,4 +1,5 @@
 import type { AppState, View } from '../types'
+import { draftContext, isResumableDraft } from './draftLifecycle'
 
 /** Device-only UI state. It is deliberately never part of the sync queue. */
 export const LAST_ROUTE_STORAGE_KEY = 'football-tracker-last-route'
@@ -20,8 +21,8 @@ function storage(): StorageLike | null {
 /** New Match needs an explicit team to be a useful cold-start destination. */
 export function restorableView(view: View, draftMatch?: AppState['draftMatch']): View {
   if (view.name !== 'new-match' || view.teamId) return view
-  const teamId = draftMatch?.teamId ?? draftMatch?.homeTeamId
-  return teamId ? { name: 'new-match', teamId, ...(view.season ? { season: view.season } : {}) } : view
+  const context = draftContext(draftMatch)
+  return context ? { name: 'new-match', ...context, ...(view.season ? { season: view.season } : {}) } : view
 }
 
 export function saveLastRoute(view: View, draftMatch?: AppState['draftMatch'], target = storage()) {
@@ -62,8 +63,11 @@ export function validRestoredView(value: unknown, state: AppState): View | null 
     case 'new-player':
       return view.teamId === undefined || hasTeam(view.teamId) ? { name: 'new-player', ...(view.teamId ? { teamId: view.teamId } : {}) } : null
     case 'new-match': {
-      const teamId = view.teamId ?? state.draftMatch?.teamId ?? state.draftMatch?.homeTeamId
-      return hasTeam(teamId) ? { name: 'new-match', teamId, ...(typeof view.season === 'string' ? { season: view.season } : {}) } : null
+      const context = isResumableDraft(state) ? draftContext(state.draftMatch) : undefined
+      const teamId = view.teamId ?? context?.teamId
+      const season = typeof view.season === 'string' ? view.season : context?.season
+      const competitionType = view.competitionType ?? context?.competitionType
+      return hasTeam(teamId) ? { name: 'new-match', teamId, ...(season ? { season } : {}), ...(competitionType ? { competitionType } : {}) } : null
     }
     default:
       return null

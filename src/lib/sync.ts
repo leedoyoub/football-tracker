@@ -4,6 +4,8 @@ import { LocalRepository } from './repository'
 import { validateState } from './validation'
 import { deserializeCloudEntity, serializeCloudEntity } from './cloudMatch'
 import type { AppState, CompetitionState, Match, Player, Team } from '../types'
+import { sanitizeDraftLifecycle } from './draftLifecycle'
+import { reconcileChampionsPairingIds } from '../engine/competition'
 
 const QUEUE_STORE = 'sync_queue'
 const META_STORE = 'sync_metadata'
@@ -80,7 +82,8 @@ export const SyncManager = {
         }
         return [...out.values()]
       }
-      const merged: AppState = { teams: merge('team', local.teams, cloud.teams), players: merge('player', local.players, cloud.players), matches: merge('match', local.matches, cloud.matches), competitionStates: merge('competition', local.competitionStates ?? [], cloud.competitionStates ?? []), draftMatch: local.draftMatch }
+      const mergedDraftSafe = sanitizeDraftLifecycle({ teams: merge('team', local.teams, cloud.teams), players: merge('player', local.players, cloud.players), matches: merge('match', local.matches, cloud.matches), competitionStates: merge('competition', local.competitionStates ?? [], cloud.competitionStates ?? []), draftMatch: local.draftMatch })
+      const merged: AppState = { ...mergedDraftSafe, matches: reconcileChampionsPairingIds(mergedDraftSafe.matches, mergedDraftSafe.competitionStates) }
       if (validateState(merged)) await LocalRepository.saveAppState(merged)
       // First sign-in / remote-empty safety: every local-only entity gets an upload.
       for (const type of ['team', 'player', 'match', 'competition'] as const) {

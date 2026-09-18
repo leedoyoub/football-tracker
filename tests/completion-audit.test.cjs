@@ -107,7 +107,7 @@ test('Player Detail, Match Story, Match Log, and Data Integrity remain reachable
   const records = source('src/screens/RecordsScreen.tsx')
   for (const label of ['Recent Form', 'Position Stats', 'Positions Played', 'Goal Types', 'Role Impact', 'Team Performance When Starting', 'Player Chemistry', 'Career Timeline', 'Personal Records', 'Substitute impact', 'Rating Details']) assert(detail.includes(label))
   assert(match.includes('Match Story') && match.includes('story.tags.slice(0, 3)'))
-  assert(log.includes('Current Matchday') && log.includes('aria-label="Live score"') && log.includes('matchScore(eventMatch)'))
+  assert(!log.includes('Current Matchday') && log.includes('competitionContextParts(activeAssignment)') && log.includes('aria-label="Live score"') && log.includes('matchScore(eventMatch)'))
   assert(records.includes("['integrity', 'Data Integrity'") && records.includes('function IntegrityRecords') && records.includes('auditDataIntegrity(matches, players, teams)'))
 })
 
