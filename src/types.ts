@@ -25,6 +25,18 @@ export type CupStage = 'stage1' | 'stage2' | 'stage3' | 'stage4' | 'stage5' | 's
 export type ChampionsStage = 'roundOf16' | 'quarterFinal' | 'semiFinal' | 'final' | 'finalReplay'
 export type CompetitionStage = 'regular' | CupStage | ChampionsStage
 
+/** Immutable competition slot identity accepted at kickoff. */
+export interface CompetitionAssignmentSnapshot {
+  competitionType: CompetitionType
+  season: string
+  teamId: string
+  stage: CompetitionStage
+  pairingId?: string
+  seriesGame?: number
+  opponentTeamId?: string
+  matchDay: number
+}
+
 export interface CompetitionState {
   id: string
   season: string
@@ -154,6 +166,8 @@ export interface Match {
   competitionPairingId?: string
   /** Per-team Champions comparison-series row. New records use 1..3 (or 1..2 in the Final). */
   competitionSeriesGame?: number
+  /** The accepted kickoff slot. Legacy records fall back to their top-level fields. */
+  competitionAssignment?: CompetitionAssignmentSnapshot
   matchDay: number
   date: string
   formation?: string
@@ -199,7 +213,7 @@ export type View =
   | { name: 'player'; id: string }
   | { name: 'match'; id: string }
   | { name: 'edit-match'; id: string }
-  | { name: 'new-match'; teamId?: string; season?: string }
+  | { name: 'new-match'; teamId?: string; season?: string; competitionType?: CompetitionType }
   | { name: 'new-team' }
   | { name: 'edit-team'; id: string }
   | { name: 'new-player'; teamId?: string }

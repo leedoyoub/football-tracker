@@ -71,7 +71,7 @@ test('import store path is atomic and normal local-first sync observes imported 
 })
 
 test('import metadata has an explicit Supabase serialization and restore path', () => {
-  const source = fs.readFileSync(require.resolve('../src/lib/sync.ts'), 'utf8')
+  const source = fs.readFileSync(require.resolve('../src/lib/cloudMatch.ts'), 'utf8')
   assert(source.includes('external_player_id: externalPlayerId === undefined ? null : String(externalPlayerId)'))
   assert(source.includes('externalPlayerId: external_player_id'))
   assert(source.includes('photo_url: photoUrl ?? null'))

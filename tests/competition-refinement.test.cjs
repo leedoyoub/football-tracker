@@ -176,16 +176,16 @@ test('League completion does not roll the season; an explicit completion marker 
 
 test('season completion is synchronized as backward-compatible CompetitionState metadata', () => {
   const store = fs.readFileSync(require.resolve('../src/store.tsx'), 'utf8')
-  const sync = fs.readFileSync(require.resolve('../src/lib/sync.ts'), 'utf8')
+  const sync = fs.readFileSync(require.resolve('../src/lib/cloudMatch.ts'), 'utf8')
   const validation = fs.readFileSync(require.resolve('../src/lib/validation.ts'), 'utf8')
   assert(store.includes("kind: 'season-complete'") && store.includes('completeSeason'))
   assert(sync.includes("if ('kind' in entity)") && sync.includes('team_ids'))
   assert(validation.includes("'season-complete'"))
 })
 
-test('visible and package metadata version are exactly v2.2.7 / 2.2.7', () => {
-  assert.equal(APP_VERSION, '2.2.7')
-  assert.equal(require('../package.json').version, '2.2.7')
+test('visible and package metadata version are exactly v2.2.8 / 2.2.8', () => {
+  assert.equal(APP_VERSION, '2.2.8')
+  assert.equal(require('../package.json').version, '2.2.8')
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('v{APP_VERSION}'))
 })

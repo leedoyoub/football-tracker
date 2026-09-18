@@ -18,6 +18,7 @@ import { useAuth } from './lib/auth'
 import { BootstrapShell, StartupRecovery } from './components/StartupBoundary'
 import { reconcileCompetitionRevisions, reviseChangedMatch, sameRawFootballValue, sameRawMatch, type CompetitionRevisions } from './engine/competitionRevision'
 import { clearGlobalRankingCache } from './engine/stats'
+import { competitionMutationSafety, reconcileSeasonCompletionMarkers } from './engine/competition'
 import { preserveRecordedAt, recordNewMatch } from './engine/matchRecording'
 import { createPersistenceQueue } from './lib/persistenceQueue'
 
@@ -150,9 +151,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const prior = before.data
     const previousMatch = prior.matches.find(item => item.id === match.id)
     const saved = previousMatch ? preserveRecordedAt(previousMatch, match) : recordNewMatch(match)
-    const next: AppState = previousMatch
+    if (previousMatch) {
+      const safety = competitionMutationSafety(prior.matches, previousMatch, saved, prior.teams, prior.players, prior.competitionStates?.find(state => state.kind === 'champions-draw' && state.season === previousMatch.season))
+      if (!safety.safe) throw new Error(safety.message)
+    }
+    const nextWithoutMarkers: AppState = previousMatch
       ? { ...prior, matches: prior.matches.map(item => item.id === saved.id ? saved : item) }
       : { ...prior, matches: [...prior.matches, saved] }
+    const next: AppState = { ...nextWithoutMarkers, competitionStates: reconcileSeasonCompletionMarkers(nextWithoutMarkers.competitionStates ?? [], nextWithoutMarkers.teams, nextWithoutMarkers.matches, nextWithoutMarkers.players) }
     const durability = await persistLocal(next)
     setSnapshot(current => {
       const currentPrevious = current.data.matches.find(item => item.id === saved.id)
@@ -223,18 +229,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       saveMatchDurably,
       updateMatch: (id, match) => {
+        const previous = snapshotRef.current.data.matches.find(item => item.id === id)
+        if (previous) {
+          const replacement = preserveRecordedAt(previous, { ...match, id })
+          const safety = competitionMutationSafety(snapshotRef.current.data.matches, previous, replacement, snapshotRef.current.data.teams, snapshotRef.current.data.players, snapshotRef.current.data.competitionStates?.find(state => state.kind === 'champions-draw' && state.season === previous.season))
+          if (!safety.safe) throw new Error(safety.message)
+        }
         update((prev) => {
           const previous = prev.matches.find(item => item.id === id)
           const replacement = previous ? preserveRecordedAt(previous, { ...match, id }) : { ...match, id }
           if (!previous || sameRawMatch(previous, replacement)) return prev
           clearGlobalRankingCache()
-          return { ...prev, matches: prev.matches.map((item) => item.id === id ? replacement : item) }
+          const matches = prev.matches.map((item) => item.id === id ? replacement : item)
+          return { ...prev, matches, competitionStates: reconcileSeasonCompletionMarkers(prev.competitionStates ?? [], prev.teams, matches, prev.players) }
         }, (current, prev, next) => ({ competitionRevisions: reviseChangedMatch(current.competitionRevisions, prev.matches.find(item => item.id === id), next.matches.find(item => item.id === id)), teamCatalogRevision: current.teamCatalogRevision }))
       },
       saveDraftMatch,
       clearDraftMatch,
       deleteMatch: (id: string) => {
-        update((prev) => prev.matches.some(match => match.id === id) ? ({ ...prev, matches: prev.matches.filter((m) => m.id !== id), ...(prev.draftMatch?.id === id ? { draftMatch: undefined } : {}) }) : prev, (current, prev) => ({ competitionRevisions: reviseChangedMatch(current.competitionRevisions, prev.matches.find(item => item.id === id), undefined), teamCatalogRevision: current.teamCatalogRevision }))
+        const previous = snapshotRef.current.data.matches.find(item => item.id === id)
+        if (previous) {
+          const safety = competitionMutationSafety(snapshotRef.current.data.matches, previous, undefined, snapshotRef.current.data.teams, snapshotRef.current.data.players, snapshotRef.current.data.competitionStates?.find(state => state.kind === 'champions-draw' && state.season === previous.season))
+          if (!safety.safe) throw new Error(safety.message)
+        }
+        update((prev) => {
+          if (!prev.matches.some(match => match.id === id)) return prev
+          const matches = prev.matches.filter(match => match.id !== id)
+          return { ...prev, matches, competitionStates: reconcileSeasonCompletionMarkers(prev.competitionStates ?? [], prev.teams, matches, prev.players), ...(prev.draftMatch?.id === id ? { draftMatch: undefined } : {}) }
+        }, (current, prev) => ({ competitionRevisions: reviseChangedMatch(current.competitionRevisions, prev.matches.find(item => item.id === id), undefined), teamCatalogRevision: current.teamCatalogRevision }))
       },
       deleteAllMatches: () => {
         update((prev) => ({ ...prev, matches: [], draftMatch: undefined, competitionStates: [] }), (current, prev) => ({ competitionRevisions: reconcileCompetitionRevisions(current.competitionRevisions, prev.matches, []), teamCatalogRevision: current.teamCatalogRevision }))

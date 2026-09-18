@@ -8,6 +8,7 @@ import { matchScore, pitchWindow } from '../engine/rating'
 import { allowsGoalkeeperLineupMove, canConfirmSubstitution, moveLineup, moveSubstitution, type LineupTarget, type SubstitutionDraft } from './matchLineup'
 import { getNextMatchDayForTeam } from '../engine/match'
 import { competitionAssignment, matchCompetitionType } from '../engine/competition'
+import { assignmentSnapshotForMatch, formatCompetitionContext, freezeCompetitionAssignment } from '../engine/competitionContext'
 import type { Appearance, Best11Slot, CompetitionType, Match, MatchEvent, Player, Position, PositionChange, Team, View } from '../types'
 import { useStore } from '../store'
 import { playerDisplayName, GoalIcon, AssistIcon, StatIcons, SubstitutePlayerCard, SubstitutionSelection } from '../components/ui'
@@ -72,6 +73,7 @@ function fillFormationSlots(
 type NewMatchScreenProps = {
   teamId?: string
   requestedSeason?: string
+  competitionType?: CompetitionType
   editingMatchId?: string
   onNavigate: (view: View) => void
 }
@@ -94,6 +96,7 @@ export function NewMatchScreen(props: NewMatchScreenProps) {
 function MatchEditor({
   teamId,
   requestedSeason,
+  competitionType: initialCompetitionType,
   editingMatchId,
   onNavigate,
   sourceMatch,
@@ -106,10 +109,10 @@ function MatchEditor({
   const [saveError, setSaveError] = useState('')
   const [saveStatus, setSaveStatus] = useState('')
   const completedSeasons = useMemo(() => competitionStates.filter(state => state.kind === 'season-complete').map(state => state.season), [competitionStates])
-  const [competitionType, setCompetitionType] = useState<CompetitionType>(() => restored ? matchCompetitionType(sourceMatch!) : 'league')
-  const nextMatch = useMemo(() => getNextMatchDayForTeam(selectedTeamId, matches, completedSeasons, competitionType), [selectedTeamId, matches, completedSeasons, competitionType])
+  const [competitionType, setCompetitionType] = useState<CompetitionType>(() => restored ? matchCompetitionType(sourceMatch!) : initialCompetitionType ?? 'league')
+  const nextMatch = useMemo(() => getNextMatchDayForTeam(selectedTeamId, matches, completedSeasons, competitionType, requestedSeason), [selectedTeamId, matches, completedSeasons, competitionType, requestedSeason])
   const season = restored ? sourceMatch!.season : requestedSeason ?? nextMatch.season
-  const matchDay = restored ? sourceMatch!.matchDay : nextMatch.matchDay
+  const matchDay = sourceMatch ? sourceMatch.matchDay : nextMatch.matchDay
   const [date, setDate] = useState(() => restored ? sourceMatch!.date : localCalendarDate())
   const recentAssignments = useMemo(() => restored ? null : getMostRecentStartingLineup(matches, selectedTeamId), [restored, matches, selectedTeamId]);
 
@@ -125,11 +128,14 @@ function MatchEditor({
 
   const championsDraw = competitionStates.find(state => state.id === `champions:${season}`)
   const tournamentTeams = useMemo(() => currentStaticTeams(teams), [teams])
-  const assignment = useMemo(() => competitionAssignment(competitionType, season, selectedTeamId, tournamentTeams, matches, championsDraw), [competitionType, season, selectedTeamId, tournamentTeams, matches, championsDraw])
-  const opponentId = assignment.opponentTeamId ?? `opponent:${draftId}`
-  const opponentName = teams.find(team => team.id === assignment.opponentTeamId)?.shortName ?? 'OPP'
-  const homeTeamId = selectedTeamId
-
+  const proposedAssignment = useMemo(() => competitionAssignment(competitionType, season, selectedTeamId, tournamentTeams, matches, championsDraw, players), [competitionType, season, selectedTeamId, tournamentTeams, matches, championsDraw, players])
+  const [frozenAssignment, setFrozenAssignment] = useState(() => editingMatchId && sourceMatch ? assignmentSnapshotForMatch(sourceMatch) : sourceMatch?.competitionAssignment)
+  const proposedSnapshot = useMemo(() => freezeCompetitionAssignment({ competitionType, season, teamId: selectedTeamId, stage: proposedAssignment.stage, pairingId: proposedAssignment.pairingId, seriesGame: proposedAssignment.seriesGame, opponentTeamId: proposedAssignment.opponentTeamId, matchDay }), [competitionType, season, selectedTeamId, proposedAssignment, matchDay])
+  const activeAssignment = frozenAssignment ?? proposedSnapshot
+  const assignment = frozenAssignment ? { available: true, stage: frozenAssignment.stage, pairingId: frozenAssignment.pairingId, seriesGame: frozenAssignment.seriesGame, opponentTeamId: frozenAssignment.opponentTeamId, message: formatCompetitionContext(frozenAssignment) } : proposedAssignment
+  const opponentId = sourceMatch?.awayTeamId ?? activeAssignment.opponentTeamId ?? `opponent:${draftId}`
+  const opponentName = sourceMatch?.opponentName ?? teams.find(team => team.id === activeAssignment.opponentTeamId)?.shortName ?? 'OPP'
+  const homeTeamId = sourceMatch?.homeTeamId ?? selectedTeamId
   const awayTeamId = opponentId
   
   // 기타 Live Events 관련 상태들 (matchDraft 외부 유지)
@@ -189,7 +195,7 @@ function MatchEditor({
   const usedIds = new Set([...startingIds, ...matchDraft.homeBench.filter(Boolean)])
   const squadPlayers = draftPlayers.filter((player) => !usedIds.has(player.id))
   const seasonStats = Object.fromEntries(draftPlayers.map((player) => {
-    const stats = playerSeasonStats(player, players, matches, season)
+    const stats = playerSeasonStats(player, players, matches, season, selectedTeamId, competitionType)
     return [player.id, { goals: stats.goals, assists: stats.assists }]
   }))
   const activeDraft = substitutionDraft ?? matchDraft
@@ -475,8 +481,8 @@ function MatchEditor({
 
   useEffect(() => {
     if (!draftReady) return
-    saveDraftMatch({ id: draftId, season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, competitionSeriesGame: assignment.seriesGame, matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot })
-  }, [draftReady, draftId, season, competitionType, assignment.stage, assignment.pairingId, assignment.seriesGame, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, opponentName, appearances, kickoffSnapshot, saveDraftMatch])
+    saveDraftMatch({ id: draftId, season, competitionType: activeAssignment.competitionType, competitionStage: activeAssignment.stage, competitionPairingId: activeAssignment.pairingId, competitionSeriesGame: activeAssignment.seriesGame, ...(frozenAssignment ? { competitionAssignment: frozenAssignment } : {}), matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot })
+  }, [draftReady, draftId, season, activeAssignment, frozenAssignment, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, opponentName, appearances, kickoffSnapshot, saveDraftMatch])
 
   async function save(): Promise<boolean> {
     if (savingRef.current || liveEvent || !kickoffIsValid) return false
@@ -485,7 +491,7 @@ function MatchEditor({
     setSaveStatus('Saving…')
     const matchData = {
       id: draftId,
-      season, competitionType, competitionStage: assignment.stage, competitionPairingId: assignment.pairingId, competitionSeriesGame: assignment.seriesGame, matchDay, date, formation: activeFormationName, homeAway: 'home' as const, homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot,
+      season, competitionType: activeAssignment.competitionType, competitionStage: activeAssignment.stage, competitionPairingId: activeAssignment.pairingId, competitionSeriesGame: activeAssignment.seriesGame, competitionAssignment: activeAssignment, matchDay, date, formation: activeFormationName, homeAway: 'home' as const, homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot,
     }
     try {
       const result = await saveMatchDurably(matchData)
@@ -493,11 +499,11 @@ function MatchEditor({
       setSaveStatus(result.mirrorSaved ? 'Saved' : 'Saved locally · mirror pending')
       window.setTimeout(() => onNavigate({ name: 'match', id: draftId }), 350)
       return true
-    } catch {
+    } catch (error) {
       // Keep the in-memory editor and its draft intact. Navigation is allowed
       // only after LocalRepository has verified primary read-back.
       savingRef.current = false
-      setSaveError('Save failed. Your match was not safely stored. Please retry.')
+      setSaveError(error instanceof Error ? error.message : 'Save failed. Your match was not safely stored. Please retry.')
       return false
     }
   }
@@ -509,8 +515,12 @@ function MatchEditor({
         <h1 className="text-2xl font-bold">Log Match</h1>
         <div className="mb-2 flex items-center justify-between rounded-xl bg-zinc-900 px-3 py-1">
           <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Current Matchday</p>
+          {/*
           <p className="text-sm font-black text-emerald-400">{season} · MD {matchDay}</p><p aria-label="Live score" className="text-xl font-black tabular-nums text-white">{matchScore(eventMatch).home} - {matchScore(eventMatch).away}</p>
         </div>
+          */}
+          <p className="text-sm font-black text-emerald-400">{formatCompetitionContext(activeAssignment)}</p><p aria-label="Live score" className="text-xl font-black tabular-nums text-white">{matchScore(eventMatch).home} - {matchScore(eventMatch).away}</p>
+      </div>
       </div>
 
       {historyError && <p role="alert" className="px-4 text-xs text-red-400">{historyError}</p>}{saveError && <p role="alert" className="mx-4 rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-200">{saveError}</p>}{saveStatus && <p aria-live="polite" className="mx-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-200">{saveStatus}</p>}
@@ -525,7 +535,7 @@ function MatchEditor({
 
             <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Starting XI</h2><Pitch slots={universalPitchSlots} players={draftPlayers} teams={teams} statsByPlayer={seasonStats} badgeMode="position" substitutionSelection={startingSelection} draggable={false} onEmptySlotClick={(slot) => selectStartingTarget({ group: 'starting', id: slot.slot })} onSlotClick={(slot) => selectStartingTarget({ group: 'starting', id: slot.slot })} /></section>
             <RosterPlayerGroup title="Bench (Max 12)" group="substitute" team={teams.find(team => team.id === selectedTeamId)} players={sortPlayersByPosition([...matchDraft.homeBench.filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is NonNullable<typeof player> => Boolean(player)), ...squadPlayers.slice(0, Math.max(0, 12 - matchDraft.homeBench.length))], appearances)} statsByPlayer={seasonStats} selectedPlayerId={activePlayer?.id} onClick={(id) => selectStartingTarget({ group: 'substitute', id })} />
-            <button disabled={!validateKickoffLineup(kickoffFromAssignments(matchDraft.slotAssignments)).valid || !isGoalkeeperPlayer(matchDraft.slotAssignments.GK) || Object.values(matchDraft.slotAssignments).filter(isGoalkeeperPlayer).length !== 1 || !assignment.available} onClick={() => { if (!lineupLocked) { setStartingSnapshot({ ...matchDraft.slotAssignments }); setStartingBenchSnapshot([...matchDraft.homeBench]) } setStep(1) }} className="w-full rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl disabled:opacity-40">CONTINUE</button>
+            <button disabled={!validateKickoffLineup(kickoffFromAssignments(matchDraft.slotAssignments)).valid || !isGoalkeeperPlayer(matchDraft.slotAssignments.GK) || Object.values(matchDraft.slotAssignments).filter(isGoalkeeperPlayer).length !== 1 || !assignment.available} onClick={() => { if (!lineupLocked) { setStartingSnapshot({ ...matchDraft.slotAssignments }); setStartingBenchSnapshot([...matchDraft.homeBench]); setFrozenAssignment(current => current ?? freezeCompetitionAssignment({ competitionType, season, teamId: selectedTeamId, stage: proposedAssignment.stage, pairingId: proposedAssignment.pairingId, seriesGame: proposedAssignment.seriesGame, opponentTeamId: proposedAssignment.opponentTeamId, matchDay })) } setStep(1) }} className="w-full rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl disabled:opacity-40">CONTINUE</button>
           </div>
         )}
 

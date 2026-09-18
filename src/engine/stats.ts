@@ -1,5 +1,6 @@
 import type {
   Best11Slot,
+  CompetitionType,
   Match,
   Player,
   PlayerSeasonStats,
@@ -108,9 +109,10 @@ export function playerSeasonStats(
   matches: Match[],
   season: string,
   teamId?: string,
+  competitionType?: CompetitionType,
 ): PlayerSeasonStats {
   const seasonMatches = matches.filter((m) =>
-    m.season === season && (!teamId || m.appearances.some((appearance) =>
+    m.season === season && (!competitionType || (m.competitionType ?? 'league') === competitionType) && (!teamId || m.appearances.some((appearance) =>
       appearance.playerId === player.id && appearance.teamId === teamId,
     )),
   )

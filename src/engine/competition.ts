@@ -204,6 +204,7 @@ export type ChampionsPairing = {
   /** New comparison-series data: each side's own independently recorded matches. */
   teamGames?: Record<string, Match[]>
   rowWinners?: (string | undefined)[]
+  integrityError?: string
 }
 
 export type ChampionsCompetition = {
@@ -246,11 +247,25 @@ export function compareChampionsSeriesRow(firstId: string, first: Match, secondI
   return firstId.localeCompare(secondId) <= 0 ? firstId : secondId
 }
 
+export function championsSeriesIntegrity(games: Match[], requiredMatches: number): { valid: true; nextGame?: number } | { valid: false; message: string } {
+  const numbers = games.map(match => match.competitionSeriesGame)
+  if (numbers.some(number => !Number.isInteger(number))) return { valid: false, message: 'Champions data-integrity warning: series game identity is missing.' }
+  if (numbers.some(number => !number || number < 1 || number > requiredMatches)) return { valid: false, message: 'Champions data-integrity warning: series game is out of range.' }
+  const unique = new Set(numbers)
+  if (unique.size !== numbers.length) return { valid: false, message: 'Champions data-integrity warning: duplicate series game identity.' }
+  for (let number = 1; number <= numbers.length; number++) if (!unique.has(number)) return { valid: false, message: 'Champions data-integrity warning: series game sequence has a gap.' }
+  return { valid: true, ...(numbers.length < requiredMatches ? { nextGame: numbers.length + 1 } : {}) }
+}
+
 function makeSeriesRound(stage: Exclude<ChampionsStage, 'finalReplay'>, pair: [string, string], games: Match[], players: Player[]) {
   const requiredMatches = stage === 'final' ? 2 : 3
   const ordered = (teamId: string) => games.filter(match => match.teamId === teamId || (!match.teamId && hasPlayed(match, teamId)))
     .sort((a, b) => (a.competitionSeriesGame ?? Number.MAX_SAFE_INTEGER) - (b.competitionSeriesGame ?? Number.MAX_SAFE_INTEGER) || a.id.localeCompare(b.id))
   const [firstId, secondId] = pair; const first = ordered(firstId), second = ordered(secondId)
+  const firstIntegrity = championsSeriesIntegrity(first, requiredMatches)
+  const secondIntegrity = championsSeriesIntegrity(second, requiredMatches)
+  if (!firstIntegrity.valid) return { requiredMatches, teamGames: { [firstId]: first, [secondId]: second }, rowWinners: [] as (string | undefined)[], integrityError: firstIntegrity.message }
+  if (!secondIntegrity.valid) return { requiredMatches, teamGames: { [firstId]: first, [secondId]: second }, rowWinners: [] as (string | undefined)[], integrityError: secondIntegrity.message }
   if (first.length !== requiredMatches || second.length !== requiredMatches) return { requiredMatches, teamGames: { [firstId]: first, [secondId]: second }, rowWinners: [] as (string | undefined)[] }
   const rowWinners = Array.from({ length: requiredMatches }, (_, index) => compareChampionsSeriesRow(firstId, first[index], secondId, second[index], players))
   const wins = (teamId: string) => rowWinners.filter(id => id === teamId).length
@@ -275,7 +290,7 @@ function makeRound(stage: Exclude<ChampionsStage, 'finalReplay'>, teamIds: strin
     const seriesMode = games.length === 0 || games.some(match => Number.isInteger(match.competitionSeriesGame))
     if (seriesMode) {
       const series = makeSeriesRound(stage, pair, games, players)
-      return { id, stage, teamIds: pair, matches: games, winnerId: series.winnerId, tied: false, requiredMatches: series.requiredMatches, teamGames: series.teamGames, rowWinners: series.rowWinners }
+      return { id, stage, teamIds: pair, matches: games, winnerId: series.winnerId, tied: false, requiredMatches: series.requiredMatches, teamGames: series.teamGames, rowWinners: series.rowWinners, ...(series.integrityError ? { integrityError: series.integrityError } : {}) }
     }
     let winnerId = games.length >= requiredMatches ? comparePair(pair, games, players, stage !== 'final', stage !== 'final') : undefined
     let tied = games.length >= requiredMatches && !winnerId
@@ -311,32 +326,89 @@ export function championsCompetition(draw: CompetitionState | undefined, matches
 
 export type CompetitionAssignment = { available: boolean; stage: CompetitionStage; pairingId?: string; seriesGame?: number; opponentTeamId?: string; message?: string }
 
-export function competitionAssignment(type: CompetitionType, season: string, teamId: string, teams: Team[], matches: Match[], draw?: CompetitionState): CompetitionAssignment {
+function assignmentCupStageLabel(stage: CupStage): string {
+  return stage === 'finalReplay' ? 'Final Replay' : stage === 'final' ? 'Final' : `Stage ${Number(stage.replace('stage', ''))}`
+}
+
+function championsStageLabel(stage: ChampionsStage): string {
+  return ({ roundOf16: 'Round of 16', quarterFinal: 'Quarter-final', semiFinal: 'Semi-final', final: 'Final', finalReplay: 'Final Replay' } as Record<ChampionsStage, string>)[stage]
+}
+
+export function competitionAssignment(type: CompetitionType, season: string, teamId: string, teams: Team[], matches: Match[], draw?: CompetitionState, players: Player[] = []): CompetitionAssignment {
   if (type === 'league') {
     const played = competitionMatches(matches, season, 'league').filter(match => hasPlayed(match, teamId)).length
     return played >= LEAGUE_MATCHES_PER_TEAM ? { available: false, stage: 'regular' as const, message: 'This team has completed its 30-match League schedule.' } : { available: true, stage: 'regular' as const }
   }
   if (type === 'cup') {
-    const cup = cupCompetition(teams, matches, season)
+    const cup = cupCompetition(teams, matches, season, players)
     if (!cup.activeTeamIds.includes(teamId) || cup.championId) return { available: false, stage: cup.stage, message: cup.championId ? 'Cup is complete.' : 'This team has been eliminated.' }
     const opponentTeamId = cup.stage === 'final' || cup.stage === 'finalReplay' ? cup.activeTeamIds.find(id => id !== teamId) : undefined
-    return { available: !cup.stageMatches.some(match => hasPlayed(match, teamId)), stage: cup.stage, opponentTeamId, message: 'This team has already played in the current Cup stage.' }
+    const played = cup.stageMatches.some(match => hasPlayed(match, teamId))
+    return played
+      ? { available: false, stage: cup.stage, opponentTeamId, message: `This team has already played in ${assignmentCupStageLabel(cup.stage)}.` }
+      : { available: true, stage: cup.stage, opponentTeamId, message: `${assignmentCupStageLabel(cup.stage)} · Ready to play` }
   }
-  const champions = championsCompetition(draw, matches, season)
+  const champions = championsCompetition(draw, matches, season, players)
   if (!champions.drawn) return { available: false, stage: 'roundOf16' as const, message: 'Complete the Champions draw from Competitions first.' }
   if (champions.championId) return { available: false, stage: 'final' as const, message: 'Champions is complete.' }
   const lookupStage = champions.currentStage === 'finalReplay' ? 'final' : champions.currentStage
   const pairing = champions.rounds[lookupStage].find(item => item.teamIds.includes(teamId))
   if (!pairing || pairing.winnerId) return { available: false, stage: champions.currentStage, message: 'This team is not active in the current Champions round.' }
+  if (pairing.integrityError) return { available: false, stage: lookupStage, pairingId: pairing.id, message: pairing.integrityError }
   if (pairing.teamGames) {
     const games = pairing.teamGames[teamId] ?? []
-    return games.length < pairing.requiredMatches
+    const integrity = championsSeriesIntegrity(games, pairing.requiredMatches)
+    if (!integrity.valid) return { available: false, stage: lookupStage, pairingId: pairing.id, message: integrity.message }
+    if (integrity.nextGame) return { available: true, stage: lookupStage, pairingId: pairing.id, seriesGame: integrity.nextGame, message: `${championsStageLabel(lookupStage)} · Game ${integrity.nextGame} of ${pairing.requiredMatches}` }
+    return { available: false, stage: lookupStage, pairingId: pairing.id, message: `This team has completed its ${championsStageLabel(lookupStage)} series.` }
+    /* Legacy length-only branch retained below only as patch context; it is unreachable.
       ? { available: true, stage: lookupStage, pairingId: pairing.id, seriesGame: games.length + 1, message: `${lookupStage === 'final' ? 'Final' : lookupStage.replace(/([A-Z])/g, ' $1')} · Game ${games.length + 1} of ${pairing.requiredMatches}` }
       : { available: false, stage: lookupStage, pairingId: pairing.id, message: 'This team has completed its Champions comparison series.' }
+  }
+  */
   }
   const replayGames = champions.currentStage === 'finalReplay' ? pairing.replayMatches ?? [] : pairing.matches
   const gamesNeeded = champions.currentStage === 'finalReplay' ? 1 : pairing.requiredMatches
   return { available: replayGames.length < gamesNeeded, stage: champions.currentStage, pairingId: pairing.id, opponentTeamId: pairing.teamIds.find(id => id !== teamId), message: 'This tie already has all required matches.' }
+}
+
+export type CompetitionMutationSafety = { safe: boolean; message?: string }
+const cupStageOrder = new Map<string, number>([...CUP_STAGES, 'final', 'finalReplay'].map((stage, index) => [stage, index]))
+const championsStageOrder = new Map<ChampionsStage, number>([['roundOf16', 0], ['quarterFinal', 1], ['semiFinal', 2], ['final', 3], ['finalReplay', 4]])
+
+function matchesWithReplacement(matches: Match[], previous: Match, replacement?: Match): Match[] {
+  return replacement ? matches.map(match => match.id === previous.id ? replacement : match) : matches.filter(match => match.id !== previous.id)
+}
+
+/** Refuse only mutations that make an already-recorded later tournament slot impossible. */
+export function competitionMutationSafety(matches: Match[], previous: Match, replacement: Match | undefined, teams: Team[], players: Player[], draw?: CompetitionState): CompetitionMutationSafety {
+  const type = matchCompetitionType(previous)
+  if (type === 'league') return { safe: true }
+  const order = type === 'cup' ? cupStageOrder : championsStageOrder
+  const stageOrder = order.get(previous.competitionStage as never)
+  if (stageOrder === undefined) return { safe: false, message: 'This match has an invalid competition stage and cannot be changed safely.' }
+  const later = matches.filter(match => match.season === previous.season && matchCompetitionType(match) === type && (order.get(match.competitionStage as never) ?? -1) > stageOrder)
+  if (!later.length) return { safe: true }
+  const next = matchesWithReplacement(matches, previous, replacement)
+  for (const downstream of later) {
+    const downstreamOrder = order.get(downstream.competitionStage as never)
+    if (downstreamOrder === undefined) return { safe: false, message: 'A later tournament record has an invalid stage.' }
+    const prior = next.filter(match => match.season === previous.season && matchCompetitionType(match) === type && (order.get(match.competitionStage as never) ?? -1) < downstreamOrder)
+    const teamId = downstream.teamId ?? downstream.homeTeamId
+    if (type === 'cup') {
+      const derived = cupCompetition(teams, prior, previous.season, players)
+      if ((cupStageOrder.get(derived.stage) ?? -1) < downstreamOrder || !derived.activeTeamIds.includes(teamId)) return { safe: false, message: `This result affects already-recorded ${assignmentCupStageLabel(downstream.competitionStage as CupStage)} matches. Reset the later round before changing this match.` }
+    } else {
+      const pairing = championsCompetition(draw, prior, previous.season, players).rounds[downstream.competitionStage as Exclude<ChampionsStage, 'finalReplay'>]?.find(item => item.id === downstream.competitionPairingId)
+      if (!pairing?.teamIds.includes(teamId)) return { safe: false, message: `This result affects already-recorded ${championsStageLabel(downstream.competitionStage as ChampionsStage)} matches. Reset the later round before changing this match.` }
+    }
+  }
+  return { safe: true }
+}
+
+/** A historical completion marker survives only while the derived season remains complete. */
+export function reconcileSeasonCompletionMarkers(states: CompetitionState[], teams: Team[], matches: Match[], players: Player[]): CompetitionState[] {
+  return states.filter(state => state.kind !== 'season-complete' || isCompetitionSeasonComplete(teams, matches, state.season, players, states.find(item => item.kind === 'champions-draw' && item.season === state.season)))
 }
 
 export type CompetitionSeasonStatus = {

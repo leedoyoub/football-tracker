@@ -160,7 +160,7 @@ export default function App() {
           {view.name === 'match' && <MatchDetailScreen matchId={view.id} onNavigate={onNavigate} />}
           {view.name === 'edit-match' && <EditMatchScreen matchId={view.id} onNavigate={onNavigate} />}
           {view.name === 'new-match' && (
-            <NewMatchScreen teamId={view.teamId} requestedSeason={view.season} onNavigate={onNavigate} />
+            <NewMatchScreen teamId={view.teamId} requestedSeason={view.season} competitionType={view.competitionType} onNavigate={onNavigate} />
           )}
           {view.name === 'new-player' && (
             <NewPlayerScreen teamId={view.teamId} onNavigate={onNavigate} />

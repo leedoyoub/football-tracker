@@ -2,7 +2,8 @@ import { getSupabase } from './supabase'
 import { openDB } from './db'
 import { LocalRepository } from './repository'
 import { validateState } from './validation'
-import type { AppState, CompetitionState, CompetitionType, Match, Player, Team } from '../types'
+import { deserializeCloudEntity, serializeCloudEntity } from './cloudMatch'
+import type { AppState, CompetitionState, Match, Player, Team } from '../types'
 
 const QUEUE_STORE = 'sync_queue'
 const META_STORE = 'sync_metadata'
@@ -22,23 +23,6 @@ function scheduleRetry(delay: number) {
 async function allQueue(): Promise<SyncItem[]> { const db = await openDB(); return new Promise((resolve, reject) => { const req = db.transaction(QUEUE_STORE, 'readonly').objectStore(QUEUE_STORE).getAll(); req.onsuccess = () => resolve(req.result ?? []); req.onerror = () => reject(req.error) }) }
 async function metadata(): Promise<SyncMetadata> { const db = await openDB(); return new Promise((resolve, reject) => { const req = db.transaction(META_STORE, 'readonly').objectStore(META_STORE).get('meta'); req.onsuccess = () => resolve({ ...emptyMeta(), ...(req.result ?? {}), entityUpdatedAt: (req.result?.entityUpdatedAt ?? {}), entityCloudUpdatedAt: (req.result?.entityCloudUpdatedAt ?? {}) }); req.onerror = () => reject(req.error) }) }
 async function putMetadata(value: SyncMetadata) { const db = await openDB(); await new Promise<void>((resolve, reject) => { const tx = db.transaction(META_STORE, 'readwrite'); tx.objectStore(META_STORE).put(value, 'meta'); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error) }) }
-export const serializeCloudEntity = (entity: Team | Player | Match | CompetitionState) => {
-  if ('kind' in entity) return { id: entity.id, season: entity.season, kind: entity.kind, team_ids: entity.teamIds }
-  if ('position' in entity && 'number' in entity) {
-    const { externalPlayerId, photoUrl, ...player } = entity
-    // Supabase uses snake_case columns; retain the app's camelCase shape locally.
-    return { ...player, external_player_id: externalPlayerId === undefined ? null : String(externalPlayerId), photo_url: photoUrl ?? null }
-  }
-  if ('appearances' in entity && 'events' in entity) {
-    const { competitionType, competitionStage, competitionPairingId, ...match } = entity
-    return { ...match, competition_type: competitionType ?? 'league', competition_stage: competitionStage ?? 'regular', competition_pairing_id: competitionPairingId ?? null }
-  }
-  return { ...entity }
-}
-export const deserializeCloudEntity = <T extends Team | Player | Match | CompetitionState>(row: T & { user_id?: string; created_at?: string; updated_at?: string; external_player_id?: string | number | null; photo_url?: string | null; team_ids?: string[]; competition_type?: CompetitionType; competition_stage?: Match['competitionStage']; competition_pairing_id?: string | null }) => {
-  const { user_id: _user, created_at: _created, updated_at: _updated, external_player_id, photo_url, team_ids, competition_type, competition_stage, competition_pairing_id, ...entity } = row
-  return { ...entity, ...(external_player_id === undefined || external_player_id === null ? {} : { externalPlayerId: external_player_id }), ...(photo_url === undefined || photo_url === null ? {} : { photoUrl: photo_url }), ...(team_ids === undefined ? {} : { teamIds: team_ids }), ...(competition_type === undefined ? {} : { competitionType: competition_type }), ...(competition_stage === undefined ? {} : { competitionStage: competition_stage }), ...(competition_pairing_id ? { competitionPairingId: competition_pairing_id } : {}) } as T
-}
 type CloudRow<T> = { entity: T; updatedAt?: string }
 const durableTimestamp = (value: unknown) => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : undefined
 const isNewer = (candidate: string | undefined, baseline: string | undefined) => !!candidate && !!baseline && Date.parse(candidate) > Date.parse(baseline)

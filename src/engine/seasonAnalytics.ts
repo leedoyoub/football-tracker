@@ -30,10 +30,13 @@ export type RaceSeries = { playerId: string; points: RacePoint[] }
 export type MonthlyBlock = { id: number; startMatchDay: number; endMatchDay: number }
 export type MonthlyAwards = {
   block: MonthlyBlock
+  /** The single display identity shared by awards, Best XI, and News. */
+  scopeLabel: string
   finalized: boolean
   playerOfMonth?: PlayerSnapshotRow
+  bestPlayerId?: string
   bestXI: Best11Slot[]
-  statsByPlayer: Record<string, { goals: number; assists: number }>
+  statsByPlayer: Record<string, { goals: number; assists: number; avgRating: number }>
 }
 export type MatchdayReview = {
   matchDay: number
@@ -65,6 +68,11 @@ export function monthlyBlockForMatchday(matchDay: number): number | null {
 export function monthlyBlockRange(block: number): MonthlyBlock | null {
   if (!Number.isInteger(block) || block < 1 || block > 10) return null
   return { id: block, startMatchDay: (block - 1) * 3 + 1, endMatchDay: block * 3 }
+}
+
+/** Canonical matchday-block notation; never substitute calendar month names. */
+export function canonicalBlockLabel(season: string, block: number): string {
+  return `${season}-${block}`
 }
 
 function recordedTeams(match: Match, registered: Set<string>): string[] {
@@ -185,7 +193,15 @@ function monthlyAwardsFor(block: MonthlyBlock, teams: Team[], players: Player[],
     used.add(candidate.playerId)
     return { slot: role.slot, position: role.position, playerId: candidate.playerId, teamId: candidate.teamId, avgRating: candidate.avgRating, matches: candidate.appearances }
   })
-  return { block, finalized, playerOfMonth: ordered[0], bestXI: slots, statsByPlayer: Object.fromEntries(ordered.map(row => [row.playerId, { goals: row.goals, assists: row.assists }])) }
+  return {
+    block,
+    scopeLabel: canonicalBlockLabel(games[0]?.season ?? 'Season', block.id),
+    finalized,
+    playerOfMonth: ordered[0],
+    bestPlayerId: ordered[0]?.playerId,
+    bestXI: slots,
+    statsByPlayer: Object.fromEntries(ordered.map(row => [row.playerId, { goals: row.goals, assists: row.assists, avgRating: row.avgRating }])),
+  }
 }
 
 /** Lazily derives one finalized monthly award block without materializing the full season. */

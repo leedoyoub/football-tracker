@@ -12,8 +12,13 @@ export function getTeamMatches(matches: Match[], teamId: string): Match[] {
 }
 
 /** MatchDay is a competition-scoped schedule number, never actual chronology. */
-export function getNextMatchDayForTeam(teamId: string, matches: Match[], completedSeasons: string[] = [], competitionType: CompetitionType = 'league'): { season: string; matchDay: number } {
+export function getNextMatchDayForTeam(teamId: string, matches: Match[], completedSeasons: string[] = [], competitionType: CompetitionType = 'league', targetSeason?: string): { season: string; matchDay: number } {
   const teamMatches = getTeamMatches(matches, teamId)
+  if (targetSeason) {
+    const scopedDays = teamMatches.filter(match => match.season === targetSeason && (match.competitionType ?? 'league') === competitionType).map(match => match.matchDay).filter(Number.isInteger)
+    const next = Math.max(0, ...scopedDays) + 1
+    return { season: targetSeason, matchDay: competitionType === 'league' ? Math.min(next, LEAGUE_MATCHES_PER_TEAM) : next }
+  }
   if (teamMatches.length === 0) {
     return { season: 'Season 1', matchDay: 1 }
   }

@@ -1,4 +1,6 @@
 import { competitionHistory, cupCompetition, championsCompetition, CHAMPIONS_ROUNDS, matchCompetitionType } from './competition'
+import { competitionAwardResult, monthlyCanonicalAwardResult } from './awards'
+import { currentStaticTeams } from '../data/teams'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
@@ -19,6 +21,26 @@ type TeamRun = { wins: number; unbeaten: number; cleanSheets: number; seasonGoal
 const EMPTY_STATES: CompetitionState[] = []
 type NewsCacheEntry = { revision: number; items: NewsItem[] }
 const newsCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], NewsCacheEntry>>>>()
+
+/** The sole News chronology rule: newest date first, then a stable identity. */
+export function sortNewsNewestFirst<T extends { date: string; id: string }>(items: T[]): T[] {
+  return items.slice().sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
+}
+
+type AwardNewsResult = { scopeLabel: string; playerLabel: string; teamLabel: string; bestPlayerId: string; bestXI: { playerId: string | null }[]; anchorMatch: { id: string; date: string } }
+const articleIdentity = (label: string) => label.toLowerCase().replace(/ /g, '-').replace('-of-the-month', '-of-month')
+
+/** Projects a previously selected award result into two stable News articles. */
+export function awardNewsFromResult(result: AwardNewsResult, nameForPlayer: (id: string) => string): NewsDraft[] {
+  const playerIdentity = articleIdentity(result.playerLabel)
+  const teamIdentity = articleIdentity(result.teamLabel)
+  const xiIdentity = result.bestXI.map(slot => slot.playerId ?? '-').join(':')
+  const monthly = result.playerLabel === 'Player of the Month'
+  return [
+    { id: `award:${playerIdentity}:${result.scopeLabel}:${result.bestPlayerId}`, kind: 'player', importance: 'major', date: result.anchorMatch.date, matchId: result.anchorMatch.id, playerId: result.bestPlayerId, eyebrow: 'AWARDS', title: monthly ? `${nameForPlayer(result.bestPlayerId)} wins ${result.scopeLabel} Player of the Month` : `${nameForPlayer(result.bestPlayerId)} wins ${result.playerLabel}`, detail: monthly ? `A brilliant run of performances earns ${nameForPlayer(result.bestPlayerId)} the ${result.scopeLabel} Player of the Month award.` : `A brilliant run of performances earns ${nameForPlayer(result.bestPlayerId)} the ${result.playerLabel} award.`, context: result.scopeLabel },
+    { id: `award:${teamIdentity}:${result.scopeLabel}:${xiIdentity}`, kind: 'team', importance: 'major', date: result.anchorMatch.date, matchId: result.anchorMatch.id, eyebrow: 'AWARDS', title: monthly ? `${result.scopeLabel} Best XI revealed` : `${result.teamLabel} revealed`, detail: monthly ? `The standout performers of ${result.scopeLabel} have been named in the latest Best XI.` : `The standout performers have been named in the ${result.teamLabel}.`, context: result.scopeLabel },
+  ]
+}
 
 const emptyTotals = (): Totals => ({ goals: 0, assists: 0, apps: 0, mom: 0, saves: 0, cleanSheets: 0 })
 const ordered = (matches: Match[]) => oldestMatches([...new Map(matches.map(match => [match.id, match])).values()])
@@ -284,17 +306,21 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
     }
     for (const award of analytics.monthlyAwards.values()) {
       const finalMatch = analytics.leagueSnapshots.get(award.block.endMatchDay)?.matches.slice(-1)[0]
-      if (!finalMatch || !award.playerOfMonth) continue
-      add({ id: `award:monthly:${seasonName}:${award.block.id}`, kind: 'player', importance: 'major', date: finalMatch.date, matchId: finalMatch.id, playerId: award.playerOfMonth.playerId, eyebrow: 'MONTHLY AWARDS', title: `${playerName(players, award.playerOfMonth.playerId)} is Player of the Month`, detail: `Monthly Best XI finalized for MD${award.block.startMatchDay}–${award.block.endMatchDay}.`, context: `${seasonName} · Month ${award.block.id}` })
+      const bestPlayerId = award.bestPlayerId
+      if (!finalMatch || !bestPlayerId) continue
+      for (const article of awardNewsFromResult(monthlyCanonicalAwardResult({ ...award, bestPlayerId }, finalMatch), id => playerName(players, id))) add(article)
     }
   }
 
+  const tournamentTeams = currentStaticTeams(teams)
   for (const history of competitionHistory(teams, matches, players, states)) {
     const winners = ([['league', history.league], ['cup', history.cup], ['champions', history.champions]] as [CompetitionType, string | undefined][]).filter((entry): entry is [CompetitionType, string] => Boolean(entry[1]))
     for (const [type, teamId] of winners) {
       const games = chronological.filter(match => match.season === history.season && matchCompetitionType(match) === type)
       const last = games[games.length - 1]; if (!last) continue
       add({ id: `title:${history.season}:${type}:${teamId}`, kind: 'team', date: last.date, matchId: last.id, teamId, eyebrow: 'CHAMPION', title: `${teamName(teams, teamId)} win the ${competitionName(type)}`, detail: `${history.season} champion.`, context: scoreText(last, teams) })
+      const award = competitionAwardResult(type, history.season, tournamentTeams, players, matches, states)
+      if (award) for (const article of awardNewsFromResult(award, id => playerName(players, id))) add(article)
     }
     const byTeam = new Map<string, CompetitionType[]>()
     for (const [type, teamId] of winners) byTeam.set(teamId, [...(byTeam.get(teamId) ?? []), type])
@@ -326,7 +352,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
     }
   }
 
-  return [...items.values()].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
+  return sortNewsNewestFirst([...items.values()])
 }
 
 export function deriveNews(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES): NewsItem[] {
@@ -344,8 +370,7 @@ export function deriveNews(players: Player[], teams: Team[], matches: Match[], s
 }
 
 export function homeMilestoneNews(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES): NewsItem[] {
-  const priority = { major: 0, medium: 1, minor: 2 }
-  return deriveNews(players, teams, matches, states).slice().sort((a, b) => (priority[a.importance ?? 'medium'] - priority[b.importance ?? 'medium']) || b.date.localeCompare(a.date) || b.id.localeCompare(a.id)).slice(0, 5)
+  return deriveNews(players, teams, matches, states).slice(0, 5)
 }
 
 /** Presentation-only grouping for Match Detail. Canonical milestone events stay

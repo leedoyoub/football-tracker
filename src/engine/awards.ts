@@ -1,12 +1,46 @@
 import type { Best11Slot, ChampionsStage, CompetitionState, CompetitionType, CupStage, Match, Player, Team } from '../types'
 import { championsCompetition, competitionMatches, competitionSeasonStatus, cupCompetition } from './competition'
-import { buildGlobalRankingData, type GlobalLeaderboardRow } from './stats'
+import { buildGlobalRankingData, unifiedBestEleven, type GlobalLeaderboardRow } from './stats'
 import { AWARD_433, awardPositionFamily, isAwardEligible } from './awardRules'
 
 export { AWARD_433, awardPositionFamily, isAwardEligible } from './awardRules'
 
 export type AwardWinner = { playerId: string; value: number; label: string; awardScore?: number }
 export type CompetitionAwards = { complete: boolean; championId?: string; scorer?: AwardWinner; assists?: AwardWinner; mvp?: AwardWinner; goalkeeper?: AwardWinner; bestXI?: Best11Slot[] }
+export type CanonicalAwardResult = {
+  scopeLabel: string
+  playerLabel: string
+  teamLabel: string
+  bestPlayerId: string
+  bestXI: Best11Slot[]
+  statsByPlayer: Record<string, { goals: number; assists: number; avgRating?: number }>
+  anchorMatch: Match
+}
+
+/** One competition-aware source for Team/Best XI wording. */
+export function competitionAwardLabel(type: CompetitionType, scope: 'season' | 'monthly' = 'season'): string {
+  if (type === 'league') return scope === 'monthly' ? 'Team of the Month' : 'Team of the Season'
+  return type === 'cup' ? 'Team of the Cup' : 'Team of the Tournament'
+}
+
+export function monthlyCanonicalAwardResult(award: Pick<CanonicalAwardResult, 'scopeLabel' | 'bestPlayerId' | 'bestXI' | 'statsByPlayer'>, anchorMatch: Match): CanonicalAwardResult {
+  return { ...award, playerLabel: 'Player of the Month', teamLabel: competitionAwardLabel('league', 'monthly'), anchorMatch }
+}
+
+/**
+ * The canonical competition-wide award read model.  Its Best XI keeps the
+ * established scoped selection while player award ranking remains the existing
+ * official awards selector.  Every consumer receives one shared result.
+ */
+export function competitionAwardResult(type: CompetitionType, season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[]): CanonicalAwardResult | undefined {
+  const official = awardsForCompetition(type, season, teams, players, matches, states)
+  const scope = competitionMatches(matches, season, type)
+  const anchorMatch = scope.slice().sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0]
+  if (!official.complete || !official.mvp || !anchorMatch) return undefined
+  const xi = unifiedBestEleven(players, scope, season)
+  const playerLabel = type === 'league' ? 'Player of the Season' : type === 'cup' ? 'Player of the Cup' : 'Player of the Tournament'
+  return { scopeLabel: season, playerLabel, teamLabel: competitionAwardLabel(type), bestPlayerId: official.mvp.playerId, bestXI: xi.slots, statsByPlayer: xi.statsByPlayer, anchorMatch }
+}
 
 const rawAverage = (row: GlobalLeaderboardRow) => row.ratings.length ? row.ratings.reduce((sum, rating) => sum + rating.raw, 0) / row.ratings.length : 0
 const appearances = (row: GlobalLeaderboardRow) => row.ratings.length

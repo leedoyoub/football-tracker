@@ -2,7 +2,7 @@ import { Pitch } from '../components/Pitch'
 import { MatchTimeline } from '../components/MatchTimeline'
 import { formatDate, SubstitutePlayerCard } from '../components/ui'
 import { getMatchManOfTheMatch, matchScore, rateMatch } from '../engine/rating'
-import { matchCompetitionType } from '../engine/competition'
+import { assignmentSnapshotForMatch, formatCompetitionContext } from '../engine/competitionContext'
 import { matchStory } from '../engine/matchStory'
 import { deriveNews, groupMatchChanges } from '../engine/news'
 import { useStore } from '../store'
@@ -18,6 +18,7 @@ export function MatchDetailScreen({ matchId, onNavigate }: { matchId: string; on
   const { teams, players, matches, competitionStates = [], deleteMatch } = useStore()
   const [deleteConfirmationStep, setDeleteConfirmationStep] = useState(0);
   const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
+  const [deleteError, setDeleteError] = useState('')
   const [tab, setTab] = useState<'facts' | 'lineup' | 'ratings'>('facts')
   
   const match = matches.find(item => item.id === matchId)
@@ -48,7 +49,10 @@ export function MatchDetailScreen({ matchId, onNavigate }: { matchId: string; on
   }
   return <div className="px-4 pb-8 pt-6">
     <button type="button" onClick={() => onNavigate({ name: 'home' })} className="mb-3 text-xs font-semibold text-emerald-400">Back</button>
+    {/*
     <p className="text-xs text-zinc-400">{match.season} · {matchCompetitionType(match).toUpperCase()} · {match.competitionStage ?? 'regular'} · MD {match.matchDay} · {formatDate(match.date)}</p>
+    */}
+    <p className="text-xs text-zinc-400">{formatCompetitionContext(assignmentSnapshotForMatch(match))} · {formatDate(match.date)}</p>
     <h1 className="mb-4 text-2xl font-semibold">{team?.shortName} {ours}-{theirs} {opponent}</h1>
     <SegmentedControl sticky label="Match detail section" value={tab} onChange={setTab} options={[{ value: 'facts', label: 'Match Facts' }, { value: 'lineup', label: 'Lineup' }, { value: 'ratings', label: 'Ratings' }]} />
     {tab === 'facts' && <div className="mt-4"><section className="mb-4 grid grid-cols-2 gap-2"><div className="rounded-xl bg-zinc-900 p-3"><small className="text-[9px] uppercase text-zinc-500">Man of the Match</small><button type="button" disabled={!momId} onClick={() => momId && onNavigate({ name: 'player', id: momId })} className="mt-1 block w-full truncate text-left text-sm font-black text-emerald-300">{momId ? byId[momId]?.displayName ?? byId[momId]?.name : 'No rated players'}</button></div><div className="rounded-xl bg-zinc-900 p-3"><small className="text-[9px] uppercase text-zinc-500">Top 3 Ratings</small><div className="mt-1 space-y-0.5 text-xs">{sortedRatings.slice(0, 3).map(row => <p key={row.playerId} className="flex justify-between gap-1"><span className="truncate">{byId[row.playerId]?.displayName ?? byId[row.playerId]?.name}</span><b>{row.raw.toFixed(1)}</b></p>)}{!sortedRatings.length && <p>No ratings</p>}</div></div></section>{changes.length > 0 && <details className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3"><summary className="min-h-10 cursor-pointer text-sm font-black text-emerald-300">What Changed? · {changes.length}</summary><div className="mt-2 space-y-2">{changes.map(change => <div key={change.id}><b className="text-xs">{change.title}</b><p className="text-[10px] text-zinc-400">{change.detail}</p></div>)}</div></details>}<section className="mb-5"><h2 className="mb-2 text-sm font-semibold">Goals, assists & timeline</h2><MatchTimeline events={match.events} players={players} teamId={teamId} match={match} /></section>{(story.tags.length > 0 || story.scoreFlow.length > 1) && <section className="mb-5 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Match Story</h2>{story.scoreFlow.length > 1 && <p className="mt-2 text-sm font-black text-zinc-200">{story.scoreFlow.map(item => `${item.home}-${item.away}`).join(' → ')}</p>}<div className="mt-2 flex flex-wrap gap-1.5">{story.tags.slice(0, 3).map(tag => <span key={tag} className="rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] font-black text-emerald-300">{tag}</span>)}</div>{story.superSubs.slice(0, 2).map(row => <p key={row.playerId} className="mt-2 text-xs text-zinc-300"><b>{byId[row.playerId]?.displayName ?? byId[row.playerId]?.name}</b> entered {row.entryMinute}' · Super Sub · {row.goals}G {row.assists}A · {row.scoreAtEntry.home}-{row.scoreAtEntry.away} → {row.finalScore.home}-{row.finalScore.away}</p>)}</section>}</div>}
@@ -57,6 +61,7 @@ export function MatchDetailScreen({ matchId, onNavigate }: { matchId: string; on
     <button type="button" onClick={() => onNavigate({ name: 'team', id: teamId })} className="mt-5 w-full rounded-xl bg-emerald-500 py-3 text-xs font-black text-black">BACK TO TEAM</button>
     <button type="button" onClick={() => onNavigate({ name: 'edit-match', id: match.id })} className="mt-3 w-full rounded-xl bg-zinc-800 py-3 text-xs font-black text-zinc-300">EDIT MATCH</button>
     <button type="button" onClick={() => setDeleteConfirmationStep(1)} className="mt-3 w-full rounded-xl border border-red-500/30 py-2 text-xs font-semibold text-red-400">Delete match</button>
+    {deleteError && <p role="alert" className="mt-2 text-xs font-semibold text-amber-300">{deleteError}</p>}
     {deleteConfirmationStep === 1 && (
       <div role="dialog" aria-modal="true" aria-label="Delete Match?" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
         <div className="w-full max-w-sm rounded-2xl bg-zinc-900 p-6">
@@ -76,7 +81,7 @@ export function MatchDetailScreen({ matchId, onNavigate }: { matchId: string; on
           <input type="text" placeholder="Enter 1001" value={deleteConfirmationInput} onChange={e => setDeleteConfirmationInput(e.target.value)} className="mt-4 w-full rounded-xl bg-black p-3 text-center text-lg font-black tracking-widest text-white outline-none ring-1 ring-zinc-700 focus:ring-red-500" />
           <div className="mt-6 flex gap-2">
             <button className="flex-1 rounded-xl bg-zinc-800 p-3 text-sm font-bold" onClick={() => { setDeleteConfirmationStep(0); setDeleteConfirmationInput(''); }}>Cancel</button>
-            <button disabled={deleteConfirmationInput !== '1001'} className="flex-1 rounded-xl bg-red-900 p-3 text-sm font-bold text-red-100 disabled:opacity-50" onClick={() => { deleteMatch(match.id); onNavigate({ name: 'home' }); }}>Delete Match</button>
+            <button disabled={deleteConfirmationInput !== '1001'} className="flex-1 rounded-xl bg-red-900 p-3 text-sm font-bold text-red-100 disabled:opacity-50" onClick={() => { try { deleteMatch(match.id); onNavigate({ name: 'home' }) } catch (error) { setDeleteError(error instanceof Error ? error.message : 'This match cannot be deleted safely.'); setDeleteConfirmationStep(0); setDeleteConfirmationInput('') } }}>Delete Match</button>
           </div>
         </div>
       </div>
