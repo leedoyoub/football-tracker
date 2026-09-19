@@ -19,14 +19,14 @@ export function SubstitutionSelection({ direction }: { direction: 'in' | 'out' }
 export function displayedRating(rating: number): number { return Number(rating.toFixed(1)) }
 export const ratingBadgeColor = (rating: number) => displayedRating(rating) >= GOOD_RATING_THRESHOLD ? 'bg-emerald-500 text-white' : displayedRating(rating) >= 6 ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'
 
-export function SubstitutePlayerCard({ player, team, rating, stats, position, inMinute, outMinute, showRating = true, selection, onClick }: { player: Player, team?: Team, rating?: number, stats?: { goals: number, assists: number }, position?: string, inMinute?: number, outMinute?: number, showRating?: boolean, selection?: 'in' | 'out', onClick: () => void }) {
+export function SubstitutePlayerCard({ player, team, rating, stats, position, inMinute, outMinute, showRating = true, selection, isMotm = false, onClick }: { player: Player, team?: Team, rating?: number, stats?: { goals: number, assists: number }, position?: string, inMinute?: number, outMinute?: number, showRating?: boolean, selection?: 'in' | 'out', isMotm?: boolean, onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} aria-label={playerDisplayName(player)} className={`flex w-full min-w-0 flex-col items-center rounded-lg bg-zinc-900 px-1 pb-2 pt-5 text-center transition-transform ${selection ? 'relative z-10 scale-105' : ''}`}>
       <div className="relative flex h-10 w-10 items-center justify-center">
         <PlayerIcon player={player} team={team} position={position ?? player.position} className="h-10 w-10 text-[11px]" />
         {showRating && (
-          <Badge colorClass={rating === undefined ? 'bg-zinc-700 text-zinc-300' : ratingBadgeColor(rating)} className="absolute -right-3 -top-3 z-30 shadow-lg" size="large">
-            {rating === undefined ? '-' : rating.toFixed(1)}
+          <Badge colorClass={rating === undefined ? 'bg-zinc-700 text-zinc-300' : isMotm ? 'bg-blue-500 text-white' : ratingBadgeColor(rating)} className="absolute -right-3 -top-3 z-30 shadow-lg" size="large">
+            {rating === undefined ? '-' : `${rating.toFixed(1)}${isMotm ? ' ★' : ''}`}
           </Badge>
         )}
       </div>
