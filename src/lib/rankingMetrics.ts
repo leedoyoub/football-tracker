@@ -1,4 +1,5 @@
 import type { LeaderboardMetric } from '../engine/stats'
+import type { CompetitionType } from '../types'
 
 // The four ranking surfaces deliberately share this public metric contract.
 // Keep its order stable: it is the order users swipe through on every surface.
@@ -19,6 +20,14 @@ export const RANKING_METRICS = [
 ] as const satisfies readonly { value: LeaderboardMetric; label: string }[]
 
 export type RankingDisplayMetric = typeof RANKING_METRICS[number]['value']
+
+export type RankingTitleScope = CompetitionType | 'all'
+
+export function rankingTitle(scope: RankingTitleScope, teamScoped = false) {
+  if (teamScoped) return 'Team Ranking'
+  if (scope === 'all') return 'Global Ranking'
+  return `${scope === 'league' ? 'League' : scope === 'cup' ? 'Cup' : 'Champions'} Ranking`
+}
 
 export function formatRankingMetricValue(metric: LeaderboardMetric, value: number) {
   return `${value.toFixed(metric === 'rating' || metric.includes('/') ? 2 : 0)}${metric === 'savePercentage' ? '%' : ''}`
