@@ -7,7 +7,8 @@ import { getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, ratePlayerMatch } 
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { compareStandings, type Standing } from './standings'
 import type { LeaderboardMetric } from './stats'
-import { AWARD_433, awardPositionFamily, isAwardEligible, monthlyAwardScore } from './awardRules'
+import { AWARD_433, isAwardEligible, monthlyAwardScore } from './awardRules'
+import { scopedAwardFamilyByPlayer } from './positionScope'
 
 export type RankMovement = number | null
 export type RankedStanding = Standing & { movement: RankMovement }
@@ -53,6 +54,7 @@ export type SeasonAnalytics = {
   playerSnapshots: Map<number, PlayerRankingSnapshot>
   formTable: Standing[]
   monthlyAwards: Map<number, MonthlyAwards>
+  activeMonthlyAwards?: MonthlyAwards
   latestMonthlyAwards?: MonthlyAwards
   latestReview?: MatchdayReview
 }
@@ -184,10 +186,10 @@ function monthlyAwardsFor(block: MonthlyBlock, teams: Team[], players: Player[],
   for (const match of selected) for (const teamId of recordedTeams(match, registered)) teamCounts.set(teamId, (teamCounts.get(teamId) ?? 0) + 1)
   const rows = [...(last?.rows.get('rating') ?? [])].filter(row => isAwardEligible(row.appearances, teamCounts.get(row.teamId) ?? 0))
   const ordered = rows.slice().sort((a, b) => monthlyAwardScore(b.avgRating) - monthlyAwardScore(a.avgRating) || b.mom - a.mom || (b.goals + b.assists) - (a.goals + a.assists) || b.minutes - a.minutes || a.playerId.localeCompare(b.playerId))
-  const byPlayer = new Map(players.map(player => [player.id, player]))
+  const historicalFamilies = scopedAwardFamilyByPlayer(players, selected, {})
   const used = new Set<string>()
   const slots = AWARD_433.map(role => {
-    const pool = ordered.filter(row => awardPositionFamily(byPlayer.get(row.playerId)?.position) === role.family)
+    const pool = ordered.filter(row => historicalFamilies.get(row.playerId) === role.family)
     const candidate = pool.find(row => !used.has(row.playerId))
     if (!candidate) return { slot: role.slot, position: role.position, playerId: null, avgRating: 0, matches: 0 }
     used.add(candidate.playerId)
@@ -252,9 +254,13 @@ export function buildSeasonAnalytics(teams: Team[], players: Player[], matches: 
   }
   const monthlyResults = [...monthlyAwards.values()]
   const latestMonthlyAwards = monthlyResults[monthlyResults.length - 1]
+  const activeBlock = monthlyBlockRange(monthlyBlockForMatchday(currentMatchDay) ?? 0)
+  const activeMonthlyAwards = activeBlock && leagueMatches.some(match => match.matchDay >= activeBlock.startMatchDay && match.matchDay <= activeBlock.endMatchDay)
+    ? monthlyAwards.get(activeBlock.id) ?? monthlyAwardsFor(activeBlock, teams, players, leagueMatches, false)
+    : undefined
   const result: SeasonAnalytics = {
     season, leagueMatches, currentMatchDay, latestCompletedMatchDay, leagueSnapshots, playerSnapshots,
-    formTable: formTable(teams, leagueMatches), monthlyAwards, latestMonthlyAwards,
+    formTable: formTable(teams, leagueMatches), monthlyAwards, activeMonthlyAwards, latestMonthlyAwards,
     latestReview: latestCompletedMatchDay ? buildReview(latestCompletedMatchDay, leagueSnapshots, playerSnapshots) : undefined,
   }
   bySeason.set(key, result)

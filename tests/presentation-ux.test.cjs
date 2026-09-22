@@ -27,16 +27,25 @@ const { HomeScreen } = require('../src/screens/HomeScreen.tsx')
 const { PlayerDetailScreen } = require('../src/screens/PlayerDetailScreen.tsx')
 const { playerFullName, playerDisplayName } = require('../src/components/ui.tsx')
 const { APP_VERSION } = require('../src/config.ts')
+const { defaultScreenState } = require('../src/lib/navigation.ts')
 const player = (id, position = 'ST') => ({ id, name: 'Legacy ' + id, fullName: 'Complete Name ' + id, displayName: 'Short ' + id, position, number: 9, teamId: 'A', teamIds: ['A', 'B'] })
 const match = (id, players, props = {}) => ({ id, season: 'S1', matchDay: 1, date: '2026-09-01', duration: 90, homeTeamId: 'A', awayTeamId: 'OPP', teamId: 'A', appearances: players.map(p => ({ playerId: p.id, teamId: 'A', role: 'starter', position: p.position, matchPosition: p.position })), events: [], ...props })
 const goal = (id, minute, props = {}) => ({ id, type: 'goal', teamId: 'A', minute, ...props })
 const near = (a, b) => assert(Math.abs(a-b) < 1e-10, `${a} != ${b}`)
 function nodes(n, predicate) { if (Array.isArray(n)) return n.flatMap(c => nodes(c, predicate)); if (!n || typeof n !== 'object') return []; return [...(predicate(n) ? [n] : []), ...nodes(n.props?.children, predicate)] }
 function text(n) { return Array.isArray(n) ? n.map(text).join('') : n && typeof n === 'object' ? text(n.props?.children) : n == null ? '' : String(n) }
-function screen(Component, store, props = {}) { const h = { cursor: 0, state: [], store }; const render = () => { owner = h; h.cursor = 0; return Component({ season: 'S1', onSeason() {}, onNavigate() {}, onBack() {}, ...props }) }; return { render } }
+function screen(Component, store, props = {}) {
+  const route = Component === HomeScreen ? { name: 'home' } : Component === PlayersScreen ? { name: 'players' } : { name: 'player', id: props.playerId ?? 'p' }
+  const h = { cursor: 0, state: [], store, screenState: defaultScreenState(route) }
+  const render = () => {
+    owner = h; h.cursor = 0
+    return Component({ season: 'S1', onSeason() {}, onNavigate() {}, onBack() {}, screenState: h.screenState, onStateChange(next) { h.screenState = next }, ...props })
+  }
+  return { render }
+}
 const teams = [{ id: 'A', name: 'Team A', shortName: 'A' }, { id: 'B', name: 'Team B', shortName: 'B' }]
 
-test('ST always receives .85 per goal and .50 per assist for starters, subs and position changes', () => {
+test('ST always receives .90 per goal and .55 per assist for starters, subs and position changes', () => {
   const p = player('p')
   for (const position of ['ST', 'LST', 'RST']) {
     for (const role of ['starter', 'bench']) {
@@ -44,14 +53,14 @@ test('ST always receives .85 per goal and .50 per assist for starters, subs and 
       m.events = [goal('g1', 20, { playerId: 'p' }), goal('g2', 50, { playerId: 'p' }), goal('a1', 60, { assistPlayerId: 'p' })]
       if (role === 'bench') m.events.unshift({ id: 'sub', type: 'sub', teamId: 'A', minute: 10, playerOutId: 'other', playerInId: 'p', position })
       const before = JSON.stringify(m); const r = ratePlayerMatch(m, p)
-      near(r.goals, 1.7); near(r.assists, .5); near(r.goals + r.assists, 2.2)
+      near(r.goals, 1.8); near(r.assists, .55); near(r.goals + r.assists, 2.35)
       assert.equal(JSON.stringify(m), before)
-      m.events = m.events.filter(e => e.id !== 'g2'); near(ratePlayerMatch(m, p).goals, .85)
+      m.events = m.events.filter(e => e.id !== 'g2'); near(ratePlayerMatch(m, p).goals, .90)
     }
   }
   const switched = match('switch', [p]); switched.appearances[0].matchPosition = 'CM'; switched.appearances[0].positionHistory = [{ minute: 30, position: 'ST' }]
   switched.events = [goal('goal', 40, { playerId: 'p' }), goal('assist', 50, { assistPlayerId: 'p' })]
-  near(ratePlayerMatch(switched, p).goals, .85); near(ratePlayerMatch(switched, p).assists, .5)
+  near(ratePlayerMatch(switched, p).goals, .90); near(ratePlayerMatch(switched, p).assists, .55)
 })
 
 test('non-ST scoring rules do not have legacy first-contribution adjustments', () => {

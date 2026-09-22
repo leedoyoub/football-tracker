@@ -1,0 +1,15 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const { test } = require('node:test')
+
+test('Home, View All, and Match Detail consume their dedicated event projections without arbitrary caps', () => {
+  const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
+  const highlight = fs.readFileSync(require.resolve('../src/screens/SeasonHighlightScreen.tsx'), 'utf8')
+  const matchDetail = fs.readFileSync(require.resolve('../src/screens/MatchDetailScreen.tsx'), 'utf8')
+  assert.match(home, /majorNewsEvents\([^)]*season[^)]*\)\.slice\(0, 4\)/)
+  assert.match(highlight, /majorNewsEvents\([^)]*season[^)]*\)/)
+  assert(!highlight.includes('homeMilestoneNews'))
+  assert.match(matchDetail, /matchChangesForMatch\([^)]*match\.id\)/)
+  assert(!matchDetail.includes('groupMatchChanges('))
+  assert(!matchDetail.includes('matchChangesForMatch(') || !matchDetail.includes('matchChangesForMatch(players, teams, matches, competitionStates, match.id).slice'))
+})

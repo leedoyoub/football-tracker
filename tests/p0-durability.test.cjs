@@ -75,7 +75,7 @@ test('match editor waits for durable save, preserves a failed form, and exposes 
   assert(editor.includes('await saveMatchDurably(matchData)'))
   assert(editor.includes('Save failed. Your match was not safely stored. Please retry.'))
   assert(editor.indexOf('await saveMatchDurably(matchData)') < editor.indexOf('clearDraftMatch()'))
-  assert(editor.indexOf('await saveMatchDurably(matchData)') < editor.indexOf("onNavigate({ name: 'match', id: draftId })"))
+  assert(editor.indexOf('await saveMatchDurably(matchData)') < editor.indexOf("onReplace({ name: 'match', id: draftId })"))
 })
 
 const tick = callback => queueMicrotask(callback)

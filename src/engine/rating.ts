@@ -25,13 +25,13 @@ const RULE = (goal: number, assist: number, teamGoal: number, suppressionMax: nu
 
 /** Finalized values. This table is intentionally data-only. */
 export const POSITION_RULES: Record<Position, PositionRules> = {
-  ST: RULE(.85, .50, 0, 0, 0), LST: RULE(.85, .50, 0, 0, 0), RST: RULE(.85, .50, 0, 0, 0),
-  SS: RULE(.90, .55, 0, 0, 0), LW: RULE(1, .65, 0, 0, 0), RW: RULE(1, .65, 0, 0, 0), CAM: RULE(1, .65, 0, 0, 0),
-  LM: RULE(1.05, .65, .03, .25, -.04), RM: RULE(1.05, .65, .03, .25, -.04),
-  CM: RULE(1.05, .65, .05, .25, -.08), LCM: RULE(1.05, .65, .05, .25, -.08), RCM: RULE(1.05, .65, .05, .25, -.08),
-  CDM: RULE(1.15, .70, .05, .65, -.10), LDM: RULE(1.15, .70, .05, .65, -.10), RDM: RULE(1.15, .70, .05, .65, -.10),
-  LB: RULE(1.25, .70, .03, 1.20, -.30), LWB: RULE(1.25, .70, .03, 1.20, -.30), RB: RULE(1.25, .70, .03, 1.20, -.30), RWB: RULE(1.25, .70, .03, 1.20, -.30),
-  CB: RULE(1.35, .75, 0, 1.50, -.35), LCB: RULE(1.35, .75, 0, 1.50, -.35), RCB: RULE(1.35, .75, 0, 1.50, -.35),
+  ST: RULE(.90, .55, 0, 0, 0), LST: RULE(.90, .55, 0, 0, 0), RST: RULE(.90, .55, 0, 0, 0),
+  SS: RULE(.90, .55, 0, 0, 0), LW: RULE(1, .65, .05, 0, 0), RW: RULE(1, .65, .05, 0, 0), CAM: RULE(1, .65, .05, 0, 0),
+  LM: RULE(1.05, .65, .05, .15, -.10), RM: RULE(1.05, .65, .05, .15, -.10),
+  CM: RULE(1.05, .65, .07, .25, -.10), LCM: RULE(1.05, .65, .07, .25, -.10), RCM: RULE(1.05, .65, .07, .25, -.10),
+  CDM: RULE(1.15, .70, .06, .50, -.15), LDM: RULE(1.15, .70, .06, .50, -.15), RDM: RULE(1.15, .70, .06, .50, -.15),
+  LB: RULE(1.25, .70, .04, 1, -.30), LWB: RULE(1.25, .70, .04, 1, -.30), RB: RULE(1.25, .70, .04, 1, -.30), RWB: RULE(1.25, .70, .04, 1, -.30),
+  CB: RULE(1.35, .75, 0, 1.30, -.35), LCB: RULE(1.35, .75, 0, 1.30, -.35), RCB: RULE(1.35, .75, 0, 1.30, -.35),
   GK: RULE(1.50, 1, 0, 0, -.35),
 }
 

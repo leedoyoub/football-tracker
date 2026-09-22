@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { recentMatches } from './recentMatches'
 import { Pitch } from '../components/Pitch'
 import { TeamIcon } from '../components/TeamIcon'
@@ -14,18 +14,18 @@ import { RankDelta, SegmentedControl } from '../components/SeasonUI'
 import { CompetitionScopeSelector } from '../components/CompetitionScopeSelector'
 import { useStore } from '../store'
 import { sortPlayersByPosition } from '../lib/positionOrder'
-import type { CompetitionType, Team, View } from '../types'
+import type { CompetitionType, ScreenStateByView, Team, View } from '../types'
 
-const teamTabMemory = new Map<string, 'overview' | 'matches' | 'players' | 'stats'>()
-
-export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamId: string; season: string; onNavigate: (view: View) => void; onBack: () => void }) {
+export function TeamDetailScreen({ teamId, season, screenState, onStateChange, onNavigate, onBack }: { teamId: string; season: string; screenState: ScreenStateByView['team']; onStateChange: (state: ScreenStateByView['team']) => void; onNavigate: (view: View) => void; onBack: () => void }) {
   const { teams, players, matches, competitionStates = [] } = useStore()
-  const [expandedContext, setExpandedContext] = useState<string | null>(null)
-  const [bestSeason, setBestSeason] = useState(season)
-  const [bestCompetition, setBestCompetition] = useState<CompetitionType | 'all'>('all')
-  const [matchesCompetition, setMatchesCompetition] = useState<CompetitionType | 'all'>('all')
-  const [tab, setTab] = useState<'overview' | 'matches' | 'players'>(() => { const saved = teamTabMemory.get(`${teamId}:${season}`); return saved === 'stats' ? 'overview' : saved ?? 'overview' })
-  useEffect(() => { teamTabMemory.set(`${teamId}:${season}`, tab) }, [teamId, season, tab])
+  const { expandedContext, bestPlayersCompetition: bestCompetition, matchesCompetition, tab } = screenState
+  const bestSeason = screenState.bestPlayersSeason ?? season
+  const patchState = (patch: Partial<ScreenStateByView['team']>) => onStateChange({ ...screenState, ...patch })
+  const setExpandedContext = (value: string | null) => patchState({ expandedContext: value })
+  const setBestSeason = (value: string) => patchState({ bestPlayersSeason: value })
+  const setBestCompetition = (value: CompetitionType | 'all') => patchState({ bestPlayersCompetition: value })
+  const setMatchesCompetition = (value: CompetitionType | 'all') => patchState({ matchesCompetition: value })
+  const setTab = (value: ScreenStateByView['team']['tab']) => patchState({ tab: value })
   const team = teams.find((item) => item.id === teamId)
   const seasons = seasonsFromMatches(matches)
   const activeSeason = seasons.includes(season) ? season : seasons[0] ?? season
@@ -66,7 +66,7 @@ export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamI
     {tab === 'overview' && <><div className="mt-4 mb-5 grid grid-cols-4 gap-2 text-center">
       {[['Rank', <span key="rank" className="flex items-center justify-center">{overview.league.rank ? `#${overview.league.rank}` : '—'} <RankDelta value={leagueRow?.movement ?? null} /></span>], ['W-D-L', `${overview.league.wins}-${overview.league.draws}-${overview.league.losses}`], ['GF-GA', `${overview.league.goalsFor}-${overview.league.goalsAgainst}`], ['Pts', overview.league.points]].map(([label, value]) => <div key={String(label)} className="min-w-0 rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{value}</div><div className="text-[9px] uppercase text-zinc-500">{label}</div></div>)}
     </div><div className="mb-2 grid grid-cols-4 gap-2 text-center"><div className="col-span-3 min-w-0 rounded-xl bg-zinc-900 px-2 py-2"><div className="truncate text-sm font-black">{overview.champions.status}</div><div className="text-[9px] uppercase text-zinc-500">Champions</div></div><div className="min-w-0 rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{overview.champions.goalsFor}-{overview.champions.goalsAgainst}</div><div className="text-[9px] uppercase text-zinc-500">GF-GA</div></div></div><div className="mb-5 grid grid-cols-4 gap-2 text-center"><div className="col-span-3 min-w-0 rounded-xl bg-zinc-900 px-2 py-2"><div className="truncate text-sm font-black">{overview.cup.status}</div><div className="text-[9px] uppercase text-zinc-500">Cup</div></div><div className="min-w-0 rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{overview.cup.goalsFor}-{overview.cup.goalsAgainst}</div><div className="text-[9px] uppercase text-zinc-500">GF-GA</div></div></div></>}
-    {tab === 'overview' && <TeamBestPlayers team={team} teamId={teamId} selectedSeason={selectedBestSeason} competition={bestCompetition} seasons={seasons.length ? seasons : [activeSeason]} players={players} matches={matches} onSeason={setBestSeason} onCompetition={setBestCompetition} onPlayer={id => onNavigate({ name: 'player', id })} onViewAll={(metric) => onNavigate({ name: 'global-ranking', season: selectedBestSeason, competitionType: bestCompetition, rankingMetric: metric, teamId })} />}
+    {tab === 'overview' && <TeamBestPlayers team={team} teamId={teamId} selectedSeason={selectedBestSeason} competition={bestCompetition} metric={screenState.bestPlayersMetric as LeaderboardMetric} seasons={seasons.length ? seasons : [activeSeason]} players={players} matches={matches} onSeason={setBestSeason} onCompetition={setBestCompetition} onMetric={metric => patchState({ bestPlayersMetric: metric })} onPlayer={id => onNavigate({ name: 'player', id })} onViewAll={(metric) => onNavigate({ name: 'global-ranking', season: selectedBestSeason, competitionType: bestCompetition, rankingMetric: metric, teamId })} />}
     {tab === 'players' && <><section className="mt-6"><div className="mb-3 flex items-end justify-between"><div><h2 className="text-lg font-semibold">Latest XI</h2><p className="text-xs text-zinc-400">Kickoff XI · {best.formation ?? 'Saved formation unavailable'}</p></div></div>{best.match && best.slots.length ? <Pitch slots={best.slots} players={players} teams={teams} statsByPlayer={statsByPlayer} showPositionBadge={false} presentation="history" onSlotClick={(slot) => { if (slot.playerId) onNavigate({ name: 'player', id: slot.playerId }) }} /> : <div className="rounded-2xl bg-zinc-900 p-6 text-center text-sm text-zinc-500">No match data yet</div>}</section><section className="mt-6">
       <h2 className="mb-1 text-sm font-semibold">Bench</h2><p className="mb-2 text-[10px] text-zinc-500">Not in Latest XI</p>
       {allTeamPlayers.length > 0 ? (
@@ -97,11 +97,10 @@ export function TeamDetailScreen({ teamId, season, onNavigate, onBack }: { teamI
 
 function scopedTeamRanking(players: Parameters<typeof buildGlobalRankingData>[0], matches: Parameters<typeof buildGlobalRankingData>[1], teamId: string, season: string, competition: CompetitionType | 'all') { return buildGlobalRankingData(players, competition === 'all' ? matches : matches.filter(match => matchCompetitionType(match) === competition), { seasons: [season], teams: [teamId], positions: [] }, 'rating') }
 
-function TeamBestPlayers({ team, teamId, selectedSeason, competition, seasons, players, matches, onSeason, onCompetition, onPlayer, onViewAll }: { team: Team; teamId: string; selectedSeason: string; competition: CompetitionType | 'all'; seasons: string[]; players: Parameters<typeof buildGlobalRankingData>[0]; matches: Parameters<typeof buildGlobalRankingData>[1]; onSeason: (season: string) => void; onCompetition: (competition: CompetitionType | 'all') => void; onPlayer: (id: string) => void; onViewAll: (metric: LeaderboardMetric) => void }) {
-  const [metric, setMetric] = useState<LeaderboardMetric>('rating')
+function TeamBestPlayers({ team, teamId, selectedSeason, competition, metric, seasons, players, matches, onSeason, onCompetition, onMetric, onPlayer, onViewAll }: { team: Team; teamId: string; selectedSeason: string; competition: CompetitionType | 'all'; metric: LeaderboardMetric; seasons: string[]; players: Parameters<typeof buildGlobalRankingData>[0]; matches: Parameters<typeof buildGlobalRankingData>[1]; onSeason: (season: string) => void; onCompetition: (competition: CompetitionType | 'all') => void; onMetric: (metric: LeaderboardMetric) => void; onPlayer: (id: string) => void; onViewAll: (metric: LeaderboardMetric) => void }) {
   const index = useMemo(() => scopedTeamRanking(players, matches, teamId, selectedSeason, competition), [players, matches, teamId, selectedSeason, competition])
   const byId = useMemo(() => new Map(players.map(player => [player.id, player])), [players])
   const rows = rankGlobalRankingRows(index, players, metric).slice(0, 5)
-  const swipe = useMetricSwipe(RANKING_METRICS.map(item => item.value), metric, setMetric)
-  return <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">Best Players</h2><CompetitionScopeSelector value={competition} onChange={onCompetition} /></div><div className="mb-3"><select aria-label="Best Players season" value={selectedSeason} onChange={event => onSeason(event.target.value)} className="w-full rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold">{seasons.map(item => <option key={item}>{item}</option>)}</select></div><RankingMetricTabs label="Best Players category" value={metric} onChange={setMetric} options={RANKING_METRICS} /><div {...swipe} className="mt-2 overflow-hidden rounded-xl bg-zinc-900 touch-pan-y" aria-label="Swipe Team Best Player metrics">{rows.map((row, index) => { const player = byId.get(row.playerId); return <div key={row.playerId} className="border-b border-white/5 last:border-0"><RankingRow rank={index + 1} player={player} team={team} value={formatRankingMetricValue(metric, row.value)} onClick={() => player && onPlayer(player.id)} /></div> })}{!rows.length && <p className="p-3 text-xs text-zinc-500">No qualifying players yet.</p>}</div><button type="button" onClick={() => onViewAll(metric)} className="secondary-view-all mt-3 w-full">View All</button></section>
+  const swipe = useMetricSwipe(RANKING_METRICS.map(item => item.value), metric, onMetric)
+  return <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">Best Players</h2><CompetitionScopeSelector value={competition} onChange={onCompetition} /></div><div className="mb-3"><select aria-label="Best Players season" value={selectedSeason} onChange={event => onSeason(event.target.value)} className="w-full rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold">{seasons.map(item => <option key={item}>{item}</option>)}</select></div><RankingMetricTabs label="Best Players category" value={metric} onChange={onMetric} options={RANKING_METRICS} /><div {...swipe} className="mt-2 overflow-hidden rounded-xl bg-zinc-900 touch-pan-y" aria-label="Swipe Team Best Player metrics">{rows.map((row, index) => { const player = byId.get(row.playerId); return <div key={row.playerId} className="border-b border-white/5 last:border-0"><RankingRow rank={index + 1} player={player} team={team} value={formatRankingMetricValue(metric, row.value)} onClick={() => player && onPlayer(player.id)} /></div> })}{!rows.length && <p className="p-3 text-xs text-zinc-500">No qualifying players yet.</p>}</div><button type="button" onClick={() => onViewAll(metric)} className="secondary-view-all mt-3 w-full">View All</button></section>
 }

@@ -14,7 +14,7 @@ test('final direct goal and assist coefficients apply at event positions', () =>
   const st = player('st', 'ST'), cb = player('cb', 'CB')
   const stMatch = game(st); stMatch.events = [goal(10, { playerId: 'st' }), goal(20, { assistPlayerId: 'st' })]
   const cbMatch = game(cb); cbMatch.events = [goal(10, { playerId: 'cb' }), goal(20, { assistPlayerId: 'cb' })]
-  near(ratePlayerMatch(stMatch, st).goals, .85); near(ratePlayerMatch(stMatch, st).assists, .5)
+  near(ratePlayerMatch(stMatch, st).goals, .90); near(ratePlayerMatch(stMatch, st).assists, .55)
   near(ratePlayerMatch(cbMatch, cb).goals, 1.35); near(ratePlayerMatch(cbMatch, cb).assists, .75)
 })
 
@@ -22,14 +22,14 @@ test('uninvolved team goals exclude scorer and assister and use event-time posit
   const p = player(); const match = game(p)
   match.appearances[0].positionHistory = [{ minute: 30, position: 'CDM' }]
   match.events = [goal(10, { playerId: 'p' }), goal(20, { playerId: 'mate', assistPlayerId: 'p' }), goal(40, { playerId: 'mate' })]
-  near(ratePlayerMatch(match, p).teamGoals, .05)
+  near(ratePlayerMatch(match, p).teamGoals, .06)
   const cb = player('cb', 'CB'); const cbMatch = game(cb); cbMatch.events = [goal(20, { playerId: 'mate' })]
   near(ratePlayerMatch(cbMatch, cb).teamGoals, 0)
 })
 
 test('SOT curve and minute-prorated suppression use the finalized values', () => {
   assert.deepEqual([0, 1, 2, 3, 5, 10].map(sotMultiplier), [1, .86, .73, .62, .45, .20])
-  for (const [minutes, expected] of [[30, 1.5 / 3], [45, .75], [60, 1.5 * 2 / 3], [90, 1.5]]) {
+  for (const [minutes, expected] of [[30, 1.3 / 3], [45, .65], [60, 1.3 * 2 / 3], [90, 1.3]]) {
     const cb = player(`cb${minutes}`, 'CB'); const match = game(cb); match.appearances[0].role = 'bench'; match.events = [{ id: 'on', type: 'sub', minute: 90 - minutes, teamId: 'A', playerOutId: 'out', playerInId: cb.id, position: 'CB' }]
     near(ratePlayerMatch(match, cb).noConceded, expected)
   }
@@ -41,8 +41,8 @@ test('conceded penalties honor on-pitch event-time position and individual cause
   const sub = player('sub', 'CB'); const after = game(sub); after.appearances[0].role = 'bench'; after.events = [goal(20, { teamId: 'B' }), { id: 'on', type: 'sub', minute: 30, teamId: 'A', playerOutId: 'x', playerInId: 'sub', position: 'CB' }]
   near(ratePlayerMatch(after, sub).conceded, 0)
   const changed = player('changed', 'CB'); const match = game(changed); match.appearances[0].positionHistory = [{ minute: 50, position: 'CDM' }]; match.events = [goal(20, { teamId: 'B' }), goal(60, { teamId: 'B', concededGoalCausePlayerId: 'changed' })]
-  near(ratePlayerMatch(match, changed).conceded, -.45); near(ratePlayerMatch(match, changed).concededCause, -.3)
-  for (const [position, penalty] of [['LB', -.3], ['LWB', -.3], ['RB', -.3], ['RWB', -.3], ['CB', -.35], ['LCB', -.35], ['RCB', -.35], ['CDM', -.1], ['CM', -.08], ['LM', -.04], ['ST', 0]]) { const p = player(position, position); const m = game(p); m.events = [goal(30, { teamId: 'B' })]; near(ratePlayerMatch(m, p).conceded, penalty) }
+  near(ratePlayerMatch(match, changed).conceded, -.50); near(ratePlayerMatch(match, changed).concededCause, -.3)
+  for (const [position, penalty] of [['LB', -.3], ['LWB', -.3], ['RB', -.3], ['RWB', -.3], ['CB', -.35], ['LCB', -.35], ['RCB', -.35], ['CDM', -.15], ['CM', -.10], ['LM', -.10], ['ST', 0]]) { const p = player(position, position); const m = game(p); m.events = [goal(30, { teamId: 'B' })]; near(ratePlayerMatch(m, p).conceded, penalty) }
 })
 
 test('v2.1.2 per-goal conceded coefficients scale for fullbacks, centre-backs, and goalkeepers', () => {

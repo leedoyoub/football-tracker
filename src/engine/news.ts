@@ -3,7 +3,7 @@ import { competitionAwardResult, monthlyCanonicalAwardResult } from './awards'
 import { currentStaticTeams } from '../data/teams'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
-import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
+import type { CompetitionState, CompetitionType, EventSurface, Match, MatchChangePayload, Player, Team } from '../types'
 import { oldestMatches } from './matchChronology'
 import { buildSeasonAnalytics, rankingMovement } from './seasonAnalytics'
 
@@ -12,8 +12,9 @@ export type NewsImportance = 'major' | 'medium' | 'minor'
 export type MilestoneScope = 'league' | 'cup' | 'champions' | 'season' | 'career'
 export type AttackingMilestoneType = 'goals' | 'assists' | 'goal-contributions' | 'balanced'
 export type MilestoneMetadata = { scope: MilestoneScope; type: AttackingMilestoneType; threshold: number; season?: string; competition?: CompetitionType }
-export type NewsItem = { id: string; kind: NewsKind; importance?: NewsImportance; date: string; matchId?: string; playerId?: string; teamId?: string; eyebrow: string; title: string; detail: string; context: string; emoji: string; milestone?: MilestoneMetadata }
+export type NewsItem = { id: string; kind: NewsKind; importance?: NewsImportance; date: string; matchId?: string; playerId?: string; teamId?: string; eyebrow: string; title: string; detail: string; context: string; emoji: string; milestone?: MilestoneMetadata; surface?: EventSurface; matchChange?: MatchChangePayload }
 type NewsDraft = Omit<NewsItem, 'emoji'>
+export type DerivedFootballEvent = NewsItem & { surface: EventSurface }
 type Totals = { goals: number; assists: number; apps: number; mom: number; saves: number; cleanSheets: number }
 type Streak = { scoring: number; contribution: number }
 type TeamRun = { wins: number; unbeaten: number; cleanSheets: number; seasonGoals: number; seasonCleanSheets: number }
@@ -22,9 +23,19 @@ const EMPTY_STATES: CompetitionState[] = []
 type NewsCacheEntry = { revision: number; items: NewsItem[] }
 const newsCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], NewsCacheEntry>>>>()
 
-/** The sole News chronology rule: newest date first, then a stable identity. */
-export function sortNewsNewestFirst<T extends { date: string; id: string }>(items: T[]): T[] {
-  return items.slice().sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
+/** The sole News chronology rule: newest date, newest anchored Match, then ID. */
+export function sortNewsNewestFirst<T extends { date: string; id: string; matchId?: string }>(items: T[], matches?: Match[]): T[] {
+  const chronology = matches ? new Map(oldestMatches(matches).map((match, index) => [match.id, index])) : undefined
+  return items.slice().sort((a, b) => {
+    const dateOrder = b.date.localeCompare(a.date)
+    if (dateOrder) return dateOrder
+    const leftMatch = a.matchId ? chronology?.get(a.matchId) : undefined
+    const rightMatch = b.matchId ? chronology?.get(b.matchId) : undefined
+    if (leftMatch !== undefined && rightMatch !== undefined && leftMatch !== rightMatch) return rightMatch - leftMatch
+    if (leftMatch !== undefined && rightMatch === undefined) return -1
+    if (leftMatch === undefined && rightMatch !== undefined) return 1
+    return b.id.localeCompare(a.id)
+  })
 }
 
 type AwardNewsResult = { scopeLabel: string; playerLabel: string; teamLabel: string; bestPlayerId: string; bestXI: { playerId: string | null }[]; anchorMatch: { id: string; date: string } }
@@ -298,9 +309,15 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
       for (const row of snapshot.standings) if (row.movement && Math.abs(row.movement) >= 2) add({ id: `rank:team:${seasonName}:${day}:${row.teamId}`, kind: 'team', importance: row.rank === 1 ? 'major' : 'medium', date: lastMatch.date, matchId: lastMatch.id, teamId: row.teamId, eyebrow: 'LEAGUE MOVEMENT', title: `${teamName(teams, row.teamId)} ${row.movement > 0 ? 'climb' : 'drop'} ${Math.abs(row.movement)} places to #${row.rank}`, detail: `League table after MD${day}.`, context: scoreText(lastMatch, teams) })
       const currentPlayers = analytics.playerSnapshots.get(day)
       const previousPlayers = analytics.playerSnapshots.get(day - 1)
-      for (const metric of ['goals', 'assists', 'mom', 'rating'] as const) {
-        const movement = rankingMovement(currentPlayers, previousPlayers, metric)
+      for (const metric of ['rating', 'goals', 'assists', 'g+a', 'mom'] as const) {
         const rows = currentPlayers?.rows.get(metric) ?? []
+        const priorLeader = previousPlayers?.rows.get(metric)?.[0]?.playerId
+        const leader = rows[0]
+        if (leader && priorLeader && leader.playerId !== priorLeader) {
+          const label = metric === 'g+a' ? 'G+A' : metric === 'mom' ? 'MOM' : metric === 'rating' ? 'Rating' : metric[0].toUpperCase() + metric.slice(1)
+          add({ id: `rank:player:${seasonName}:${day}:${metric}:${leader.playerId}`, kind: 'player', importance: 'major', surface: 'news', date: lastMatch.date, matchId: lastMatch.id, playerId: leader.playerId, eyebrow: `${label.toUpperCase()} RACE`, title: `${playerName(players, leader.playerId)} takes #1 in ${label}`, detail: `League after MD${day}.`, context: `League - MD${day}` })
+        }
+        const movement = rankingMovement(currentPlayers, previousPlayers, metric)
         for (const [index, row] of rows.slice(0, 5).entries()) { const delta = movement.get(row.playerId); if (!delta || (Math.abs(delta) < 2 && index > 0)) continue; add({ id: `rank:player:${seasonName}:${day}:${metric}:${row.playerId}`, kind: 'player', importance: index === 0 ? 'major' : 'minor', date: lastMatch.date, matchId: lastMatch.id, playerId: row.playerId, eyebrow: `${metric.toUpperCase()} RACE`, title: `${playerName(players, row.playerId)} moves to #${index + 1} in ${metric === 'rating' ? 'Avg Rating' : metric}`, detail: `${delta > 0 ? 'Up' : 'Down'} ${Math.abs(delta)} place${Math.abs(delta) === 1 ? '' : 's'}.`, context: `League · MD${day}` }) }
       }
     }
@@ -352,7 +369,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
     }
   }
 
-  return sortNewsNewestFirst([...items.values()])
+  return sortNewsNewestFirst([...items.values()], matches)
 }
 
 export function deriveNews(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES): NewsItem[] {
@@ -367,6 +384,43 @@ export function deriveNews(players: Player[], teams: Team[], matches: Match[], s
   const result = deriveNewsUncached(players, teams, matches, states)
   byStates.set(states, { revision: RATING_ENGINE_REVISION, items: result })
   return result
+}
+
+/** Explicit semantic whitelist for the compact Home News surface. */
+function surfaceFor(item: NewsItem): EventSurface {
+  if (item.surface) return item.surface
+  if (item.id.startsWith('award:') || item.id.startsWith('title:') || item.id.startsWith('double:') || item.id.startsWith('treble:') || item.id.startsWith('cup-winner:') || item.id.startsWith('champions-winner:')) return 'news'
+  if (item.id.startsWith('rare:') && item.importance === 'major') return 'both'
+  if (item.id.startsWith('career-apps:') || item.id.startsWith('career-mom:') || item.id.startsWith('career-clean-sheets:')) return 'news'
+  if (item.milestone?.scope === 'career' && item.milestone.threshold >= 50 && ['goals', 'assists', 'goal-contributions'].includes(item.milestone.type)) return 'news'
+  if (item.id.startsWith('streak:') || item.id.startsWith('team-win-streak:') || item.id.startsWith('team-unbeaten:')) return 'both'
+  return 'match-change'
+}
+
+/** Canonical, non-persistent event model consumed by News and Match Changes. */
+export function deriveFootballEvents(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES): DerivedFootballEvent[] {
+  const derived = deriveNews(players, teams, matches, states)
+    // The participant-only transition index owns detailed ranking movement.
+    // Snapshot stories enter this model solely for an explicit core-metric #1.
+    .filter(item => !item.id.startsWith('rank:') || item.surface === 'news')
+    .map(item => ({ ...item, surface: surfaceFor(item), matchChange: item.matchChange ?? { kind: item.id.startsWith('rank:') ? 'ranking' : item.id.startsWith('record:') ? 'record' : item.id.startsWith('rare:') ? 'performance' : item.id.startsWith('award:') || item.id.startsWith('title:') ? 'competition' : 'milestone', label: item.title } }))
+  const contributions: DerivedFootballEvent[] = ordered(matches).flatMap(match => {
+    const byPlayer = new Map<string, { goals: number; assists: number }>()
+    const add = (playerId: string, key: 'goals' | 'assists') => { const row = byPlayer.get(playerId) ?? { goals: 0, assists: 0 }; row[key]++; byPlayer.set(playerId, row) }
+    for (const event of match.events) if (event.type === 'goal' && !event.ownGoal) { if (event.playerId) add(event.playerId, 'goals'); if (event.assistPlayerId) add(event.assistPlayerId, 'assists') }
+    return [...byPlayer.entries()].map(([playerId, row]) => {
+      const name = playerName(players, playerId)
+      const summary = [row.goals && `${row.goals} goal${row.goals === 1 ? '' : 's'}`, row.assists && `${row.assists} assist${row.assists === 1 ? '' : 's'}`].filter(Boolean).join(', ')
+      return { id: `match-performance:${match.id}:${playerId}`, kind: 'match' as const, date: match.date, matchId: match.id, playerId, eyebrow: 'MATCH CHANGE', title: `${name} records ${summary}`, detail: summary, context: scoreText(match, teams), emoji: '⚽', surface: 'match-change' as const, matchChange: { kind: 'performance' as const, label: `${name}: ${summary}` } }
+    })
+  })
+  return sortNewsNewestFirst([...derived, ...contributions], matches)
+}
+
+/** Major News projection: one deterministic whitelist shared by Home and View All. */
+export function majorNewsEvents(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES, season?: string): DerivedFootballEvent[] {
+  const matchSeasons = new Map(matches.map(match => [match.id, match.season]))
+  return deriveFootballEvents(players, teams, matches, states).filter(item => (item.surface === 'news' || item.surface === 'both') && (!season || !item.matchId || matchSeasons.get(item.matchId) === season))
 }
 
 export function homeMilestoneNews(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES): NewsItem[] {

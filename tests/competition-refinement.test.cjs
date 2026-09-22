@@ -23,9 +23,9 @@ test('competition navigation defaults to League and keeps season/type as indepen
   const app = fs.readFileSync(require.resolve('../src/App.tsx'), 'utf8')
   const screen = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
   const nav = fs.readFileSync(require.resolve('../src/components/BottomNav.tsx'), 'utf8')
-  assert(screen.includes("initialType = 'league'"))
+  assert(screen.includes('const type = screenState.competitionType'))
   assert(screen.includes('Competition season') && screen.includes('setType(item)'))
-  assert(app.includes('view.season ?? season') && app.includes("view.competitionType ?? 'league'"))
+  assert(app.includes('view.season ?? season') && app.includes("ScreenStateByView['competition']"))
   assert(nav.includes("label: 'Competitions'") && !nav.includes("id: 'news'") && !nav.includes('🏆'))
 })
 
@@ -65,11 +65,11 @@ test('Cup total boundary tie performs a stable Elimination Draw only among affec
   assert(!first.lastEliminationDrawTeamIds.includes('T13'))
 })
 
-test('Cup UI retains eliminated teams, cumulative columns and a Survival Line above orange At Risk rows', () => {
+test('Cup UI retains eliminated teams, stage/frozen columns and a Survival Line above orange At Risk rows', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
   for (const token of ['W-D-L', 'GF-GA', 'Survival Line', 'At Risk', 'Eliminated · Stage', 'Show Survival Line', 'View All 16']) assert(source.includes(token), token)
   assert(source.includes("bg-orange-400/10") && !source.includes('bg-red-500/10'))
-  assert(source.includes('Displayed totals are cumulative; survival order uses this Stage only.'))
+  assert(source.includes('Survivors show this Stage; eliminated teams are frozen at elimination.'))
 })
 
 test('Cup final is one match, requests Replay on a three-way metric tie and Replay always resolves', () => {
@@ -131,7 +131,7 @@ test('Home has the four compact dashboard responsibilities and no active play-st
 
 test('Competition Best XI labels and sources are scoped to League, Cup stages and Champions rounds', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
-  for (const token of ['Team of the Stage ${index + 1}', 'Team of the Round ${index + 1}', 'Team of the Final', 'Team of the Season', 'competitionStageMatches']) assert(source.includes(token), token)
+  for (const token of ['Team of the Stage ${index + 1}', 'Team of the Round ${index + 1}', 'Team of the Final', 'Season Best XI', 'competitionStageMatches']) assert(source.includes(token), token)
   assert(source.includes("if (type === 'league') return []"))
   assert(!source.includes('Team of the Year'))
 })
@@ -183,9 +183,9 @@ test('season completion is synchronized as backward-compatible CompetitionState 
   assert(validation.includes("'season-complete'"))
 })
 
-test('visible and package metadata version are exactly v2.2.10 / 2.2.10', () => {
-  assert.equal(APP_VERSION, '2.2.10')
-  assert.equal(require('../package.json').version, '2.2.10')
+test('visible and package metadata version are exactly v2.2.11 / 2.2.11', () => {
+  assert.equal(APP_VERSION, '2.2.11')
+  assert.equal(require('../package.json').version, '2.2.11')
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('v{APP_VERSION}'))
 })

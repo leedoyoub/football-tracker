@@ -12,7 +12,8 @@ test('History entry uses a lightweight season shell and keeps Awards internal', 
   const screen = source('src/screens/RecordsHistory.tsx')
   assert(records.includes("category === 'history' && <RecordsHistory"))
   assert(!records.includes("category === 'awards' &&"))
-  for (const token of ['>Timeline<', '>Awards<', 'timelineSeason', 'awardSeason', 'openSeason === season && <TimelineDetail', 'openSeason === season && <AwardsDetail']) assert(screen.includes(token), token)
+  for (const token of ['>Timeline<', '>Awards<', "panel === 'timeline'", 'openSeason === season && <TimelineDetail', 'openSeason === season && <AwardsDetail']) assert(screen.includes(token), token)
+  assert(!screen.includes('useState('), 'history drill-down state must be owned by NavigationEntry')
 })
 
 test('History read models build only on first opened detail and reuse unchanged data', () => {

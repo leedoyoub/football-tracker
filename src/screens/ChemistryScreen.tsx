@@ -8,8 +8,9 @@ const CATEGORIES: [CombinationKind | 'goals', string][] = [['duo', 'Duo'], ['att
 const labels: Record<CombinationKind, string> = { duo: 'Together', attack: 'Attack unit', midfield: 'Midfield unit', cb: 'CB partnership', fullback: 'Fullback pair', backFour: 'Back four' }
 const sortLabels: Record<CombinationOnPitchMetric, string> = { onPitchGF90: 'On-pitch GF/90', onPitchGA90: 'On-pitch GA/90', onPitchGD90: 'On-pitch GD/90' }
 
-export function ChemistryScreen({ season, onNavigate }: { season: string; onNavigate: (view: View) => void }) {
+export function ChemistryScreen({ season, onNavigate: navigate, onBack }: { season: string; onNavigate: (view: View) => void; onBack: () => void }) {
   const { players, teams, matches } = useStore()
+  const onNavigate = (view: View) => view.name === 'home' ? onBack() : navigate(view)
   const [category, setCategory] = useState<CombinationKind | 'goals'>('duo')
   const [teamId, setTeamId] = useState('')
   const [onPitchMetric, setOnPitchMetric] = useState<CombinationOnPitchMetric | ''>('')

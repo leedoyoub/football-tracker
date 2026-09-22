@@ -14,6 +14,7 @@ import { hasPitchAppearance, ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAt
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import { kickoffLineupForMatch } from './kickoffLineup'
 import { newestMatches, oldestMatches } from './matchChronology'
+import { positionFamily, scopedAwardFamilyByPlayer, scopedPositionFamilyByPlayer } from './positionScope'
 
 
 export function seasonsFromMatches(matches: Match[]): string[] {
@@ -294,6 +295,10 @@ export function buildGlobalRankingData(
     return rows
   }
   const selected = matches.filter(match => (!filters.seasons.length || filters.seasons.includes(match.season)))
+  const historicalPositionFamilies = filters.positions.length
+    ? scopedPositionFamilyByPlayer(players, selected, { teams: filters.teams })
+    : undefined
+  const allowedPositionFamilies = new Set(filters.positions.map(positionFamily).filter((family): family is NonNullable<typeof family> => Boolean(family)))
   const playerById = new Map(players.map(player => [player.id, player]))
   const matchesByPlayer = new Map<string, Match[]>()
   for (const match of selected) {
@@ -320,7 +325,7 @@ export function buildGlobalRankingData(
   }
 
   const rows = players.flatMap(player => {
-    if (filters.positions.length && !filters.positions.includes(player.position)) return []
+    if (allowedPositionFamilies.size && !allowedPositionFamilies.has(historicalPositionFamilies?.get(player.id) as NonNullable<ReturnType<typeof positionFamily>>)) return []
     const playerMatches = oldestMatches(matchesByPlayer.get(player.id) ?? [])
     const ratingRows: RatingBreakdown[] = []
     let starts = 0; let subs = 0; let saves = 0; let wins = 0; let draws = 0; let losses = 0
@@ -549,6 +554,7 @@ const UNIFIED_433: { slot: string; position: Position; group: Position[]; fallba
 type UnifiedCandidate = {
   player: Player
   teamId?: string
+  awardFamily?: import('./awardRules').AwardPositionFamily
   average: number
   matches: number
   latestRating: number
@@ -591,10 +597,12 @@ function unifiedCandidates(players: Player[], matches: Match[], season: string, 
       const teamParticipations = orderedParticipations.filter((item) => item.teamId === teamId)
       const ratings = teamParticipations.flatMap((item) => item.rating ? [item.rating] : [])
       const selectedRatings = recentOnly ? ratings.slice(0, 3) : ratings
+      const selectedParticipations = recentOnly ? teamParticipations.slice(0, 3) : teamParticipations
       const completed = seasonMatches.filter((match) => matchRecordedForTeam(match, teamId)).length
       const eligible = teamParticipations.length >= Math.ceil(completed * 0.5)
       if ((recentOnly && selectedRatings.length < 3) || (!recentOnly && !eligible)) return []
-      return [{ player, teamId, average: selectedRatings.reduce((sum, row) => sum + row.raw, 0) / selectedRatings.length, matches: selectedRatings.length, latestRating: selectedRatings[0]?.raw ?? 0 }]
+      const awardFamily = scopedAwardFamilyByPlayer([player], selectedParticipations.map(item => item.match), { teams: [teamId] }).get(player.id)
+      return [{ player, teamId, awardFamily, average: selectedRatings.reduce((sum, row) => sum + row.raw, 0) / selectedRatings.length, matches: selectedRatings.length, latestRating: selectedRatings[0]?.raw ?? 0 }]
     })
   }).filter((candidate) => candidate.matches > 0).sort(candidateOrder)
 }
@@ -617,13 +625,10 @@ export function unifiedBestEleven(
   if (cached) return cached
   const candidates = unifiedCandidates(players, matches, season, recentOnly)
   const used = new Set<string>()
-  const pick = (positions: Position[], fallback: Position[] = []): UnifiedCandidate | undefined => {
-    const primary = candidates.find((candidate) => !used.has(candidate.player.id) && positions.includes(candidate.player.position))
-    if (primary) return primary
-    return candidates.find((candidate) => !used.has(candidate.player.id) && fallback.includes(candidate.player.position))
-  }
+  const familyForRole = (slot: string) => slot === 'GK' ? 'GK' : slot === 'LB' ? 'LB' : slot === 'RB' ? 'RB' : slot === 'LCB' || slot === 'RCB' ? 'CB' : ['LCM', 'CM', 'RCM'].includes(slot) ? 'MID' : 'ATT'
+  const pick = (slot: string): UnifiedCandidate | undefined => candidates.find(candidate => !used.has(candidate.player.id) && candidate.awardFamily === familyForRole(slot))
   const slots = UNIFIED_433.map((role) => {
-    const candidate = pick(role.group, role.fallback)
+    const candidate = pick(role.slot)
     if (!candidate) return { slot: role.slot, position: role.position, playerId: null, avgRating: 0, matches: 0 }
     used.add(candidate.player.id)
     return { slot: role.slot, position: role.position, playerId: candidate.player.id, teamId: candidate.teamId, avgRating: candidate.average, matches: candidate.matches }

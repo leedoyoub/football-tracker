@@ -1,7 +1,8 @@
 import type { Best11Slot, ChampionsStage, CompetitionState, CompetitionType, CupStage, Match, Player, Team } from '../types'
 import { championsCompetition, competitionMatches, competitionSeasonStatus, cupCompetition } from './competition'
 import { buildGlobalRankingData, unifiedBestEleven, type GlobalLeaderboardRow } from './stats'
-import { AWARD_433, awardPositionFamily, isAwardEligible } from './awardRules'
+import { AWARD_433, isAwardEligible } from './awardRules'
+import { scopedAwardFamilyByPlayer } from './positionScope'
 
 export { AWARD_433, awardPositionFamily, isAwardEligible } from './awardRules'
 
@@ -73,11 +74,11 @@ export function ratingAwardScore(avgRating: number, progressBonus: number, minut
   return avgRating + progressBonus * participationRatio(minutes, teamMatches)
 }
 
-export function buildAwardBestXI(players: Player[], ranked: { row: GlobalLeaderboardRow; score: number }[]): Best11Slot[] {
-  const byId = new Map(players.map(player => [player.id, player]))
+export function buildAwardBestXI(players: Player[], ranked: { row: GlobalLeaderboardRow; score: number }[], matches: Match[]): Best11Slot[] {
+  const historicalFamilies = scopedAwardFamilyByPlayer(players, matches, {})
   const used = new Set<string>()
   return AWARD_433.map(role => {
-    const selected = ranked.find(candidate => !used.has(candidate.row.playerId) && awardPositionFamily(byId.get(candidate.row.playerId)?.position) === role.family)
+    const selected = ranked.find(candidate => !used.has(candidate.row.playerId) && historicalFamilies.get(candidate.row.playerId) === role.family)
     if (!selected) return { slot: role.slot, position: role.position, playerId: null, avgRating: 0, matches: 0 }
     used.add(selected.row.playerId)
     return { slot: role.slot, position: role.position, playerId: selected.row.playerId, teamId: selected.row.historicalTeamId ?? selected.row.teamId, avgRating: rawAverage(selected.row), matches: appearances(selected.row) }
@@ -155,7 +156,7 @@ export function awardsForCompetition(type: CompetitionType, season: string, team
   const mvp = best ? { playerId: best.row.playerId, value: rawAverage(best.row), awardScore: best.score, label: 'Avg Rating' } : undefined
   const goalkeeperLabel = type === 'league' ? 'Goalkeeper of the Season' : type === 'cup' ? 'Goalkeeper of the Cup' : 'Goalkeeper of the Tournament'
   const goalkeeperEligible = eligible.map(candidate => ({ ...candidate, score: ratingAwardScore(goalkeeperAverage(candidate.row), bonusFor(teamIdFor(candidate.row)), goalkeeperMinutes(candidate.row), games.filter(match => match.teamId ? match.teamId === teamIdFor(candidate.row) : match.homeTeamId === teamIdFor(candidate.row) || match.awayTeamId === teamIdFor(candidate.row)).length) }))
-  return { complete, championId, scorer: winner(stats, row => row.goals, 'Goals'), assists: winner(stats, row => row.assists, 'Assists'), mvp, goalkeeper: goalkeeperWinner(goalkeeperEligible, goalkeeperLabel), bestXI: buildAwardBestXI(players, eligible) }
+  return { complete, championId, scorer: winner(stats, row => row.goals, 'Goals'), assists: winner(stats, row => row.assists, 'Assists'), mvp, goalkeeper: goalkeeperWinner(goalkeeperEligible, goalkeeperLabel), bestXI: buildAwardBestXI(players, eligible, games) }
 }
 
 export function seasonAwards(season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[]) {

@@ -135,8 +135,8 @@ function emptyStanding(teamId: string): Standing {
   return { rank: 0, teamId, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 }
 }
 
-function cupRows(teamIds: string[], cumulative: Standing[], current: Standing[], eliminatedAt: Record<string, number>, eliminatedOrder: Record<string, number>, atRisk: string[], championId?: string, runnerUpId?: string): CupTableRow[] {
-  const cumulativeById = new Map(cumulative.map(row => [row.teamId, row]))
+function cupRows(teamIds: string[], current: Standing[], eliminatedSnapshots: Record<string, Standing>, eliminatedAt: Record<string, number>, eliminatedOrder: Record<string, number>, atRisk: string[], championId?: string, runnerUpId?: string): CupTableRow[] {
+  const currentById = new Map(current.map(row => [row.teamId, row]))
   const currentRank = new Map(current.map((row, index) => [row.teamId, index + 1]))
   return teamIds.map(teamId => {
     const eliminatedStage = eliminatedAt[teamId]
@@ -145,7 +145,8 @@ function cupRows(teamIds: string[], cumulative: Standing[], current: Standing[],
     if (teamId === championId) rank = 1
     if (teamId === runnerUpId) rank = 2
     const state: CupTableRow['state'] = eliminatedStage ? 'eliminated' : atRisk.includes(teamId) ? 'at-risk' : 'surviving'
-    return { ...(cumulativeById.get(teamId) ?? emptyStanding(teamId)), rank, stageRank: currentRank.get(teamId), state, ...(eliminatedStage ? { eliminatedStage } : {}) }
+    const totals = eliminatedStage ? eliminatedSnapshots[teamId] : currentById.get(teamId)
+    return { ...(totals ?? emptyStanding(teamId)), rank, stageRank: currentRank.get(teamId), state, ...(eliminatedStage ? { eliminatedStage } : {}) }
   }).sort((a, b) => a.rank - b.rank || a.teamId.localeCompare(b.teamId))
 }
 
@@ -155,12 +156,14 @@ export function cupCompetition(teams: Team[], matches: Match[], season: string, 
   const eliminatedTeamIds: string[] = []
   const eliminatedAtByTeam: Record<string, number> = {}
   const eliminatedOrder: Record<string, number> = {}
+  const eliminatedSnapshots: Record<string, Standing> = {}
+  const processedStageMatches: Match[] = []
   let lastEliminationDrawTeamIds: string[] = []
   const cumulativeStandings = seasonStandings(teams.filter(team => teamIds.includes(team.id)), competitionMatches(matches, season, 'cup'), season)
 
   const result = (stage: CupStage, standings: Standing[], games: Match[], stageComplete: boolean, atRiskTeamIds: string[], eliminationDrawTeamIds: string[], championId?: string, runnerUpId?: string): CupCompetition => ({
     stage, activeTeamIds, eliminatedTeamIds, eliminatedAtByTeam, standings, cumulativeStandings,
-    rows: cupRows(teamIds, cumulativeStandings, standings, eliminatedAtByTeam, eliminatedOrder, atRiskTeamIds, championId, runnerUpId),
+    rows: cupRows(teamIds, standings, eliminatedSnapshots, eliminatedAtByTeam, eliminatedOrder, atRiskTeamIds, championId, runnerUpId),
     stageMatches: games, stageComplete, atRiskTeamIds, eliminationDrawTeamIds, lastEliminationDrawTeamIds, championId, runnerUpId,
   })
 
@@ -172,12 +175,15 @@ export function cupCompetition(teams: Team[], matches: Match[], season: string, 
     const atRisk = standings.slice(-2).map(row => row.teamId)
     const drawIds = boundaryTieIds(standings)
     if (!complete) return result(stage, standings, games, false, atRisk, drawIds)
+    processedStageMatches.push(...games)
+    const cumulativeAtStage = new Map(seasonStandings(teams.filter(team => teamIds.includes(team.id)), processedStageMatches, season).map(row => [row.teamId, row]))
     if (drawIds.length) lastEliminationDrawTeamIds = drawIds
     const eliminated = standings.slice(-2)
     eliminated.forEach((row, order) => {
       eliminatedTeamIds.push(row.teamId)
       eliminatedAtByTeam[row.teamId] = stageIndex + 1
       eliminatedOrder[row.teamId] = order
+      eliminatedSnapshots[row.teamId] = cumulativeAtStage.get(row.teamId) ?? emptyStanding(row.teamId)
     })
     activeTeamIds = standings.slice(0, -2).map(row => row.teamId)
   }

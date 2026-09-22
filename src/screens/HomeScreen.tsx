@@ -1,24 +1,21 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { APP_VERSION } from '../config'
 import { TeamIcon } from '../components/TeamIcon'
 import { SectionHeader } from '../components/SeasonUI'
 import { RankingMetricTabs, RankingRow, useMetricSwipe } from '../components/RankingRow'
 import { RANKING_METRICS, formatRankingMetricValue, type RankingDisplayMetric } from '../lib/rankingMetrics'
-import { homeMilestoneNews } from '../engine/news'
+import { majorNewsEvents } from '../engine/news'
 import { buildGlobalRankingData, rankGlobalRankingRows } from '../engine/stats'
 import { championsCompetition, cupCompetition, leagueCompetition } from '../engine/competition'
 import { derivedResults } from '../lib/results'
 import { useStore } from '../store'
-import type { Match, Player, Team, View } from '../types'
+import type { Player, ScreenStateByView, Team, View } from '../types'
 
-const homeLeaderMemory = new WeakMap<Match[], Map<string, RankingDisplayMetric>>()
-function rememberedMetric(matches: Match[], season: string) { let values = homeLeaderMemory.get(matches); if (!values) { values = new Map(); homeLeaderMemory.set(matches, values) }; return { values, metric: values.get(season) ?? 'rating' } }
-
-export function HomeScreen({ season, onNavigate }: { season: string; onSeason?: (season: string) => void; onNavigate: (view: View) => void }) {
+export function HomeScreen({ season, screenState, onStateChange, onNavigate }: { season: string; screenState: ScreenStateByView['home']; onStateChange: (state: ScreenStateByView['home']) => void; onSeason?: (season: string) => void; onNavigate: (view: View) => void }) {
   const { players, teams, matches, competitionStates = [] } = useStore()
-  const remembered = rememberedMetric(matches, season); const [metric, setMetric] = useState<RankingDisplayMetric>(remembered.metric)
+  const metric = screenState.leaderMetric as RankingDisplayMetric
   const recent = useMemo(() => derivedResults(matches, teams).slice(0, 5), [matches, teams])
-  const news = useMemo(() => homeMilestoneNews(players, teams, matches, competitionStates).slice(0, 4), [players, teams, matches, competitionStates])
+  const news = useMemo(() => majorNewsEvents(players, teams, matches, competitionStates, season).slice(0, 4), [players, teams, matches, competitionStates, season])
   const seasonMatches = useMemo(() => matches.filter(match => match.season === season), [matches, season])
   const rankingIndex = useMemo(() => buildGlobalRankingData(players, seasonMatches, { seasons: [season], teams: [], positions: [] }, 'rating'), [players, seasonMatches, season])
   const rankings = useMemo(() => new Map(RANKING_METRICS.map(item => [item.value, rankGlobalRankingRows(rankingIndex, players, item.value)])), [rankingIndex, players])
@@ -27,7 +24,7 @@ export function HomeScreen({ season, onNavigate }: { season: string; onSeason?: 
   const league = useMemo(() => leagueCompetition(teams, matches, season, players), [teams, matches, season, players])
   const cup = useMemo(() => cupCompetition(teams, matches, season, players), [teams, matches, season, players])
   const champions = useMemo(() => championsCompetition(competitionStates.find(state => state.id === `champions:${season}`), matches, season, players), [competitionStates, matches, season, players])
-  const selectMetric = (next: RankingDisplayMetric) => { remembered.values.set(season, next); setMetric(next) }
+  const selectMetric = (next: RankingDisplayMetric) => onStateChange({ ...screenState, leaderMetric: next })
   const leaderSwipe = useMetricSwipe(RANKING_METRICS.map(item => item.value), metric, selectMetric)
   return <div className="px-4 pb-8 pt-6">
     <header className="mb-5 rounded-2xl border border-white/5 bg-zinc-900 p-3"><p className="text-[10px] font-bold uppercase tracking-[.18em] text-emerald-400">Season dashboard</p><div className="mt-1 flex items-baseline justify-between gap-3"><h1 className="text-xl font-semibold">{season}</h1><span className="text-xs text-zinc-400">Competition progress</span></div><div className="mt-3 grid grid-cols-3 gap-2 text-[10px]"><Snapshot label="League" value={league.complete ? 'Completed · 30/30' : `MD${league.matchdayProgress}/30`} /><Snapshot label="Cup" value={cup.championId ? 'Completed' : cup.stage === 'final' ? 'Final' : `Stage ${cup.stage.replace('stage', '')}`} /><Snapshot label="Champions" value={champions.championId ? 'Completed' : champions.drawn ? champions.currentStage.replace(/([A-Z])/g, ' $1') : 'Not started'} /></div></header>

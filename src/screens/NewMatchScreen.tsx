@@ -76,7 +76,8 @@ type NewMatchScreenProps = {
   requestedSeason?: string
   competitionType?: CompetitionType
   editingMatchId?: string
-  onNavigate: (view: View) => void
+  onReplace: (view: View) => void
+  onBack: () => void
 }
 
 /** Resolve an editor entity before mounting the hook-heavy editor. This keeps a
@@ -96,7 +97,7 @@ export function NewMatchScreen(props: NewMatchScreenProps) {
   })
   if (conflict) {
     const context = draftContext(resumableDraft)!
-    return <div className="space-y-4 p-6"><h1 className="text-xl font-black">Unfinished match found</h1><p className="text-sm text-zinc-400">{context.season} · {context.competitionType} for this saved draft differs from the match you requested.</p><button type="button" onClick={() => props.onNavigate({ name: 'new-match', ...context })} className="w-full rounded-xl bg-emerald-500 p-3 font-black text-black">Resume Draft</button><button type="button" onClick={clearDraftMatch} className="w-full rounded-xl border border-zinc-600 p-3 font-black">Discard Draft &amp; Start New</button><button type="button" onClick={() => props.onNavigate({ name: 'team', id: props.teamId! })} className="w-full p-3 text-sm text-zinc-400">Cancel</button></div>
+    return <div className="space-y-4 p-6"><h1 className="text-xl font-black">Unfinished match found</h1><p className="text-sm text-zinc-400">{context.season} · {context.competitionType} for this saved draft differs from the match you requested.</p><button type="button" onClick={() => props.onReplace({ name: 'new-match', ...context })} className="w-full rounded-xl bg-emerald-500 p-3 font-black text-black">Resume Draft</button><button type="button" onClick={clearDraftMatch} className="w-full rounded-xl border border-zinc-600 p-3 font-black">Discard Draft &amp; Start New</button><button type="button" onClick={props.onBack} className="w-full p-3 text-sm text-zinc-400">Cancel</button></div>
   }
   const sourceMatch = props.editingMatchId ? editingMatch : resumableDraft
   const selectedTeamId = props.teamId ?? sourceMatch?.teamId ?? sourceMatch?.homeTeamId ?? teams[0]?.id ?? ''
@@ -106,11 +107,11 @@ export function NewMatchScreen(props: NewMatchScreenProps) {
 }
 
 function MatchEditor({
-  teamId,
   requestedSeason,
   competitionType: initialCompetitionType,
   editingMatchId,
-  onNavigate,
+  onReplace,
+  onBack,
   sourceMatch,
   selectedTeamId,
   restored,
@@ -508,7 +509,7 @@ function MatchEditor({
     try {
       const result = await saveMatchDurably(matchData)
       setSaveStatus(result.mirrorSaved ? 'Saved' : 'Saved locally · mirror pending')
-      window.setTimeout(() => onNavigate({ name: 'match', id: draftId }), 350)
+      window.setTimeout(() => onReplace({ name: 'match', id: draftId }), 350)
       return true
     } catch (error) {
       // Keep the in-memory editor and its draft intact. Navigation is allowed
@@ -522,7 +523,7 @@ function MatchEditor({
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 max-w-full touch-pan-y flex-col overflow-x-clip bg-black text-white">
       <div className="px-4 pt-3">
-        <button onClick={() => { if (editingMatchId) clearDraftMatch(); onNavigate(teamId ? { name: 'team', id: teamId } : { name: 'teams' }) }} className="mb-3 text-xs font-semibold text-emerald-400">← Cancel</button>
+        <button onClick={() => { if (editingMatchId) clearDraftMatch(); onBack() }} className="mb-3 text-xs font-semibold text-emerald-400">← Cancel</button>
         <h1 className="text-2xl font-bold">Log Match</h1>
         <div className="mb-2 flex min-w-0 items-center justify-between gap-3 rounded-xl bg-zinc-900 px-3 py-2">
           <div className="min-w-0"><p className="text-sm font-bold leading-tight text-zinc-300">{competitionContextParts(activeAssignment).primary}</p><p className="mt-0.5 text-xs font-black leading-tight text-emerald-400">{competitionContextParts(activeAssignment).secondary}</p></div>

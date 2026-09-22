@@ -1,16 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { playerFullName } from '../components/ui'
 import { PlayerIcon } from '../components/PlayerIcon'
 import { seasonsFromMatches } from '../engine/stats'
 import { useStore } from '../store'
 import { emptyFilters, matchesForPlayer, playerHasNoCurrentTeam, RankingFilterButton } from './RankingFilters'
-import type { View } from '../types'
+import type { ScreenStateByView, View } from '../types'
 import type { RankingFilters } from './RankingFilters'
 
-export function PlayersScreen({ onNavigate, appliedFilters = emptyFilters, onFiltersChange = () => {} }: { onNavigate: (view: View) => void; appliedFilters: RankingFilters; onFiltersChange: (filters: RankingFilters) => void }) {
+export function PlayersScreen({ screenState, onStateChange, onNavigate, appliedFilters = emptyFilters, onFiltersChange = () => {} }: { screenState: ScreenStateByView['players']; onStateChange: (state: ScreenStateByView['players']) => void; onNavigate: (view: View) => void; appliedFilters: RankingFilters; onFiltersChange: (filters: RankingFilters) => void }) {
   const { players, teams, matches } = useStore()
   const seasons = useMemo(() => seasonsFromMatches(matches), [matches])
-  const [search, setSearch] = useState('')
+  const search = screenState.search
+  const setSearch = (value: string) => onStateChange({ ...screenState, search: value })
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
     return players

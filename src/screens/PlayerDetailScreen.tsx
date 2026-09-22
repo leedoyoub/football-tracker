@@ -12,7 +12,7 @@ import { playerStreaks } from '../engine/seasonInsights'
 import { newestMatches } from '../engine/matchChronology'
 import { deriveNews } from '../engine/news'
 import { useStore } from '../store'
-import type { CompetitionType, Match, Player, RatingBreakdown, View } from '../types'
+import type { CompetitionType, Match, Player, RatingBreakdown, ScreenStateByView, View } from '../types'
 
 const competitions: { value: CompetitionType | 'all'; label: string }[] = [{ value: 'all', label: 'All competitions' }, { value: 'league', label: 'League' }, { value: 'cup', label: 'Cup' }, { value: 'champions', label: 'Champions' }]
 const pct = (number: number) => `${number.toFixed(0)}%`
@@ -20,12 +20,14 @@ const value = (number: number | null | undefined, digits = 2) => number === null
 const fieldPositions = new Set(['CB', 'LB', 'RB', 'LWB', 'RWB'])
 const metric = (label: string, content: string | number) => <div key={label} className="rounded-xl bg-black/20 px-2 py-2 text-center"><b className="block text-sm tabular-nums">{content}</b><small className="block text-[9px] uppercase text-zinc-500">{label}</small></div>
 
-export function PlayerDetailScreen({ playerId, season, onNavigate, onBack }: { playerId: string; season: string; onNavigate: (view: View) => void; onBack: () => void }) {
+export function PlayerDetailScreen({ playerId, season, screenState, onStateChange, onNavigate, onBack }: { playerId: string; season: string; screenState: ScreenStateByView['player']; onStateChange: (state: ScreenStateByView['player']) => void; onNavigate: (view: View) => void; onBack: () => void }) {
   const { players, teams, matches } = useStore()
   const player = players.find(item => item.id === playerId)
   const seasons = useMemo(() => seasonsFromMatches(matches), [matches])
-  const [selectedSeason, setSelectedSeason] = useState(seasons.includes(season) ? season : seasons[0] ?? season)
-  const [competition, setCompetition] = useState<CompetitionType | 'all'>('all')
+  const selectedSeason = screenState.season && seasons.includes(screenState.season) ? screenState.season : seasons.includes(season) ? season : seasons[0] ?? season
+  const competition = screenState.competition
+  const setSelectedSeason = (value: string) => onStateChange({ ...screenState, season: value })
+  const setCompetition = (value: CompetitionType | 'all') => onStateChange({ ...screenState, competition: value })
   const scopedMatches = useMemo(() => matches.filter(match => match.season === selectedSeason && (competition === 'all' || (match.competitionType ?? 'league') === competition)), [matches, selectedSeason, competition])
   const rankingIndex = useMemo(() => buildGlobalRankingData(players, scopedMatches, { seasons: [selectedSeason], teams: [], positions: [] }, 'rating'), [players, scopedMatches, selectedSeason])
   const rankingRows = useMemo(() => ({ rating: rankGlobalRankingRows(rankingIndex, players, 'rating'), goals: rankGlobalRankingRows(rankingIndex, players, 'goals'), assists: rankGlobalRankingRows(rankingIndex, players, 'assists') }), [rankingIndex, players])

@@ -58,5 +58,5 @@ test('Supabase browser auth owns URL detection and no callback token values are 
 
 test('logout resets the in-memory route as well as the persisted route', () => {
   const app = fs.readFileSync(require.resolve('../src/App.tsx'), 'utf8')
-  assert(app.includes("setHistory([{ name: 'home' }])") && app.includes('setRouteRestored(false)'))
+  assert(app.includes("setHistory(resetNavigationEntries({ name: 'home' }))") && app.includes('setRouteRestored(false)'))
 })

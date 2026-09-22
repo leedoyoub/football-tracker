@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { LocalRepository } from '../lib/repository';
-import type { View } from '../types';
 import { useAuth } from '../lib/auth';
 
-export function DataManagementScreen({ onNavigate }: { onNavigate: (view: View) => void }) {
+export function DataManagementScreen({ onBack }: { onBack: () => void }) {
   const [message, setMessage] = useState('');
   const { user, signInWithGoogle, signOut } = useAuth();
 
@@ -40,7 +39,7 @@ export function DataManagementScreen({ onNavigate }: { onNavigate: (view: View) 
 
   return (
     <div className="px-4 pb-8 pt-6">
-      <button type="button" onClick={() => onNavigate({ name: 'home' })} className="mb-3 text-xs font-semibold text-emerald-400">← Back</button>
+      <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">← Back</button>
       <h1 className="mb-4 text-2xl font-semibold">Data Management</h1>
       <div className="space-y-4">
         {user ? (

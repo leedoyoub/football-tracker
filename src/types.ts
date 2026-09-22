@@ -220,6 +220,82 @@ export type View =
   | { name: 'edit-player'; id: string }
   | { name: 'data-management' }
 
+export type PositionFilterKey = 'all' | 'st-ss' | 'lw-rw' | 'cam' | 'lm-rm' | 'cm' | 'cdm' | 'fb' | 'cb' | 'gk'
+
+/** Derived event visibility is ephemeral and never written into football history. */
+export type EventSurface = 'news' | 'match-change' | 'both'
+export type MatchChangePayload = { kind: 'milestone' | 'performance' | 'ranking' | 'record' | 'competition'; label: string }
+
+export type RecordsCategory = 'player' | 'combination' | 'team' | 'history' | 'awards' | 'insights' | 'integrity'
+
+/** Ephemeral UI state belongs to a navigation entry. It is intentionally
+ * separate from both the route persisted by lastRoute and football history. */
+export interface ScreenStateByView {
+  home: { name: 'home'; leaderMetric: RankSort; positionFilter: PositionFilterKey }
+  competition: {
+    name: 'competition'
+    competitionType: CompetitionType
+    tab: 'players' | 'table' | 'form' | 'history'
+    rankingMetric: RankSort
+    positionFilter: PositionFilterKey
+    bestXiMode: 'season' | 'monthly'
+    viewAllMetric: RankSort | null
+    cupViewAll: boolean
+    compareMode: boolean
+    comparedPlayerIds: string[]
+    rankingTeamIds: string[]
+    historyMatchday: number | null
+    historyComparedTeamIds: string[]
+  }
+  'global-ranking': { name: 'global-ranking'; metric: RankSort; scope: CompetitionType | 'all'; positionFilter: PositionFilterKey; viewAll: boolean }
+  results: { name: 'results' }
+  records: {
+    name: 'records'
+    category: RecordsCategory
+    competition: CompetitionType | 'all'
+    positionFilter: PositionFilterKey
+    filterSeasonIds: string[]
+    filterTeamIds: string[]
+    expandedLeaderboardId: string | null
+    historyPanel: string | null
+    historySeason: string | null
+    historyBlock: number | null
+  }
+  standings: { name: 'standings' }
+  'season-recap': { name: 'season-recap' }
+  'season-highlight': { name: 'season-highlight' }
+  chemistry: { name: 'chemistry' }
+  comparison: { name: 'comparison'; leftId: string | null; rightId: string | null; season: string | null; competition: CompetitionType | 'all'; teamId: string | null }
+  teams: { name: 'teams' }
+  team: {
+    name: 'team'
+    tab: 'overview' | 'matches' | 'players'
+    bestPlayersSeason: string | null
+    bestPlayersCompetition: CompetitionType | 'all'
+    bestPlayersMetric: RankSort
+    matchesCompetition: CompetitionType | 'all'
+    expandedContext: string | null
+  }
+  'import-squad': { name: 'import-squad' }
+  players: { name: 'players'; search: string }
+  player: { name: 'player'; season: string | null; competition: CompetitionType | 'all' }
+  match: { name: 'match'; tab: 'facts' | 'lineup' | 'ratings' }
+  'edit-match': { name: 'edit-match' }
+  'new-match': { name: 'new-match' }
+  'new-team': { name: 'new-team' }
+  'edit-team': { name: 'edit-team' }
+  'new-player': { name: 'new-player' }
+  'edit-player': { name: 'edit-player' }
+  'data-management': { name: 'data-management' }
+}
+
+export type ScreenState = ScreenStateByView[keyof ScreenStateByView]
+export type NavigationEntry<V extends View = View> = {
+  view: V
+  scrollTop: number
+  screenState: ScreenStateByView[V['name']]
+}
+
 export type RankSort =
   | 'rating' | 'goals' | 'assists' | 'g+a' | 'minutes' | 'mom'
   | 'goals/90' | 'assists/90' | 'g+a/90' | 'sotAllowed' | 'cleanSheets' | 'saves'

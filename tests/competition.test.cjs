@@ -110,7 +110,7 @@ test('Competition navigation, season selector, tabs, persistence, and Supabase m
   const cloud = fs.readFileSync(require.resolve('../src/lib/cloudMatch.ts'), 'utf8')
   const migration = fs.readFileSync(require.resolve('../supabase/migrations/20260910120000_add_competitions.sql'), 'utf8')
   assert(nav.includes("id: 'competition'") && !nav.includes("id: 'news'"))
-  assert(screen.includes("initialType = 'league'") && screen.includes('Competition season') && screen.includes('ChampionsBracket'))
+  assert(screen.includes('screenState.competitionType') && screen.includes('Competition season') && screen.includes('ChampionsBracket'))
   assert(matchScreen.includes('competitionType') && matchScreen.includes('competitionStage') && matchScreen.includes('competitionPairingId'))
   assert(sync.includes("competition_states") && cloud.includes('competition_type'))
   assert(migration.includes('competition_type') && migration.includes('competition_states'))
