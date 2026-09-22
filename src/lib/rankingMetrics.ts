@@ -9,6 +9,7 @@ export const RANKING_METRICS = [
   { value: 'g+a', label: 'G+A' },
   { value: 'minutes', label: 'Minutes' },
   { value: 'mom', label: 'MOM' },
+  { value: 'goodMatches', label: '7.2+ Matches' },
   { value: 'goals/90', label: 'Goals/90' },
   { value: 'assists/90', label: 'Assists/90' },
   { value: 'g+a/90', label: 'G+A/90' },

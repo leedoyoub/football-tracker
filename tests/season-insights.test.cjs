@@ -27,9 +27,9 @@ test('form ignores unused bench and streaks track current separately from season
 test('clutch classification rebuilds score state in chronological event order', () => {
   const game = match('clutch', 1, [goal('a', 10, { playerId: 'p' }), goal('b', 30, { teamId: 'B' }), goal('c', 80, { playerId: 'p' })])
   const classifications = insights.classifyGoalEvents(game)
-  assert.deepEqual(classifications[0].labels, ['Opening Goal', 'Go-ahead Goal'])
+  assert.deepEqual(classifications[0].labels, ['Opening Goal'])
   assert(classifications[1].labels.includes('Equalizer'))
-  assert.deepEqual(classifications[2].labels, ['Go-ahead Goal', 'Winning Goal', 'Late Goal'])
+  assert.deepEqual(classifications[2].labels, ['Go-ahead Goal', 'Game-winning Goal', 'Late Goal'])
 })
 
 test('starting XI leaders enforce the sample and recap requires explicit all-competition season completion', () => {

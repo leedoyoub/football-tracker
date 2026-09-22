@@ -13,7 +13,7 @@ const game = (id, events, appearances) => ({ id, season: 'S1', matchDay: 1, date
 
 test('Home uses the compact dashboard refinement', () => {
   const home = source('src/screens/HomeScreen.tsx')
-  assert(home.includes('Season dashboard') && home.includes('Season Leaders'))
+  assert(home.includes('Season dashboard') && home.includes('Global Ranking'))
   assert(!home.includes('competition-progress') && home.includes('item.emoji') && home.includes('News'))
   if (!home.includes('competition-progress')) return
   assert(home.includes("emoji: '👑', label: 'League'"))

@@ -1,4 +1,5 @@
 import type { CompetitionType, Match } from '../types'
+import { competitionIdentityForMatch } from './competitionContext'
 
 export type CompetitionRevisions = Record<string, Partial<Record<CompetitionType, number>>>
 
@@ -7,7 +8,8 @@ export function competitionRevision(revisions: CompetitionRevisions, season: str
 }
 
 function scope(match: Match): [string, CompetitionType] {
-  return [match.season, match.competitionType ?? 'league']
+  const identity = competitionIdentityForMatch(match)
+  return [identity.season, identity.competitionType]
 }
 
 function bumpScopes(revisions: CompetitionRevisions, scopes: Iterable<string>): CompetitionRevisions {

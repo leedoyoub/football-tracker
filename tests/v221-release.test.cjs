@@ -32,8 +32,8 @@ function game(day, options = {}) {
   }
 }
 
-test('v2.2.12 metadata and the finalized revision-9 position table are exact', () => {
-  assert.equal(APP_VERSION, '2.2.12'); assert.equal(require('../package.json').version, '2.2.12'); assert.equal(RATING_ENGINE_REVISION, 9)
+test('v2.2.13 metadata and the finalized revision-9 position table are exact', () => {
+  assert.equal(APP_VERSION, '2.2.13'); assert.equal(require('../package.json').version, '2.2.13'); assert.equal(RATING_ENGINE_REVISION, 9)
   const expected = {
     LB: [.04, 1], LWB: [.04, 1], RB: [.04, 1], RWB: [.04, 1],
     CDM: [.06, .50], LDM: [.06, .50], RDM: [.06, .50],
@@ -145,7 +145,7 @@ test('mobile screen hierarchy, compare mode, cached snapshots and navigation mem
   const team = fs.readFileSync(require.resolve('../src/screens/TeamDetailScreen.tsx'), 'utf8')
   const playerDetail = fs.readFileSync(require.resolve('../src/screens/PlayerDetailScreen.tsx'), 'utf8')
   const matchDetail = fs.readFileSync(require.resolve('../src/screens/MatchDetailScreen.tsx'), 'utf8')
-  for (const token of ['screenState.leaderMetric', 'Season Leaders', 'News', 'slice(0, 5)', 'slice(0, 4)', 'seasonMatches']) assert(home.includes(token), token)
+  for (const token of ['screenState.leaderMetric', 'Global Ranking', 'News', 'slice(0, 5)', 'slice(0, 4)', 'seasonMatches']) assert(home.includes(token), token)
   for (const token of ['screenState.competitionType', 'screenState.rankingMetric', "label: 'Players'", "label: 'Table'", "label: 'Form'", "label: 'History'", 'Team of the Month', 'Race History']) assert(competition.includes(token), token)
   for (const token of ['screenState.bestPlayersMetric', "label: 'Overview'", "label: 'Matches'", "label: 'Players'", 'Roster management', 'Latest XI', 'Bench', 'RANKING_METRICS']) assert(team.includes(token), token)
   for (const token of ['RankedMetric', 'Overall rank', 'Position-family rank', 'Team rank', 'Season avg', 'Last 5 avg', 'Active Streaks', 'Awards']) assert(playerDetail.includes(token), token)

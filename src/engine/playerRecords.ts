@@ -6,12 +6,14 @@ import { positionFilterFamilies, scopedPositionFamilyByPlayer } from './position
 import { getMatchManOfTheMatch, isOnPitchAtEvent, matchPositionAtEvent, matchPositionSegments, ratePlayerMatch } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { playerStreaks } from './seasonInsights'
+import { goalTypeTotals } from './goalTypes'
 
 export type PlayerRecordLeaderboardId =
   | 'goals' | 'assists' | 'matches-scored-in' | 'braces' | 'hat-tricks'
   | 'four-goals' | 'three-assists' | 'four-ga' | 'mom'
   | 'good' | 'eight' | 'nine' | 'ten' | 'clean-sheets' | 'saves'
   | 'good-streak' | 'scoring-streak' | 'ga-streak'
+  | 'game-winning-goals' | 'comeback-goals' | 'equalizers' | 'opening-goals' | 'stoppage-time-goals'
   | 'highest-rating' | 'highest-goals' | 'highest-assists' | 'highest-ga'
 
 export type PlayerRecordRow = { playerId: string; numeric: number; value: string; detail: string; rank: number }
@@ -23,6 +25,7 @@ type PlayerRecordFacts = {
   fourGoalGames: number; threeAssistGames: number; fourGAGames: number; mom: number; goodRatings: number; eightRatings: number
   nineRatings: number; tenRatings: number; cleanSheets: number; saves: number; goodStreak: number; scoringStreak: number; gaStreak: number
   highestRating: number; highestGoals: number; highestAssists: number; highestGA: number
+  gameWinningGoals: number; comebackGoals: number; equalizers: number; openingGoals: number; stoppageTimeGoals: number
 }
 
 const cache = new WeakMap<Match[], WeakMap<Player[], Map<string, PlayerRecordGroup[]>>>()
@@ -73,6 +76,7 @@ function buildFacts(players: Player[], matches: Match[], scope: PlayerRecordScop
     const count = (predicate: (row: typeof rated[number]) => boolean) => rated.filter(predicate).length
     const sum = (metric: (row: typeof rated[number]) => number) => rated.reduce((total, row) => total + metric(row), 0)
     const streak = (key: 'goodRating' | 'goals' | 'goalContributions') => playerStreaks(player, games).find(row => row.key === key)?.best ?? 0
+    const goalTypes = (key: Parameters<typeof goalTypeTotals>[0] extends never ? never : keyof ReturnType<typeof goalTypeTotals>) => rated.reduce((total, row) => total + goalTypeTotals(row.match, player.id)[key], 0)
     return [{
       playerId: player.id, appearances: rated.length,
       goals: sum(row => row.goals), assists: sum(row => row.assists), matchesScoredIn: count(row => row.goals >= 1), braces: count(row => row.goals >= 2), hatTricks: count(row => row.goals >= 3),
@@ -80,6 +84,7 @@ function buildFacts(players: Player[], matches: Match[], scope: PlayerRecordScop
       goodRatings: count(row => row.rating.raw >= GOOD_RATING_THRESHOLD), eightRatings: count(row => row.rating.raw >= 8), nineRatings: count(row => row.rating.raw >= 9), tenRatings: count(row => row.rating.raw === 10),
       cleanSheets: count(row => row.cleanSheet), saves: sum(row => row.saves), goodStreak: streak('goodRating'), scoringStreak: streak('goals'), gaStreak: streak('goalContributions'),
       highestRating: Math.max(...rated.map(row => row.rating.raw)), highestGoals: Math.max(...rated.map(row => row.goals)), highestAssists: Math.max(...rated.map(row => row.assists)), highestGA: Math.max(...rated.map(row => row.goals + row.assists)),
+      gameWinningGoals: goalTypes('gameWinning'), comebackGoals: goalTypes('comeback'), equalizers: goalTypes('equalizer'), openingGoals: goalTypes('opening'), stoppageTimeGoals: goalTypes('stoppageTime'),
     }]
   })
 }
@@ -104,6 +109,7 @@ export function buildPlayerRecordLeaderboards(players: Player[], matches: Match[
     group('mom', 'Most MOM Awards', row => row.mom, ' MOM'), group('good', 'Most 7.2+ Matches', row => row.goodRatings), group('eight', 'Most 8.0+ Ratings', row => row.eightRatings), group('nine', 'Most 9.0+ Ratings', row => row.nineRatings),
     group('ten', 'Most 10.0 Ratings', row => row.tenRatings, '', () => 'final canonical 10.0 ratings'), group('clean-sheets', 'Most Clean Sheets', row => row.cleanSheets, ' CS'), group('saves', 'Most Career Saves', row => row.saves, ' saves'),
     group('good-streak', 'Longest 7.2+ Streak', row => row.goodStreak, ' matches'), group('scoring-streak', 'Longest Scoring Streak', row => row.scoringStreak, ' matches'), group('ga-streak', 'Longest G+A Streak', row => row.gaStreak, ' matches'),
+    group('game-winning-goals', 'Most Game-Winning Goals', row => row.gameWinningGoals, ' goals'), group('comeback-goals', 'Most Comeback Goals', row => row.comebackGoals, ' goals'), group('equalizers', 'Most Equalizers', row => row.equalizers, ' goals'), group('opening-goals', 'Most Opening Goals', row => row.openingGoals, ' goals'), group('stoppage-time-goals', 'Most Stoppage-Time Goals', row => row.stoppageTimeGoals, ' goals'),
     group('highest-rating', 'Highest Match Rating', row => row.highestRating, '', row => `${row.highestRating.toFixed(2)} canonical raw rating`), group('highest-goals', 'Most Goals in a Match', row => row.highestGoals, ' goals'),
     group('highest-assists', 'Most Assists in a Match', row => row.highestAssists, ' assists'), group('highest-ga', 'Most G+A in a Match', row => row.highestGA, ' G+A'),
   ]

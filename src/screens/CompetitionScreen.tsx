@@ -20,6 +20,7 @@ import {
   type CupCompetition,
 } from '../engine/competition'
 import { competitionRevision } from '../engine/competitionRevision'
+import { matchCompetitionStage } from '../engine/competitionContext'
 import { selectLeagueCompetition, type LeagueCacheDiagnostic } from '../engine/competitionSelectors'
 import { matchScore } from '../engine/rating'
 import { LEAGUE_MATCHES_PER_TEAM } from '../engine/leagueFormat'
@@ -246,7 +247,7 @@ function CompetitionRankings({ season, type, screenState, onStateChange, players
     if (next.length === 2) onNavigate({ name: 'comparison', leftId: next[0], rightId: next[1], season, competitionType: type })
   }
   const sectionId = `competition-ranking-${type}-${metric}`
-  return <section id={sectionId} className="mt-7"><SectionHeader title="Global Rankings" subtitle={`${season} · ${LABELS[type]} only`} action={<div className="flex items-center gap-1"><button type="button" aria-pressed={compareMode} onClick={() => patchState({ compareMode: !compareMode, comparedPlayerIds: [] })} className={`min-h-9 rounded-lg px-2 text-[10px] font-black ${compareMode ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-emerald-300'}`}>{compareMode ? 'Cancel' : 'Compare'}</button><RankingFilterButton applied={effective} onApply={next => patchState({ rankingTeamIds: next.teams, viewAllMetric: null })} seasons={[season]} teams={teams} /></div>} />
+  return <section id={sectionId} className="mt-7"><SectionHeader title={`${LABELS[type]} Ranking`} subtitle={`${season} · ${LABELS[type]} only`} action={<div className="flex items-center gap-1"><button type="button" aria-pressed={compareMode} onClick={() => patchState({ compareMode: !compareMode, comparedPlayerIds: [] })} className={`min-h-9 rounded-lg px-2 text-[10px] font-black ${compareMode ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-emerald-300'}`}>{compareMode ? 'Cancel' : 'Compare'}</button><RankingFilterButton applied={effective} onApply={next => patchState({ rankingTeamIds: next.teams, viewAllMetric: null })} seasons={[season]} teams={teams} /></div>} />
     {compareMode && <p className="mb-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-[10px] text-emerald-200">Select exactly two players ({selectedPlayers.length}/2). Ranking order stays unchanged.</p>}
     <div className="no-scrollbar mb-3 flex gap-1.5 overflow-x-auto pb-1 touch-pan-x" onPointerDown={event => { if (event.pointerType === 'mouse') drag.current = { x: event.clientX, left: event.currentTarget.scrollLeft, active: true } }} onPointerMove={event => { if (drag.current.active) event.currentTarget.scrollLeft = drag.current.left - (event.clientX - drag.current.x) }} onPointerUp={() => { drag.current.active = false }}>{METRICS.map(item => <button key={item.id} type="button" onClick={() => patchState({ rankingMetric: item.id, viewAllMetric: null })} className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold ${metric === item.id ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-zinc-400'}`}>{item.label}</button>)}</div>{all && rows.length > 10 && <FloatingScrollToTop sectionId={sectionId} />}
     <div {...rankingSwipe} className="overflow-hidden rounded-xl bg-zinc-900 touch-pan-y" aria-label="Swipe competition ranking metrics">{(all ? rows : rows.slice(0, 10)).map((row, index) => { const player = playerById[row.playerId]; const team = teamById[row.historicalTeamId ?? row.teamId]; const selected = selectedPlayers.includes(row.playerId); return <div key={row.playerId} className="border-b border-white/5 last:border-0"><RankingRow rank={index + 1} player={player} team={team} movement={type === 'league' ? playerMovement.get(row.playerId) ?? null : null} value={format(row.value)} selected={compareMode && selected} onClick={() => choosePlayer(row.playerId)} /></div> })}{!rows.length && <p className="p-3 text-xs text-zinc-500">No qualifying players yet.</p>}</div>
@@ -278,9 +279,9 @@ function CompetitionBestElevens({ season, type, players, teams, matches, allMatc
       const games = competitionStageMatches(allMatches, season, 'cup', stage)
       const complete = cup?.stage !== stage && games.length > 0
       return complete ? [{ title: `Team of the Stage ${index + 1}`, games, recent: false }] : []
-    }), ...(cup?.championId ? [{ title: 'Team of the Final', games: competitionMatches(allMatches, season, 'cup').filter(match => match.competitionStage === 'final' || match.competitionStage === 'finalReplay'), recent: false }] : [])]
+    }), ...(cup?.championId ? [{ title: 'Team of the Final', games: competitionMatches(allMatches, season, 'cup').filter(match => matchCompetitionStage(match) === 'final' || matchCompetitionStage(match) === 'finalReplay'), recent: false }] : [])]
     return CHAMPIONS_ROUNDS.flatMap((stage, index) => {
-      const games = competitionMatches(allMatches, season, 'champions').filter(match => match.competitionStage === stage || (stage === 'final' && match.competitionStage === 'finalReplay'))
+      const games = competitionMatches(allMatches, season, 'champions').filter(match => matchCompetitionStage(match) === stage || (stage === 'final' && matchCompetitionStage(match) === 'finalReplay'))
       const pairs = champions?.rounds[stage] ?? []
       return pairs.length > 0 && pairs.every(pair => Boolean(pair.winnerId)) ? [{ title: `Team of the Round ${index + 1}`, games, recent: false }] : []
     })

@@ -39,13 +39,13 @@ test('good rating threshold is centrally 7.2', () => {
   assert.equal(isGoodRating(7.2), true)
 })
 
-test('goal types retain score-state semantics and late drama is not cosmetic', () => {
+test('goal types retain score-state semantics while stoppage time remains event-derived', () => {
   const match = { ...base([
     { id: 'away', type: 'goal', minute: 10, teamId: 'B' },
     { id: 'equal', type: 'goal', minute: 89, teamId: 'A', playerId: 'cb' },
     { id: 'lead', type: 'goal', minute: 90, teamId: 'A', playerId: 'cb' },
   ]), appearances: [] }
   const goals = classifyGoalTypes(match)
-  assert(goals[1].tags.includes('equalizer') && goals[1].tags.includes('lateDrama'))
-  assert(goals[2].tags.includes('goAhead') && goals[2].tags.includes('comeback') && goals[2].tags.includes('winning') && goals[2].tags.includes('lateDrama'))
+  assert(goals[1].tags.includes('equalizer'))
+  assert(goals[2].tags.includes('goAhead') && goals[2].tags.includes('comeback') && goals[2].tags.includes('gameWinning'))
 })

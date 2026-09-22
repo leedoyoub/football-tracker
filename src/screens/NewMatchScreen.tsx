@@ -8,8 +8,8 @@ import { matchScore, pitchWindow } from '../engine/rating'
 import { allowsGoalkeeperLineupMove, canConfirmSubstitution, moveLineup, moveSubstitution, type LineupTarget, type SubstitutionDraft } from './matchLineup'
 import { getNextMatchDayForTeam } from '../engine/match'
 import { competitionAssignment, matchCompetitionType } from '../engine/competition'
-import { assignmentSnapshotForMatch, competitionContextParts, formatCompetitionContext, freezeCompetitionAssignment } from '../engine/competitionContext'
-import { draftContext, draftMatchesContext, isResumableDraft } from '../lib/draftLifecycle'
+import { assignmentSnapshotForMatch, canonicalScheduleOrdinal, competitionContextParts, formatCompetitionContext, freezeCompetitionAssignment, matchesCompetitionAssignmentExactly } from '../engine/competitionContext'
+import { activeEditorIdentity, draftContext, draftMatchesContext, editorLifecycleMode, isFreshCheckpointForSession, isResumableDraft, type EditorLifecycleMode } from '../lib/draftLifecycle'
 import type { Appearance, Best11Slot, CompetitionType, Match, MatchEvent, Player, Position, PositionChange, Team, View } from '../types'
 import { useStore } from '../store'
 import { playerDisplayName, GoalIcon, AssistIcon, StatIcons, SubstitutePlayerCard, SubstitutionSelection } from '../components/ui'
@@ -75,6 +75,7 @@ type NewMatchScreenProps = {
   teamId?: string
   requestedSeason?: string
   competitionType?: CompetitionType
+  resumeDraft?: boolean
   editingMatchId?: string
   onReplace: (view: View) => void
   onBack: () => void
@@ -84,26 +85,29 @@ type NewMatchScreenProps = {
  * bad edit request fail-closed without conditionally calling editor hooks. */
 export function NewMatchScreen(props: NewMatchScreenProps) {
   const { teams, players, matches, draftMatch, clearDraftMatch } = useStore()
+  const [freshCheckpointId] = useState(() => crypto.randomUUID())
   const editingMatch = props.editingMatchId ? matches.find(match => match.id === props.editingMatchId) : undefined
   if (props.editingMatchId && !editingMatch) return <div className="p-6 text-sm text-red-400">Match unavailable. Edit was not started.</div>
   // Editing restores the durable match explicitly. Normal creation restores
   // only a lifecycle-valid draft and never a completed Match by accident.
   const resumableDraft = !props.editingMatchId && isResumableDraft({ matches, draftMatch }) ? draftMatch : undefined
+  const ownsFreshCheckpoint = isFreshCheckpointForSession(resumableDraft, freshCheckpointId)
   const requested = props.teamId ? { teamId: props.teamId, season: props.requestedSeason, competitionType: props.competitionType } : undefined
   const conflict = resumableDraft && requested && !draftMatchesContext(resumableDraft, {
     teamId: requested.teamId,
     season: requested.season ?? draftContext(resumableDraft)!.season,
     competitionType: requested.competitionType ?? draftContext(resumableDraft)!.competitionType,
   })
-  if (conflict) {
+  if (resumableDraft && !props.resumeDraft && !ownsFreshCheckpoint) {
     const context = draftContext(resumableDraft)!
-    return <div className="space-y-4 p-6"><h1 className="text-xl font-black">Unfinished match found</h1><p className="text-sm text-zinc-400">{context.season} · {context.competitionType} for this saved draft differs from the match you requested.</p><button type="button" onClick={() => props.onReplace({ name: 'new-match', ...context })} className="w-full rounded-xl bg-emerald-500 p-3 font-black text-black">Resume Draft</button><button type="button" onClick={clearDraftMatch} className="w-full rounded-xl border border-zinc-600 p-3 font-black">Discard Draft &amp; Start New</button><button type="button" onClick={props.onBack} className="w-full p-3 text-sm text-zinc-400">Cancel</button></div>
+    return <div className="space-y-4 p-6"><h1 className="text-xl font-black">Unfinished match found</h1><p className="text-sm text-zinc-400">{conflict ? `${context.season} · ${context.competitionType} differs from the match you requested.` : `${context.season} · ${context.competitionType} is ready to resume.`}</p><button type="button" onClick={() => props.onReplace({ name: 'new-match', ...context, resumeDraft: true })} className="w-full rounded-xl bg-emerald-500 p-3 font-black text-black">Resume Draft</button><button type="button" onClick={clearDraftMatch} className="w-full rounded-xl border border-zinc-600 p-3 font-black">Discard Draft &amp; Start New</button><button type="button" onClick={props.onBack} className="w-full p-3 text-sm text-zinc-400">Cancel</button></div>
   }
-  const sourceMatch = props.editingMatchId ? editingMatch : resumableDraft
+  const mode = editorLifecycleMode({ editingMatch, draft: resumableDraft, resumeRequested: props.resumeDraft })
+  const sourceMatch = mode === 'fresh' ? undefined : mode === 'edit' ? editingMatch : resumableDraft
   const selectedTeamId = props.teamId ?? sourceMatch?.teamId ?? sourceMatch?.homeTeamId ?? teams[0]?.id ?? ''
   const restored = sourceMatch && (sourceMatch.teamId ?? sourceMatch.homeTeamId) === selectedTeamId ? restoreDraft(sourceMatch, players) : null
   if (props.editingMatchId && !restored) return <div className="p-6 text-sm text-red-400">Match unavailable. Its saved lineup cannot be restored safely.</div>
-  return <MatchEditor {...props} sourceMatch={sourceMatch} selectedTeamId={selectedTeamId} restored={restored} />
+  return <MatchEditor {...props} freshCheckpointId={freshCheckpointId} mode={mode} sourceMatch={sourceMatch} selectedTeamId={selectedTeamId} restored={restored} />
 }
 
 function MatchEditor({
@@ -115,18 +119,19 @@ function MatchEditor({
   sourceMatch,
   selectedTeamId,
   restored,
-}: NewMatchScreenProps & { sourceMatch?: Match; selectedTeamId: string; restored: ReturnType<typeof restoreDraft> }) {
+  mode,
+  freshCheckpointId,
+}: NewMatchScreenProps & { mode: EditorLifecycleMode; sourceMatch?: Match; selectedTeamId: string; restored: ReturnType<typeof restoreDraft>; freshCheckpointId: string }) {
   const { teams, players, matches, competitionStates = [], saveMatchDurably, saveDraftMatch, clearDraftMatch } = useStore()
-  const [draftId] = useState(() => restored ? sourceMatch!.id : crypto.randomUUID())
+  const [draftId] = useState(() => sourceMatch?.id ?? freshCheckpointId)
   const savingRef = useRef(false)
   const [saveError, setSaveError] = useState('')
   const [saveStatus, setSaveStatus] = useState('')
   const completedSeasons = useMemo(() => competitionStates.filter(state => state.kind === 'season-complete').map(state => state.season), [competitionStates])
-  const [competitionType, setCompetitionType] = useState<CompetitionType>(() => restored ? matchCompetitionType(sourceMatch!) : initialCompetitionType ?? 'league')
+  const [competitionType, setCompetitionType] = useState<CompetitionType>(() => mode === 'fresh' ? initialCompetitionType ?? 'league' : matchCompetitionType(sourceMatch!))
   const nextMatch = useMemo(() => getNextMatchDayForTeam(selectedTeamId, matches, completedSeasons, competitionType, requestedSeason), [selectedTeamId, matches, completedSeasons, competitionType, requestedSeason])
-  const season = restored ? sourceMatch!.season : requestedSeason ?? nextMatch.season
-  const matchDay = sourceMatch ? sourceMatch.matchDay : nextMatch.matchDay
-  const [date, setDate] = useState(() => restored ? sourceMatch!.date : localCalendarDate())
+  const season = mode === 'fresh' ? requestedSeason ?? nextMatch.season : sourceMatch!.season
+  const [date, setDate] = useState(() => mode === 'fresh' ? localCalendarDate() : sourceMatch!.date)
   const recentAssignments = useMemo(() => restored ? null : getMostRecentStartingLineup(matches, selectedTeamId), [restored, matches, selectedTeamId]);
 
   const [step, setStep] = useState(() => restored?.draft.events.length ? 1 : 0) // 0: Lineups, 1: Events
@@ -142,13 +147,15 @@ function MatchEditor({
   const championsDraw = competitionStates.find(state => state.id === `champions:${season}`)
   const tournamentTeams = useMemo(() => currentStaticTeams(teams), [teams])
   const proposedAssignment = useMemo(() => competitionAssignment(competitionType, season, selectedTeamId, tournamentTeams, matches, championsDraw, players), [competitionType, season, selectedTeamId, tournamentTeams, matches, championsDraw, players])
-  const [frozenAssignment, setFrozenAssignment] = useState(() => editingMatchId && sourceMatch ? assignmentSnapshotForMatch(sourceMatch) : sourceMatch?.competitionAssignment)
+  const proposalMatchDay = canonicalScheduleOrdinal(competitionType, proposedAssignment.stage, proposedAssignment.seriesGame) ?? nextMatch.matchDay
+  const [frozenAssignment, setFrozenAssignment] = useState(() => mode === 'fresh' ? undefined : sourceMatch ? assignmentSnapshotForMatch(sourceMatch) : undefined)
+  const matchDay = frozenAssignment?.matchDay ?? proposalMatchDay
   const proposedSnapshot = useMemo(() => freezeCompetitionAssignment({ competitionType, season, teamId: selectedTeamId, stage: proposedAssignment.stage, pairingId: proposedAssignment.pairingId, seriesGame: proposedAssignment.seriesGame, opponentTeamId: proposedAssignment.opponentTeamId, matchDay }), [competitionType, season, selectedTeamId, proposedAssignment, matchDay])
-  const activeAssignment = frozenAssignment ?? proposedSnapshot
+  const activeAssignment = activeEditorIdentity(mode, sourceMatch, frozenAssignment ?? proposedSnapshot)
   const assignment = frozenAssignment ? { available: true, stage: frozenAssignment.stage, pairingId: frozenAssignment.pairingId, seriesGame: frozenAssignment.seriesGame, opponentTeamId: frozenAssignment.opponentTeamId, message: formatCompetitionContext(frozenAssignment) } : proposedAssignment
-  const opponentId = sourceMatch?.awayTeamId ?? activeAssignment.opponentTeamId ?? `opponent:${draftId}`
-  const opponentName = sourceMatch?.opponentName ?? teams.find(team => team.id === activeAssignment.opponentTeamId)?.shortName ?? 'OPP'
-  const homeTeamId = sourceMatch?.homeTeamId ?? selectedTeamId
+  const opponentId = mode === 'fresh' ? activeAssignment.opponentTeamId ?? `opponent:${draftId}` : sourceMatch?.awayTeamId ?? activeAssignment.opponentTeamId ?? `opponent:${draftId}`
+  const opponentName = mode === 'fresh' ? teams.find(team => team.id === activeAssignment.opponentTeamId)?.shortName ?? 'OPP' : sourceMatch?.opponentName ?? teams.find(team => team.id === activeAssignment.opponentTeamId)?.shortName ?? 'OPP'
+  const homeTeamId = mode === 'fresh' ? selectedTeamId : sourceMatch?.homeTeamId ?? selectedTeamId
   const awayTeamId = opponentId
   
   // 기타 Live Events 관련 상태들 (matchDraft 외부 유지)
@@ -493,9 +500,9 @@ function MatchEditor({
   }
 
   useEffect(() => {
-    if (!draftReady || editingMatchId || savingRef.current) return
-    saveDraftMatch({ id: draftId, season, competitionType: activeAssignment.competitionType, competitionStage: activeAssignment.stage, competitionPairingId: activeAssignment.pairingId, competitionSeriesGame: activeAssignment.seriesGame, ...(frozenAssignment ? { competitionAssignment: frozenAssignment } : {}), matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot })
-  }, [draftReady, editingMatchId, draftId, season, activeAssignment, frozenAssignment, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, opponentName, appearances, kickoffSnapshot, saveDraftMatch])
+    if (!draftReady || mode === 'edit' || savingRef.current) return
+    saveDraftMatch({ id: draftId, season, competitionType: activeAssignment.competitionType, competitionStage: activeAssignment.stage, competitionPairingId: activeAssignment.pairingId, competitionSeriesGame: activeAssignment.seriesGame, competitionAssignment: activeAssignment, matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot })
+  }, [draftReady, mode, draftId, season, activeAssignment, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, opponentName, appearances, kickoffSnapshot, saveDraftMatch])
 
   async function save(): Promise<boolean> {
     if (savingRef.current || liveEvent || !kickoffIsValid) return false
@@ -505,6 +512,11 @@ function MatchEditor({
     const matchData = {
       id: draftId,
       season, competitionType: activeAssignment.competitionType, competitionStage: activeAssignment.stage, competitionPairingId: activeAssignment.pairingId, competitionSeriesGame: activeAssignment.seriesGame, competitionAssignment: activeAssignment, matchDay, date, formation: activeFormationName, homeAway: 'home' as const, homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot,
+    }
+    if (!matchesCompetitionAssignmentExactly(matchData, activeAssignment)) {
+      setSaveError('Competition identity changed. Reopen the match and try again.')
+      savingRef.current = false
+      return false
     }
     try {
       const result = await saveMatchDurably(matchData)

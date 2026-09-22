@@ -3,6 +3,7 @@ import { getFromIndexedDB, saveToIndexedDB } from './db';
 import { validateState } from './validation';
 import { sanitizeDraftLifecycle } from './draftLifecycle';
 import { reconcileChampionsPairingIds } from '../engine/competition';
+import { normalizeMatchCompetitionIdentity } from '../engine/competitionContext';
 
 // This is a durable data namespace, deliberately independent from app and
 // derived-engine versions.  Never turn a release number into a storage key.
@@ -71,7 +72,7 @@ export const LocalRepository = {
               teamIds: player.teamIds ?? (player.teamId ? [player.teamId] : [])
             })),
           });
-          const migratedState: AppState = { ...migrated, matches: reconcileChampionsPairingIds(migrated.matches, migrated.competitionStates) };
+          const migratedState: AppState = { ...migrated, matches: reconcileChampionsPairingIds(migrated.matches.map(normalizeMatchCompetitionIdentity), migrated.competitionStates) };
           // Mirroring a recovered browser-storage payload into IndexedDB is a
           // resilience enhancement, never a prerequisite for reading history.
           // Private mode, quota pressure, or a blocked database must not make a
@@ -132,6 +133,6 @@ export const LocalRepository = {
   async importData(jsonString: string): Promise<void> {
     const parsed = JSON.parse(jsonString);
     if (!validateState(parsed)) throw new Error('Invalid JSON structure');
-    await this.saveAppState(parsed);
+    await this.saveAppState({ ...parsed, matches: parsed.matches.map(normalizeMatchCompetitionIdentity) });
   }
 };

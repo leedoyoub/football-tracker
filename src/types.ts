@@ -213,7 +213,7 @@ export type View =
   | { name: 'player'; id: string }
   | { name: 'match'; id: string }
   | { name: 'edit-match'; id: string }
-  | { name: 'new-match'; teamId?: string; season?: string; competitionType?: CompetitionType }
+  | { name: 'new-match'; teamId?: string; season?: string; competitionType?: CompetitionType; resumeDraft?: boolean }
   | { name: 'new-team' }
   | { name: 'edit-team'; id: string }
   | { name: 'new-player'; teamId?: string }
@@ -297,7 +297,7 @@ export type NavigationEntry<V extends View = View> = {
 }
 
 export type RankSort =
-  | 'rating' | 'goals' | 'assists' | 'g+a' | 'minutes' | 'mom'
+  | 'rating' | 'goals' | 'assists' | 'g+a' | 'minutes' | 'mom' | 'goodMatches'
   | 'goals/90' | 'assists/90' | 'g+a/90' | 'sotAllowed' | 'cleanSheets' | 'saves'
   | 'goalsConceded' | 'savePercentage'
 
@@ -356,6 +356,7 @@ export interface PlayerSeasonStats {
   assists: number
   avgRating: number
   mom: number
+  goodMatches: number
   saves: number
   wins: number
   draws: number

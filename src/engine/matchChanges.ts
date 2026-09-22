@@ -4,6 +4,7 @@ import { oldestMatches } from './matchChronology'
 import { buildPlayerRecordLeaderboards } from './playerRecords'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { buildGlobalRankingData, rankGlobalRankingRows, type LeaderboardMetric } from './stats'
+import { matchCompetitionType } from './competitionContext'
 
 export type GroupedMatchChangeItem = { id: string; label: string; kind: MatchChangePayload['kind'] }
 export type GroupedMatchChange = { id: string; playerId?: string; title: string; detail: string; eventIds: string[]; items: GroupedMatchChangeItem[] }
@@ -23,24 +24,26 @@ function ranks(rows: { playerId: string }[]) {
   return new Map(rows.map((row, index) => [row.playerId, index + 1]))
 }
 
-function transitionLabel(before: Map<string, number>, after: Map<string, number>, playerId: string, metric: string) {
+/** A rank movement is meaningful only inside the visible cutoff of its surface. */
+export function rankingTransitionLabel(before: Map<string, number>, after: Map<string, number>, playerId: string, metric: string, topLimit: number, scope: string) {
   // A leaderboard cannot have a movement story until it has a prior snapshot.
   // In particular, the first recorded match is a baseline, not a #1 takeover.
   if (!before.size) return undefined
   const previous = before.get(playerId) ?? Number.POSITIVE_INFINITY
   const next = after.get(playerId) ?? Number.POSITIVE_INFINITY
-  if (next > 10) return undefined
+  if (next > topLimit) return undefined
   const priorLeader = [...before.entries()].find(([, rank]) => rank === 1)?.[0]
-  if (next === 1 && priorLeader && priorLeader !== playerId) return `takes #1 in ${metric}`
-  if (previous > 10) return `enters the Top 10 in ${metric} at #${next}`
-  if (next < previous) return `climbs ${previous - next} place${previous - next === 1 ? '' : 's'} to #${next} in ${metric}`
+  const context = ` · ${scope}`
+  if (next === 1 && priorLeader && priorLeader !== playerId) return `takes #1 in ${metric}${context}`
+  if (previous > topLimit) return `enters the Top ${topLimit} in ${metric} at #${next}${context}`
+  if (next < previous) return `climbs ${previous - next} place${previous - next === 1 ? '' : 's'} to #${next} in ${metric}${context}`
   return undefined
 }
 
-function addRankingChanges(target: RankingChange[], identity: string, matchId: string, participantIds: Set<string>, beforeRows: { playerId: string }[], afterRows: { playerId: string }[], label: string) {
+function addRankingChanges(target: RankingChange[], identity: string, matchId: string, participantIds: Set<string>, beforeRows: { playerId: string }[], afterRows: { playerId: string }[], label: string, topLimit: number, scope: string) {
   const before = ranks(beforeRows); const after = ranks(afterRows)
   for (const playerId of participantIds) {
-    const change = transitionLabel(before, after, playerId, label)
+    const change = rankingTransitionLabel(before, after, playerId, label, topLimit, scope)
     if (change) target.push({ id: `ranking:${identity}:${playerId}`, matchId, playerId, label: change })
   }
 }
@@ -57,7 +60,19 @@ function rankingChanges(players: Player[], matches: Match[]): RankingChange[] {
     for (const metric of CORE_METRICS) {
       const before = rankGlobalRankingRows(buildGlobalRankingData(players, beforeMatches, { seasons: [], teams: [], positions: [] }, 'rating'), players, metric)
       const after = rankGlobalRankingRows(buildGlobalRankingData(players, afterMatches, { seasons: [], teams: [], positions: [] }, 'rating'), players, metric)
-      addRankingChanges(result, `core:global:${metric}`, match.id, participantIds, before, after, metric === 'g+a' ? 'G+A' : metric === 'mom' ? 'MOM' : metric === 'rating' ? 'Rating' : metric[0].toUpperCase() + metric.slice(1))
+      const label = metric === 'g+a' ? 'G+A' : metric === 'mom' ? 'MOM' : metric === 'rating' ? 'Rating' : metric[0].toUpperCase() + metric.slice(1)
+      addRankingChanges(result, `core:global:${metric}`, match.id, participantIds, before, after, label, 10, 'Global')
+
+      // Competition tables are independent Top 10 surfaces. They must be
+      // rebuilt from the same chronological prefix, never inferred from the
+      // global table or the display matchDay.
+      const type = matchCompetitionType(match)
+      const competitionBefore = beforeMatches.filter(item => matchCompetitionType(item) === type)
+      const competitionAfter = afterMatches.filter(item => matchCompetitionType(item) === type)
+      const beforeCompetitionRows = rankGlobalRankingRows(buildGlobalRankingData(players, competitionBefore, { seasons: [], teams: [], positions: [] }, 'rating'), players, metric)
+      const afterCompetitionRows = rankGlobalRankingRows(buildGlobalRankingData(players, competitionAfter, { seasons: [], teams: [], positions: [] }, 'rating'), players, metric)
+      const competitionLabel = type === 'league' ? 'League' : type === 'cup' ? 'Cup' : 'Champions'
+      addRankingChanges(result, `competition:${type}:${metric}`, match.id, participantIds, beforeCompetitionRows, afterCompetitionRows, label, 10, competitionLabel)
     }
     for (const teamId of new Set(match.appearances.filter(appearance => participantIds.has(appearance.playerId)).map(appearance => appearance.teamId))) {
       const teamParticipantIds = new Set(match.appearances
@@ -66,13 +81,13 @@ function rankingChanges(players: Player[], matches: Match[]): RankingChange[] {
       for (const metric of CORE_METRICS) {
         const before = rankGlobalRankingRows(buildGlobalRankingData(players, beforeMatches, { seasons: [], teams: [teamId], positions: [] }, 'rating'), players, metric)
         const after = rankGlobalRankingRows(buildGlobalRankingData(players, afterMatches, { seasons: [], teams: [teamId], positions: [] }, 'rating'), players, metric)
-        addRankingChanges(result, `core:team:${teamId}:${metric}`, match.id, teamParticipantIds, before, after, metric === 'g+a' ? 'Team G+A' : `Team ${metric === 'mom' ? 'MOM' : metric[0].toUpperCase() + metric.slice(1)}`)
+        addRankingChanges(result, `core:team:${teamId}:${metric}`, match.id, teamParticipantIds, before, after, metric === 'g+a' ? 'G+A' : metric === 'mom' ? 'MOM' : metric === 'rating' ? 'Rating' : metric[0].toUpperCase() + metric.slice(1), 3, 'Team')
       }
     }
     const beforeRecords = new Map(buildPlayerRecordLeaderboards(players, beforeMatches).map(group => [group.id, group.rows]))
     for (const group of buildPlayerRecordLeaderboards(players, afterMatches)) {
       if (group.id === 'goals' || group.id === 'assists' || group.id === 'mom') continue
-      addRankingChanges(result, `record:${group.id}`, match.id, participantIds, beforeRecords.get(group.id) ?? [], group.rows, group.title)
+      addRankingChanges(result, `record:${group.id}`, match.id, participantIds, beforeRecords.get(group.id) ?? [], group.rows, group.title, 10, 'Record')
     }
   }
   return result

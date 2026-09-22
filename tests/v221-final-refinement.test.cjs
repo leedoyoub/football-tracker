@@ -6,7 +6,7 @@ for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module
 
 test('v2.2.3 home is compact and routes each consolidated detail destination', () => {
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
-  for (const token of ['Season dashboard', 'Recent Matches', 'News', 'Season Leaders', 'slice(0, 5)', 'slice(0, 4)', "kind: 'news'", 'rankingMetric']) assert(home.includes(token), token)
+  for (const token of ['Season dashboard', 'Recent Matches', 'News', 'Global Ranking', 'slice(0, 5)', 'slice(0, 4)', "kind: 'news'", 'rankingMetric']) assert(home.includes(token), token)
   assert(!/play.?style/i.test(home) && !home.includes('Show More'))
 })
 

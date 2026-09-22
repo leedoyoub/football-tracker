@@ -38,8 +38,8 @@ export function matchStory(match: Match, players: Player[]): MatchStory {
   }
   if (leadChanges >= 2) tags.add('Multiple Lead Changes')
   for (const row of classifyGoalTypes(match)) {
-    if (row.tags.includes('winning') && row.tags.includes('lateDrama')) tags.add('Late Winner')
-    if (row.tags.includes('equalizer') && row.tags.includes('lateDrama')) tags.add('Late Equalizer')
+    if (row.tags.includes('gameWinning') && row.event.minute >= 85) tags.add('Late Winner')
+    if (row.tags.includes('equalizer') && row.event.minute >= 85) tags.add('Late Equalizer')
   }
   const superSubs: SuperSub[] = []
   for (const appearance of match.appearances.filter(item => item.role === 'bench')) {

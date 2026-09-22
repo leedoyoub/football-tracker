@@ -5,6 +5,7 @@ import { GOOD_RATING_THRESHOLD } from './constants'
 import { classifyGoalTypes } from './goalTypes'
 import type { CompetitionState, Match, MatchEvent, Player } from '../types'
 import { oldestMatches } from './matchChronology'
+import { matchCompetitionType } from './competitionContext'
 
 /** All season insight calculations live here so none of them require extra match input. */
 export const STARTING_XI_MIN_SAMPLE = 3
@@ -37,13 +38,13 @@ export type GoalClassification = {
   scoringTeamId: string
   scoreBefore: { home: number; away: number }
   scoreAfter: { home: number; away: number }
-  labels: ('Opening Goal' | 'Equalizer' | 'Go-ahead Goal' | 'Comeback Goal' | 'Winning Goal' | 'Late Drama' | 'Late Goal')[]
+  labels: ('Opening Goal' | 'Equalizer' | 'Go-ahead Goal' | 'Lead-extending Goal' | 'Deficit-reducing Goal' | 'Comeback Goal' | 'Game-winning Goal' | 'Stoppage-time Goal' | 'Late Goal')[]
 }
 
 /** Rebuilds the score at every goal, including own goals, in stable timeline order. */
 export function classifyGoalEvents(match: Match): GoalClassification[] {
   const goals = goalsInOrder(match); const derived = new Map(classifyGoalTypes(match).map(row => [row.event, row]))
-  const labels = { opening: 'Opening Goal', equalizer: 'Equalizer', goAhead: 'Go-ahead Goal', comeback: 'Comeback Goal', winning: 'Winning Goal', lateDrama: 'Late Drama' } as const
+  const labels = { opening: 'Opening Goal', equalizer: 'Equalizer', goAhead: 'Go-ahead Goal', leadExtending: 'Lead-extending Goal', deficitReducing: 'Deficit-reducing Goal', comeback: 'Comeback Goal', gameWinning: 'Game-winning Goal', stoppageTime: 'Stoppage-time Goal' } as const
   return goals.map(goal => {
     const row = derived.get(goal.event)
     const result: GoalClassification['labels'] = (row?.tags ?? []).map(tag => labels[tag])
@@ -160,7 +161,7 @@ export function seasonRecap(players: Player[], matches: Match[], season: string,
     awardFor('substitute', 'Best Substitute', bestSub, row => `${starterSubstituteSplits(row.player, matches, filter).substitute.averageRating.toFixed(2)} as a substitute`),
     xi && { id: 'most-used-xi', title: 'Most Used XI', playerIds: xi.playerIds, detail: `${xi.matches} matches · ${(xi.winRate * 100).toFixed(0)}% wins` },
   ].filter((award): award is SeasonAward => Boolean(award))
-  return { season, complete: isSeasonComplete(matches, season, states), matchDays: new Set(matches.filter(match => match.season === season && (match.competitionType ?? 'league') === 'league').map(match => match.matchDay)).size, awards, bestXI }
+  return { season, complete: isSeasonComplete(matches, season, states), matchDays: new Set(matches.filter(match => match.season === season && matchCompetitionType(match) === 'league').map(match => match.matchDay)).size, awards, bestXI }
 }
 
 export type DataStory = { id: string; eyebrow: string; title: string; detail: string; playerIds: string[] }

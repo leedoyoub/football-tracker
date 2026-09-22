@@ -67,7 +67,7 @@ export function validRestoredView(value: unknown, state: AppState): View | null 
       const teamId = view.teamId ?? context?.teamId
       const season = typeof view.season === 'string' ? view.season : context?.season
       const competitionType = view.competitionType ?? context?.competitionType
-      return hasTeam(teamId) ? { name: 'new-match', teamId, ...(season ? { season } : {}), ...(competitionType ? { competitionType } : {}) } : null
+      return hasTeam(teamId) ? { name: 'new-match', teamId, ...(season ? { season } : {}), ...(competitionType ? { competitionType } : {}), ...(view.resumeDraft ? { resumeDraft: true } : {}) } : null
     }
     default:
       return null

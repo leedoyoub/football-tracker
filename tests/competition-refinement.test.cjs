@@ -140,7 +140,7 @@ test('Recent Match cards use the compact result-colored five-card grid and full 
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('grid-cols-5') && home.includes('Latest five recent matches'))
   assert(home.includes("'border-emerald-300/50 bg-emerald-500/20'") && home.includes("'border-red-300/50 bg-red-500/20'") && home.includes("'border-zinc-400/30 bg-zinc-700/50'"))
-  assert(home.includes("? 'Champions' : result.match.competitionType === 'cup' ? 'Cup' : 'League'"))
+  assert(home.includes("const type = matchCompetitionType(result.match); const competition = type === 'champions' ? 'Champions' : type === 'cup' ? 'Cup' : 'League'"))
   assert(!home.includes('snap-x') && !home.includes('Recent matches carousel'))
 })
 test('competition identity remains scoped to Competition surfaces after Home is simplified', () => {
@@ -183,9 +183,9 @@ test('season completion is synchronized as backward-compatible CompetitionState 
   assert(validation.includes("'season-complete'"))
 })
 
-test('visible and package metadata version are exactly v2.2.12 / 2.2.12', () => {
-  assert.equal(APP_VERSION, '2.2.12')
-  assert.equal(require('../package.json').version, '2.2.12')
+test('visible and package metadata version are exactly v2.2.13 / 2.2.13', () => {
+  assert.equal(APP_VERSION, '2.2.13')
+  assert.equal(require('../package.json').version, '2.2.13')
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('v{APP_VERSION}'))
 })

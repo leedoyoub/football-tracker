@@ -54,8 +54,8 @@ test('v2.2.8 assigns Champions game 1 through 3 but fails closed on duplicate, g
 })
 
 test('v2.2.8 serializes and restores frozen series-game identity through the cloud boundary', () => {
-  const snapshot = freezeCompetitionAssignment({ competitionType: 'champions', season, teamId: 'T1', stage: 'final', pairingId: 'final:0', seriesGame: 2, opponentTeamId: 'T2', matchDay: 2 })
-  const match = { ...game('cloud', { competitionStage: 'final', competitionPairingId: 'final:0', competitionSeriesGame: 2 }), competitionAssignment: snapshot }
+  const snapshot = freezeCompetitionAssignment({ competitionType: 'champions', season, teamId: 'T1', stage: 'final', pairingId: 'final:0', seriesGame: 2, opponentTeamId: 'T2', matchDay: 11 })
+  const match = { ...game('cloud', { competitionStage: 'final', competitionPairingId: 'final:0', competitionSeriesGame: 2, awayTeamId: 'T2', matchDay: 11 }), competitionAssignment: snapshot }
   const roundTrip = deserializeCloudEntity(serializeCloudEntity(match))
   assert.equal(roundTrip.competitionSeriesGame, 2)
   assert.deepEqual(roundTrip.competitionAssignment, snapshot)

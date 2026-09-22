@@ -15,6 +15,8 @@ import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import { kickoffLineupForMatch } from './kickoffLineup'
 import { newestMatches, oldestMatches } from './matchChronology'
 import { positionFamily, scopedAwardFamilyByPlayer, scopedPositionFamilyByPlayer, type PositionFamily } from './positionScope'
+import { matchCompetitionType } from './competitionContext'
+import { GOOD_RATING_THRESHOLD } from './constants'
 
 
 export function seasonsFromMatches(matches: Match[]): string[] {
@@ -96,6 +98,7 @@ export function aggregatePlayerStats(
     avgRating,
     saves,
     mom,
+    goodMatches: ratings.filter(rating => rating.raw >= GOOD_RATING_THRESHOLD).length,
     wins,
     draws,
     losses,
@@ -113,7 +116,7 @@ export function playerSeasonStats(
   competitionType?: CompetitionType,
 ): PlayerSeasonStats {
   const seasonMatches = matches.filter((m) =>
-    m.season === season && (!competitionType || (m.competitionType ?? 'league') === competitionType) && (!teamId || m.appearances.some((appearance) =>
+    m.season === season && (!competitionType || matchCompetitionType(m) === competitionType) && (!teamId || m.appearances.some((appearance) =>
       appearance.playerId === player.id && appearance.teamId === teamId,
     )),
   )
@@ -372,14 +375,14 @@ export function buildGlobalRankingData(
     const minutes = ratingRows.reduce((sum, rating) => sum + rating.minutes, 0)
     const avgRating = ratingRows.reduce((sum, rating) => sum + rating.raw, 0) / ratingRows.length
     const latest = newestMatches(playerMatches)[0]
-    const stats: PlayerSeasonStats = { playerId: player.id, teamId: player.teamId, season: 'All', matches: ratingRows.length, starts, subs, minutes, goals, assists, avgRating, mom: playerMatches.filter(match => momFor(match) === player.id).length, saves, wins, draws, losses, recentForm: recentForm.slice(-5).reverse(), ratings: ratingRows }
+    const stats: PlayerSeasonStats = { playerId: player.id, teamId: player.teamId, season: 'All', matches: ratingRows.length, starts, subs, minutes, goals, assists, avgRating, mom: playerMatches.filter(match => momFor(match) === player.id).length, goodMatches: ratingRows.filter(rating => rating.raw >= GOOD_RATING_THRESHOLD).length, saves, wins, draws, losses, recentForm: recentForm.slice(-5).reverse(), ratings: ratingRows }
     const playedGoalkeeper = ratingRows.some(rating => {
       const match = playerMatches.find(item => item.id === rating.matchId)
       const appearance = match?.appearances.find(item => item.playerId === player.id)
       return match && appearance && matchPositionSegments(match, appearance).some(segment => segment.position === 'GK')
     })
     const per90 = (value: number) => stats.minutes ? value / stats.minutes * 90 : 0
-    const value = _metric === 'goals' ? stats.goals : _metric === 'assists' ? stats.assists : _metric === 'g+a' ? stats.goals + stats.assists : _metric === 'minutes' ? stats.minutes : _metric === 'mom' ? stats.mom : _metric === 'goals/90' ? per90(stats.goals) : _metric === 'assists/90' ? per90(stats.assists) : _metric === 'g+a/90' ? per90(stats.goals + stats.assists) : stats.avgRating
+    const value = _metric === 'goals' ? stats.goals : _metric === 'assists' ? stats.assists : _metric === 'g+a' ? stats.goals + stats.assists : _metric === 'minutes' ? stats.minutes : _metric === 'mom' ? stats.mom : _metric === 'goodMatches' ? stats.goodMatches : _metric === 'goals/90' ? per90(stats.goals) : _metric === 'assists/90' ? per90(stats.assists) : _metric === 'g+a/90' ? per90(stats.goals + stats.assists) : stats.avgRating
     return [{ ...stats, value, historicalTeamId: latest?.appearances.find(item => item.playerId === player.id)?.teamId, playedGoalkeeper, sotAllowedAppearances, sotAllowedTotal, concededOnPitch, qualifyingGoalkeeperAppearances, qualifyingSaves }]
   })
   const presented = presentMetric(rows, _metric)
@@ -405,6 +408,7 @@ export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Pla
       case 'g+a': return row.goals + row.assists
       case 'minutes': return row.minutes
       case 'mom': return row.mom
+      case 'goodMatches': return row.goodMatches
       case 'goals/90': return row.minutes ? row.goals / row.minutes * 90 : 0
       case 'assists/90': return row.minutes ? row.assists / row.minutes * 90 : 0
       case 'g+a/90': return row.minutes ? (row.goals + row.assists) / row.minutes * 90 : 0
@@ -458,6 +462,7 @@ export function getLeaderboard(
         case 'g+a': value = s.goals + s.assists; break
         case 'minutes': value = s.minutes; break
         case 'mom': value = s.mom; break
+        case 'goodMatches': value = s.goodMatches; break
         case 'goals/90': value = s.minutes > 0 ? (s.goals / s.minutes * 90) : 0; break
         case 'assists/90': value = s.minutes > 0 ? (s.assists / s.minutes * 90) : 0; break
         case 'g+a/90': value = s.minutes > 0 ? ((s.goals + s.assists) / s.minutes * 90) : 0; break

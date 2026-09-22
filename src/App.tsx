@@ -190,7 +190,7 @@ export default function App() {
           {view.name === 'match' && <MatchDetailScreen matchId={view.id} screenState={entry.screenState as ScreenStateByView['match']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} onBackToTeam={onBackToTeam} onReplace={onReplace} />}
           {view.name === 'edit-match' && <EditMatchScreen matchId={view.id} onReplace={onReplace} onBack={onBack} />}
           {view.name === 'new-match' && (
-            <NewMatchScreen teamId={view.teamId} requestedSeason={view.season} competitionType={view.competitionType} onReplace={onReplace} onBack={onBack} />
+            <NewMatchScreen teamId={view.teamId} requestedSeason={view.season} competitionType={view.competitionType} resumeDraft={view.resumeDraft} onReplace={onReplace} onBack={onBack} />
           )}
           {view.name === 'new-player' && (
             <NewPlayerScreen teamId={view.teamId} onReplace={onReplace} onBack={onBack} />

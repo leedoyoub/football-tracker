@@ -51,7 +51,7 @@ export function MatchDetailScreen({ matchId, screenState, onStateChange, onNavig
   return <div className="px-4 pb-8 pt-6">
     <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">Back</button>
     {/*
-    <p className="text-xs text-zinc-400">{match.season} · {matchCompetitionType(match).toUpperCase()} · {match.competitionStage ?? 'regular'} · MD {match.matchDay} · {formatDate(match.date)}</p>
+    <p className="text-xs text-zinc-400">{formatCompetitionContext(assignmentSnapshotForMatch(match))} · {formatDate(match.date)}</p>
     */}
     <p className="text-xs text-zinc-400">{formatCompetitionContext(assignmentSnapshotForMatch(match))} · {formatDate(match.date)}</p>
     <h1 className="mb-4 text-2xl font-semibold">{team?.shortName} {ours}-{theirs} {opponent}</h1>
