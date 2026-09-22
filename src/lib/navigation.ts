@@ -47,6 +47,11 @@ export function resetNavigationEntries<V extends View>(view: V, screenState?: Sc
   return [createNavigationEntry(view, screenState ?? defaultScreenState(view))]
 }
 
+/** The Team Detail page-level back affordance intentionally returns to the Teams hub. */
+export function teamDetailBackEntries() {
+  return resetNavigationEntries({ name: 'teams' })
+}
+
 export function updateCurrentScreenState(entries: NavigationEntry[], screenState: NavigationEntry['screenState']): NavigationEntry[] {
   if (!entries.length) return entries
   return entries.map((entry, index) => index === entries.length - 1 ? { ...entry, screenState } : entry)

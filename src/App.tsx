@@ -33,7 +33,8 @@ import { BootstrapShell, StartupRecovery } from './components/StartupBoundary'
 import { emptyFilters, type RankingFilters } from './screens/RankingFilters'
 import { appContentOverflowClass } from './lib/routeLayout'
 import { loadLocalModePreference, saveLocalModePreference } from './lib/localMode'
-import { createNavigationEntry, popNavigationEntry, pushNavigationEntry, replaceNavigationEntry, resetNavigationEntries, sameTeamBackTarget, updateCurrentScreenState } from './lib/navigation'
+import { createNavigationEntry, popNavigationEntry, pushNavigationEntry, replaceNavigationEntry, resetNavigationEntries, sameTeamBackTarget, teamDetailBackEntries, updateCurrentScreenState } from './lib/navigation'
+import { restoreScrollWhenReachable } from './lib/scrollRestoration'
 
 export default function App() {
   const { user, loading, startupError, signInWithGoogle, retryStartup } = useAuth()
@@ -90,7 +91,7 @@ export default function App() {
     const container = scrollRef.current
     if (!container) return
     restoreScroll.current = false
-    container.scrollTop = entry.scrollTop
+    return restoreScrollWhenReachable(container, entry.scrollTop)
   }, [entry, history])
 
   const tab: Tab = useMemo(() => {
@@ -122,6 +123,11 @@ export default function App() {
   function onBack() {
     restoreScroll.current = true
     setHistory(popNavigationEntry)
+  }
+
+  function onBackToTeams() {
+    restoreScroll.current = true
+    setHistory(teamDetailBackEntries())
   }
 
   function onReplace(next: View) {
@@ -174,7 +180,7 @@ export default function App() {
           {view.name === 'comparison' && <ComparisonScreen season={view.season ?? season} screenState={entry.screenState as ScreenStateByView['comparison']} onStateChange={onStateChange} onNavigate={onNavigate} />}
 
           {view.name === 'teams' && <TeamsScreen season={season} onNavigate={onNavigate} />}
-          {view.name === 'team' && <TeamDetailScreen teamId={view.id} season={season} screenState={entry.screenState as ScreenStateByView['team']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} />}
+          {view.name === 'team' && <TeamDetailScreen teamId={view.id} season={season} screenState={entry.screenState as ScreenStateByView['team']} onStateChange={onStateChange} onNavigate={onNavigate} onBackToTeams={onBackToTeams} />}
           {view.name === 'import-squad' && <SquadImportScreen teamId={view.teamId} onBack={onBack} />}
           {view.name === 'players' && <PlayersScreen screenState={entry.screenState as ScreenStateByView['players']} onStateChange={onStateChange} onNavigate={onNavigate} appliedFilters={playerFilters} onFiltersChange={setPlayerFilters} />}
 

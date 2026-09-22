@@ -53,7 +53,7 @@ test('v2.2.10 Match Detail uses the canonical substitute MOM for Pitch, Bench, R
 
   const detail = fs.readFileSync(require.resolve('../src/screens/MatchDetailScreen.tsx'), 'utf8')
   const pitch = fs.readFileSync(require.resolve('../src/components/Pitch.tsx'), 'utf8')
-  assert.match(detail, /const momId = getMatchManOfTheMatch\(match, players\)/)
+  assert.match(detail, /momId: getMatchManOfTheMatch\(match, players\)/)
   assert.match(detail, /motmPlayerId=\{momId\}/)
   assert.match(detail, /isMotm=\{id === momId\}/)
   assert.match(detail, /appearance\.playerId === momId/)

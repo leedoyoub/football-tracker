@@ -14,7 +14,7 @@ import { hasPitchAppearance, ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAt
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import { kickoffLineupForMatch } from './kickoffLineup'
 import { newestMatches, oldestMatches } from './matchChronology'
-import { positionFamily, scopedAwardFamilyByPlayer, scopedPositionFamilyByPlayer } from './positionScope'
+import { positionFamily, scopedAwardFamilyByPlayer, scopedPositionFamilyByPlayer, type PositionFamily } from './positionScope'
 
 
 export function seasonsFromMatches(matches: Match[]): string[] {
@@ -278,7 +278,7 @@ function presentMetric(rows: GlobalLeaderboardRow[], metric: LeaderboardMetric) 
 export function buildGlobalRankingData(
   players: Player[],
   matches: Match[],
-  filters: { seasons: string[], teams: string[], positions: Position[] },
+  filters: { seasons: string[], teams: string[], positions: (Position | PositionFamily)[] },
   _metric: LeaderboardMetric,
 ): GlobalLeaderboardRow[] {
   const cacheKey = `${RATING_ENGINE_REVISION}|${filters.seasons.slice().sort().join(',')}|${filters.teams.slice().sort().join(',')}|${filters.positions.slice().sort().join(',')}`

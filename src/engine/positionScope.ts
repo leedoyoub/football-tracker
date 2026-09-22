@@ -10,6 +10,8 @@ const FAMILY_ORDER: PositionFamily[] = ['GK', 'CB', 'FB', 'CDM', 'CM', 'LM', 'RM
 const AWARD_ORDER: AwardPositionFamily[] = ['GK', 'LB', 'CB', 'RB', 'MID', 'ATT']
 
 export function positionFamily(position?: string): PositionFamily | undefined {
+  // Filters use the normalized FB family while appearances retain LB/RB variants.
+  if (position === 'FB') return 'FB'
   const value = normalizePositionFamily(position)
   if (!value) return undefined
   if (value === 'LB' || value === 'LWB' || value === 'RB' || value === 'RWB') return 'FB'

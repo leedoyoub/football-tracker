@@ -16,7 +16,7 @@ import { useStore } from '../store'
 import { sortPlayersByPosition } from '../lib/positionOrder'
 import type { CompetitionType, ScreenStateByView, Team, View } from '../types'
 
-export function TeamDetailScreen({ teamId, season, screenState, onStateChange, onNavigate, onBack }: { teamId: string; season: string; screenState: ScreenStateByView['team']; onStateChange: (state: ScreenStateByView['team']) => void; onNavigate: (view: View) => void; onBack: () => void }) {
+export function TeamDetailScreen({ teamId, season, screenState, onStateChange, onNavigate, onBackToTeams }: { teamId: string; season: string; screenState: ScreenStateByView['team']; onStateChange: (state: ScreenStateByView['team']) => void; onNavigate: (view: View) => void; onBackToTeams: () => void }) {
   const { teams, players, matches, competitionStates = [] } = useStore()
   const { expandedContext, bestPlayersCompetition: bestCompetition, matchesCompetition, tab } = screenState
   const bestSeason = screenState.bestPlayersSeason ?? season
@@ -55,7 +55,7 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
   const allTeamPlayers = sortPlayersByPosition(players.filter((player) => (player.teamIds ?? [player.teamId]).includes(teamId)), [])
   const leagueRow = analytics.leagueSnapshots.get(analytics.currentMatchDay)?.standings.find(row => row.teamId === teamId)
   return <div className="px-4 pb-8 pt-6">
-    <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">← Back</button>
+    <button type="button" onClick={onBackToTeams} className="mb-3 min-h-9 px-1 text-xs font-semibold text-emerald-400">← Back to Teams</button>
     <header className="mb-5 flex items-center gap-3">
       <TeamIcon team={team} className="h-12 w-12 text-sm font-black">{team.shortName}</TeamIcon>
       <div><h1 className="text-xl font-bold">{team.name}</h1><p className="text-[10px] uppercase tracking-widest text-zinc-500">{activeSeason} · Season stats</p></div>

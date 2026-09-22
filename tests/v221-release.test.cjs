@@ -32,8 +32,8 @@ function game(day, options = {}) {
   }
 }
 
-test('v2.2.11 metadata and the finalized revision-9 position table are exact', () => {
-  assert.equal(APP_VERSION, '2.2.11'); assert.equal(require('../package.json').version, '2.2.11'); assert.equal(RATING_ENGINE_REVISION, 9)
+test('v2.2.12 metadata and the finalized revision-9 position table are exact', () => {
+  assert.equal(APP_VERSION, '2.2.12'); assert.equal(require('../package.json').version, '2.2.12'); assert.equal(RATING_ENGINE_REVISION, 9)
   const expected = {
     LB: [.04, 1], LWB: [.04, 1], RB: [.04, 1], RWB: [.04, 1],
     CDM: [.06, .50], LDM: [.06, .50], RDM: [.06, .50],

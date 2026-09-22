@@ -1,11 +1,12 @@
-import type { CompetitionState, Match, Player, Team } from '../types'
+import type { CompetitionState, Match, MatchChangePayload, Player, Team } from '../types'
 import { deriveFootballEvents } from './news'
 import { oldestMatches } from './matchChronology'
 import { buildPlayerRecordLeaderboards } from './playerRecords'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { buildGlobalRankingData, rankGlobalRankingRows, type LeaderboardMetric } from './stats'
 
-export type GroupedMatchChange = { id: string; playerId?: string; title: string; detail: string; eventIds: string[] }
+export type GroupedMatchChangeItem = { id: string; label: string; kind: MatchChangePayload['kind'] }
+export type GroupedMatchChange = { id: string; playerId?: string; title: string; detail: string; eventIds: string[]; items: GroupedMatchChangeItem[] }
 
 const EMPTY_STATES: CompetitionState[] = []
 const cache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], Map<string, GroupedMatchChange[]>>>>>()
@@ -98,16 +99,18 @@ export function matchChangesForMatch(players: Player[], teams: Team[], matches: 
     if (event.matchId !== matchId || (event.surface !== 'match-change' && event.surface !== 'both')) continue
     const key = event.playerId ? `player:${event.playerId}` : `event:${event.id}`
     const current = groups.get(key)
-    if (current) { current.detail = `${current.detail} · ${event.matchChange?.label ?? event.title}`; current.eventIds.push(event.id); continue }
-    groups.set(key, { id: `match-change:${matchId}:${key}`, playerId: event.playerId, title: event.playerId ? `${players.find(player => player.id === event.playerId)?.displayName ?? players.find(player => player.id === event.playerId)?.name ?? 'Player'} · Changes` : event.eyebrow, detail: event.matchChange?.label ?? event.title, eventIds: [event.id] })
+    const item = { id: event.id, label: event.matchChange?.label ?? event.title, kind: event.matchChange?.kind ?? 'milestone' as MatchChangePayload['kind'] }
+    if (current) { current.detail = `${current.detail} · ${item.label}`; current.eventIds.push(item.id); current.items.push(item); continue }
+    groups.set(key, { id: `match-change:${matchId}:${key}`, playerId: event.playerId, title: event.playerId ? `${players.find(player => player.id === event.playerId)?.displayName ?? players.find(player => player.id === event.playerId)?.name ?? 'Player'} · Changes` : event.eyebrow, detail: item.label, eventIds: [item.id], items: [item] })
   }
   for (const event of cachedRankingChanges(players, matches)) {
     if (event.matchId !== matchId) continue
     const key = `player:${event.playerId}`
     const current = groups.get(key)
-    if (current) { current.detail = `${current.detail} · ${event.label}`; current.eventIds.push(event.id); continue }
+    const item: GroupedMatchChangeItem = { id: event.id, label: event.label, kind: 'ranking' }
+    if (current) { current.detail = `${current.detail} · ${item.label}`; current.eventIds.push(item.id); current.items.push(item); continue }
     const player = players.find(item => item.id === event.playerId)
-    groups.set(key, { id: `match-change:${matchId}:${key}`, playerId: event.playerId, title: `${player?.displayName ?? player?.name ?? 'Player'} · Changes`, detail: event.label, eventIds: [event.id] })
+    groups.set(key, { id: `match-change:${matchId}:${key}`, playerId: event.playerId, title: `${player?.displayName ?? player?.name ?? 'Player'} · Changes`, detail: item.label, eventIds: [item.id], items: [item] })
   }
   const result = [...groups.values()]
   byMatch.set(matchId, result)
