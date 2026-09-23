@@ -66,8 +66,8 @@ test('Home keeps stable source arrays for ranking and reuses News for immutable 
 })
 
 test('v2.2.1 version is consistent and rating revision advances once', () => {
-  assert.equal(APP_VERSION, '2.3.1')
-  assert.equal(require('../package.json').version, '2.3.1')
-  assert.equal(require('../package-lock.json').version, '2.3.1')
-  assert.equal(RATING_ENGINE_REVISION, 9)
+  assert.equal(APP_VERSION, '2.3.2')
+  assert.equal(require('../package.json').version, '2.3.2')
+  assert.equal(require('../package-lock.json').version, '2.3.2')
+  assert.equal(RATING_ENGINE_REVISION, 10)
 })

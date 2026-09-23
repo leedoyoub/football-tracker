@@ -25,7 +25,7 @@ test('conceded goals affect only the position segment in which they occurred', (
   const match = game([appearance(p, 'starter', { positionHistory: [{ minute: 60, position: 'CDM' }] })], [goal('late', 80)])
   const trace = tracePlayerMatchRating(match, p)
   assert.deepEqual(trace.suppressionIntervals.map(row => [row.position, row.minutes, row.sot90]), [['CB', 60, 0], ['CDM', 30, 3]])
-  near(trace.sotBonus, .97)
+  near(trace.sotBonus, 1.032)
 })
 
 test('fractional SOT values interpolate and preserve every integer table value', () => {

@@ -74,7 +74,7 @@ test('event-time position applies CB then CDM penalties and suppression interval
   const fixture = match([substitution('on', 73), opponentGoal('g75', 75), opponentGoal('g88', 88)], { appearances: [{ playerId: 'cb', teamId: 'A', role: 'bench', position: 'CB', matchPosition: 'CB', positionHistory: [{ minute: 80, position: 'CDM' }] }] })
   const trace = tracePlayerMatchRating(fixture, cb)
   assert.deepEqual(trace.concededGoals.map(goal => [goal.position, goal.penalty]), [['CB', -.35], ['CDM', -.15]])
-  near(trace.raw, 5.7330000000000005)
+  near(trace.raw, 5.740666666666667)
 })
 
 test('an exit before the second goal ends both minutes and conceded attribution', () => {

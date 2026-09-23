@@ -14,16 +14,16 @@ const near = (actual, expected) => assert(Math.abs(actual - expected) < 1e-10, `
 const player = (id, position, rating = 1) => ({ id, name: id, displayName: id, teamId: 'A', position, number: 1, rating })
 const appearance = player => ({ playerId: player.id, teamId: 'A', position: player.position, matchPosition: player.position, role: 'starter' })
 
-test('v9 has the exact finalized balance table and result modifier', () => {
-  assert.equal(revision.RATING_ENGINE_REVISION, 9)
+test('v10 has the exact finalized balance table and result modifier', () => {
+  assert.equal(revision.RATING_ENGINE_REVISION, 10)
   assert.equal(rating.GOALKEEPER_BASE_RATING, 7.0)
   for (const position of ['CB', 'LCB', 'RCB']) assert.equal(rating.POSITION_RULES[position].suppressionMax, 1.30)
   for (const position of ['LB', 'LWB', 'RB', 'RWB']) assert.equal(rating.POSITION_RULES[position].suppressionMax, 1)
-  for (const position of ['CDM', 'LDM', 'RDM']) assert.equal(rating.POSITION_RULES[position].suppressionMax, .50)
-  for (const position of ['CM', 'LCM', 'RCM']) assert.equal(rating.POSITION_RULES[position].suppressionMax, .25)
-  for (const position of ['LM', 'RM']) assert.equal(rating.POSITION_RULES[position].suppressionMax, .15)
+  for (const position of ['CDM', 'LDM', 'RDM']) assert.equal(rating.POSITION_RULES[position].suppressionMax, .80)
+  for (const position of ['CM', 'LCM', 'RCM']) assert.equal(rating.POSITION_RULES[position].suppressionMax, .30)
+  for (const position of ['LM', 'RM']) assert.equal(rating.POSITION_RULES[position].suppressionMax, .25)
   for (const position of ['CAM', 'GK', 'LW', 'RW', 'SS', 'ST', 'LST', 'RST']) assert.equal(rating.POSITION_RULES[position].suppressionMax, 0)
-  const teamGoal = { LW: .05, RW: .05, CAM: .05, LM: .05, RM: .05, CM: .07, LCM: .07, RCM: .07, CDM: .06, LDM: .06, RDM: .06, LB: .04, LWB: .04, RB: .04, RWB: .04 }
+  const teamGoal = { LW: .05, RW: .05, CAM: .05, LM: .06, RM: .06, CM: .08, LCM: .08, RCM: .08, CDM: .06, LDM: .06, RDM: .06, LB: .04, LWB: .04, RB: .04, RWB: .04 }
   for (const position of Object.keys(rating.POSITION_RULES)) assert.equal(rating.POSITION_RULES[position].teamGoal, teamGoal[position] ?? 0)
   assert.deepEqual([.8, .6, .4, .2, 0].map(rating.saveBonusPerSave), [.30, .27, .25, .21, .17])
   const base = { id: 'result', season: 'S1', matchDay: 1, date: '2026-01-01', duration: 90, homeTeamId: 'A', awayTeamId: 'B', appearances: [], events: [] }
@@ -53,7 +53,7 @@ test('historical v6 rating and MOM feed every derived stats surface, not saved f
   const rawFactsBefore = JSON.stringify(match)
   const defenderRating = rating.ratePlayerMatch(match, defender)
   const creatorRating = rating.ratePlayerMatch(match, creator)
-  near(defenderRating.raw, 6.5 + .1 + .05 + .15 / 90)
+  near(defenderRating.raw, 6.5 + .1 + .06 + .25 / 90)
   near(creatorRating.raw, 6.65)
   assert.equal(rating.getMatchManOfTheMatch(match, players), defender.id)
   assert.equal(JSON.stringify(match), rawFactsBefore)

@@ -32,12 +32,12 @@ function game(day, options = {}) {
   }
 }
 
-test('v2.3.1 metadata and the finalized revision-9 position table are exact', () => {
-  assert.equal(APP_VERSION, '2.3.1'); assert.equal(require('../package.json').version, '2.3.1'); assert.equal(RATING_ENGINE_REVISION, 9)
+test('v2.3.2 metadata and the finalized revision-10 position table are exact', () => {
+  assert.equal(APP_VERSION, '2.3.2'); assert.equal(require('../package.json').version, '2.3.2'); assert.equal(RATING_ENGINE_REVISION, 10)
   const expected = {
     LB: [.04, 1], LWB: [.04, 1], RB: [.04, 1], RWB: [.04, 1],
-    CDM: [.06, .50], LDM: [.06, .50], RDM: [.06, .50],
-    CM: [.07, .25], LCM: [.07, .25], RCM: [.07, .25], LM: [.05, .15], RM: [.05, .15],
+    CDM: [.06, .80], LDM: [.06, .80], RDM: [.06, .80],
+    CM: [.08, .30], LCM: [.08, .30], RCM: [.08, .30], LM: [.06, .25], RM: [.06, .25],
     CB: [0, 1.3], LCB: [0, 1.3], RCB: [0, 1.3], CAM: [.05, 0], LW: [.05, 0], RW: [.05, 0], ST: [0, 0], GK: [0, 0],
   }
   for (const [position, [teamGoal, suppressionMax]] of Object.entries(expected)) assert.deepEqual([rating.POSITION_RULES[position].teamGoal, rating.POSITION_RULES[position].suppressionMax], [teamGoal, suppressionMax], position)

@@ -72,12 +72,12 @@ for (const [field, expected] of [['playerId', 1.35], ['assistPlayerId', .75], ['
 })
 test('uninvolved goal bonus changes with position and excludes scorer/assister', () => {
   const p = player('p', 'LB'), m = game(p, [goal('g1', 30, { teamId: 'A' }), goal('g2', 70, { teamId: 'A' }), goal('g3', 80, { teamId: 'A', playerId: 'p' }), goal('g4', 85, { teamId: 'A', assistPlayerId: 'p' })], { appearances: [app(p, 'starter', { positionHistory: [{ minute: 60, position: 'CM' }] })] })
-  near(rating.ratePlayerMatch(m, p).teamGoals, .11)
+  near(rating.ratePlayerMatch(m, p).teamGoals, .12)
 })
 test('SOT suppression splits 60 CB / 30 CDM with full precision', () => {
   const p = player(), m = game(p, [goal('g', 80)], { appearances: [app(p, 'starter', { positionHistory: [{ minute: 60, position: 'CDM' }] })] })
   const trace = rating.tracePlayerMatchRating(m, p)
-  near(trace.sotBonus, .97)
+  near(trace.sotBonus, 1.032)
   near(trace.suppressionIntervals.reduce((sum, row) => sum + row.bonus, 0), trace.sotBonus)
 })
 for (const first of [true, false]) test(`same-minute substitution ${first ? 'before' : 'after'} goal`, () => {
@@ -108,7 +108,7 @@ for (const minute of [91, 95, 99]) test(`stoppage-time goal at ${minute} keeps r
 })
 test('multiple position intervals cannot exceed the 1.0 minutes factor in stoppage time', () => {
   const p = player(), m = game(p, [goal('end', 99)], { appearances: [app(p, 'starter', { positionHistory: [{ minute: 60, position: 'CDM' }] })] })
-  near(rating.ratePlayerMatch(m, p).noConceded, .97)
+  near(rating.ratePlayerMatch(m, p).noConceded, 1.032)
 })
 test('supported repeated on/off intervals exclude bench gaps from minutes and goals', () => {
   const p = player(), m = game(p, [sub(20, 'other', 'p'), goal('gap', 30), sub(40), goal('on', 50), sub(60, 'next', 'p'), goal('off', 70)])
@@ -193,7 +193,7 @@ test('legacy partnership statistics attribute final-minute goals and reject off-
   const result = stats.partnershipStats('p', 'mate', [m], 'S1')
   assert.equal(result.goalsTogether, 1); assert.equal(result.assistsBtoA, 1)
 })
-test('historical Match and Player Detail actually render the same v9 single-match value', () => {
+test('historical Match and Player Detail actually render the same current-engine single-match value', () => {
   const { p, m } = gerardFixture(), React = require('react'), { renderToStaticMarkup } = require('react-dom/server')
   const path = require.resolve('../src/store.tsx'), previous = require.cache[path]
   require.cache[path] = { id: path, filename: path, loaded: true, exports: { useStore: () => ({ players: [p], matches: [m], teams: [], deleteMatch() {} }) } }
