@@ -53,7 +53,7 @@ test('defaults retain every approved state-bearing screen field', () => {
   assert.deepEqual(defaultScreenState({ name: 'home' }), { name: 'home', leaderMetric: 'rating', positionFilter: 'all' })
   assert.deepEqual(defaultScreenState({ name: 'match', id: 'm1' }), { name: 'match', tab: 'facts' })
   assert.deepEqual(defaultScreenState({ name: 'global-ranking', season: 'Season 3', competitionType: 'cup', rankingMetric: 'assists' }), {
-    name: 'global-ranking', metric: 'assists', scope: 'cup', positionFilter: 'all', viewAll: false,
+    name: 'global-ranking', metric: 'assists', scope: 'cup', positionFilter: 'all', teamId: null, viewAll: false,
   })
   assert.deepEqual(defaultScreenState({ name: 'team', id: 'A' }), {
     name: 'team', tab: 'overview', bestPlayersSeason: null, bestPlayersCompetition: 'all', bestPlayersMetric: 'rating', matchesCompetition: 'all', expandedContext: null,

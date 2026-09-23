@@ -293,8 +293,13 @@ function makeSeriesRound(stage: Exclude<ChampionsStage, 'finalReplay'>, pair: [s
   const secondIntegrity = championsSeriesIntegrity(second, requiredMatches)
   if (!firstIntegrity.valid) return { requiredMatches, teamGames: { [firstId]: first, [secondId]: second }, rowWinners: [] as (string | undefined)[], integrityError: firstIntegrity.message }
   if (!secondIntegrity.valid) return { requiredMatches, teamGames: { [firstId]: first, [secondId]: second }, rowWinners: [] as (string | undefined)[], integrityError: secondIntegrity.message }
-  if (first.length !== requiredMatches || second.length !== requiredMatches) return { requiredMatches, teamGames: { [firstId]: first, [secondId]: second }, rowWinners: [] as (string | undefined)[] }
-  const rowWinners = Array.from({ length: requiredMatches }, (_, index) => compareChampionsSeriesRow(firstId, first[index], secondId, second[index], players))
+  const firstByGame = new Map(first.map(match => [competitionIdentityForMatch(match).seriesGame!, match]))
+  const secondByGame = new Map(second.map(match => [competitionIdentityForMatch(match).seriesGame!, match]))
+  const rowWinners = Array.from({ length: requiredMatches }, (_, index) => {
+    const seriesGame = index + 1; const left = firstByGame.get(seriesGame); const right = secondByGame.get(seriesGame)
+    return left && right ? compareChampionsSeriesRow(firstId, left, secondId, right, players) : undefined
+  })
+  if (first.length !== requiredMatches || second.length !== requiredMatches) return { requiredMatches, teamGames: { [firstId]: first, [secondId]: second }, rowWinners }
   const wins = (teamId: string) => rowWinners.filter(id => id === teamId).length
   let winnerId: string | undefined
   if (wins(firstId) !== wins(secondId)) winnerId = wins(firstId) > wins(secondId) ? firstId : secondId
@@ -306,6 +311,14 @@ function makeSeriesRound(stage: Exclude<ChampionsStage, 'finalReplay'>, pair: [s
     winnerId = values.find(value => value !== 0)! > 0 ? firstId : values.every(value => value === 0) ? (firstId.localeCompare(secondId) <= 0 ? firstId : secondId) : secondId
   }
   return { requiredMatches, teamGames: { [firstId]: first, [secondId]: second }, rowWinners, winnerId }
+}
+
+export type ChampionsBracketProjection = Record<Exclude<ChampionsStage, 'finalReplay' | 'roundOf16'>, [string, string][]>
+
+/** Presentation-only downstream slots; this never constructs authoritative rounds. */
+export function projectChampionsBracket(rounds: ChampionsCompetition['rounds']): ChampionsBracketProjection {
+  const slots = (source: ChampionsPairing[], count: number): [string, string][] => Array.from({ length: count }, (_, index) => [source[index * 2]?.winnerId ?? 'TBD', source[index * 2 + 1]?.winnerId ?? 'TBD'])
+  return { quarterFinal: slots(rounds.roundOf16, 4), semiFinal: slots(rounds.quarterFinal, 2), final: slots(rounds.semiFinal, 1) }
 }
 
 function repairChampionsPairing(match: Match, stage: Exclude<ChampionsStage, 'finalReplay'>, pair: [string, string], pairingId: string, draw: CompetitionState): Match | undefined {
@@ -324,20 +337,42 @@ function repairChampionsPairing(match: Match, stage: Exclude<ChampionsStage, 'fi
 
 function makeRound(stage: Exclude<ChampionsStage, 'finalReplay'>, teamIds: string[], matches: Match[], season: string, players: Player[], draw: CompetitionState): ChampionsPairing[] {
   const requiredMatches = stage === 'final' ? 1 : 2
+  const stageGames = competitionStageMatches(matches, season, 'champions', stage)
+  const pairings = Array.from({ length: teamIds.length / 2 }, (_, index) => {
+    const pair = [teamIds[index * 2], teamIds[index * 2 + 1]] as [string, string]
+    return { id: `${stage}:${index}`, pair }
+  })
+  const pairById = new Map(pairings.map(pairing => [pairing.id, pairing]))
+  const pairIdByTeam = new Map(pairings.flatMap(({ id, pair }) => pair.map(teamId => [teamId, id] as const)))
+  const gamesByPairing = new Map(pairings.map(({ id }) => [id, [] as Match[]]))
+  const ambiguousPairings = new Set<string>()
+
+  // Index each staged record once. A record can concern at most two pairings
+  // through its home/away/team identities, avoiding a full-stage scan per row.
+  for (const match of stageGames) {
+    const identity = competitionIdentityForMatch(match)
+    const candidateIds = new Set<string>()
+    if (identity.pairingId && pairById.has(identity.pairingId)) candidateIds.add(identity.pairingId)
+    for (const teamId of [match.teamId, match.homeTeamId, match.awayTeamId]) {
+      const candidateId = teamId ? pairIdByTeam.get(teamId) : undefined
+      if (candidateId) candidateIds.add(candidateId)
+    }
+    for (const id of candidateIds) {
+      const pairing = pairById.get(id)!
+      const repaired = repairChampionsPairing(match, stage, pairing.pair, id, draw)
+      if (repaired) gamesByPairing.get(id)!.push(repaired)
+      else if (hasPlayed(match, pairing.pair[0]) || hasPlayed(match, pairing.pair[1])) ambiguousPairings.add(id)
+    }
+  }
+
   return Array.from({ length: teamIds.length / 2 }, (_, index) => {
     const pair = [teamIds[index * 2], teamIds[index * 2 + 1]] as [string, string]
     const id = `${stage}:${index}`
-    const stageGames = competitionStageMatches(matches, season, 'champions', stage)
-    const resolved = stageGames.map(match => repairChampionsPairing(match, stage, pair, id, draw) ?? match)
-    const games = resolved.filter(match => competitionIdentityForMatch(match).pairingId === id)
+    const games = gamesByPairing.get(id)!
     // Never silently ignore a same-team record from this stage. Without a
     // unique repair it is ambiguous whether it belongs to this pairing, so
     // reopening Game 1 would risk duplicating an already-recorded slot.
-    const unresolved = stageGames.some(match => {
-      if (!hasPlayed(match, pair[0]) && !hasPlayed(match, pair[1])) return false
-      return competitionIdentityForMatch(match).pairingId !== id && !repairChampionsPairing(match, stage, pair, id, draw)
-    })
-    if (unresolved) return { id, stage, teamIds: pair, matches: [], tied: false, requiredMatches: stage === 'final' ? 2 : 3, integrityError: 'Champions data-integrity warning: pairing identity is missing or ambiguous.' }
+    if (ambiguousPairings.has(id)) return { id, stage, teamIds: pair, matches: [], tied: false, requiredMatches: stage === 'final' ? 2 : 3, integrityError: 'Champions data-integrity warning: pairing identity is missing or ambiguous.' }
     const seriesMode = games.length === 0 || games.some(match => Number.isInteger(competitionIdentityForMatch(match).seriesGame))
     if (seriesMode) {
       const series = makeSeriesRound(stage, pair, games, players)

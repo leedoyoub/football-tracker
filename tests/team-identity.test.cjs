@@ -13,8 +13,8 @@ test('static catalog has the 16 intended API-Football teams in requested order',
   const bayern = STATIC_TEAMS.findIndex(team => team.id === 'bayern-munich')
   assert.equal(STATIC_TEAMS[bayern + 1].id, 'borussia-dortmund')
   assert.equal(STATIC_TEAMS[bayern + 1].externalTeamId, 165)
-  assert.equal(STATIC_TEAMS.at(-1).id, 'inter-miami')
-  assert.equal(STATIC_TEAMS.at(-1).externalTeamId, 9568)
+  assert.equal(STATIC_TEAMS[3].id, 'inter-miami')
+  assert.equal(STATIC_TEAMS[3].externalTeamId, 9568)
   assert(STATIC_TEAMS.every(team => team.abbreviation && team.logo && team.logo.includes(String(team.externalTeamId))))
 })
 

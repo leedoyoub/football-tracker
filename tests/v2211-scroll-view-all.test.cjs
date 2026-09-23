@@ -22,13 +22,13 @@ test('active View All control stays hidden until its section leaves view and ret
   assert.deepEqual(calls, [{ behavior: 'smooth', block: 'start' }])
 })
 
-test('floating controls are attached only to active expanded ranking sections', () => {
+test('floating controls remain on full ranking lists, not compact competition previews', () => {
   const records = fs.readFileSync(require.resolve('../src/screens/RecordsScreen.tsx'), 'utf8')
   const globalRanking = fs.readFileSync(require.resolve('../src/screens/GlobalRankingScreen.tsx'), 'utf8')
   const competition = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
   assert(!records.includes('</div><FloatingScrollToTop />'), 'Records must not render an unconditional page-level control')
   assert.match(records, /activeGroup.*FloatingScrollToTop/s)
   assert.match(globalRanking, /rows\.length > 10.*FloatingScrollToTop/s)
-  assert.match(competition, /all && rows\.length > 10.*FloatingScrollToTop/s)
-  assert(!competition.includes('rows.slice(0, all ? 50 : 10)'), 'expanded competition rankings must not retain a 50-row cap')
+  assert(!competition.includes('FloatingScrollToTop'), 'compact competition previews never expand inline')
+  assert(competition.includes('rows.slice(0, 10)'))
 })

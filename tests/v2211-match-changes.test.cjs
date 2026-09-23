@@ -15,30 +15,26 @@ const players = [...Array.from({ length: 10 }, (_, index) => ({ id: `p${index}`,
 const appearances = players.map(player => ({ playerId: player.id, teamId: 'A', position: 'ST', role: 'starter' }))
 const game = (id, day, events = []) => ({ id, season: 'Season 1', competitionType: 'league', matchDay: day, date: `2026-01-0${day}`, duration: 90, homeTeamId: 'A', awayTeamId: 'B', teamId: 'A', appearances, events })
 
-test('only a participating player receives canonical Top 10 entry and #1 ranking transitions', () => {
+test('ranking transitions are excluded from What Changed even for a participating scorer', () => {
   const matches = [game('m1', 1), game('m2', 2, [{ id: 'z-goal', type: 'goal', minute: 10, teamId: 'A', playerId: 'z' }])]
   const changes = matchChangesForMatch(players, teams, matches, [], 'm2')
-  const zed = changes.find(change => change.playerId === 'z')
-  assert(zed)
-  assert(zed.eventIds.includes('ranking:core:global:goals:z'))
-  assert.match(zed.detail, /TAKES #1.*Goals/)
-  assert.equal(changes.some(change => change.playerId === 'p9' && change.eventIds.some(id => id.startsWith('ranking:'))), false)
+  assert.deepEqual(changes, [])
 })
 
-test('an initial leaderboard observation is not a #1 takeover transition', () => {
+test('an initial leaderboard observation remains absent from milestone-only What Changed', () => {
   const matches = [game('first', 1, [{ id: 'z-goal', type: 'goal', minute: 10, teamId: 'A', playerId: 'z' }])]
   const changes = matchChangesForMatch(players, teams, matches, [], 'first')
   assert.equal(changes.some(change => change.playerId === 'z' && change.eventIds.some(id => id.startsWith('ranking:'))), false)
 })
 
-test('same-date chronology rebuilds transitions after historical collection replacement', () => {
+test('same-date chronology rebuilds the milestone-only index after historical collection replacement', () => {
   const early = game('early', 1)
   const late = { ...game('late', 1, [{ id: 'z-goal', type: 'goal', minute: 10, teamId: 'A', playerId: 'z' }]), recordedAt: 2 }
   const first = matchChangesForMatch(players, teams, [early, late], [], 'late')
   const edited = { ...late, events: [] }
   const rebuilt = matchChangesForMatch(players, teams, [early, edited], [], 'late')
-  assert(first.some(change => change.eventIds.includes('ranking:core:global:goals:z')))
-  assert.equal(rebuilt.some(change => change.eventIds.includes('ranking:core:global:goals:z')), false)
+  assert.deepEqual(first, [])
+  assert.deepEqual(rebuilt, [])
 })
 
 test('What Changed keeps Team Top 3 separate from Global and Competition Top 10 cutoffs', () => {

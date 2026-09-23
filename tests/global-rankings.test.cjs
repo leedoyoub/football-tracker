@@ -37,11 +37,11 @@ test('season/source changes create a fresh derived ranking result', () => {
   assert.equal(buildGlobalRankingData(players, [{ ...s1, events: [...s1.events, { id: 'new', type: 'goal', minute: 30, teamId: 'A', playerId: 'st' }] }], filters(), 'goals').find(row => row.playerId === 'st').value, 2)
 })
 
-test('Competitions consumes one memoized ranking dataset for preview and View All', () => {
+test('Competition previews consume one memoized ranking dataset and route View All to the full scoped screen', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
-  assert(source.includes("buildGlobalRankingData(players, matches, effective, 'rating')"))
+  assert(source.includes("buildGlobalRankingData(players, matches, { seasons: [season], teams: [], positions: [] }, 'rating')"))
   assert(source.includes('rankGlobalRankingRows(rankingIndex, players, metric)'))
-  assert(source.includes('(all ? rows : rows.slice(0, 10))'))
-  assert(source.includes("all ? 'Show Top 10' : 'View All'"))
+  assert(source.includes('rows.slice(0, 10)'))
+  assert(source.includes("competitionType: type"))
   assert(!source.includes('matchesForPlayer(player, matches, appliedFilters)'))
 })

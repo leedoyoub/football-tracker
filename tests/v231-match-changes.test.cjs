@@ -20,23 +20,21 @@ test('ordinary 1G, 1A, and 1G1A never create Match Changes', () => {
   assert.deepEqual(changesFor([p], matches, 'one'), [])
 })
 
-test('strict personal bests are emitted only when a player exceeds the previous raw match maximum', () => {
+test('strict personal bests are excluded from milestone-only What Changed', () => {
   const p = player('p')
   const matches = [game('first', 1, [], [appearance('p')]), game('second', 2, [{ id: 'g1', type: 'goal', minute: 1, teamId: 'A', playerId: 'p' }, { id: 'g2', type: 'goal', minute: 2, teamId: 'A', playerId: 'p' }], [appearance('p')])]
   const output = labels(changesFor([p], matches, 'second'))
-  assert(output.some(label => /Personal best.*2 Goals/i.test(label)))
-  assert(output.some(label => /Personal best.*2 G\+A/i.test(label)))
+  assert.equal(output.some(label => /Personal best/i.test(label)), false)
 })
 
-test('a player who takes Global and League #1 gets takeover events but no ordinary climb', () => {
+test('a player who takes Global and League #1 gets no What Changed ranking event', () => {
   const p = player('p', 'A'); const r = player('r', 'B')
   const matches = [
     game('first', 1, [{ id: 'r', type: 'goal', minute: 1, teamId: 'B', playerId: 'r' }], [appearance('p'), appearance('r', 'B')]),
     game('take', 2, [{ id: 'p1', type: 'goal', minute: 1, teamId: 'A', playerId: 'p' }, { id: 'p2', type: 'goal', minute: 2, teamId: 'A', playerId: 'p' }], [appearance('p'), appearance('r', 'B')]),
   ]
   const output = labels(changesFor([p, r], matches, 'take'))
-  assert.equal(output.filter(label => /TAKES #1.*Goals/i.test(label)).length, 2)
-  assert.equal(output.some(label => /Top 10|climb|Top 3/i.test(label)), false)
+  assert.equal(output.some(label => /TAKES #1|Top 10|climb|Top 3/i.test(label)), false)
 })
 
 test('the Match Changes source does not import or invoke the News derivation', () => {
@@ -45,10 +43,10 @@ test('the Match Changes source does not import or invoke the News derivation', (
   assert.equal(source.includes('deriveFootballEvents'), false)
 })
 
-test('takeover accumulation uses the Ranking comparator without rebuilding prefix ranking rows', () => {
+test('milestone-only index has no ranking accumulator or prefix ranking rebuild', () => {
   const source = fs.readFileSync(require.resolve('../src/engine/matchChangeIndex.ts'), 'utf8')
-  assert.match(source, /compareCoreLeaderboardRows/)
-  assert.match(source, /updateRanking\(globalRanking, contribution\)/)
+  assert.equal(source.includes('compareCoreLeaderboardRows'), false)
+  assert.equal(source.includes('globalRanking'), false)
   assert.equal(source.includes('buildGlobalRankingData'), false)
   assert.equal(source.includes('rankGlobalRankingRows'), false)
   assert.equal(source.includes('rows.slice()'), false)

@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AwardBestXI } from '../components/AwardBestXI'
-import { FloatingScrollToTop } from '../components/FloatingScrollToTop'
 import { RankingMetricTabs, RankingRow, useMetricSwipe } from '../components/RankingRow'
 import { RANKING_METRICS, formatRankingMetricValue, rankingTitle, type RankingDisplayMetric } from '../lib/rankingMetrics'
 import { TeamIcon } from '../components/TeamIcon'
 import { playerFullName } from '../components/ui'
+import { resultTone } from '../lib/resultTone'
 import { StandingsTable } from '../components/StandingsTable'
 import {
   CHAMPIONS_ROUNDS,
   CUP_STAGES,
   championsCompetition,
+  projectChampionsBracket,
   competitionMatches,
   competitionStageMatches,
   cupCompetition,
@@ -25,12 +26,11 @@ import { selectLeagueCompetition, type LeagueCacheDiagnostic } from '../engine/c
 import { matchScore } from '../engine/rating'
 import { LEAGUE_MATCHES_PER_TEAM } from '../engine/leagueFormat'
 import { buildGlobalRankingData, rankGlobalRankingRows, seasonsFromMatches, unifiedBestEleven, type LeaderboardMetric } from '../engine/stats'
-import { buildSeasonAnalytics, rankingMovement, type PlayerRankingSnapshot, type SeasonAnalytics } from '../engine/seasonAnalytics'
+import { buildSeasonAnalytics, type PlayerRankingSnapshot, type SeasonAnalytics } from '../engine/seasonAnalytics'
 import { SectionHeader, SegmentedControl } from '../components/SeasonUI'
 import { currentStaticTeams } from '../data/teams'
 import { competitionAwardResult, competitionAwardLabel } from '../engine/awards'
 import { useStore } from '../store'
-import { emptyFilters, RankingFilterButton, type RankingFilters } from './RankingFilters'
 import type { CompetitionState, CompetitionType, Match, Player, ScreenStateByView, Team, View } from '../types'
 
 const LABELS: Record<CompetitionType, string> = { league: 'League', cup: 'Cup', champions: 'Champions' }
@@ -39,8 +39,6 @@ const STAGE_LABELS: Record<string, string> = {
   stage1: 'Stage 1', stage2: 'Stage 2', stage3: 'Stage 3', stage4: 'Stage 4', stage5: 'Stage 5', stage6: 'Stage 6', stage7: 'Stage 7',
   final: 'Final', finalReplay: 'Final Replay', roundOf16: 'Round of 16', quarterFinal: 'Quarter-finals', semiFinal: 'Semi-finals',
 }
-const METRICS = RANKING_METRICS.map(({ value: id, label }) => ({ id, label }))
-
 let diagnosticSequence = 0
 function measuredInDevelopment<T>(label: string, operation: () => T): T {
   if (!import.meta.env.DEV || typeof performance === 'undefined') return operation()
@@ -210,11 +208,17 @@ function DrawPanel({ teams, drawnIds, teamById, onDraw }: { teams: Team[]; drawn
 }
 
 function ChampionsBracket({ teams, rounds, championId, currentStage }: { teams: Record<string, Team>; rounds: ReturnType<typeof championsCompetition>['rounds']; championId?: string; currentStage: string }) {
+  const projection = projectChampionsBracket(rounds)
+  const placeholders = (stage: 'quarterFinal' | 'semiFinal' | 'final') => projection[stage].map((teamIds, index): ChampionsPairing => ({ id: `projected:${stage}:${index}`, stage, teamIds, matches: [], tied: false, requiredMatches: 0, rowWinners: [] }))
+  rounds = { ...rounds, quarterFinal: rounds.quarterFinal.length ? rounds.quarterFinal : placeholders('quarterFinal'), semiFinal: rounds.semiFinal.length ? rounds.semiFinal : placeholders('semiFinal'), final: rounds.final.length ? rounds.final : placeholders('final') }
   const card = (pairing: ChampionsPairing) => {
     const games = (teamId: string) => pairing.teamGames?.[teamId] ?? pairing.matches.filter(match => match.teamId === teamId || match.homeTeamId === teamId || match.awayTeamId === teamId)
     const score = (match: Match | undefined, teamId: string) => { if (!match) return '–'; const value = matchScore(match); const home = match.homeTeamId === teamId || (match.teamId === teamId && match.homeTeamId !== teamId); return `${home ? value.home : value.away}-${home ? value.away : value.home}` }
     const rows = Array.from({ length: pairing.requiredMatches }, (_, index) => index)
-    return <div key={pairing.id} className={`relative rounded-xl border p-2 shadow-lg ${pairing.stage === currentStage ? 'border-cyan-300/60 bg-cyan-400/10' : 'border-white/10 bg-zinc-900'}`}><div className="mb-2 grid grid-cols-2 gap-2">{pairing.teamIds.map(id => <TeamIcon key={id} team={teams[id]} className="mx-auto h-6 w-6 text-[6px]" />)}</div><div className="grid grid-cols-2 gap-x-2 gap-y-1">{rows.flatMap(index => pairing.teamIds.map(id => <span key={`${id}:${index}`} className={`rounded px-1 py-0.5 text-center text-[10px] font-black ${pairing.rowWinners?.[index] === id ? 'bg-emerald-500/25 text-emerald-200' : pairing.rowWinners?.[index] ? 'bg-red-500/20 text-red-200' : 'bg-black/30 text-zinc-400'}`}>{score(games(id)[index], id)}</span>))}</div><p className="mt-1 border-t border-white/5 pt-1 text-center text-[8px] text-zinc-600">{pairing.teamGames ? `${games(pairing.teamIds[0]).length}/${pairing.requiredMatches} · ${games(pairing.teamIds[1]).length}/${pairing.requiredMatches}` : `${pairing.matches.length}/${pairing.requiredMatches} matches`}</p></div>
+    const projected = pairing.id.startsWith('projected:')
+    const iconTone = (id: string) => resultTone(projected || !pairing.winnerId ? 'N' : pairing.winnerId === id ? 'W' : 'L')
+    const scoreTone = (id: string, index: number) => resultTone(pairing.rowWinners?.[index] === id ? 'W' : pairing.rowWinners?.[index] ? 'L' : 'N')
+    return <div key={pairing.id} className={`relative rounded-xl border p-2 shadow-lg ${!projected && pairing.stage === currentStage ? 'border-cyan-300/60 bg-cyan-400/10' : 'border-white/10 bg-zinc-900'}`}><div className="mb-2 grid grid-cols-2 gap-2">{pairing.teamIds.map((id, index) => id === 'TBD' ? <span key={`${id}:${index}`} className="mx-auto grid h-6 w-6 place-items-center rounded-full border border-zinc-400/30 bg-zinc-700/50 text-[6px] font-black text-zinc-400">TBD</span> : <span key={id} className={`mx-auto rounded-full border p-0.5 ${iconTone(id)}`}><TeamIcon team={teams[id]} className="h-6 w-6 text-[6px]" /></span>)}</div>{!projected && <><div className="grid grid-cols-2 gap-x-2 gap-y-1">{rows.flatMap(index => pairing.teamIds.map(id => <span key={`${id}:${index}`} className={`rounded border px-1 py-0.5 text-center text-[10px] font-black ${scoreTone(id, index)}`}>{score(games(id)[index], id)}</span>))}</div><p className="mt-1 border-t border-white/5 pt-1 text-center text-[8px] text-zinc-600">{pairing.teamGames ? `${games(pairing.teamIds[0]).length}/${pairing.requiredMatches} · ${games(pairing.teamIds[1]).length}/${pairing.requiredMatches}` : `${pairing.matches.length}/${pairing.requiredMatches} matches`}</p></>}</div>
   }
   return <div aria-label="Champions fixed knockout bracket" className="champions-bracket-scroll no-scrollbar overflow-x-auto overflow-y-hidden"><div className="grid min-w-[780px] grid-cols-[1.35fr_1fr_.9fr_1fr_1.35fr] items-center gap-4 rounded-2xl border border-blue-400/10 bg-gradient-to-b from-slate-950 to-black p-4"><Round title="Round of 16" pairs={rounds.roundOf16.slice(0, 4)} card={card} side="left" /><div className="space-y-10"><Round title="Quarter-finals" pairs={rounds.quarterFinal.slice(0, 2)} card={card} side="left" /><Round title="Semi-final" pairs={rounds.semiFinal.slice(0, 1)} card={card} side="left" /></div><div className="text-center"><div className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-amber-300/40 bg-amber-300/10 text-3xl">🏆</div><p className="mt-2 text-[10px] font-black uppercase text-amber-300">{championId ? teams[championId]?.name : 'Champion'}</p>{rounds.final[0] && <div className="mt-3">{card(rounds.final[0])}</div>}</div><div className="space-y-10"><Round title="Semi-final" pairs={rounds.semiFinal.slice(1)} card={card} side="right" /><Round title="Quarter-finals" pairs={rounds.quarterFinal.slice(2)} card={card} side="right" /></div><Round title="Round of 16" pairs={rounds.roundOf16.slice(4)} card={card} side="right" /></div></div>
 }
@@ -225,34 +229,16 @@ function Round({ title, pairs, card, side }: { title: string; pairs: ChampionsPa
 
 function CompetitionRankings({ season, type, screenState, onStateChange, players, teams, matches, onNavigate }: { season: string; type: CompetitionType; screenState: ScreenStateByView['competition']; onStateChange: (state: ScreenStateByView['competition']) => void; players: Player[]; teams: Team[]; matches: Match[]; onNavigate: (view: View) => void }) {
   const metric = screenState.rankingMetric as LeaderboardMetric
-  const filters: RankingFilters = { ...emptyFilters, seasons: [season], teams: screenState.rankingTeamIds }
-  const all = screenState.viewAllMetric === metric
-  const compareMode = screenState.compareMode
-  const selectedPlayers = screenState.comparedPlayerIds
-  const patchState = (patch: Partial<ScreenStateByView['competition']>) => onStateChange({ ...screenState, ...patch })
-  const drag = useRef({ x: 0, left: 0, active: false })
-  const effective = useMemo(() => ({ ...filters, seasons: [season] }), [filters, season])
-  const rankingIndex = useMemo(() => measuredInDevelopment('Deferred Global Rankings/player stats/rating derivation', () => buildGlobalRankingData(players, matches, effective, 'rating')), [players, matches, effective])
+  const setMetric = (next: LeaderboardMetric) => onStateChange({ ...screenState, rankingMetric: next })
+  const rankingIndex = useMemo(() => measuredInDevelopment('Deferred Global Rankings/player stats/rating derivation', () => buildGlobalRankingData(players, matches, { seasons: [season], teams: [], positions: [] }, 'rating')), [players, matches, season])
   const rows = useMemo(() => measuredInDevelopment('Global Rankings metric ordering', () => rankGlobalRankingRows(rankingIndex, players, metric)), [rankingIndex, players, metric])
   const playerById = useMemo(() => Object.fromEntries(players.map(player => [player.id, player])), [players])
   const teamById = useMemo(() => Object.fromEntries(teams.map(team => [team.id, team])), [teams])
-  const analytics = useMemo(() => type === 'league' ? buildSeasonAnalytics(teams, players, matches, season) : null, [type, teams, players, matches, season])
-  const playerMovement = useMemo(() => analytics ? rankingMovement(analytics.playerSnapshots.get(analytics.currentMatchDay), analytics.playerSnapshots.get(analytics.currentMatchDay - 1), metric) : new Map<string, number | null>(), [analytics, metric])
-  const format = (value: number) => value.toFixed(metric === 'rating' || metric.endsWith('/90') || metric === 'sotAllowed' || metric === 'goalsConceded' || metric === 'savePercentage' ? 2 : 0) + (metric === 'savePercentage' ? '%' : '')
-  const rankingSwipe = useMetricSwipe(METRICS.map(item => item.id), metric, next => patchState({ rankingMetric: next, viewAllMetric: null }))
-  const choosePlayer = (playerId: string) => {
-    if (!compareMode) { onNavigate({ name: 'player', id: playerId }); return }
-    const next = selectedPlayers.includes(playerId) ? selectedPlayers.filter(id => id !== playerId) : [...selectedPlayers, playerId].slice(-2)
-    patchState({ comparedPlayerIds: next })
-    if (next.length === 2) onNavigate({ name: 'comparison', leftId: next[0], rightId: next[1], season, competitionType: type })
-  }
-  const sectionId = `competition-ranking-${type}-${metric}`
-  return <section id={sectionId} className="mt-7"><SectionHeader title={rankingTitle(type)} subtitle={`${season} · ${LABELS[type]} only`} action={<div className="flex items-center gap-1"><button type="button" aria-pressed={compareMode} onClick={() => patchState({ compareMode: !compareMode, comparedPlayerIds: [] })} className={`min-h-9 rounded-lg px-2 text-[10px] font-black ${compareMode ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-emerald-300'}`}>{compareMode ? 'Cancel' : 'Compare'}</button><RankingFilterButton applied={effective} onApply={next => patchState({ rankingTeamIds: next.teams, viewAllMetric: null })} seasons={[season]} teams={teams} /></div>} />
-    {compareMode && <p className="mb-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-[10px] text-emerald-200">Select exactly two players ({selectedPlayers.length}/2). Ranking order stays unchanged.</p>}
-    <div className="no-scrollbar mb-3 flex gap-1.5 overflow-x-auto pb-1 touch-pan-x" onPointerDown={event => { if (event.pointerType === 'mouse') drag.current = { x: event.clientX, left: event.currentTarget.scrollLeft, active: true } }} onPointerMove={event => { if (drag.current.active) event.currentTarget.scrollLeft = drag.current.left - (event.clientX - drag.current.x) }} onPointerUp={() => { drag.current.active = false }}>{METRICS.map(item => <button key={item.id} type="button" onClick={() => patchState({ rankingMetric: item.id, viewAllMetric: null })} className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold ${metric === item.id ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-zinc-400'}`}>{item.label}</button>)}</div>{all && rows.length > 10 && <FloatingScrollToTop sectionId={sectionId} />}
-    <div {...rankingSwipe} className="overflow-hidden rounded-xl bg-zinc-900 touch-pan-y" aria-label="Swipe competition ranking metrics">{(all ? rows : rows.slice(0, 10)).map((row, index) => { const player = playerById[row.playerId]; const team = teamById[row.historicalTeamId ?? row.teamId]; const selected = selectedPlayers.includes(row.playerId); return <div key={row.playerId} className="border-b border-white/5 last:border-0"><RankingRow rank={index + 1} player={player} team={team} movement={type === 'league' ? playerMovement.get(row.playerId) ?? null : null} value={format(row.value)} selected={compareMode && selected} onClick={() => choosePlayer(row.playerId)} /></div> })}{!rows.length && <p className="p-3 text-xs text-zinc-500">No qualifying players yet.</p>}</div>
-    {rows.length > 10 && <button type="button" onClick={() => patchState({ viewAllMetric: all ? null : metric })} className="secondary-view-all mt-3 w-full">{all ? 'Show Top 10' : 'View All'}</button>}
-    {analytics && ['goals', 'assists', 'mom', 'rating'].includes(metric) && <RaceHistoryPanel analytics={analytics} metric={metric as 'goals' | 'assists' | 'mom' | 'rating'} players={playerById} />}
+  const rankingSwipe = useMetricSwipe(RANKING_METRICS.map(item => item.value), metric, setMetric)
+  return <section className="mt-7"><SectionHeader title={rankingTitle(type)} subtitle={`${season} · Top 10`} />
+    <RankingMetricTabs label={`${LABELS[type]} ranking metric`} value={metric} onChange={setMetric} options={RANKING_METRICS} />
+    <div {...rankingSwipe} className="mt-2 overflow-hidden rounded-xl bg-zinc-900 touch-pan-y" aria-label="Swipe competition ranking metrics">{rows.slice(0, 10).map((row, index) => { const player = playerById[row.playerId]; const team = teamById[row.historicalTeamId ?? row.teamId]; return <div key={row.playerId} className="border-b border-white/5 last:border-0"><RankingRow rank={index + 1} compact player={player} team={team} value={formatRankingMetricValue(metric, row.value)} onClick={() => onNavigate({ name: 'player', id: row.playerId })} /></div> })}{!rows.length && <p className="p-3 text-xs text-zinc-500">No qualifying players yet.</p>}</div>
+    <button type="button" onClick={() => onNavigate({ name: 'global-ranking', season, competitionType: type, rankingMetric: metric })} className="secondary-view-all mt-3 w-full">View All</button>
   </section>
 }
 
@@ -285,7 +271,7 @@ function CompetitionBestElevens({ season, type, players, teams, matches, allMatc
       const pairs = champions?.rounds[stage] ?? []
       return pairs.length > 0 && pairs.every(pair => Boolean(pair.winnerId)) ? [{ title: `Team of the Round ${index + 1}`, games, recent: false }] : []
     })
-  }, [type, matches, allMatches, season, cup?.stage, cup?.championId, champions?.rounds])
+  }, [type, allMatches, season, cup?.stage, cup?.championId, champions?.rounds])
   const finalXI = canonicalAward ? { slots: canonicalAward.bestXI, statsByPlayer: canonicalAward.statsByPlayer } : seasonXI
   return <section className="mt-7"><h2 className="text-lg font-semibold">Best XI</h2><p className="mb-3 text-xs text-zinc-500">Competition-scoped · existing 4-3-3 position rules</p>{snapshots.map(snapshot => <BestEleven key={snapshot.title} title={snapshot.title} xi={measuredInDevelopment(`Deferred ${snapshot.title}`, () => unifiedBestEleven(players, snapshot.games, season, snapshot.recent))} players={players} teams={teams} onNavigate={onNavigate} />)}<BestEleven title={canonicalAward?.teamLabel ?? competitionAwardLabel(type)} xi={finalXI} bestPlayerId={canonicalAward?.bestPlayerId} players={players} teams={teams} onNavigate={onNavigate} /></section>
 }

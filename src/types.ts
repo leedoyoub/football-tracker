@@ -247,7 +247,7 @@ export interface ScreenStateByView {
     historyMatchday: number | null
     historyComparedTeamIds: string[]
   }
-  'global-ranking': { name: 'global-ranking'; metric: RankSort; scope: CompetitionType | 'all'; positionFilter: PositionFilterKey; viewAll: boolean }
+  'global-ranking': { name: 'global-ranking'; metric: RankSort; scope: CompetitionType | 'all'; positionFilter: PositionFilterKey; teamId: string | null; viewAll: boolean }
   results: { name: 'results' }
   records: {
     name: 'records'

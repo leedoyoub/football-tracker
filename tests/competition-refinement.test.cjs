@@ -139,7 +139,7 @@ test('Competition Best XI labels and sources are scoped to League, Cup stages an
 test('Recent Match cards use the compact result-colored five-card grid and full competition labels', () => {
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('grid-cols-5') && home.includes('Latest five recent matches'))
-  assert(home.includes("'border-emerald-300/50 bg-emerald-500/20'") && home.includes("'border-red-300/50 bg-red-500/20'") && home.includes("'border-zinc-400/30 bg-zinc-700/50'"))
+  assert(home.includes('resultTone(result.outcome)'))
   assert(home.includes("const type = matchCompetitionType(result.match); const competition = type === 'champions' ? 'Champions' : type === 'cup' ? 'Cup' : 'League'"))
   assert(!home.includes('snap-x') && !home.includes('Recent matches carousel'))
 })
@@ -183,9 +183,9 @@ test('season completion is synchronized as backward-compatible CompetitionState 
   assert(validation.includes("'season-complete'"))
 })
 
-test('visible and package metadata version are exactly v2.3.2 / 2.3.2', () => {
-  assert.equal(APP_VERSION, '2.3.2')
-  assert.equal(require('../package.json').version, '2.3.2')
+test('visible and package metadata version are exactly v2.3.3 / 2.3.3', () => {
+  assert.equal(APP_VERSION, '2.3.3')
+  assert.equal(require('../package.json').version, '2.3.3')
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('v{APP_VERSION}'))
 })

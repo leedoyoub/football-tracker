@@ -11,6 +11,7 @@ import { buildGlobalRankingData, rankGlobalRankingRows, seasonsFromMatches } fro
 import { buildSeasonAnalytics, scopedMetricRanks } from '../engine/seasonAnalytics'
 import { playerStreaks } from '../engine/seasonInsights'
 import { deriveNews } from '../engine/news'
+import { playerTeamTitles } from '../engine/historyReadModels'
 import { useStore } from '../store'
 import type { CompetitionType, Match, Player, RatingBreakdown, ScreenStateByView, View } from '../types'
 
@@ -21,7 +22,7 @@ const fieldPositions = new Set(['CB', 'LB', 'RB', 'LWB', 'RWB'])
 const metric = (label: string, content: string | number) => <div key={label} className="rounded-xl bg-black/20 px-2 py-2 text-center"><b className="block text-sm tabular-nums">{content}</b><small className="block text-[9px] uppercase text-zinc-500">{label}</small></div>
 
 export function PlayerDetailScreen({ playerId, season, screenState, onStateChange, onNavigate, onBack }: { playerId: string; season: string; screenState: ScreenStateByView['player']; onStateChange: (state: ScreenStateByView['player']) => void; onNavigate: (view: View) => void; onBack: () => void }) {
-  const { players, teams, matches } = useStore()
+  const { players, teams, matches, competitionStates = [] } = useStore()
   const player = players.find(item => item.id === playerId)
   const seasons = useMemo(() => seasonsFromMatches(matches), [matches])
   const selectedSeason = screenState.season && seasons.includes(screenState.season) ? screenState.season : seasons.includes(season) ? season : seasons[0] ?? season
@@ -42,6 +43,7 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
   const formChange = recent.length ? recentAverage - data.averageRating : 0
   const ranks = { rating: scopedMetricRanks(rankingRows.rating, players, player.id), goals: scopedMetricRanks(rankingRows.goals, players, player.id), assists: scopedMetricRanks(rankingRows.assists, players, player.id) }
   const monthlyAwards = [...leagueAnalytics.monthlyAwards.values()].flatMap(award => [award.playerOfMonth?.playerId === player.id ? 'Player of the Month' : null, award.bestXI.some(slot => slot.playerId === player.id) ? 'Monthly Best XI' : null].filter((item): item is string => Boolean(item)))
+  const awards = [...monthlyAwards, ...playerTeamTitles(teams, players, matches, competitionStates, player.id, selectedSeason)]
   const milestones = deriveNews(players, teams, matches).filter(item => item.playerId === player.id && item.milestone).slice(0, 3)
   const positions = [...data.positionMinutes.entries()].map(([position, minutes]) => ({ position, minutes, share: data.minutes ? minutes / data.minutes * 100 : 0 })).filter(row => row.share >= 10).sort((left, right) => right.share - left.share || right.minutes - left.minutes)
   return <div className="px-4 pb-8 pt-6">
@@ -51,7 +53,7 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
     <Overview data={data} ranks={ranks} />
     <RecentForm recent={recent} overall={data.averageRating} change={formChange} onNavigate={onNavigate} />
     <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Active Streaks</h2>{activeStreaks.length ? <div className="mt-2 flex flex-wrap gap-2">{activeStreaks.map(row => <span key={row.key} className="rounded-full bg-emerald-500/10 px-2.5 py-1.5 text-[10px] font-bold text-emerald-300">{row.current} straight · {row.label}</span>)}</div> : <p className="mt-2 text-xs text-zinc-500">No active streak.</p>}</section>
-    <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><div className="flex items-center justify-between"><div><h2 className="text-sm font-semibold">Awards {monthlyAwards.length}</h2><p className="text-[10px] text-zinc-500">Finalized awards in {selectedSeason}</p></div>{monthlyAwards.length > 3 && <button type="button" className="secondary-view-all">View All</button>}</div>{monthlyAwards.length ? <div className="mt-2 space-y-1">{monthlyAwards.slice(-3).reverse().map((award, index) => <p key={`${award}:${index}`} className="rounded-lg bg-black/20 px-2 py-1.5 text-xs">{award}</p>)}</div> : <p className="mt-2 text-xs text-zinc-500">No completed Monthly Awards yet.</p>}</section>
+    <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><div><h2 className="text-sm font-semibold">Awards {awards.length}</h2><p className="text-[10px] text-zinc-500">Finalized awards and team titles in {selectedSeason}</p></div>{awards.length ? <div className="mt-2 space-y-1">{awards.slice().reverse().map((award, index) => <p key={`${award}:${index}`} className="rounded-lg bg-black/20 px-2 py-1.5 text-xs">{award}</p>)}</div> : <p className="mt-2 text-xs text-zinc-500">No completed awards or team titles yet.</p>}</section>
     {milestones.length > 0 && <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Recent Milestones</h2><div className="mt-2 space-y-1">{milestones.map(item => <button key={item.id} type="button" onClick={() => item.matchId && onNavigate({ name: 'match', id: item.matchId })} className="block w-full rounded-lg bg-black/20 px-2 py-1.5 text-left text-xs">{item.title.replace(/^.*? · /, '')}</button>)}</div></section>}
     <PositionStats data={data} player={player} />
     <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Positions Played</h2><p className="mt-1 text-[10px] text-zinc-500">Match-position timeline minutes · positions under 10% are hidden.</p>{positions.length ? <div className="mt-3 space-y-2">{positions.map(row => <div key={row.position} className="grid grid-cols-[34px_1fr_auto] items-center gap-2 text-xs"><b>{row.position}</b><span className="h-2 overflow-hidden rounded-full bg-black/30"><span className="block h-full rounded-full bg-emerald-400" style={{ width: `${row.share}%` }} /></span><span className="tabular-nums">{pct(row.share)} · {row.minutes}'</span></div>)}</div> : <p className="mt-2 text-xs text-zinc-500">No position minutes yet.</p>}</section>

@@ -22,14 +22,14 @@ const app = p => ({ playerId: p.id, teamId: 'A', role: 'starter', position: p.po
 const game = (id, day, events = []) => ({ id, season: 'S1', competitionType: 'league', competitionStage: 'regular', matchDay: day, date: `2026-01-${String(day).padStart(2, '0')}`, duration: 90, homeTeamId: 'A', awayTeamId: 'B', teamId: 'A', appearances: players.map(app), events })
 const labels = (index, id) => (index.get(id) ?? []).flatMap(group => group.items.map(item => item.label))
 
-test('revision-10 strict rating personal best and rare-rating Match Changes derive from canonical raw ratings', () => {
+test('revision-10 personal-best and rare performance remain News-only while Match Changes stays milestone-only', () => {
   const first = game('first', 1)
   const improved = game('improved', 2, [{ id: 'team-goal', type: 'goal', minute: 20, teamId: 'A', assistPlayerId: cam.id }])
   const high = game('high', 3, [{ id: 'g1', type: 'goal', minute: 10, teamId: 'A', playerId: cdm.id }, { id: 'g2', type: 'goal', minute: 20, teamId: 'A', playerId: cdm.id }])
   const index = buildMatchChangeIndex(players, teams, [first, improved, high], [])
   assert(ratePlayerMatch(improved, cdm).raw > ratePlayerMatch(first, cdm).raw)
-  assert(labels(index, 'improved').some(label => /Personal best .* rating/.test(label)))
-  assert(labels(index, 'high').some(label => /rare rating/.test(label)))
+  assert.equal(labels(index, 'improved').some(label => /Personal best .* rating/.test(label)), false)
+  assert.equal(labels(index, 'high').some(label => /rare rating/.test(label)), false)
   assert(deriveNews(players, teams, [first, improved, high], []).some(item => item.id === 'rare:high:cdm:performance' && item.detail === ratePlayerMatch(high, cdm).rating.toFixed(1)))
 })
 
@@ -109,23 +109,22 @@ test('every revision-keyed rating projection rebuilds on revision or raw collect
   assert.notStrictEqual(unifiedBestEleven(players, editedMatches, 'S1'), initial.xi)
 })
 
-test('canonical rating and MOM changes emit the existing #1 takeovers and season MOM milestone', () => {
+test('canonical ranking remains independent while season MOM milestones stay in What Changed', () => {
   const solo = (id, day, subject, events) => ({ ...game(id, day, events), appearances: [app(subject)] })
   const camLead = solo('cam-lead', 1, cam, [{ id: 'cam-assist', type: 'goal', minute: 20, teamId: 'A', assistPlayerId: cam.id }])
   const cdmTakeover = solo('cdm-takeover', 2, cdm, [{ id: 'cdm-goal', type: 'goal', minute: 20, teamId: 'A', playerId: cdm.id }])
   const index = buildMatchChangeIndex(players, teams, [camLead, cdmTakeover], [])
   assert.equal(getMatchManOfTheMatch(cdmTakeover, players), cdm.id)
-  assert(labels(index, 'cdm-takeover').some(label => /TAKES #1 .* Rating/.test(label)))
-  assert(labels(index, 'cdm-takeover').some(label => /TAKES #1 .* MOM/.test(label)))
+  assert.equal(labels(index, 'cdm-takeover').some(label => /TAKES #1/.test(label)), false)
   const tenWins = Array.from({ length: 10 }, (_, index) => solo(`mom-${index + 1}`, index + 1, cdm, [{ id: `mom-goal-${index + 1}`, type: 'goal', minute: 20, teamId: 'A', playerId: cdm.id }]))
   assert(labels(buildMatchChangeIndex(players, teams, tenWins, []), 'mom-10').includes('Season 10 MOM'))
 })
 
-test('Match Changes remains one-pass and lazy rather than a News or full-ranking consumer', () => {
+test('Match Changes remains one-pass, lazy, and free of ranking computation', () => {
   const index = fs.readFileSync(require.resolve('../src/engine/matchChangeIndex.ts'), 'utf8')
   const detail = fs.readFileSync(require.resolve('../src/screens/MatchDetailScreen.tsx'), 'utf8')
   assert.equal(index.includes("from './news'"), false)
   assert.equal(index.includes('buildGlobalRankingData'), false)
-  assert.match(index, /compareCoreLeaderboardRows/)
+  assert.equal(index.includes('compareCoreLeaderboardRows'), false)
   assert.match(detail, /function MatchChangesPanel[\s\S]*open \? presentMatchChanges/)
 })

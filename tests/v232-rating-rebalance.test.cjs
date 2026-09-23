@@ -20,9 +20,9 @@ function suppressionFixture(position, saves) {
   return { subject, match: game([subject, keeper], saves ? [{ id: `save:${position}`, type: 'save', minute: 20, teamId: 'A', playerId: keeper.id, count: saves }] : []) }
 }
 
-test('v2.3.2 release metadata and revision-10 table contain exactly the approved changes', () => {
-  assert.equal(APP_VERSION, '2.3.2')
-  assert.equal(require('../package.json').version, '2.3.2')
+test('v2.3.3 release metadata and revision-10 table contain exactly the approved changes', () => {
+  assert.equal(APP_VERSION, '2.3.3')
+  assert.equal(require('../package.json').version, '2.3.3')
   assert.equal(RATING_ENGINE_REVISION, 10)
   const expected = { LM: [.06, .25], RM: [.06, .25], CM: [.08, .30], LCM: [.08, .30], RCM: [.08, .30], CDM: [.06, .80], LDM: [.06, .80], RDM: [.06, .80] }
   for (const [position, values] of Object.entries(expected)) assert.deepEqual([POSITION_RULES[position].teamGoal, POSITION_RULES[position].suppressionMax], values, position)
