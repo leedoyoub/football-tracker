@@ -7,10 +7,12 @@ export const POSITION_FILTER_OPTIONS: { value: PositionFilterKey; label: string 
   { value: 'cdm', label: 'CDM' }, { value: 'fb', label: 'FB' }, { value: 'cb', label: 'CB' }, { value: 'gk', label: 'GK' },
 ]
 
-export function PositionFilter({ value, onChange, label = 'Position' }: { value: PositionFilterKey; onChange: (value: PositionFilterKey) => void; label?: string }) {
+export function PositionFilter({ value, onChange, label = 'Position', allLabel = 'All', allAccessibilityLabel = 'All' }: { value: PositionFilterKey; onChange: (value: PositionFilterKey) => void; label?: string; allLabel?: string; allAccessibilityLabel?: string }) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const selected = POSITION_FILTER_OPTIONS.find(option => option.value === value)?.label ?? 'All'
+  const visibleSelected = value === 'all' ? allLabel : selected
+  const accessibleSelected = value === 'all' ? allAccessibilityLabel : selected
 
   useEffect(() => {
     if (!open) return
@@ -22,8 +24,8 @@ export function PositionFilter({ value, onChange, label = 'Position' }: { value:
   }, [open])
 
   return <div ref={root} className="relative inline-flex">
-    <button type="button" aria-label={`${label}: ${selected}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(current => !current)} className={`min-h-9 rounded-lg border px-2.5 py-1.5 text-[10px] font-black ${value === 'all' ? 'border-white/10 bg-zinc-900 text-zinc-300' : 'border-emerald-400/40 bg-emerald-500/15 text-emerald-300'}`}>
-      {selected} <span aria-hidden="true">⌄</span>
+    <button type="button" aria-label={`${label}: ${accessibleSelected}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(current => !current)} className={`min-h-9 rounded-lg border px-2.5 py-1.5 text-[10px] font-black ${value === 'all' ? 'border-white/10 bg-zinc-900 text-zinc-300' : 'border-emerald-400/40 bg-emerald-500/15 text-emerald-300'}`}>
+      {visibleSelected} <span aria-hidden="true">⌄</span>
     </button>
     {open && <div role="menu" aria-label={`${label} filter`} className="absolute right-0 top-full z-30 mt-1 grid min-w-28 grid-cols-2 gap-1 rounded-xl border border-white/10 bg-zinc-900 p-1 shadow-xl">
       {POSITION_FILTER_OPTIONS.map(option => <button key={option.value} type="button" role="menuitemradio" aria-checked={option.value === value} onClick={() => { onChange(option.value); setOpen(false) }} className={`min-h-8 rounded-lg px-2 text-left text-[10px] font-bold ${option.value === value ? 'bg-emerald-500 text-black' : 'text-zinc-300 hover:bg-white/10'}`}>{option.label}</button>)}
