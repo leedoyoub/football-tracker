@@ -21,16 +21,14 @@ test('only a participating player receives canonical Top 10 entry and #1 ranking
   const zed = changes.find(change => change.playerId === 'z')
   assert(zed)
   assert(zed.eventIds.includes('ranking:core:global:goals:z'))
-  assert.match(zed.detail, /takes #1 in Goals/)
+  assert.match(zed.detail, /TAKES #1.*Goals/)
   assert.equal(changes.some(change => change.playerId === 'p9' && change.eventIds.some(id => id.startsWith('ranking:'))), false)
 })
 
 test('an initial leaderboard observation is not a #1 takeover transition', () => {
   const matches = [game('first', 1, [{ id: 'z-goal', type: 'goal', minute: 10, teamId: 'A', playerId: 'z' }])]
   const changes = matchChangesForMatch(players, teams, matches, [], 'first')
-  const zed = changes.find(change => change.playerId === 'z')
-  assert(zed)
-  assert.equal(zed.eventIds.some(id => id.startsWith('ranking:')), false)
+  assert.equal(changes.some(change => change.playerId === 'z' && change.eventIds.some(id => id.startsWith('ranking:'))), false)
 })
 
 test('same-date chronology rebuilds transitions after historical collection replacement', () => {

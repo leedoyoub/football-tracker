@@ -392,6 +392,10 @@ export function buildGlobalRankingData(
 
 /** Re-sorts an already-derived player index without recalculating any ratings. */
 const rankedRowsCache = new WeakMap<GlobalLeaderboardRow[], WeakMap<Player[], Map<LeaderboardMetric, GlobalLeaderboardRow[]>>>()
+export type CoreLeaderboardRow = Pick<GlobalLeaderboardRow, 'playerId' | 'avgRating' | 'goals' | 'assists' | 'mom'>
+const CORE_LEADERBOARD_METRICS = new Set<LeaderboardMetric>(['rating', 'goals', 'assists', 'g+a', 'mom'])
+export function coreLeaderboardMetricValue(row: CoreLeaderboardRow, metric: Extract<LeaderboardMetric, 'rating' | 'goals' | 'assists' | 'g+a' | 'mom'>) { return metric === 'rating' ? row.avgRating : metric === 'goals' ? row.goals : metric === 'assists' ? row.assists : metric === 'g+a' ? row.goals + row.assists : row.mom }
+export function compareCoreLeaderboardRows(left: CoreLeaderboardRow, right: CoreLeaderboardRow, metric: Extract<LeaderboardMetric, 'rating' | 'goals' | 'assists' | 'g+a' | 'mom'>) { return coreLeaderboardMetricValue(right, metric) - coreLeaderboardMetricValue(left, metric) || right.avgRating - left.avgRating || left.playerId.localeCompare(right.playerId) }
 export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Player[], metric: LeaderboardMetric): GlobalLeaderboardRow[] {
   let byPlayers = rankedRowsCache.get(rows)
   if (!byPlayers) { byPlayers = new WeakMap(); rankedRowsCache.set(rows, byPlayers) }
@@ -426,7 +430,7 @@ export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Pla
     if (!player || requiresDefensiveSample || requiresGoalkeeperSample) return []
     const value = valueFor(row)
     return Number.isFinite(value) ? [{ ...row, value }] : []
-  }).sort((a, b) => (metric === 'sotAllowed' || metric === 'goalsConceded' ? a.value - b.value : b.value - a.value) || b.avgRating - a.avgRating || a.playerId.localeCompare(b.playerId))
+  }).sort((a, b) => CORE_LEADERBOARD_METRICS.has(metric) ? compareCoreLeaderboardRows(a, b, metric as Extract<LeaderboardMetric, 'rating' | 'goals' | 'assists' | 'g+a' | 'mom'>) : (metric === 'sotAllowed' || metric === 'goalsConceded' ? a.value - b.value : b.value - a.value) || b.avgRating - a.avgRating || a.playerId.localeCompare(b.playerId))
   byMetric.set(metric, ranked)
   return ranked
 }

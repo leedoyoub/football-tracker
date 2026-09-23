@@ -22,6 +22,7 @@ import { competitionMutationSafety, reconcileChampionsPairingIds, reconcileSeaso
 import { preserveRecordedAt, recordNewMatch } from './engine/matchRecording'
 import { createPersistenceQueue } from './lib/persistenceQueue'
 import { sanitizeDraftLifecycle } from './lib/draftLifecycle'
+import { measureInDevelopment } from './lib/developmentMeasurement'
 
 type StoreSnapshot = { data: AppState; competitionRevisions: CompetitionRevisions; teamCatalogRevision: number }
 
@@ -153,7 +154,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     })
   }, [persistLocal])
 
-  const saveMatchDurably = useCallback(async (match: Match) => {
+  const saveMatchDurably = useCallback((match: Match) => measureInDevelopment('saveMatchDurably', async () => {
     const before = snapshotRef.current
     const prior = before.data
     const previousMatch = prior.matches.find(item => item.id === match.id)
@@ -189,7 +190,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // primary success or the navigation that follows it.
     void SyncManager.queueStateChange(prior, next).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker sync] Cloud sync pending after verified local save.'))
     return durability
-  }, [persistLocal])
+  }), [persistLocal])
   const saveDraftMatch = useCallback((match: Match) => {
     if (finalizingDraftIds.current.has(match.id)) return
     setSnapshot(current => {

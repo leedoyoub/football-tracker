@@ -125,7 +125,7 @@ test('Home has the four compact dashboard responsibilities and no active play-st
   const order = ['recent-matches', 'news', 'season-leaders'].map(token => source.indexOf(`data-home-section="${token}"`))
   assert(order.every((value, index) => value >= 0 && (!index || value > order[index - 1])))
   assert(!source.includes('Global Rankings') && !source.includes('Team of the Week') && !source.includes('Team of the Season') && !source.includes('StandingsTable'))
-  assert(source.includes('derivedResults(matches, teams).slice(0, 5)') && source.includes("kind: 'news'"))
+  assert(source.includes('recentDerivedResults(matches, teams, 5)') && source.includes("kind: 'news'"))
   assert(!/play.?style/i.test(source) && !source.includes('Show More'))
 })
 
@@ -183,9 +183,9 @@ test('season completion is synchronized as backward-compatible CompetitionState 
   assert(validation.includes("'season-complete'"))
 })
 
-test('visible and package metadata version are exactly v2.2.13 / 2.2.13', () => {
-  assert.equal(APP_VERSION, '2.2.13')
-  assert.equal(require('../package.json').version, '2.2.13')
+test('visible and package metadata version are exactly v2.3.1 / 2.3.1', () => {
+  assert.equal(APP_VERSION, '2.3.1')
+  assert.equal(require('../package.json').version, '2.3.1')
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('v{APP_VERSION}'))
 })

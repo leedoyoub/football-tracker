@@ -4,6 +4,7 @@ import { validateState } from './validation';
 import { sanitizeDraftLifecycle } from './draftLifecycle';
 import { reconcileChampionsPairingIds } from '../engine/competition';
 import { normalizeMatchCompetitionIdentity } from '../engine/competitionContext';
+import { measureInDevelopment } from './developmentMeasurement'
 
 // This is a durable data namespace, deliberately independent from app and
 // derived-engine versions.  Never turn a release number into a storage key.
@@ -88,20 +89,19 @@ export const LocalRepository = {
   },
 
   async saveAppState(state: AppState): Promise<DurableSaveResult> {
+    return measureInDevelopment('LocalRepository.saveAppState', async () => {
     // Serialize and validate before touching any durable source. This makes a
     // reported successful match save mean primary browser storage was proven.
-    if (!validateState(state)) throw new Error('Invalid state structure, saving aborted.');
+    if (!measureInDevelopment('validation', () => validateState(state))) throw new Error('Invalid state structure, saving aborted.');
     let serialized: string
-    try { serialized = JSON.stringify(state) } catch { throw new Error('Primary storage serialization failed.') }
+    try { serialized = measureInDevelopment('JSON.stringify', () => JSON.stringify(state)) } catch { throw new Error('Primary storage serialization failed.') }
 
     const current = safelyRead(STORAGE_KEY)
-    const writePrimary = () => {
+    const writePrimary = () => measureInDevelopment('localStorage write/read-back', () => {
       localStorage.setItem(STORAGE_KEY, serialized)
       const readBack = localStorage.getItem(STORAGE_KEY)
       if (readBack !== serialized) throw new Error('Primary storage read-back did not match the saved state.')
-      const parsed = JSON.parse(readBack)
-      if (!validateState(parsed)) throw new Error('Primary storage verification failed.')
-    }
+    })
     try {
       writePrimary()
     } catch (error) {
@@ -123,6 +123,7 @@ export const LocalRepository = {
     // already verified localStorage save into a user-visible failed save.
     void saveToIndexedDB(STORAGE_KEY, state).catch(() => { /* Mirror is best-effort. */ })
     return { primarySaved: true, mirrorSaved: false, mirrorError: 'IndexedDB mirror pending.' }
+    })
   },
 
   async exportData(): Promise<string> {

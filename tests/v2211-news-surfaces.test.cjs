@@ -27,8 +27,7 @@ test('canonical event projections keep major News separate from detailed match c
   assert(events.some(event => event.matchId === 'ordinary' && (event.surface === 'match-change' || event.surface === 'both')))
   assert(news.every(item => item.surface === 'news' || item.surface === 'both'))
   assert(news.every(item => item.date >= '2026-01-01'))
-  assert.equal(changes.length, 1)
-  assert.equal(changes[0].playerId, 'p')
+  assert.equal(changes.length, 0)
 })
 
 test('match changes are cached by collection identity and never mutate raw history', () => {

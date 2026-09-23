@@ -10,14 +10,14 @@ import { positionFilterFamilies } from '../engine/positionScope'
 import { PositionFilter } from '../components/PositionFilter'
 import { championsCompetition, cupCompetition, leagueCompetition } from '../engine/competition'
 import { matchCompetitionType } from '../engine/competitionContext'
-import { derivedResults } from '../lib/results'
+import { recentDerivedResults } from '../lib/results'
 import { useStore } from '../store'
 import type { Player, ScreenStateByView, Team, View } from '../types'
 
 export function HomeScreen({ season, screenState, onStateChange, onNavigate }: { season: string; screenState: ScreenStateByView['home']; onStateChange: (state: ScreenStateByView['home']) => void; onSeason?: (season: string) => void; onNavigate: (view: View) => void }) {
   const { players, teams, matches, competitionStates = [] } = useStore()
   const metric = screenState.leaderMetric as RankingDisplayMetric
-  const recent = useMemo(() => derivedResults(matches, teams).slice(0, 5), [matches, teams])
+  const recent = useMemo(() => recentDerivedResults(matches, teams, 5), [matches, teams])
   const news = useMemo(() => majorNewsEvents(players, teams, matches, competitionStates, season).slice(0, 4), [players, teams, matches, competitionStates, season])
   const seasonMatches = useMemo(() => matches.filter(match => match.season === season), [matches, season])
   const rankingIndex = useMemo(() => buildGlobalRankingData(players, seasonMatches, { seasons: [season], teams: [], positions: positionFilterFamilies(screenState.positionFilter) }, 'rating'), [players, seasonMatches, season, screenState.positionFilter])

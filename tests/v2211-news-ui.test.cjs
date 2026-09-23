@@ -9,7 +9,7 @@ test('Home, View All, and Match Detail consume their dedicated event projections
   assert.match(home, /majorNewsEvents\([^)]*season[^)]*\)\.slice\(0, 4\)/)
   assert.match(highlight, /majorNewsEvents\([^)]*season[^)]*\)/)
   assert(!highlight.includes('homeMilestoneNews'))
-  assert.match(matchDetail, /matchChangesForMatch\([^)]*match\.id\)/)
+  assert.match(matchDetail, /function MatchChangesPanel[\s\S]*matchChangesForMatch\([^)]*matchId\)/)
   assert(!matchDetail.includes('groupMatchChanges('))
   assert(!matchDetail.includes('matchChangesForMatch(') || !matchDetail.includes('matchChangesForMatch(players, teams, matches, competitionStates, match.id).slice'))
 })

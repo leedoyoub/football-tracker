@@ -521,7 +521,7 @@ function MatchEditor({
     try {
       const result = await saveMatchDurably(matchData)
       setSaveStatus(result.mirrorSaved ? 'Saved' : 'Saved locally · mirror pending')
-      window.setTimeout(() => onReplace({ name: 'match', id: draftId }), 350)
+      onReplace({ name: 'match', id: draftId })
       return true
     } catch (error) {
       // Keep the in-memory editor and its draft intact. Navigation is allowed
