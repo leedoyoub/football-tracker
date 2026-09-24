@@ -131,7 +131,7 @@ test('Home has the four compact dashboard responsibilities and no active play-st
 
 test('Competition Best XI labels and sources are scoped to League, Cup stages and Champions rounds', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
-  for (const token of ['Team of the Stage ${index + 1}', 'Team of the Round ${index + 1}', 'Team of the Final', 'Season Best XI', 'competitionStageMatches']) assert(source.includes(token), token)
+  for (const token of ['Team of the Stage ${index + 1}', 'Team of the Round ${index + 1}', 'Team of the Final', 'Season Best XI', 'indexCompetitionMatchesByStage(matches)']) assert(source.includes(token), token)
   assert(source.includes("if (type === 'league') return []"))
   assert(!source.includes('Team of the Year'))
 })
@@ -183,9 +183,9 @@ test('season completion is synchronized as backward-compatible CompetitionState 
   assert(validation.includes("'season-complete'"))
 })
 
-test('visible and package metadata version are exactly v2.3.3 / 2.3.3', () => {
-  assert.equal(APP_VERSION, '2.3.3')
-  assert.equal(require('../package.json').version, '2.3.3')
+test('visible and package metadata version are exactly v2.3.4 / 2.3.4', () => {
+  assert.equal(APP_VERSION, '2.3.4')
+  assert.equal(require('../package.json').version, '2.3.4')
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('v{APP_VERSION}'))
 })

@@ -1,5 +1,5 @@
 import type { Best11Slot, ChampionsStage, CompetitionState, CompetitionType, CupStage, Match, Player, Team } from '../types'
-import { championsCompetition, competitionMatches, competitionSeasonStatus, cupCompetition } from './competition'
+import { competitionMatches, competitionSeasonStatus, type CompetitionSeasonStatus } from './competition'
 import { buildGlobalRankingData, unifiedBestEleven, type GlobalLeaderboardRow } from './stats'
 import { AWARD_433, isAwardEligible } from './awardRules'
 import { scopedAwardFamilyByPlayer } from './positionScope'
@@ -8,6 +8,7 @@ export { AWARD_433, awardPositionFamily, isAwardEligible } from './awardRules'
 
 export type AwardWinner = { playerId: string; value: number; label: string; awardScore?: number }
 export type CompetitionAwards = { complete: boolean; championId?: string; scorer?: AwardWinner; assists?: AwardWinner; mvp?: AwardWinner; goalkeeper?: AwardWinner; bestXI?: Best11Slot[] }
+export type CompetitionAwardModels = Partial<Pick<CompetitionSeasonStatus, 'league' | 'cup' | 'champions'>>
 export type CanonicalAwardResult = {
   scopeLabel: string
   playerLabel: string
@@ -33,8 +34,8 @@ export function monthlyCanonicalAwardResult(award: Pick<CanonicalAwardResult, 's
  * established scoped selection while player award ranking remains the existing
  * official awards selector.  Every consumer receives one shared result.
  */
-export function competitionAwardResult(type: CompetitionType, season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[]): CanonicalAwardResult | undefined {
-  const official = awardsForCompetition(type, season, teams, players, matches, states)
+export function competitionAwardResult(type: CompetitionType, season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], models?: CompetitionAwardModels): CanonicalAwardResult | undefined {
+  const official = awardsForCompetition(type, season, teams, players, matches, states, models)
   const scope = competitionMatches(matches, season, type)
   const anchorMatch = scope.slice().sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0]
   if (!official.complete || !official.mvp || !anchorMatch) return undefined
@@ -121,18 +122,20 @@ function goalkeeperWinner(rows: { row: GlobalLeaderboardRow; score: number }[], 
   return best ? { playerId: best.row.playerId, value: goalkeeperAverage(best.row), awardScore: best.score, label } : undefined
 }
 
-export function awardsForCompetition(type: CompetitionType, season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[]): CompetitionAwards {
+export function awardsForCompetition(type: CompetitionType, season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], models?: CompetitionAwardModels): CompetitionAwards {
   const games = competitionMatches(matches, season, type)
   const stats = buildGlobalRankingData(players, games, { seasons: [season], teams: [], positions: [] }, 'rating')
   const draw = states.find(state => state.kind === 'champions-draw' && state.season === season)
-  const status = competitionSeasonStatus(teams, matches, season, players, draw)
-  const complete = type === 'league' ? status.league.complete : type === 'cup' ? Boolean(status.cup.championId) : Boolean(status.champions.championId)
-  const championId = type === 'league' ? status.league.championId : type === 'cup' ? status.cup.championId : status.champions.championId
+  const hasCurrentModel = type === 'league' ? Boolean(models?.league) : type === 'cup' ? Boolean(models?.cup) : Boolean(models?.champions)
+  const fallbackStatus = hasCurrentModel ? undefined : competitionSeasonStatus(teams, matches, season, players, draw)
+  const league = models?.league ?? fallbackStatus?.league
+  const cup = models?.cup ?? fallbackStatus?.cup
+  const champions = models?.champions ?? fallbackStatus?.champions
+  const complete = type === 'league' ? Boolean(league?.complete) : type === 'cup' ? Boolean(cup?.championId) : Boolean(champions?.championId)
+  const championId = type === 'league' ? league?.championId : type === 'cup' ? cup?.championId : champions?.championId
   if (!complete) return { complete, championId }
-  const cup = type === 'cup' ? cupCompetition(teams, matches, season, players) : undefined
-  const champions = type === 'champions' ? championsCompetition(draw, matches, season, players) : undefined
   const bonusFor = (teamId: string) => {
-    if (type === 'league') return leaguePositionBonus(status.league.standings.find(row => row.teamId === teamId)?.rank ?? 99)
+    if (type === 'league') return leaguePositionBonus(league?.standings.find(row => row.teamId === teamId)?.rank ?? 99)
     if (type === 'cup') {
       if (cup?.championId === teamId) return cupProgressBonus('champion')
       if (cup?.runnerUpId === teamId) return cupProgressBonus('runnerUp')

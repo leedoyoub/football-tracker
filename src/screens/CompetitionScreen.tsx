@@ -12,17 +12,14 @@ import {
   championsCompetition,
   projectChampionsBracket,
   competitionMatches,
-  competitionStageMatches,
-  cupCompetition,
   drawNextChampionsTeam,
-  isCompetitionSeasonComplete,
   leagueCompetition,
   type ChampionsPairing,
   type CupCompetition,
 } from '../engine/competition'
 import { competitionRevision } from '../engine/competitionRevision'
 import { matchCompetitionStage } from '../engine/competitionContext'
-import { selectLeagueCompetition, type LeagueCacheDiagnostic } from '../engine/competitionSelectors'
+import { selectChampionsCompetition, selectCompetitionSeasonComplete, selectCupCompetition, selectLeagueCompetition, type LeagueCacheDiagnostic } from '../engine/competitionSelectors'
 import { matchScore } from '../engine/rating'
 import { LEAGUE_MATCHES_PER_TEAM } from '../engine/leagueFormat'
 import { buildGlobalRankingData, rankGlobalRankingRows, seasonsFromMatches, unifiedBestEleven, type LeaderboardMetric } from '../engine/stats'
@@ -59,20 +56,27 @@ function reportLeagueCache(diagnostic: LeagueCacheDiagnostic) {
   console.debug(`[Football Tracker performance] League derived cache: ${diagnostic.hit ? 'HIT' : 'MISS'} · ${diagnostic.key} · ${diagnostic.reason} · ${diagnostic.durationMs.toFixed(3)}ms`)
 }
 
-export function CompetitionScreen({ season, screenState, onStateChange, onSeason, onNavigate }: { season: string; screenState: ScreenStateByView['competition']; onStateChange: (state: ScreenStateByView['competition']) => void; onSeason: (season: string) => void; onNavigate: (view: View) => void }) {
+function reportCompetitionCache(label: string, diagnostic: { key: string; hit: boolean; reason: string; durationMs: number }) {
+  if (!import.meta.env.DEV) return
+  console.debug(`[Football Tracker performance] ${label} derived cache: ${diagnostic.hit ? 'HIT' : 'MISS'} · ${diagnostic.key} · ${diagnostic.reason} · ${diagnostic.durationMs.toFixed(3)}ms`)
+}
+
+export function CompetitionScreen({ season, screenState, onStateChange, onCompetitionTypeChange, onSeason, onNavigate }: { season: string; screenState: ScreenStateByView['competition']; onStateChange: (state: ScreenStateByView['competition']) => void; onCompetitionTypeChange: (type: CompetitionType) => void; onSeason: (season: string) => void; onNavigate: (view: View) => void }) {
   const { teams, players, matches, competitionStates = [], competitionRevisions = {}, competitionCacheOwner, teamCatalogRevision = 0, setChampionsDraw, completeSeason } = useStore()
   const type = screenState.competitionType
   const patchState = (patch: Partial<ScreenStateByView['competition']>) => onStateChange({ ...screenState, ...patch })
-  const setType = (value: CompetitionType) => patchState({ competitionType: value, viewAllMetric: null, cupViewAll: false, compareMode: false, comparedPlayerIds: [] })
+  const setType = (value: CompetitionType) => { if (value !== type) onCompetitionTypeChange(value) }
   const renderMark = `football-tracker:CompetitionScreen:${diagnosticSequence++}:start`
   if (import.meta.env.DEV && typeof performance !== 'undefined') performance.mark(renderMark)
   const tournamentTeams = useMemo(() => currentStaticTeams(teams), [teams])
   const seasons = useMemo(() => [...new Set([...seasonsFromMatches(matches), ...competitionStates.map(state => state.season), season, 'Season 1'])].sort((a, b) => Number(b.match(/\d+/)?.[0] ?? 0) - Number(a.match(/\d+/)?.[0] ?? 0)), [matches, competitionStates, season])
   const draw = competitionStates.find(state => state.id === `champions:${season}`)
   const leagueRevision = competitionRevision(competitionRevisions, season, 'league')
+  const cupRevision = competitionRevision(competitionRevisions, season, 'cup')
+  const championsRevision = competitionRevision(competitionRevisions, season, 'champions')
   const league = useMemo(() => type === 'league' ? measuredInDevelopment('League standings derivation', () => selectLeagueCompetition(competitionCacheOwner, teams, matches, season, leagueRevision, teamCatalogRevision, reportLeagueCache, players)) : null, [type, competitionCacheOwner, teams, matches, players, season, leagueRevision, teamCatalogRevision])
-  const cup = useMemo(() => type === 'cup' ? cupCompetition(tournamentTeams, matches, season, players) : null, [type, tournamentTeams, matches, season, players])
-  const champions = useMemo(() => type === 'champions' ? championsCompetition(draw, matches, season, players) : null, [type, draw, matches, season, players])
+  const cup = useMemo(() => type === 'cup' ? selectCupCompetition(competitionCacheOwner, tournamentTeams, matches, season, cupRevision, teamCatalogRevision, players, diagnostic => reportCompetitionCache('Cup', diagnostic)) : null, [type, competitionCacheOwner, tournamentTeams, matches, season, cupRevision, teamCatalogRevision, players])
+  const champions = useMemo(() => type === 'champions' ? selectChampionsCompetition(competitionCacheOwner, draw, matches, season, championsRevision, players, diagnostic => reportCompetitionCache('Champions', diagnostic)) : null, [type, competitionCacheOwner, draw, matches, season, championsRevision, players])
   const finalized = competitionStates.some(state => state.kind === 'season-complete' && state.season === season)
   const nextSeason = `Season ${Number(season.match(/\d+/)?.[0] ?? 1) + 1}`
   const teamById = useMemo(() => Object.fromEntries(teams.map(team => [team.id, team])) as Record<string, Team>, [teams])
@@ -132,7 +136,11 @@ function DeferredCompetitionBestElevens({ season, type, players, teams, allMatch
 }
 
 function DeferredSeasonCompletion({ season, teams, players, matches, draw, finalized, nextSeason, onComplete }: { season: string; teams: Team[]; players: Player[]; matches: Match[]; draw?: CompetitionState; finalized: boolean; nextSeason: string; onComplete: () => void }) {
-  const complete = useMemo(() => measuredInDevelopment('Deferred season completion', () => isCompetitionSeasonComplete(teams, matches, season, players, draw)), [teams, matches, season, players, draw])
+  const { competitionCacheOwner, competitionRevisions = {}, teamCatalogRevision = 0 } = useStore()
+  const leagueRevision = competitionRevision(competitionRevisions, season, 'league')
+  const cupRevision = competitionRevision(competitionRevisions, season, 'cup')
+  const championsRevision = competitionRevision(competitionRevisions, season, 'champions')
+  const complete = useMemo(() => measuredInDevelopment('Deferred season completion', () => selectCompetitionSeasonComplete(competitionCacheOwner, teams, matches, season, leagueRevision, cupRevision, championsRevision, teamCatalogRevision, players, draw)), [competitionCacheOwner, teams, matches, season, leagueRevision, cupRevision, championsRevision, teamCatalogRevision, players, draw])
   if (!complete) return null
   return <section className="mt-7 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4"><h2 className="text-sm font-black">Season complete</h2><p className="mt-1 text-xs text-zinc-300">League, Cup and Champions all have champions.</p>{finalized ? <p className="mt-3 text-xs font-bold text-emerald-300">History finalized · {nextSeason} is available</p> : <button type="button" onClick={onComplete} className="mt-3 rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-black text-black">Complete Season</button>}</section>
 }
@@ -253,25 +261,39 @@ function RaceHistoryPanel({ analytics, metric, players }: { analytics: SeasonAna
   return <details className="mt-3 rounded-xl bg-zinc-900 p-3"><summary className="min-h-8 cursor-pointer text-xs font-black">Race History · Current Top 10</summary>{series.length ? <div className="mt-3"><p className="mb-2 text-[10px] text-zinc-500">Current Top 10 traced through canonical snapshots. Rank 1 is at the top.</p><div className="mb-2 flex flex-wrap gap-1">{series.map(row => <button key={row.playerId} type="button" aria-pressed={selected === row.playerId} onClick={() => setSelected(value => value === row.playerId ? null : row.playerId)} className={`rounded-full px-2 py-1 text-[9px] font-bold ${selected === row.playerId ? 'bg-white text-black' : selected ? 'bg-zinc-800 text-zinc-500' : 'bg-zinc-800 text-zinc-200'}`}>{playerFullName(players[row.playerId])}</button>)}</div><div ref={scrollRef} className="overflow-x-auto overscroll-x-contain" aria-label="Horizontally scrollable rank plot"><svg width={width} height="190" role="img" aria-label="Race History rank graph" className="block min-w-full">{Array.from({ length: 10 }, (_, index) => <g key={index}><line x1="28" x2={width} y1={y(index + 1)} y2={y(index + 1)} stroke="#3f3f46" strokeWidth="1" /><text x="2" y={y(index + 1) + 3} fill="#a1a1aa" fontSize="8">{index + 1}</text></g>)}{series.map((row, index) => { const muted = selected !== null && selected !== row.playerId; const points = row.points.map((point, pointIndex) => `${32 + pointIndex * 36},${y(point.rank)}`).join(' '); return <g key={row.playerId} opacity={muted ? .18 : 1}><polyline points={points} fill="none" stroke={colors[index]} strokeWidth={selected === row.playerId ? 3 : 1.5} />{row.points.map((point, pointIndex) => <g key={point.day}><circle cx={32 + pointIndex * 36} cy={y(point.rank)} r={selected === row.playerId ? 3 : 2} fill={colors[index]} />{(selected === row.playerId || pointIndex === row.points.length - 1) && <text x={34 + pointIndex * 36} y={y(point.rank) - 4} fill="white" fontSize="8">#{point.rank}</text>}</g>)}</g>})}</svg></div></div> : <p className="mt-2 text-xs text-zinc-500">No race history available yet.</p>}</details>
 }
 
+function indexCompetitionMatchesByStage(matches: Match[]) {
+  const byStage = new Map<string, Match[]>()
+  for (const match of matches) {
+    const stage = matchCompetitionStage(match)
+    const stageMatches = byStage.get(stage)
+    if (stageMatches) stageMatches.push(match)
+    else byStage.set(stage, [match])
+  }
+  return byStage
+}
+
 function CompetitionBestElevens({ season, type, players, teams, matches, allMatches, cup, champions, onNavigate }: { season: string; type: CompetitionType; players: Player[]; teams: Team[]; matches: Match[]; allMatches: Match[]; cup: CupCompetition | null; champions: ReturnType<typeof championsCompetition> | null; onNavigate: (view: View) => void }) {
   const { competitionStates = [] } = useStore()
+  const tournamentTeams = useMemo(() => currentStaticTeams(teams), [teams])
+  const awardModels = useMemo(() => type === 'cup' ? { cup: cup ?? undefined } : type === 'champions' ? { champions: champions ?? undefined } : {}, [type, cup, champions])
   const seasonXI = useMemo(() => measuredInDevelopment('Deferred Team of Season', () => unifiedBestEleven(players, matches, season)), [players, matches, season])
-  const canonicalAward = useMemo(() => competitionAwardResult(type, season, currentStaticTeams(teams), players, allMatches, competitionStates), [type, season, teams, players, allMatches, competitionStates])
+  const canonicalAward = useMemo(() => competitionAwardResult(type, season, tournamentTeams, players, allMatches, competitionStates, awardModels), [type, season, tournamentTeams, players, allMatches, competitionStates, awardModels])
+  const stageMatches = useMemo(() => indexCompetitionMatchesByStage(matches), [matches])
   const snapshots = useMemo(() => {
     // League monthly awards are rendered with the League tabs. This avoids a
     // second, overlapping Team of the Week award surface.
     if (type === 'league') return []
     if (type === 'cup') return [...CUP_STAGES.flatMap((stage, index) => {
-      const games = competitionStageMatches(allMatches, season, 'cup', stage)
+      const games = stageMatches.get(stage) ?? []
       const complete = cup?.stage !== stage && games.length > 0
       return complete ? [{ title: `Team of the Stage ${index + 1}`, games, recent: false }] : []
-    }), ...(cup?.championId ? [{ title: 'Team of the Final', games: competitionMatches(allMatches, season, 'cup').filter(match => matchCompetitionStage(match) === 'final' || matchCompetitionStage(match) === 'finalReplay'), recent: false }] : [])]
+    }), ...(cup?.championId ? [{ title: 'Team of the Final', games: [...(stageMatches.get('final') ?? []), ...(stageMatches.get('finalReplay') ?? [])], recent: false }] : [])]
     return CHAMPIONS_ROUNDS.flatMap((stage, index) => {
-      const games = competitionMatches(allMatches, season, 'champions').filter(match => matchCompetitionStage(match) === stage || (stage === 'final' && matchCompetitionStage(match) === 'finalReplay'))
+      const games = stage === 'final' ? [...(stageMatches.get('final') ?? []), ...(stageMatches.get('finalReplay') ?? [])] : stageMatches.get(stage) ?? []
       const pairs = champions?.rounds[stage] ?? []
       return pairs.length > 0 && pairs.every(pair => Boolean(pair.winnerId)) ? [{ title: `Team of the Round ${index + 1}`, games, recent: false }] : []
     })
-  }, [type, allMatches, season, cup?.stage, cup?.championId, champions?.rounds])
+  }, [type, stageMatches, cup?.stage, cup?.championId, champions?.rounds])
   const finalXI = canonicalAward ? { slots: canonicalAward.bestXI, statsByPlayer: canonicalAward.statsByPlayer } : seasonXI
   return <section className="mt-7"><h2 className="text-lg font-semibold">Best XI</h2><p className="mb-3 text-xs text-zinc-500">Competition-scoped · existing 4-3-3 position rules</p>{snapshots.map(snapshot => <BestEleven key={snapshot.title} title={snapshot.title} xi={measuredInDevelopment(`Deferred ${snapshot.title}`, () => unifiedBestEleven(players, snapshot.games, season, snapshot.recent))} players={players} teams={teams} onNavigate={onNavigate} />)}<BestEleven title={canonicalAward?.teamLabel ?? competitionAwardLabel(type)} xi={finalXI} bestPlayerId={canonicalAward?.bestPlayerId} players={players} teams={teams} onNavigate={onNavigate} /></section>
 }

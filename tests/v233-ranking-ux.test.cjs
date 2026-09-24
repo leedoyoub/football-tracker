@@ -12,7 +12,7 @@ test('Cup and Champions previews are compact Top 10 routes to their canonical Gl
 
 test('Global Ranking owns a source-level team filter', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/GlobalRankingScreen.tsx'), 'utf8')
-  assert(source.includes('aria-label="Global Ranking team"'))
+  assert(source.includes('label="Global Ranking team"'))
   assert(source.includes('teams: teamId ? [teamId] : []'))
-  assert(source.includes('setTeamId(event.target.value || null)'))
+  assert(source.includes('onChange={setTeamId}'))
 })

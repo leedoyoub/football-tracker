@@ -1,0 +1,25 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const { test } = require('node:test')
+
+test('deferred Competition consumers use selector-backed models and retain staged rendering', () => {
+  const source = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
+  const bestElevens = source.slice(source.indexOf('function CompetitionBestElevens'), source.indexOf('function BestEleven'))
+  assert(source.includes('key={`${season}:${type}`}'))
+  assert(source.includes('stage >= 2 && <DeferredCompetitionBestElevens'))
+  assert(source.includes('stage >= 3 && <DeferredSeasonCompletion'))
+  assert.match(source, /selectCompetitionSeasonComplete\(competitionCacheOwner/)
+  assert.match(bestElevens, /const awardModels = useMemo/)
+  assert.match(bestElevens, /competitionAwardResult\(type, season, tournamentTeams, players, allMatches, competitionStates, awardModels\)/)
+  assert.match(bestElevens, /indexCompetitionMatchesByStage\(matches\)/)
+  assert.equal(bestElevens.includes('competitionStageMatches(allMatches'), false)
+  assert.equal(bestElevens.includes("competitionMatches(allMatches, season, 'cup').filter"), false)
+  assert.equal(bestElevens.includes("competitionMatches(allMatches, season, 'champions').filter"), false)
+  assert.equal(bestElevens.includes('selectCompetitionSeasonStatus('), false)
+})
+
+test('awards accept an optional current competition model instead of forcing a second raw derivation', () => {
+  const source = fs.readFileSync(require.resolve('../src/engine/awards.ts'), 'utf8')
+  assert.match(source, /models\?: CompetitionAwardModels/)
+  assert.match(source, /models\?\.cup \?\? fallbackStatus\?\.cup/)
+})

@@ -22,7 +22,7 @@ import { ResultsScreen } from './screens/ResultsScreen'
 import { GlobalRankingScreen } from './screens/GlobalRankingScreen'
 import { SquadImportScreen } from './screens/SquadImportScreen'
 import { useStore } from './store'
-import type { NavigationEntry, ScreenState, ScreenStateByView, Tab, View } from './types'
+import type { CompetitionType, NavigationEntry, ScreenState, ScreenStateByView, Tab, View } from './types'
 import { seasonsFromMatches } from './engine/stats'
 import { useAuth } from './lib/auth'
 import { isSupabaseConfigured } from './lib/supabase'
@@ -35,6 +35,7 @@ import { appContentOverflowClass } from './lib/routeLayout'
 import { loadLocalModePreference, saveLocalModePreference } from './lib/localMode'
 import { createNavigationEntry, popNavigationEntry, pushNavigationEntry, replaceNavigationEntry, resetNavigationEntries, sameTeamBackTarget, teamDetailBackEntries, updateCurrentScreenState } from './lib/navigation'
 import { restoreScrollWhenReachable } from './lib/scrollRestoration'
+import { resetCompetitionTypeScroll } from './lib/competitionTypeScroll'
 
 export default function App() {
   const { user, loading, startupError, signInWithGoogle, retryStartup } = useAuth()
@@ -139,6 +140,16 @@ export default function App() {
     setHistory(prev => updateCurrentScreenState(prev, next))
   }
 
+  function onCompetitionTypeChange(next: CompetitionType) {
+    resetCompetitionTypeScroll(scrollRef.current)
+    setHistory(prev => {
+      const current = prev[prev.length - 1]
+      if (!current || current.view.name !== 'competition') return prev
+      const screenState = current.screenState as ScreenStateByView['competition']
+      return updateCurrentScreenState(prev, { ...screenState, competitionType: next, viewAllMetric: null, cupViewAll: false, compareMode: false, comparedPlayerIds: [] })
+    })
+  }
+
   function onBackToTeam(teamId: string) {
     restoreScroll.current = true
     setHistory(prev => {
@@ -169,7 +180,7 @@ export default function App() {
           {view.name === 'home' && (
             <HomeScreen season={season} screenState={entry.screenState as ScreenStateByView['home']} onStateChange={onStateChange} onSeason={setSeason} onNavigate={onNavigate} />
           )}
-          {view.name === 'competition' && <CompetitionScreen season={view.season ?? season} screenState={entry.screenState as ScreenStateByView['competition']} onStateChange={onStateChange} onSeason={(nextSeason) => { setSeason(nextSeason); setHistory(previous => previous.map((item, index) => index === previous.length - 1 && item.view.name === 'competition' ? { ...item, view: { ...item.view, season: nextSeason } } : item)) }} onNavigate={onNavigate} />}
+          {view.name === 'competition' && <CompetitionScreen season={view.season ?? season} screenState={entry.screenState as ScreenStateByView['competition']} onStateChange={onStateChange} onCompetitionTypeChange={onCompetitionTypeChange} onSeason={(nextSeason) => { setSeason(nextSeason); setHistory(previous => previous.map((item, index) => index === previous.length - 1 && item.view.name === 'competition' ? { ...item, view: { ...item.view, season: nextSeason } } : item)) }} onNavigate={onNavigate} />}
           {view.name === 'global-ranking' && <GlobalRankingScreen season={view.season ?? season} screenState={entry.screenState as ScreenStateByView['global-ranking']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'results' && <ResultsScreen onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'records' && <RecordsScreen season={season} screenState={entry.screenState as ScreenStateByView['records']} onStateChange={onStateChange} onNavigate={onNavigate} />}
