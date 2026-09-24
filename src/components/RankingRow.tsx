@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { PlayerAvatar } from './PlayerAvatar'
 import { RankDelta } from './SeasonUI'
 import { playerFullName } from './ui'
+import { ensureHorizontalTabVisible } from '../lib/horizontalTabScroll'
 import type { Player, Team } from '../types'
 
 export function RankingRow({ rank, player, team, value, movement = null, onClick, compact = false, selected = false }: { rank: number; player?: Player; team?: Team; value: string; movement?: number | null; onClick?: () => void; compact?: boolean; selected?: boolean }) {
@@ -26,7 +27,12 @@ export function useMetricSwipe<T extends string>(values: readonly T[], value: T,
 }
 
 export function RankingMetricTabs<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (value: T) => void; options: readonly { value: T; label: string }[] }) {
+  const container = useRef<HTMLDivElement | null>(null)
   const selected = useRef<HTMLButtonElement | null>(null)
-  useEffect(() => { selected.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' }) }, [value])
-  return <div className="no-scrollbar flex max-w-full gap-1 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x" aria-label={label}>{options.map(option => <button key={option.value} ref={option.value === value ? selected : undefined} type="button" onClick={() => onChange(option.value)} className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold ${option.value === value ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-zinc-400'}`}>{option.label}</button>)}</div>
+  useEffect(() => {
+    const viewport = container.current
+    const item = selected.current
+    if (viewport && item) ensureHorizontalTabVisible(viewport, item)
+  }, [value])
+  return <div ref={container} className="no-scrollbar flex max-w-full gap-1 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x" aria-label={label}>{options.map(option => <button key={option.value} ref={option.value === value ? selected : undefined} type="button" onClick={() => onChange(option.value)} className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold ${option.value === value ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-zinc-400'}`}>{option.label}</button>)}</div>
 }
