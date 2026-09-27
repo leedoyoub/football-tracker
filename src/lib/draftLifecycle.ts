@@ -4,6 +4,12 @@ import { assignmentSnapshotForMatch, type CompetitionIdentity } from '../engine/
 export type DraftContext = { teamId: string; season: string; competitionType: CompetitionType }
 export type EditorLifecycleMode = 'fresh' | 'resume' | 'edit'
 
+/** A non-fresh editor is allowed to mount only after its exact persisted
+ * source is restored. This makes resume failure closed by construction. */
+export function editorSourceCanMount(mode: EditorLifecycleMode, source: Match | undefined, restored: unknown): boolean {
+  return mode === 'fresh' || Boolean(source && restored)
+}
+
 /** A checkpoint only becomes an editor source after the user explicitly resumes it. */
 export function editorLifecycleMode(input: { editingMatch?: Match; draft?: Match; resumeRequested?: boolean }): EditorLifecycleMode {
   if (input.editingMatch) return 'edit'

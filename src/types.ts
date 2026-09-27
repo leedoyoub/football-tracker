@@ -181,6 +181,10 @@ export interface Match {
   /** Legacy compatibility only. Current UI and statistics derive MOM from raw match facts. */
   manOfMatchPlayerId?: string
   duration: number
+  /** Optional cumulative opponent shots on target supplied by the match logger. */
+  halftimeOpponentSot?: number
+  /** Optional cumulative opponent shots on target supplied by the match logger. */
+  fulltimeOpponentSot?: number
   appearances: Appearance[]
   events: MatchEvent[]
   /** Optional saved kickoff layout; used only when historical data already has it. */

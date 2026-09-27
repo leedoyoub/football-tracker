@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { AppState, CompetitionState, Match, Player, Team } from './types'
-import { LocalRepository, type DurableSaveResult } from './lib/repository'
+import { LocalRepository, prepareImportData, preservePreImportBackup, type DurableSaveResult } from './lib/repository'
 import { STATIC_TEAMS, withStaticTeams } from './data/teams'
 import { assertRosterCapacity, currentTeamIds } from './lib/roster'
 import { applySquadImport, type SquadImportItem } from './lib/squadImport'
@@ -23,6 +23,7 @@ import { preserveRecordedAt, recordNewMatch } from './engine/matchRecording'
 import { createPersistenceQueue } from './lib/persistenceQueue'
 import { sanitizeDraftLifecycle } from './lib/draftLifecycle'
 import { measureInDevelopment } from './lib/developmentMeasurement'
+import { performAtomicImport } from './lib/importTransaction'
 
 type StoreSnapshot = { data: AppState; competitionRevisions: CompetitionRevisions; teamCatalogRevision: number }
 
@@ -40,6 +41,7 @@ interface StoreValue extends AppState {
   updateMatch: (id: string, match: Match) => void
   saveDraftMatch: (match: Match) => void
   clearDraftMatch: () => void
+  importAppState: (json: string) => Promise<void>
   deleteMatch: (id: string) => void
   deleteAllMatches: () => void
   setChampionsDraw: (season: string, teamIds: string[]) => void
@@ -87,12 +89,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const persistenceQueue = useRef(createPersistenceQueue(LocalRepository.saveAppState))
   const draftTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const draftEpoch = useRef(0)
+  const persistenceEpoch = useRef(0)
   /** Finalised IDs reject any late editor-effect checkpoint for that draft. */
   const finalizingDraftIds = useRef(new Set<string>())
   snapshotRef.current = snapshot
 
   const persistLocal = useCallback((next: AppState, valid?: () => boolean) => {
-    return persistenceQueue.current.enqueue(next, valid)
+    const epoch = persistenceEpoch.current
+    return persistenceQueue.current.enqueue(next, () => epoch === persistenceEpoch.current && (!valid || valid()))
   }, [])
 
   useEffect(() => {
@@ -205,6 +209,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const clearDraftMatch = useCallback(() => {
     update((prev) => ({ ...prev, draftMatch: undefined }))
   }, [update])
+  const importAppState = useCallback(async (json: string) => {
+    await performAtomicImport(json, {
+      prepare: value => reconcilePersistedState(reconcileTeamCatalog(prepareImportData(value))),
+      preserveBackup: preservePreImportBackup,
+      prior: () => snapshotRef.current.data,
+      cancelDraft: () => { if (draftTimer.current) { clearTimeout(draftTimer.current); draftTimer.current = undefined } },
+      invalidateDraft: () => { draftEpoch.current++ },
+      nextPersistenceEpoch: () => ++persistenceEpoch.current,
+      currentPersistenceEpoch: () => persistenceEpoch.current,
+      enqueue: (next, valid) => persistenceQueue.current.enqueue(next, valid),
+      invalidateDerived: clearGlobalRankingCache,
+      replaceLive: prepared => setSnapshot(current => reconcileRepositorySnapshot(current, prepared)),
+      sync: (prior, prepared) => { void SyncManager.queueStateChange(prior, prepared).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker sync] Imported state queued for sync.')) },
+    })
+  }, [])
 
   const value = useMemo<StoreValue>(
     () => ({
@@ -267,6 +286,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       saveDraftMatch,
       clearDraftMatch,
+      importAppState,
       deleteMatch: (id: string) => {
         const previous = snapshotRef.current.data.matches.find(item => item.id === id)
         if (previous) {
@@ -291,7 +311,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         update(prev => ({ ...prev, competitionStates: [...(prev.competitionStates ?? []).filter(item => item.id !== completion.id), completion] }))
       },
     }),
-    [state, snapshot.competitionRevisions, snapshot.teamCatalogRevision, competitionCacheOwner, update, saveDraftMatch, clearDraftMatch, saveMatchDurably],
+    [state, snapshot.competitionRevisions, snapshot.teamCatalogRevision, competitionCacheOwner, update, saveDraftMatch, clearDraftMatch, saveMatchDurably, importAppState],
   )
 
   if (hydration === 'loading') return <BootstrapShell />

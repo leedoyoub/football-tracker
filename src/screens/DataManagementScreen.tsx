@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { LocalRepository } from '../lib/repository';
 import { useAuth } from '../lib/auth';
+import { useStore } from '../store';
 
 export function DataManagementScreen({ onBack }: { onBack: () => void }) {
   const [message, setMessage] = useState('');
   const { user, signInWithGoogle, signOut } = useAuth();
+  const { importAppState } = useStore()
 
   const handleExport = async () => {
     try {
@@ -28,8 +30,8 @@ export function DataManagementScreen({ onBack }: { onBack: () => void }) {
     reader.onload = async (event) => {
       try {
         const json = event.target?.result as string;
-        await LocalRepository.importData(json);
-        setMessage('Import successful. Please refresh.');
+        await importAppState(json);
+        setMessage('Import successful.');
       } catch (e) {
         setMessage('Import failed. Invalid file.');
       }

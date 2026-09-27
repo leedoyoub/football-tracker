@@ -20,16 +20,16 @@ function suppressionFixture(position, saves) {
   return { subject, match: game([subject, keeper], saves ? [{ id: `save:${position}`, type: 'save', minute: 20, teamId: 'A', playerId: keeper.id, count: saves }] : []) }
 }
 
-test('v2.3.4 release metadata and revision-10 table contain exactly the approved changes', () => {
+test('v2.3.4 release metadata and revision-11 table contain exactly the approved changes', () => {
   assert.equal(APP_VERSION, '2.3.4')
   assert.equal(require('../package.json').version, '2.3.4')
-  assert.equal(RATING_ENGINE_REVISION, 10)
-  const expected = { LM: [.06, .25], RM: [.06, .25], CM: [.08, .30], LCM: [.08, .30], RCM: [.08, .30], CDM: [.06, .80], LDM: [.06, .80], RDM: [.06, .80] }
+  assert.equal(RATING_ENGINE_REVISION, 11)
+  const expected = { LM: [.05, .25], RM: [.05, .25], CM: [.07, .30], LCM: [.07, .30], RCM: [.07, .30], CDM: [.06, .80], LDM: [.06, .80], RDM: [.06, .80] }
   for (const [position, values] of Object.entries(expected)) assert.deepEqual([POSITION_RULES[position].teamGoal, POSITION_RULES[position].suppressionMax], values, position)
-  assert.deepEqual([POSITION_RULES.ST.goal, POSITION_RULES.CB.suppressionMax, POSITION_RULES.GK.assist], [.9, 1.3, 1])
+  assert.deepEqual([POSITION_RULES.ST.goal, POSITION_RULES.CB.suppressionMax, POSITION_RULES.GK.assist], [.9, 1.4, 1])
 })
 
-test('revision-10 keeps the SOT curve and applies approved suppression ceilings', () => {
+test('revision-11 keeps the SOT curve and applies approved suppression ceilings', () => {
   assert.equal(sotMultiplier(0), 1); assert.equal(sotMultiplier(3), .62); assert.equal(sotMultiplier(10), .20)
   for (const [position, maximum] of [['LM', .25], ['RM', .25], ['CM', .30], ['LCM', .30], ['RCM', .30], ['CDM', .80], ['LDM', .80], ['RDM', .80]]) {
     const zero = suppressionFixture(position, 0)
@@ -39,8 +39,8 @@ test('revision-10 keeps the SOT curve and applies approved suppression ceilings'
   }
 })
 
-test('revision-10 team-goal bonus excludes scorer and assister', () => {
-  for (const [position, expected] of [['LM', .06], ['CM', .08], ['CDM', .06]]) {
+test('revision-11 team-goal bonus excludes scorer and assister', () => {
+  for (const [position, expected] of [['LM', .05], ['CM', .07], ['CDM', .06]]) {
     const subject = player(`subject:${position}`, position)
     const scorer = player(`scorer:${position}`, 'ST')
     const assister = player(`assister:${position}`, 'CAM')

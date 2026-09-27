@@ -17,6 +17,6 @@ test('v2.3.4 release metadata aligns without changing rating or storage invarian
   assert.equal(packageJson.version, '2.3.4')
   assert.equal(lockfile.packages[''].version, '2.3.4')
   assert.equal(APP_VERSION, '2.3.4')
-  assert.equal(RATING_ENGINE_REVISION, 10)
+  assert.equal(RATING_ENGINE_REVISION, 11)
   assert.equal(STORAGE_KEY, 'football-tracker-v1')
 })

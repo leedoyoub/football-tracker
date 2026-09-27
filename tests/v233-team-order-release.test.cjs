@@ -22,6 +22,6 @@ test('v2.3.3 exposes exactly the approved catalog order and retains catalog iden
 test('v2.3.4 aligns version sources without changing rating revision or storage key', () => {
   assert.equal(APP_VERSION, '2.3.4')
   assert.equal(require('../package.json').version, '2.3.4')
-  assert.equal(RATING_ENGINE_REVISION, 10)
+  assert.equal(RATING_ENGINE_REVISION, 11)
   assert.equal(STORAGE_KEY, 'football-tracker-v1')
 })

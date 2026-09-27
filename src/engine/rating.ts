@@ -12,6 +12,7 @@ import {
   normalizeMatchTimeline,
   scoringTeamId,
 } from './timeline.ts'
+import { opponentSot, opponentSotExposureForPositionSegment } from './opponentSot.ts'
 
 export { creditedMinutesPlayed, creditedPitchIntervals, creditedPositionSegments, hasPitchAppearance, isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchPositionSegments, normalizeMatchPosition, normalizePositionFamily, pitchWindow, scoringTeamId } from './timeline.ts'
 
@@ -26,13 +27,13 @@ const RULE = (goal: number, assist: number, teamGoal: number, suppressionMax: nu
 /** Finalized values. This table is intentionally data-only. */
 export const POSITION_RULES: Record<Position, PositionRules> = {
   ST: RULE(.90, .55, 0, 0, 0), LST: RULE(.90, .55, 0, 0, 0), RST: RULE(.90, .55, 0, 0, 0),
-  SS: RULE(.90, .55, 0, 0, 0), LW: RULE(1, .65, .05, 0, 0), RW: RULE(1, .65, .05, 0, 0), CAM: RULE(1, .65, .05, 0, 0),
-  LM: RULE(1.05, .65, .06, .25, -.10), RM: RULE(1.05, .65, .06, .25, -.10),
-  CM: RULE(1.05, .65, .08, .30, -.10), LCM: RULE(1.05, .65, .08, .30, -.10), RCM: RULE(1.05, .65, .08, .30, -.10),
-  CDM: RULE(1.15, .70, .06, .80, -.15), LDM: RULE(1.15, .70, .06, .80, -.15), RDM: RULE(1.15, .70, .06, .80, -.15),
-  LB: RULE(1.25, .70, .04, 1, -.30), LWB: RULE(1.25, .70, .04, 1, -.30), RB: RULE(1.25, .70, .04, 1, -.30), RWB: RULE(1.25, .70, .04, 1, -.30),
-  CB: RULE(1.35, .75, 0, 1.30, -.35), LCB: RULE(1.35, .75, 0, 1.30, -.35), RCB: RULE(1.35, .75, 0, 1.30, -.35),
-  GK: RULE(1.50, 1, 0, 0, -.35),
+  SS: RULE(.90, .55, 0, 0, 0), LW: RULE(1, .65, .03, 0, 0), RW: RULE(1, .65, .03, 0, 0), CAM: RULE(1, .65, .04, 0, 0),
+  LM: RULE(1.05, .65, .05, .25, -.10), RM: RULE(1.05, .65, .05, .25, -.10),
+  CM: RULE(1.05, .65, .07, .30, -.10), LCM: RULE(1.05, .65, .07, .30, -.10), RCM: RULE(1.05, .65, .07, .30, -.10),
+  CDM: RULE(1.15, .70, .06, .80, -.12), LDM: RULE(1.15, .70, .06, .80, -.12), RDM: RULE(1.15, .70, .06, .80, -.12),
+  LB: RULE(1.25, .70, .04, 1, -.20), LWB: RULE(1.25, .70, .04, 1, -.20), RB: RULE(1.25, .70, .04, 1, -.20), RWB: RULE(1.25, .70, .04, 1, -.20),
+  CB: RULE(1.35, .75, 0, 1.40, -.25), LCB: RULE(1.35, .75, 0, 1.40, -.25), RCB: RULE(1.35, .75, 0, 1.40, -.25),
+  GK: RULE(1.50, 1, 0, 0, -.25),
 }
 
 export const SOT_MULTIPLIERS = [1, .86, .73, .62, .53, .45, .38, .32, .27, .23] as const
@@ -87,24 +88,9 @@ function saveCount(match: Match, appearance: Appearance): number {
   }, 0)
 }
 
-function validTeamSaveEvents(match: Match, teamId: string): Extract<MatchEvent, { type: 'save' }>[] {
-  return match.events.flatMap((event): Extract<MatchEvent, { type: 'save' }>[] => {
-    if (event.type !== 'save' || event.teamId !== teamId || !validCount(event.count ?? 1)) return []
-    const keeper = match.appearances.find(appearance => appearance.playerId === event.playerId && appearance.teamId === teamId)
-    if (!keeper) return []
-    const isGoalkeeper = event.minute === undefined
-      ? matchPositionSegments(match, keeper).some(segment => segment.position === 'GK')
-      : matchPositionAtEvent(match, keeper, event) === 'GK'
-    return isGoalkeeper ? [event] : []
-  })
-}
-
 /** Team-level SOT proxy: every applicable own-team GK save plus goals conceded. */
-export function opponentSotProxy(match: Match, teamId: string): number {
-  const saves = validTeamSaveEvents(match, teamId).reduce((total, event) => total + validCount(event.count ?? 1), 0)
-  const goals = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && scoringTeamId(match, event) !== teamId).length
-  return saves + goals
-}
+/** Compatibility alias; all consumers now use the canonical domain. */
+export function opponentSotProxy(match: Match, teamId: string): number { return opponentSot(match, teamId) }
 
 export type ConcededGoalTrace = {
   eventId: string
@@ -212,15 +198,10 @@ export function ratePlayerMatch(match: Match, player: Player, revision = RATING_
 function suppressionByInterval(match: Match, appearance: Appearance) {
   const segments = matchPositionSegments(match, appearance)
   const totalMinutes = creditedMinutesPlayed(match, appearance)
-  const saves = validTeamSaveEvents(match, appearance.teamId)
-  const undatedSaves = saves.filter(event => event.minute === undefined).reduce((total, event) => total + validCount(event.count ?? 1), 0)
-  const opponentGoals = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && scoringTeamId(match, event) !== appearance.teamId)
   return segments.map(row => {
     const minutes = creditedPositionSegments(match, appearance).filter(segment => segment.position === row.position && segment.enter >= row.enter && segment.exit <= row.exit).reduce((total, segment) => total + segment.exit - segment.enter, 0)
-    const contains = (event: MatchEvent) => event.minute !== undefined && event.minute >= row.enter && event.minute <= row.exit && matchPositionAtEvent(match, appearance, event) === row.position
-    const exactTimedSaves = saves.filter(contains).reduce((total, event) => total + validCount(event.count ?? 1), 0)
-    const conceded = opponentGoals.filter(contains).length
-    const sot90 = minutes > 0 ? (exactTimedSaves + undatedSaves * minutes / 90 + conceded) * 90 / minutes : 0
+    const exposure = opponentSotExposureForPositionSegment(match, appearance, row.position, row.enter, row.exit)
+    const sot90 = minutes > 0 ? exposure * 90 / minutes : 0
     const multiplier = sotMultiplier(sot90)
     return { ...row, minutes, sot90, multiplier, bonus: POSITION_RULES[row.position].suppressionMax * multiplier * minutes / Math.max(90, totalMinutes) }
   })

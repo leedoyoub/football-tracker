@@ -67,7 +67,7 @@ test('sync reconciliation uses server timestamps, preserves pending local rows, 
 test('store serializes durable saves and restores the queue after a rejected write', () => {
   const store = fs.readFileSync(require.resolve('../src/store.tsx'), 'utf8')
   assert(store.includes('createPersistenceQueue(LocalRepository.saveAppState)'))
-  assert(store.includes('persistenceQueue.current.enqueue(next, valid)'))
+  assert(store.includes('persistenceQueue.current.enqueue(next, () => epoch === persistenceEpoch.current && (!valid || valid()))'))
 })
 
 test('match editor waits for durable save, preserves a failed form, and exposes explicit feedback', () => {

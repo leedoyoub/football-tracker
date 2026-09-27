@@ -1,4 +1,5 @@
 import { matchScore, rateMatch } from './rating'
+import { opponentSot } from './opponentSot'
 import { compareStandings, sameStandingMetrics, seasonStandings, type Standing, type StandingTieMetrics } from './standings'
 import { LEAGUE_MATCHES_PER_TEAM } from './leagueFormat'
 import type { ChampionsStage, CompetitionStage, CompetitionState, CompetitionType, CupStage, Match, Player, Team } from '../types'
@@ -96,14 +97,10 @@ function averageTeamRating(teamId: string, games: Match[], players: Player[]): n
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
 }
 
-/** Goals conceded + goalkeeper saves is the available raw-data representation of opponent SOT. */
 function allowedShots(teamId: string, games: Match[]): number {
   return games.reduce((total, match) => {
     if (!hasPlayed(match, teamId)) return total
-    const score = matchScore(match)
-    const conceded = match.homeTeamId === teamId ? score.away : score.home
-    const saves = match.events.reduce((sum, event) => sum + (event.type === 'save' && event.teamId === teamId ? event.count ?? 1 : 0), 0)
-    return total + conceded + saves
+    return total + opponentSot(match, teamId)
   }, 0)
 }
 

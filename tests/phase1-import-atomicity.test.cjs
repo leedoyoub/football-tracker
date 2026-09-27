@@ -1,0 +1,11 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const { test } = require('node:test')
+const ts = require('typescript')
+for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename)
+const { prepareImportData } = require('../src/lib/repository.ts')
+const state = id => ({ teams: [{ id: 'A', name: 'A' }], players: [], matches: [{ id, homeTeamId: 'A', awayTeamId: 'B', appearances: [], events: [] }], competitionStates: [] })
+test('import preparation validates before returning a normalized replacement snapshot', () => {
+  assert.equal(prepareImportData(JSON.stringify(state('imported'))).matches[0].id, 'imported')
+  assert.throws(() => prepareImportData(JSON.stringify({ matches: [] })), /Invalid JSON structure/)
+})

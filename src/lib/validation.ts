@@ -1,4 +1,5 @@
 import type { AppState } from '../types';
+import { validateManualOpponentSot } from '../engine/opponentSot';
 
 // Robust validation checking deep structure
 export function validateState(state: any): state is AppState {
@@ -28,6 +29,7 @@ export function validateState(state: any): state is AppState {
     for (const event of match.events) {
         if (!event.id || !event.type || !event.teamId) return false;
     }
+    if (validateManualOpponentSot(match, match.teamId ?? match.homeTeamId).kind === 'invalid') return false;
   }
 
   for (const competition of state.competitionStates ?? []) {

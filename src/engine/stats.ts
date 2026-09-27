@@ -17,6 +17,7 @@ import { newestMatches, oldestMatches } from './matchChronology'
 import { positionFamily, scopedAwardFamilyByPlayer, scopedPositionFamilyByPlayer, type PositionFamily } from './positionScope'
 import { matchCompetitionType } from './competitionContext'
 import { GOOD_RATING_THRESHOLD } from './constants'
+import { opponentSot } from './opponentSot'
 
 
 export function seasonsFromMatches(matches: Match[]): string[] {
@@ -355,10 +356,7 @@ export function buildGlobalRankingData(
       const isDefender = playedPositions.some(defenderRankingPosition)
       const isGoalkeeper = playedPositions.some(goalkeeperPosition)
       if (window && isDefender && rating.minutes >= 60) {
-        const score = matchScore(match)
-        const conceded = appearance.teamId === match.homeTeamId ? score.away : score.home
-        const teamSaves = match.events.reduce((total, event) => total + (event.type === 'save' && event.teamId === appearance.teamId ? event.count ?? 1 : 0), 0)
-        sotAllowedTotal += conceded + teamSaves
+        sotAllowedTotal += opponentSot(match, appearance.teamId)
         sotAllowedAppearances++
       }
       if (window && isGoalkeeper && rating.minutes >= 60) {

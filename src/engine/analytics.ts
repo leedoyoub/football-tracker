@@ -1,4 +1,5 @@
-import { creditedPositionSegments, hasPitchAppearance, isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchScore, opponentSotProxy, ratePlayerMatch } from './rating'
+import { creditedPositionSegments, hasPitchAppearance, isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchScore, ratePlayerMatch } from './rating'
+import { opponentSot } from './opponentSot'
 import type { Match, Player, Position } from '../types'
 
 export type AnalyticsFilter = { season?: string; teamId?: string }
@@ -89,8 +90,8 @@ function buildCombination(match: Match, playerIds: string[], teamId: string, rol
     startingGoalInvolvements += Number(scorer || assister)
   }
   const onPitchGoalDifference = goalsFor - goalsAgainst
-  const weightedOpponentSot = opponentSotProxy(match, teamId) * togetherMinutes / 90
-  return { togetherMinutes, matches: 1, startsTogether, goalsFor, goalsAgainst, weightedOpponentSot, onPitchGoalsFor: goalsFor, onPitchGoalsAgainst: goalsAgainst, onPitchGoalDifference, onPitchGoalsForPer90: goalsFor / togetherMinutes * 90, onPitchGoalsAgainstPer90: goalsAgainst / togetherMinutes * 90, onPitchGoalDifferencePer90: onPitchGoalDifference / togetherMinutes * 90, startingGoalsFor: startsTogether ? ours : 0, startingGoalsAgainst: startsTogether ? theirs : 0, startingCombinedGA, startingGoalInvolvements, startingOpponentSot: startsTogether ? opponentSotProxy(match, teamId) : 0, startingWins: startsTogether && ours > theirs ? 1 : 0, startingDraws: startsTogether && ours === theirs ? 1 : 0, startingLosses: startsTogether && ours < theirs ? 1 : 0, startingCleanSheets: startsTogether && theirs === 0 ? 1 : 0, goalDifference: onPitchGoalDifference, combinedGoals, combinedAssists, combinedGA: combinedGoals + combinedAssists, averageRating: ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 0, wins: ours > theirs ? 1 : 0, draws: ours === theirs ? 1 : 0, losses: ours < theirs ? 1 : 0, cleanSheets: goalsAgainst === 0 ? 1 : 0 }
+  const weightedOpponentSot = opponentSot(match, teamId) * togetherMinutes / 90
+  return { togetherMinutes, matches: 1, startsTogether, goalsFor, goalsAgainst, weightedOpponentSot, onPitchGoalsFor: goalsFor, onPitchGoalsAgainst: goalsAgainst, onPitchGoalDifference, onPitchGoalsForPer90: goalsFor / togetherMinutes * 90, onPitchGoalsAgainstPer90: goalsAgainst / togetherMinutes * 90, onPitchGoalDifferencePer90: onPitchGoalDifference / togetherMinutes * 90, startingGoalsFor: startsTogether ? ours : 0, startingGoalsAgainst: startsTogether ? theirs : 0, startingCombinedGA, startingGoalInvolvements, startingOpponentSot: startsTogether ? opponentSot(match, teamId) : 0, startingWins: startsTogether && ours > theirs ? 1 : 0, startingDraws: startsTogether && ours === theirs ? 1 : 0, startingLosses: startsTogether && ours < theirs ? 1 : 0, startingCleanSheets: startsTogether && theirs === 0 ? 1 : 0, goalDifference: onPitchGoalDifference, combinedGoals, combinedAssists, combinedGA: combinedGoals + combinedAssists, averageRating: ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 0, wins: ours > theirs ? 1 : 0, draws: ours === theirs ? 1 : 0, losses: ours < theirs ? 1 : 0, cleanSheets: goalsAgainst === 0 ? 1 : 0 }
 }
 
 export function combinationStats(players: Player[], matches: Match[], filter: AnalyticsFilter, kind: CombinationKind): CombinationStats[] {

@@ -69,5 +69,5 @@ test('v2.2.1 version is consistent and rating revision advances once', () => {
   assert.equal(APP_VERSION, '2.3.4')
   assert.equal(require('../package.json').version, '2.3.4')
   assert.equal(require('../package-lock.json').version, '2.3.4')
-  assert.equal(RATING_ENGINE_REVISION, 10)
+  assert.equal(RATING_ENGINE_REVISION, 11)
 })

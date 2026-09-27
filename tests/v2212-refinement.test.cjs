@@ -128,6 +128,6 @@ test('v2.3.4 keeps package, lockfile, app version, rating revision, and storage 
   assert.equal(require('../package.json').version, '2.3.4')
   assert.equal(require('../package-lock.json').version, '2.3.4')
   assert.equal(require('../package-lock.json').packages[''].version, '2.3.4')
-  assert.equal(RATING_ENGINE_REVISION, 10)
+  assert.equal(RATING_ENGINE_REVISION, 11)
   assert(repository.includes("STORAGE_KEY = 'football-tracker-v1'"))
 })

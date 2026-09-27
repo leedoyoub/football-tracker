@@ -17,6 +17,14 @@ const EMERGENCY_PREFIX = 'football-tracker-emergency-';
 const MAX_SNAPSHOTS = 5;
 export type DurableSaveResult = { primarySaved: true; mirrorSaved: boolean; mirrorError?: string }
 
+/** Parse and normalize without changing durable storage or the live Store. */
+export function prepareImportData(jsonString: string): AppState {
+  const parsed = JSON.parse(jsonString)
+  if (!validateState(parsed)) throw new Error('Invalid JSON structure')
+  const migrated = sanitizeDraftLifecycle({ ...parsed, matches: parsed.matches.map(normalizeMatchCompetitionIdentity) })
+  return { ...migrated, matches: reconcileChampionsPairingIds(migrated.matches, migrated.competitionStates) }
+}
+
 function safelyRead(key: string): string | null {
   try { return localStorage.getItem(key) } catch { return null }
 }
@@ -33,6 +41,11 @@ function preserveRecoveryCopies(current: string | null) {
     localStorage.setItem(`${EMERGENCY_PREFIX}1`, current)
     localStorage.setItem(BACKUP_KEY, current)
   } catch { /* Primary storage verification below remains authoritative. */ }
+}
+export function preservePreImportBackup() {
+  const current = safelyRead(STORAGE_KEY)
+  if (!current) return
+  try { localStorage.setItem(BACKUP_KEY, current) } catch { throw new Error('Unable to preserve the current data before import.') }
 }
 export function compactLegacyRecoveryStorage() {
   try {
@@ -132,8 +145,6 @@ export const LocalRepository = {
   },
 
   async importData(jsonString: string): Promise<void> {
-    const parsed = JSON.parse(jsonString);
-    if (!validateState(parsed)) throw new Error('Invalid JSON structure');
-    await this.saveAppState({ ...parsed, matches: parsed.matches.map(normalizeMatchCompetitionIdentity) });
+    await this.saveAppState(prepareImportData(jsonString));
   }
 };
