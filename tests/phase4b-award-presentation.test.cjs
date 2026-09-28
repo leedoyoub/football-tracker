@@ -60,7 +60,7 @@ test('award pitches opt into historical team crests without affecting standard p
   assert.match(pitch, /showAwardTeamCrest = false/)
   assert.match(pitch, /data-award-team-crest="top-left"/)
   assert.match(pitch, /teamById\[slot\.teamId \?\? ''\]/)
-  assert.match(pitch, /h-3\.5 w-3\.5 border-white\/30/)
+  assert.match(pitch, /h-4 w-4 border-white\/30/)
 })
 
 test('Home renders canonical Season Best XI beneath Global Ranking and Player Detail exposes canonical app subcounts', () => {
