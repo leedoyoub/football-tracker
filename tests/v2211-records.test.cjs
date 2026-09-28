@@ -34,20 +34,20 @@ test('canonical individual model owns rating, clean-sheet, save, and remaining a
   assert.equal(boards.find(board => board.id === 'saves').rows[0].numeric, 4)
 })
 
-test('expanded Player Records has no 50-row cap and includes a 51st row', () => {
+test('dedicated Player Records has no 50-row cap and includes a 51st row', () => {
   const players = Array.from({ length: 52 }, (_, index) => player(`p${String(index).padStart(2, '0')}`))
   const matches = players.map((p, index) => match(`m${index}`, p, 1))
   const rows = buildPlayerRecordLeaderboards(players, matches, {}).find(board => board.id === 'goals').rows
   assert.equal(rows.length, 52)
   assert.equal(rows[50].rank, 1)
-  const screen = fs.readFileSync(require.resolve('../src/screens/RecordsScreen.tsx'), 'utf8')
-  assert(!screen.includes('group.rows.slice(0, 50)'))
-  assert(screen.includes('buildPlayerRecordLeaderboards'))
+  const adapter = fs.readFileSync(require.resolve('../src/screens/recordsLeaderboards.ts'), 'utf8')
+  assert(!adapter.includes('group.rows.slice(0, 50)'))
+  assert(adapter.includes('buildPlayerRecordLeaderboards'))
 })
 
 test('team lowest goals conceded board follows clean sheets and excludes teams with no matches', () => {
-  const screen = fs.readFileSync(require.resolve('../src/screens/RecordsScreen.tsx'), 'utf8')
-  const clean = screen.indexOf("group('clean-sheets', 'Most Clean Sheets'")
+  const screen = fs.readFileSync(require.resolve('../src/screens/recordsLeaderboards.ts'), 'utf8')
+  const clean = screen.indexOf("group('clean', 'Most Clean Sheets'")
   const lowest = screen.indexOf("group('ga-rate', 'Lowest Goals Conceded per Match'")
   assert(clean >= 0 && lowest > clean)
   assert(screen.includes('.filter(row => row.summary.games.length)'))

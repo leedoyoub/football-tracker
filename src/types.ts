@@ -201,10 +201,12 @@ export interface AppState {
 
 export type View =
   | { name: 'home' }
+  | { name: 'latest-changes'; season?: string }
   | { name: 'competition'; season?: string; competitionType?: CompetitionType; rankingMetric?: 'rating' | 'goals' | 'assists' | 'mom' }
   | { name: 'global-ranking'; season?: string; competitionType?: CompetitionType | 'all'; rankingMetric?: RankSort; teamId?: string }
   | { name: 'results' }
   | { name: 'records' }
+  | { name: 'records-leaderboard'; category: Extract<RecordsCategory, 'player' | 'team' | 'combination'>; leaderboardId: string; competition?: CompetitionType | 'all'; positionFilter?: PositionFilterKey; seasonIds?: string[]; teamIds?: string[] }
   | { name: 'standings' }
   | { name: 'season-recap'; season: string }
   | { name: 'season-highlight'; season: string; kind: 'monthly' | 'review' | 'news' }
@@ -236,6 +238,7 @@ export type RecordsCategory = 'player' | 'combination' | 'team' | 'history' | 'a
  * separate from both the route persisted by lastRoute and football history. */
 export interface ScreenStateByView {
   home: { name: 'home'; leaderMetric: RankSort; positionFilter: PositionFilterKey }
+  'latest-changes': { name: 'latest-changes' }
   competition: {
     name: 'competition'
     competitionType: CompetitionType
@@ -260,10 +263,18 @@ export interface ScreenStateByView {
     positionFilter: PositionFilterKey
     filterSeasonIds: string[]
     filterTeamIds: string[]
-    expandedLeaderboardId: string | null
     historyPanel: string | null
     historySeason: string | null
     historyBlock: number | null
+  }
+  'records-leaderboard': {
+    name: 'records-leaderboard'
+    category: Extract<RecordsCategory, 'player' | 'team' | 'combination'>
+    leaderboardId: string
+    competition: CompetitionType | 'all'
+    positionFilter: PositionFilterKey
+    filterSeasonIds: string[]
+    filterTeamIds: string[]
   }
   standings: { name: 'standings' }
   'season-recap': { name: 'season-recap' }

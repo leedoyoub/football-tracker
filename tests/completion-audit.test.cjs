@@ -14,7 +14,7 @@ const game = (id, events, appearances) => ({ id, season: 'S1', matchDay: 1, date
 test('Home uses the compact dashboard refinement', () => {
   const home = source('src/screens/HomeScreen.tsx')
   assert(home.includes('Season dashboard') && home.includes('Global Ranking'))
-  assert(!home.includes('competition-progress') && home.includes('item.emoji') && home.includes('News'))
+  assert(!home.includes('competition-progress') && home.includes('Latest Changes') && home.includes('deriveLatestChanges'))
   if (!home.includes('competition-progress')) return
   assert(home.includes("emoji: '👑', label: 'League'"))
   assert(home.includes("emoji: '🥇', label: 'Cup'"))
@@ -74,8 +74,7 @@ test('starting-combination metrics exclude matches where the unit did not start 
 })
 
 test('Records exposes only the approved pair-based combination record menu', () => {
-  const records = source('src/screens/RecordsScreen.tsx')
-  assert(records.includes('<ApprovedCombinationRecords players={players} matches={scoped} />'))
+  const records = source('src/screens/recordsLeaderboards.ts')
   for (const label of ['Most Goal Combinations', 'Most Mutual Goal Combinations', 'Most Matches Both Scored', 'Most Matches Both Had G+A', 'Best Duo Combined G+A', 'Best CB Partnership · Shot Suppression']) assert(records.includes(label))
 })
 
@@ -91,13 +90,12 @@ test('all ranking surfaces share metric pills and ranking rows while League View
 })
 
 test('Combination leaders reuse the canonical Records first-place highlight and preserve pair notation', () => {
-  const records = source('src/screens/RecordsScreen.tsx')
+  const records = source('src/screens/recordsLeaderboards.ts')
   const labels = ['Most Goal Combinations', 'Most Mutual Goal Combinations', 'Most Matches Both Scored', 'Most Matches Both Had G+A', 'Best Duo Combined G+A', 'Best CB Partnership · Shot Suppression']
-  assert.equal((records.match(/<FirstPlaceHighlight name=\{name\(leader\.ids, group\.connector\)\}/g) ?? []).length, 1)
-  assert(records.includes('rows.slice(1).map'))
-  assert(records.includes("connector: '→'") && records.includes("connector: '↔'") && records.includes("connector: '+'"))
+  assert(records.includes('combinationGroups') && records.includes('entries(rows, ascending)'))
+  assert(records.includes("], '→')") && records.includes("], '↔')") && records.includes("], '+')"))
   for (const label of labels) assert(records.includes(label))
-  assert(records.includes('filter(row => row.togetherMinutes >= 180)') && records.includes('entries(cb, true)'))
+  assert(records.includes('filter(row => row.togetherMinutes >= 180)') && records.includes("group('cb-suppression'"))
 })
 
 test('Player Detail, Match Story, Match Log, and Data Integrity remain reachable from rendered screens', () => {

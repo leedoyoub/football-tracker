@@ -19,7 +19,7 @@ test('push snapshots prior scroll and pop restores the exact prior route, state,
   const recordsState = {
     ...defaultScreenState({ name: 'records' }),
     category: 'player', competition: 'cup', positionFilter: 'cam',
-    expandedLeaderboardId: 'hat-tricks', historyPanel: 'monthly', historySeason: 'Season 2', historyBlock: 4,
+    historyPanel: 'monthly', historySeason: 'Season 2', historyBlock: 4,
   }
   const initial = [createNavigationEntry({ name: 'records' }, recordsState)]
   const pushed = pushNavigationEntry(initial, { name: 'player', id: 'p1' }, 842)
@@ -64,7 +64,7 @@ test('defaults retain every approved state-bearing screen field', () => {
     historyMatchday: null, historyComparedTeamIds: [],
   })
   assert.deepEqual(defaultScreenState({ name: 'records' }), {
-    name: 'records', category: 'player', competition: 'all', positionFilter: 'all', filterSeasonIds: [], filterTeamIds: [], expandedLeaderboardId: null,
+    name: 'records', category: 'player', competition: 'all', positionFilter: 'all', filterSeasonIds: [], filterTeamIds: [],
     historyPanel: null, historySeason: null, historyBlock: null,
   })
   assert.deepEqual(defaultScreenState({ name: 'comparison', leftId: 'p1', rightId: 'p2', season: 'Season 3', competitionType: 'cup' }), {

@@ -398,11 +398,11 @@ function surfaceFor(item: NewsItem): EventSurface {
 }
 
 /** Canonical, non-persistent event model consumed by News and Match Changes. */
-export function deriveFootballEvents(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES): DerivedFootballEvent[] {
+export function deriveFootballEvents(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES, options: { includeAllRanking?: boolean } = {}): DerivedFootballEvent[] {
   const derived = deriveNews(players, teams, matches, states)
     // The participant-only transition index owns detailed ranking movement.
     // Snapshot stories enter this model solely for an explicit core-metric #1.
-    .filter(item => !item.id.startsWith('rank:') || item.surface === 'news')
+    .filter(item => options.includeAllRanking || !item.id.startsWith('rank:') || item.surface === 'news')
     .map(item => ({ ...item, surface: surfaceFor(item), matchChange: item.matchChange ?? { kind: item.id.startsWith('rank:') ? 'ranking' : item.id.startsWith('record:') ? 'record' : item.id.startsWith('rare:') ? 'performance' : item.id.startsWith('award:') || item.id.startsWith('title:') ? 'competition' : 'milestone', label: item.title } }))
   const contributions: DerivedFootballEvent[] = ordered(matches).flatMap(match => {
     const byPlayer = new Map<string, { goals: number; assists: number }>()

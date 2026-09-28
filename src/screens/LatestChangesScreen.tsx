@@ -1,0 +1,13 @@
+import { useMemo } from 'react'
+import { PlayerIdentityAction, TeamIdentityAction } from '../components/EntityActions'
+import { deriveLatestChanges } from '../engine/latestChanges'
+import { useStore } from '../store'
+import type { View } from '../types'
+
+export function LatestChangesScreen({ season, onNavigate, onBack }: { season: string; onNavigate: (view: View) => void; onBack: () => void }) {
+  const { players, teams, matches, competitionStates = [] } = useStore()
+  const changes = useMemo(() => deriveLatestChanges(players, teams, matches, competitionStates, season), [players, teams, matches, competitionStates, season])
+  const playerById = useMemo(() => new Map(players.map(player => [player.id, player])), [players])
+  const teamById = useMemo(() => new Map(teams.map(team => [team.id, team])), [teams])
+  return <div className="px-4 pb-8 pt-6"><button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">Back</button><header className="mb-4"><h1 className="text-2xl font-semibold">Latest Changes</h1><p className="text-xs text-zinc-500">{season} · newest first</p></header><div className="space-y-2">{changes.map(group => <article key={group.id} className="rounded-2xl bg-zinc-900 p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="text-sm font-semibold">{group.title}</h2><p className="mt-1 text-xs text-zinc-500">{group.detail}</p></div>{group.matchId && <button type="button" onClick={() => onNavigate({ name: 'match', id: group.matchId! })} className="shrink-0 rounded-md text-xs text-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-300">Open match</button>}</div><div className="mt-3 flex flex-wrap gap-2">{group.playerIds.map(id => <PlayerIdentityAction key={`p:${id}`} player={playerById.get(id)} onNavigate={playerId => onNavigate({ name: 'player', id: playerId })} className="text-xs text-zinc-300" avatarClassName="hidden">{playerById.get(id)?.displayName ?? playerById.get(id)?.name ?? 'Unknown player'}</PlayerIdentityAction>)}{group.teamIds.map(id => <TeamIdentityAction key={`t:${id}`} team={teamById.get(id)} onNavigate={teamId => onNavigate({ name: 'team', id: teamId })} className="text-xs text-zinc-300" iconClassName="hidden">{teamById.get(id)?.shortName ?? teamById.get(id)?.name ?? 'Unknown team'}</TeamIdentityAction>)}</div>{group.items.length > 1 && <ul className="mt-3 space-y-1 border-t border-white/5 pt-2 text-[11px] text-zinc-400">{group.items.slice(1).map(item => <li key={item.id}>{item.title}</li>)}</ul>}</article>)}{!changes.length && <p className="rounded-2xl bg-zinc-900 p-4 text-sm text-zinc-500">No meaningful changes yet.</p>}</div></div>
+}

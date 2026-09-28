@@ -27,7 +27,7 @@ test('floating controls remain on full ranking lists, not compact competition pr
   const globalRanking = fs.readFileSync(require.resolve('../src/screens/GlobalRankingScreen.tsx'), 'utf8')
   const competition = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
   assert(!records.includes('</div><FloatingScrollToTop />'), 'Records must not render an unconditional page-level control')
-  assert.match(records, /activeGroup.*FloatingScrollToTop/s)
+  assert(records.includes("name: 'records-leaderboard'"), 'Records View All must use the dedicated screen')
   assert.match(globalRanking, /rows\.length > 10.*FloatingScrollToTop/s)
   assert(!competition.includes('FloatingScrollToTop'), 'compact competition previews never expand inline')
   assert(competition.includes('rows.slice(0, 10)'))

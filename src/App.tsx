@@ -18,6 +18,8 @@ import { SeasonRecapScreen } from './screens/SeasonRecapScreen'
 import { SeasonHighlightScreen } from './screens/SeasonHighlightScreen'
 import { CompetitionScreen } from './screens/CompetitionScreen'
 import { RecordsScreen } from './screens/RecordsScreen'
+import { RecordsLeaderboardScreen } from './screens/RecordsLeaderboardScreen'
+import { LatestChangesScreen } from './screens/LatestChangesScreen'
 import { ResultsScreen } from './screens/ResultsScreen'
 import { GlobalRankingScreen } from './screens/GlobalRankingScreen'
 import { SquadImportScreen } from './screens/SquadImportScreen'
@@ -103,7 +105,7 @@ export default function App() {
       return 'players'
     }
     if (view.name === 'competition' || view.name === 'global-ranking') return 'competition'
-    if (view.name === 'records' || view.name === 'chemistry' || view.name === 'comparison') return 'records'
+    if (view.name === 'records' || view.name === 'records-leaderboard' || view.name === 'chemistry' || view.name === 'comparison') return 'records'
     return 'home'
   }, [view])
 
@@ -180,10 +182,12 @@ export default function App() {
           {view.name === 'home' && (
             <HomeScreen season={season} screenState={entry.screenState as ScreenStateByView['home']} onStateChange={onStateChange} onSeason={setSeason} onNavigate={onNavigate} />
           )}
+          {view.name === 'latest-changes' && <LatestChangesScreen season={view.season ?? season} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'competition' && <CompetitionScreen season={view.season ?? season} screenState={entry.screenState as ScreenStateByView['competition']} onStateChange={onStateChange} onCompetitionTypeChange={onCompetitionTypeChange} onSeason={(nextSeason) => { setSeason(nextSeason); setHistory(previous => previous.map((item, index) => index === previous.length - 1 && item.view.name === 'competition' ? { ...item, view: { ...item.view, season: nextSeason } } : item)) }} onNavigate={onNavigate} />}
           {view.name === 'global-ranking' && <GlobalRankingScreen season={view.season ?? season} screenState={entry.screenState as ScreenStateByView['global-ranking']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'results' && <ResultsScreen onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'records' && <RecordsScreen season={season} screenState={entry.screenState as ScreenStateByView['records']} onStateChange={onStateChange} onNavigate={onNavigate} />}
+          {view.name === 'records-leaderboard' && <RecordsLeaderboardScreen screenState={entry.screenState as ScreenStateByView['records-leaderboard']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'standings' && <StandingsScreen season={season} onNavigate={onNavigate} />}
           {view.name === 'season-recap' && <SeasonRecapScreen season={view.season} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'season-highlight' && <SeasonHighlightScreen season={view.season} kind={view.kind} onNavigate={onNavigate} onBack={onBack} />}

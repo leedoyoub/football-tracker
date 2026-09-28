@@ -122,10 +122,10 @@ test('Champions bracket keeps native horizontal scrolling while hiding its brows
 
 test('Home has the four compact dashboard responsibilities and no active play-style product', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
-  const order = ['recent-matches', 'news', 'season-leaders'].map(token => source.indexOf(`data-home-section="${token}"`))
+  const order = ['recent-matches', 'latest-changes', 'season-leaders'].map(token => source.indexOf(`data-home-section="${token}"`))
   assert(order.every((value, index) => value >= 0 && (!index || value > order[index - 1])))
   assert(!source.includes('Global Rankings') && !source.includes('Team of the Week') && !source.includes('Team of the Season') && !source.includes('StandingsTable'))
-  assert(source.includes('recentDerivedResults(matches, teams, 5)') && source.includes("kind: 'news'"))
+  assert(source.includes('recentDerivedResults(matches, teams, 5)') && source.includes('deriveLatestChanges'))
   assert(!/play.?style/i.test(source) && !source.includes('Show More'))
 })
 
@@ -160,8 +160,8 @@ test('Teams uses the compact card progress read model without player-count or ti
 })
 
 test('Records owns History, Trophy Cabinet and cached form Insights', () => {
-  const source = fs.readFileSync(require.resolve('../src/screens/RecordsScreen.tsx'), 'utf8')
-  for (const token of ["'history'", "'insights'", 'Season History', 'Trophy Cabinet', 'Golden Boot', 'Team of the Season', 'Team Form', 'In-form Players']) assert(source.includes(token), token)
+  const source = fs.readFileSync(require.resolve('../src/screens/RecordsScreen.tsx'), 'utf8') + fs.readFileSync(require.resolve('../src/screens/RecordsHistory.tsx'), 'utf8')
+  for (const token of ["'history'", "'insights'", 'Season Timeline', 'Golden Boot', 'Team of the Season', 'Team Form', 'In-form Players']) assert(source.includes(token), token)
   assert(source.includes('useMemo'))
 })
 

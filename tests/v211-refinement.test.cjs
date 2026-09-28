@@ -31,6 +31,6 @@ test('Records defers inactive derivation tabs and Combination only sorts prepare
   const records = fs.readFileSync(require.resolve('../src/screens/RecordsScreen.tsx'), 'utf8')
   const combinations = fs.readFileSync(require.resolve('../src/components/CombinationRecords.tsx'), 'utf8')
   assert(records.includes("category === 'history' && <RecordsHistory") && records.includes("category === 'integrity' && <IntegrityRecords"))
-  assert(records.includes('function HistoryRecords') && records.includes('function IntegrityRecords'))
+  assert(records.includes('RecordsHistory') && records.includes('function IntegrityRecords'))
   assert(combinations.includes('const prepared = useMemo(() => combinationStats') && combinations.includes('}, [prepared, sort])'))
 })
