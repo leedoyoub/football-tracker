@@ -18,6 +18,7 @@ import { PlayerAvatar } from '../components/PlayerAvatar'
 
 import { restoreDraft } from '../lib/editorRestore'
 import { validateManualOpponentSot } from '../engine/opponentSot'
+import { initialOpponentSotDraft, updateFulltimeOpponentSot, updateHalftimeOpponentSot, type OpponentSotDraftState } from './opponentSotWorkflow'
 import { rebuildLiveHistory } from './liveHistory'
 import { sortPlayersByPosition } from '../lib/positionOrder'
 import { currentStaticTeams } from '../data/teams'
@@ -116,8 +117,8 @@ function MatchEditor({
   const nextMatch = useMemo(() => getNextMatchDayForTeam(selectedTeamId, matches, completedSeasons, competitionType, requestedSeason), [selectedTeamId, matches, completedSeasons, competitionType, requestedSeason])
   const season = mode === 'fresh' ? requestedSeason ?? nextMatch.season : sourceMatch!.season
   const [date, setDate] = useState(() => mode === 'fresh' ? localCalendarDate() : sourceMatch!.date)
-  const [halftimeOpponentSot, setHalftimeOpponentSot] = useState(() => sourceMatch?.halftimeOpponentSot?.toString() ?? '')
-  const [fulltimeOpponentSot, setFulltimeOpponentSot] = useState(() => sourceMatch?.fulltimeOpponentSot?.toString() ?? '')
+  const [opponentSotDraft, setOpponentSotDraft] = useState(() => initialOpponentSotDraft(sourceMatch, mode === 'fresh'))
+  const { halftimeOpponentSot, fulltimeOpponentSot, fulltimeOpponentSotAutoLinked } = opponentSotDraft
   const recentAssignments = useMemo(() => restored ? null : getMostRecentStartingLineup(matches, selectedTeamId), [restored, matches, selectedTeamId]);
 
   const [step, setStep] = useState(() => restored?.draft.events.length ? 1 : 0) // 0: Lineups, 1: Events
@@ -485,33 +486,59 @@ function MatchEditor({
     })
   }
 
+  const finalMatchData = useMemo<Match>(() => ({
+    id: draftId,
+    season, competitionType: activeAssignment.competitionType, competitionStage: activeAssignment.stage, competitionPairingId: activeAssignment.pairingId, competitionSeriesGame: activeAssignment.seriesGame, competitionAssignment: activeAssignment, matchDay, date, formation: activeFormationName, homeAway: 'home' as const, homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90,
+    halftimeOpponentSot: parseOpponentSot(halftimeOpponentSot), fulltimeOpponentSot: parseOpponentSot(fulltimeOpponentSot), appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot,
+  }), [draftId, season, activeAssignment, matchDay, date, activeFormationName, homeTeamId, awayTeamId, selectedTeamId, opponentName, halftimeOpponentSot, fulltimeOpponentSot, appearances, matchDraft.events, kickoffSnapshot])
+  const draftCheckpoint = useMemo<Match>(() => ({ ...finalMatchData, fulltimeOpponentSotAutoLinked: fulltimeOpponentSotAutoLinked }), [finalMatchData, fulltimeOpponentSotAutoLinked])
+
+  function applyOpponentSot(next: OpponentSotDraftState) {
+    const candidate = { ...finalMatchData, halftimeOpponentSot: parseOpponentSot(next.halftimeOpponentSot), fulltimeOpponentSot: parseOpponentSot(next.fulltimeOpponentSot) }
+    const validation = validateManualOpponentSot(candidate, selectedTeamId)
+    if (validation.kind === 'invalid') { setSaveError(validation.message); return }
+    setOpponentSotDraft(next)
+    setSaveError('')
+  }
+
+  function changeHalftimeOpponentSot(value: string) {
+    if (!/^\d*$/.test(value)) return
+    applyOpponentSot(updateHalftimeOpponentSot(opponentSotDraft, value))
+  }
+
+  function changeFulltimeOpponentSot(value: string) {
+    if (!/^\d*$/.test(value)) return
+    applyOpponentSot(updateFulltimeOpponentSot(opponentSotDraft, value))
+  }
+
   useEffect(() => {
     if (!draftReady || !editorSourceCanMount(mode, sourceMatch, restored) || mode === 'edit' || savingRef.current) return
-    saveDraftMatch({ id: draftId, season, competitionType: activeAssignment.competitionType, competitionStage: activeAssignment.stage, competitionPairingId: activeAssignment.pairingId, competitionSeriesGame: activeAssignment.seriesGame, competitionAssignment: activeAssignment, matchDay, date, formation: activeFormationName, homeAway: 'home', homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, halftimeOpponentSot: parseOpponentSot(halftimeOpponentSot), fulltimeOpponentSot: parseOpponentSot(fulltimeOpponentSot), appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot })
-  }, [draftReady, mode, draftId, season, activeAssignment, matchDay, date, activeFormationName, matchDraft, homeTeamId, awayTeamId, selectedTeamId, opponentName, appearances, kickoffSnapshot, saveDraftMatch, sourceMatch, restored, halftimeOpponentSot, fulltimeOpponentSot])
+    saveDraftMatch(draftCheckpoint)
+  }, [draftReady, mode, draftCheckpoint, saveDraftMatch, sourceMatch, restored])
 
   async function save(): Promise<boolean> {
     if (savingRef.current || liveEvent || !kickoffIsValid) return false
     savingRef.current = true
     setSaveError('')
     setSaveStatus('Saving…')
-    const matchData = {
-      id: draftId,
-      season, competitionType: activeAssignment.competitionType, competitionStage: activeAssignment.stage, competitionPairingId: activeAssignment.pairingId, competitionSeriesGame: activeAssignment.seriesGame, competitionAssignment: activeAssignment, matchDay, date, formation: activeFormationName, homeAway: 'home' as const, homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90, halftimeOpponentSot: parseOpponentSot(halftimeOpponentSot), fulltimeOpponentSot: parseOpponentSot(fulltimeOpponentSot), appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot,
-    }
-    if (!matchesCompetitionAssignmentExactly(matchData, activeAssignment)) {
+    if (!matchesCompetitionAssignmentExactly(finalMatchData, activeAssignment)) {
       setSaveError('Competition identity changed. Reopen the match and try again.')
       savingRef.current = false
       return false
     }
-    const manualSot = validateManualOpponentSot(matchData, selectedTeamId)
+    if (mode !== 'edit' && (finalMatchData.halftimeOpponentSot === undefined || finalMatchData.fulltimeOpponentSot === undefined)) {
+      setSaveError('Enter 1H and Full Match SOT in the Log Match SOT control before finishing.')
+      savingRef.current = false
+      return false
+    }
+    const manualSot = validateManualOpponentSot(finalMatchData, selectedTeamId)
     if (manualSot.kind === 'invalid') {
       setSaveError(manualSot.message)
       savingRef.current = false
       return false
     }
     try {
-      const result = await saveMatchDurably(matchData)
+      const result = await saveMatchDurably(finalMatchData)
       setSaveStatus(result.mirrorSaved ? 'Saved' : 'Saved locally · mirror pending')
       onComplete({ name: 'match', id: draftId })
       return true
@@ -555,7 +582,7 @@ function MatchEditor({
           teams={teams} substitutionSelection={substitutionSelection} pendingSubs={pendingSubs}
           goalReady={!!liveScorerId && assistChosen && eligibleGoalIds.includes(liveScorerId) && (!liveAssistId || eligibleGoalIds.includes(liveAssistId))} assistChosen={assistChosen}
           slots={liveEvent === 'goal' || liveEvent === 'conceded' ? goalSlots : liveSlots} players={draftPlayers} benchPlayers={liveBenchPlayers} stats={liveStats} events={activeDraft.events}
-          totalSaves={totalSaves} onTotalSaves={changeTotalSaves} halftimeOpponentSot={halftimeOpponentSot} fulltimeOpponentSot={fulltimeOpponentSot} onHalftimeOpponentSot={setHalftimeOpponentSot} onFulltimeOpponentSot={setFulltimeOpponentSot} hasStartingGoalkeeper={!!startingGoalkeeperId} subOutId={subSelection ? (subSelection.group === 'starting' ? activeDraft.slotAssignments[subSelection.id] : subSelection.id) : ''} substitutionError={substitutionError}
+          totalSaves={totalSaves} onTotalSaves={changeTotalSaves} opponentSot={opponentSotDraft} onHalftimeOpponentSot={changeHalftimeOpponentSot} onFulltimeOpponentSot={changeFulltimeOpponentSot} sotError={saveError.includes('SOT') ? saveError : ''} hasStartingGoalkeeper={!!startingGoalkeeperId} subOutId={subSelection ? (subSelection.group === 'starting' ? activeDraft.slotAssignments[subSelection.id] : subSelection.id) : ''} substitutionError={substitutionError}
           onSubSlot={(id) => selectSubstitutionTarget({ group: 'starting', id })}
           onSubBench={() => selectSubstitutionTarget({ group: 'substitute', id: '' })}
           onSubOut={(id) => { const slot = Object.keys(activeDraft.slotAssignments).find(slotId => activeDraft.slotAssignments[slotId] === id); if (slot) selectSubstitutionTarget({ group: 'starting', id: slot }) }}
@@ -574,13 +601,14 @@ function MatchEditor({
 function LiveMatchStep(props: {
   startingGoalkeeperName: string;
   goalReady: boolean; assistChosen: boolean; teams: Team[]; substitutionSelection: Record<string, 'in' | 'out'>; pendingSubs: Extract<MatchEvent, { type: 'sub' }>[]
-  totalSaves: string; onTotalSaves: (value: string) => void; halftimeOpponentSot: string; fulltimeOpponentSot: string; onHalftimeOpponentSot: (value: string) => void; onFulltimeOpponentSot: (value: string) => void; hasStartingGoalkeeper: boolean; subOutId: string; substitutionError: string; canConfirmSubstitutions: boolean
+  totalSaves: string; onTotalSaves: (value: string) => void; opponentSot: OpponentSotDraftState; onHalftimeOpponentSot: (value: string) => void; onFulltimeOpponentSot: (value: string) => void; sotError: string; hasStartingGoalkeeper: boolean; subOutId: string; substitutionError: string; canConfirmSubstitutions: boolean
   onSubOut: (id: string) => void; onSubIn: (id: string) => void; onSubSlot: (id: string) => void; onSubBench: () => void
   slots: Best11Slot[]; players: Player[]; benchPlayers: Player[]; stats: Record<string, { goals: number; assists: number }>; events: MatchEvent[]; selectedTeamId: string
   liveEvent: 'goal' | 'conceded' | 'substitution' | null; liveMinute: string; liveScorerId: string; liveAssistId: string; liveCauseId: string; livePicker: 'scorer' | 'assist' | 'cause' | 'minute'; validMinute: boolean
   onOpen: (type: 'goal' | 'conceded' | 'substitution') => void; onSave: () => void; onCancel: () => void; onMinute: (value: string | number) => void; onCommitMinute: () => void; onScorer: (id: string) => void; onAssist: (id: string) => void; onCause: (id: string) => void; onPicker: (picker: 'scorer' | 'assist' | 'cause' | 'minute') => void; onPitchClick: (id: string) => void; onBack: () => void; onFinish: () => Promise<boolean>; onEditEvent: (event: MatchEvent) => void; onDeleteEvent: (event: MatchEvent) => void
 }) {
   const [finishStage, setFinishStage] = useState<'saves' | null>(null)
+  const [sotOpen, setSotOpen] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<MatchEvent | null>(null)
   const finishMatch = async () => {
@@ -592,7 +620,7 @@ function LiveMatchStep(props: {
   const playerName = (id: string) => playerDisplayName(props.players.find((player) => player.id === id))
   return <div className="space-y-3">
     <div className="sticky top-0 z-30 space-y-2 bg-black/95 py-2">
-    <div className="grid grid-cols-3 gap-2">{([['goal', 'GOAL'], ['conceded', 'CONCEDED'], ['substitution', 'SUBSTITUTION']] as const).map(([type, label]) => <button key={type} type="button" disabled={!!props.liveEvent} onClick={() => props.onOpen(type)} className={`rounded-xl py-3 text-[10px] font-black ${props.liveEvent === type ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-white'}`}>{label}</button>)}</div>
+    <div className="grid grid-cols-4 gap-2">{([['goal', 'GOAL'], ['conceded', 'CONCEDED'], ['substitution', 'SUBSTITUTION']] as const).map(([type, label]) => <button key={type} type="button" disabled={!!props.liveEvent} onClick={() => props.onOpen(type)} className={`rounded-xl py-3 text-[10px] font-black ${props.liveEvent === type ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-white'}`}>{label}</button>)}<button type="button" aria-label="Opponent SOT" disabled={!!props.liveEvent} onClick={() => setSotOpen(true)} className="rounded-xl bg-zinc-900 py-3 text-[10px] font-black text-white disabled:opacity-40">SOT</button></div>
     {props.liveEvent && props.liveEvent !== 'substitution' && <div className="space-y-2 rounded-xl bg-zinc-900 p-2">{props.liveEvent !== 'goal' && <MinuteInput value={props.liveMinute} onChange={props.onMinute} onConfirm={props.onSave} onCommit={props.onCommitMinute} label={`${eventName} Time`} />}
     {props.liveEvent === 'goal' && <div className="space-y-3">
       <div aria-live="polite" className="grid grid-cols-2 gap-2">
@@ -625,11 +653,21 @@ function LiveMatchStep(props: {
     <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Event History</h2><button type="button" disabled={!!props.liveEvent || !props.events.some(e => e.type !== 'save')} onClick={() => { const events = props.events.filter(e => e.type !== 'save'); const event = events[events.length - 1]; if (event) props.onDeleteEvent(event) }} className="mb-2 text-xs font-bold text-emerald-400 disabled:opacity-40">UNDO LAST</button><div className="space-y-1.5">{props.events.slice().sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0)).map((event) => <button type="button" disabled={!!props.liveEvent} onClick={() => event.type === 'save' ? setFinishStage('saves') : setSelectedEvent(event)} key={event.id} className="block w-full rounded-xl bg-zinc-900 px-3 py-2 text-left text-[11px]">{event.type !== 'save' && `${event.minute}' `}{event.type === 'goal' ? event.teamId === props.selectedTeamId ? `Goal${event.playerId ? `: ${playerName(event.playerId)}` : ' · Opponent own goal'}${event.assistPlayerId ? ` · Assist: ${playerName(event.assistPlayerId)}` : ''}` : `Conceded${event.concededGoalCausePlayerId ? ` · Cause: ${playerName(event.concededGoalCausePlayerId)}` : ''}` : event.type === 'sub' ? `Substitution: ${playerName(event.playerOutId)} → ${playerName(event.playerInId)}` : `Save: ${playerName(event.playerId)} × ${event.count ?? 1}`}</button>)}</div></section>
     <div className="flex gap-2"><button type="button" onClick={props.onBack} className="flex-1 rounded-2xl bg-zinc-900 py-4 text-sm font-black">BACK</button><button type="button" disabled={!!props.liveEvent} onClick={() => setFinishStage('saves')} className="flex-2 rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl">END MATCH</button></div>
     {finishStage && <div role="dialog" aria-modal="true" aria-label="End match" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="w-full max-w-sm space-y-3 rounded-xl bg-zinc-900 p-4">
-      <p className="font-bold">{props.startingGoalkeeperName || 'No starting goalkeeper'}</p><label className="flex items-center justify-between">Saves<input aria-label="Total saves" type="text" inputMode="numeric" pattern="[0-9]*" value={props.totalSaves} disabled={!props.hasStartingGoalkeeper || finishing} onChange={event => props.onTotalSaves(event.target.value)} className="w-20 rounded-lg bg-black p-2 text-base" /></label><label className="flex items-center justify-between">Opponent SOT HT<input aria-label="Opponent SOT HT" type="text" inputMode="numeric" pattern="[0-9]*" value={props.halftimeOpponentSot} disabled={finishing} onChange={event => props.onHalftimeOpponentSot(event.target.value)} className="w-20 rounded-lg bg-black p-2 text-base" /></label><label className="flex items-center justify-between">Opponent SOT FT<input aria-label="Opponent SOT FT" type="text" inputMode="numeric" pattern="[0-9]*" value={props.fulltimeOpponentSot} disabled={finishing} onChange={event => props.onFulltimeOpponentSot(event.target.value)} className="w-20 rounded-lg bg-black p-2 text-base" /></label><button disabled={finishing || (props.hasStartingGoalkeeper && props.totalSaves === '')} onClick={finishMatch} className="w-full rounded-lg bg-emerald-500 p-3 text-xs font-black text-black disabled:opacity-40">{finishing ? 'SAVING…' : 'SAVE & FINISH MATCH'}</button>
+      <p className="font-bold">{props.startingGoalkeeperName || 'No starting goalkeeper'}</p><label className="flex items-center justify-between">Saves<input aria-label="Total saves" type="text" inputMode="numeric" pattern="[0-9]*" value={props.totalSaves} disabled={!props.hasStartingGoalkeeper || finishing} onChange={event => props.onTotalSaves(event.target.value)} className="w-20 rounded-lg bg-black p-2 text-base" /></label>{props.sotError && <><p role="alert" className="text-xs text-red-400">{props.sotError}</p><button type="button" onClick={() => { setFinishStage(null); setSotOpen(true) }} className="w-full rounded-lg bg-black p-2 text-xs font-black text-emerald-300">OPEN SOT</button></>}<button disabled={finishing || (props.hasStartingGoalkeeper && props.totalSaves === '')} onClick={finishMatch} className="w-full rounded-lg bg-emerald-500 p-3 text-xs font-black text-black disabled:opacity-40">{finishing ? 'SAVING…' : 'SAVE & FINISH MATCH'}</button>
       <button onClick={() => setFinishStage(null)} className="w-full p-2 text-xs">CANCEL</button>
     </div></div>}
+    {sotOpen && <div role="dialog" aria-modal="true" aria-label="Opponent SOT" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="w-full max-w-sm space-y-3 rounded-xl bg-zinc-900 p-4"><h2 className="text-sm font-black">Opponent SOT</h2><SotValueControl label="1H SOT" value={props.opponentSot.halftimeOpponentSot} onChange={props.onHalftimeOpponentSot} /><SotValueControl label="Full Match SOT" value={props.opponentSot.fulltimeOpponentSot} onChange={props.onFulltimeOpponentSot} autoLinked={props.opponentSot.fulltimeOpponentSotAutoLinked} />{props.sotError && <p role="alert" className="text-xs text-red-400">{props.sotError}</p>}<button type="button" onClick={() => setSotOpen(false)} className="w-full rounded-lg bg-emerald-500 p-3 text-xs font-black text-black">DONE</button></div></div>}
     {selectedEvent && <div role="dialog" aria-modal="true" aria-label="Event actions" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="flex w-full max-w-sm gap-2 rounded-xl bg-zinc-900 p-4"><button className="flex-1 p-3" onClick={() => { props.onEditEvent(selectedEvent); setSelectedEvent(null) }}>EDIT</button><button className="flex-1 p-3 text-red-400" onClick={() => { props.onDeleteEvent(selectedEvent); setSelectedEvent(null) }}>DELETE</button><button className="flex-1 p-3" onClick={() => setSelectedEvent(null)}>CANCEL</button></div></div>}
   </div>
+}
+
+function SotValueControl({ label, value, onChange, autoLinked = false }: { label: string; value: string; onChange: (value: string) => void; autoLinked?: boolean }) {
+  const step = (direction: -1 | 1) => {
+    if (value === '') { if (direction > 0) onChange('1'); return }
+    const next = Math.max(0, Number(value) + direction)
+    if (Number.isSafeInteger(next)) onChange(String(next))
+  }
+  return <label className="flex items-center justify-between gap-3 text-sm font-bold"><span>{label}</span><span className="flex items-center gap-1"><button type="button" aria-label={`${label} decrease`} disabled={value === '' || value === '0'} onClick={() => step(-1)} className="h-9 w-9 rounded-lg bg-black text-lg disabled:opacity-30">−</button><input aria-label={label} type="text" inputMode="numeric" pattern="[0-9]*" value={value} onChange={event => onChange(event.target.value)} className="h-9 w-12 rounded-lg bg-black text-center text-base" /><button type="button" aria-label={`${label} increase`} onClick={() => step(1)} className="h-9 w-9 rounded-lg bg-black text-lg">+</button>{autoLinked && <span className="ml-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-black text-emerald-300">AUTO</span>}</span></label>
 }
 
 function BenchTapTarget({ onClick }: { onClick: () => void }) {

@@ -185,6 +185,8 @@ export interface Match {
   halftimeOpponentSot?: number
   /** Optional cumulative opponent shots on target supplied by the match logger. */
   fulltimeOpponentSot?: number
+  /** Draft-checkpoint workflow state only. Finalized records omit this flag. */
+  fulltimeOpponentSotAutoLinked?: boolean
   appearances: Appearance[]
   events: MatchEvent[]
   /** Optional saved kickoff layout; used only when historical data already has it. */

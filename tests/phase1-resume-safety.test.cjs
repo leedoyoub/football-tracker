@@ -40,7 +40,8 @@ test('a restoration failure prevents resume mounting and cannot activate a draft
   const source = fs.readFileSync(require.resolve('../src/screens/NewMatchScreen.tsx'), 'utf8')
   assert(source.includes("if ((mode === 'resume' || mode === 'edit') && !restored)"))
   assert(source.includes("if (!draftReady || !editorSourceCanMount(mode, sourceMatch, restored)"))
-  assert(source.includes('[halftimeOpponentSot, setHalftimeOpponentSot]'))
+  assert(source.includes('initialOpponentSotDraft(sourceMatch, mode === \'fresh\')'))
+  assert(source.includes('fulltimeOpponentSotAutoLinked: fulltimeOpponentSotAutoLinked'))
   assert(source.includes('halftimeOpponentSot: parseOpponentSot(halftimeOpponentSot)'))
 })
 

@@ -72,10 +72,10 @@ test('store serializes durable saves and restores the queue after a rejected wri
 
 test('match editor waits for durable save, preserves a failed form, and exposes explicit feedback', () => {
   const editor = fs.readFileSync(require.resolve('../src/screens/NewMatchScreen.tsx'), 'utf8')
-  assert(editor.includes('await saveMatchDurably(matchData)'))
+  assert(editor.includes('await saveMatchDurably(finalMatchData)'))
   assert(editor.includes('Save failed. Your match was not safely stored. Please retry.'))
-  assert(editor.indexOf('await saveMatchDurably(matchData)') < editor.indexOf('clearDraftMatch()'))
-  assert(editor.indexOf('await saveMatchDurably(matchData)') < editor.indexOf("onComplete({ name: 'match', id: draftId })"))
+  assert(editor.indexOf('await saveMatchDurably(finalMatchData)') < editor.indexOf('clearDraftMatch()'))
+  assert(editor.indexOf('await saveMatchDurably(finalMatchData)') < editor.indexOf("onComplete({ name: 'match', id: draftId })"))
 })
 
 const tick = callback => queueMicrotask(callback)
