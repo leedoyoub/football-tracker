@@ -49,20 +49,44 @@ export function resetNavigationEntries<V extends View>(view: V, screenState?: Sc
   return [createNavigationEntry(view, screenState ?? defaultScreenState(view))]
 }
 
-/** The Team Detail page-level back affordance intentionally returns to the Teams hub. */
-export function teamDetailBackEntries() {
-  return resetNavigationEntries({ name: 'teams' })
+type DetailView = Extract<View, { name: 'team' | 'player' | 'match' }>
+const isDetailView = (view: View): view is DetailView => view.name === 'team' || view.name === 'player' || view.name === 'match'
+const isTransientWorkflow = (view: View) => view.name === 'new-match' || view.name === 'edit-match'
+const sameDetailDestination = (left: View, right: View) => isDetailView(left) && isDetailView(right) && left.name === right.name && left.id === right.id
+
+/** Returns the nearest prior instance of an exact Team, Player, or Match detail. */
+export function popToExistingNavigationEntry(entries: NavigationEntry[], view: View, currentScrollTop: number): NavigationEntry[] | undefined {
+  if (!isDetailView(view)) return undefined
+  for (let index = entries.length - 1; index >= 0; index--) {
+    if (!sameDetailDestination(entries[index].view, view)) continue
+    return index === entries.length - 1 ? snapshotScroll(entries, index, currentScrollTop) : entries.slice(0, index + 1)
+  }
+  return undefined
+}
+
+/** Browse navigation preserves an existing exact detail entry instead of pushing a duplicate. */
+export function navigateBrowseEntry<V extends View>(entries: NavigationEntry[], view: V, currentScrollTop: number): NavigationEntry[] {
+  return popToExistingNavigationEntry(entries, view, currentScrollTop) ?? pushNavigationEntry(entries, view, currentScrollTop)
+}
+
+/** Editors live above their browse parent only while the workflow is active. */
+export function enterTransientWorkflow<V extends Extract<View, { name: 'new-match' | 'edit-match' }>>(entries: NavigationEntry[], view: V, currentScrollTop: number): NavigationEntry[] {
+  return pushNavigationEntry(entries, view, currentScrollTop)
+}
+
+/** Cancel and successful completion consume a transient editor; an orphan uses its destination fallback. */
+export function closeTransientWorkflow<V extends View>(entries: NavigationEntry[], fallback: V): NavigationEntry[] {
+  const current = entries[entries.length - 1]
+  return current && isTransientWorkflow(current.view) && entries.length > 1 ? entries.slice(0, -1) : replaceNavigationEntry(entries, fallback)
+}
+
+/** Team Back returns to its actual browse source, with Teams only for an orphan detail entry. */
+export function backFromTeamDetailEntries(entries: NavigationEntry[]): NavigationEntry[] {
+  const browseEntries = entries.slice(0, -1).filter(entry => !isTransientWorkflow(entry.view))
+  return browseEntries.length ? browseEntries : resetNavigationEntries({ name: 'teams' })
 }
 
 export function updateCurrentScreenState(entries: NavigationEntry[], screenState: NavigationEntry['screenState']): NavigationEntry[] {
   if (!entries.length) return entries
   return entries.map((entry, index) => index === entries.length - 1 ? { ...entry, screenState } : entry)
-}
-
-export type SameTeamBackTarget = { action: 'pop' } | { action: 'replace'; entry: NavigationEntry<Extract<View, { name: 'team' }>> }
-
-export function sameTeamBackTarget(entries: NavigationEntry[], teamId: string): SameTeamBackTarget {
-  const previous = entries[entries.length - 2]?.view
-  if (previous?.name === 'team' && previous.id === teamId) return { action: 'pop' }
-  return { action: 'replace', entry: createNavigationEntry({ name: 'team', id: teamId }) }
 }

@@ -11,7 +11,7 @@ const {
   pushNavigationEntry,
   replaceNavigationEntry,
   resetNavigationEntries,
-  sameTeamBackTarget,
+  navigateBrowseEntry,
   snapshotScroll,
 } = require('../src/lib/navigation.ts')
 
@@ -39,14 +39,13 @@ test('snapshot, replace, and root-tab reset are immutable entry operations', () 
   assert.equal(entries[1].scrollTop, 0)
 })
 
-test('BACK TO TEAM pops only for the immediately previous same Team Detail and otherwise replaces', () => {
+test('detail browsing pops to the nearest exact detail and otherwise pushes a new entry', () => {
   const same = [createNavigationEntry({ name: 'team', id: 'A' }), createNavigationEntry({ name: 'match', id: 'm1' })]
-  assert.deepEqual(sameTeamBackTarget(same, 'A'), { action: 'pop' })
+  assert.deepEqual(navigateBrowseEntry(same, { name: 'team', id: 'A' }, 240), [createNavigationEntry({ name: 'team', id: 'A' })])
 
   const other = [createNavigationEntry({ name: 'results' }), createNavigationEntry({ name: 'match', id: 'm1' })]
-  const target = sameTeamBackTarget(other, 'A')
-  assert.equal(target.action, 'replace')
-  assert.deepEqual(target.entry.view, { name: 'team', id: 'A' })
+  const target = navigateBrowseEntry(other, { name: 'team', id: 'A' }, 240)
+  assert.deepEqual(target.map(entry => entry.view), [{ name: 'results' }, { name: 'match', id: 'm1' }, { name: 'team', id: 'A' }])
 })
 
 test('defaults retain every approved state-bearing screen field', () => {
@@ -81,10 +80,10 @@ test('screens use root navigation operations instead of route-shaped local memor
   for (const removed of ['teamTabMemory', 'leagueViewMemory', 'rankingMetricMemory', 'homeLeaderMemory', 'scrollPositions']) {
     assert(!app.includes(removed), `${removed} must not remain in App`)
   }
-  assert.match(app, /sameTeamBackTarget\(prev, teamId\)/)
+  assert.match(app, /navigateBrowseEntry\(prev, \{ name: 'team', id: teamId \}/)
   assert.match(match, /onClick=\{onBack\}/)
   assert.match(match, /onBackToTeam\(teamId\)/)
-  assert.match(newMatch, /onReplace\(\{ name: 'match', id: draftId \}\)/)
+  assert.match(newMatch, /onComplete\(\{ name: 'match', id: draftId \}\)/)
   assert.match(newMatch, /onClick=\{\(\) => \{ if \(editingMatchId\) clearDraftMatch\(\); onBack\(\) \}\}/)
   assert.match(newPlayer, /onReplace\(\{ name: 'player', id/)
   assert.match(newPlayer, /onClick=\{onBack\}/)

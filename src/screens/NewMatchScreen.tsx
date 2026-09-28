@@ -62,6 +62,7 @@ type NewMatchScreenProps = {
   editingMatchId?: string
   onReplace: (view: View) => void
   onBack: () => void
+  onComplete: (view: View) => void
 }
 
 /** Resolve an editor entity before mounting the hook-heavy editor. This keeps a
@@ -97,8 +98,8 @@ function MatchEditor({
   requestedSeason,
   competitionType: initialCompetitionType,
   editingMatchId,
-  onReplace,
   onBack,
+  onComplete,
   sourceMatch,
   selectedTeamId,
   restored,
@@ -512,7 +513,7 @@ function MatchEditor({
     try {
       const result = await saveMatchDurably(matchData)
       setSaveStatus(result.mirrorSaved ? 'Saved' : 'Saved locally · mirror pending')
-      onReplace({ name: 'match', id: draftId })
+      onComplete({ name: 'match', id: draftId })
       return true
     } catch (error) {
       // Keep the in-memory editor and its draft intact. Navigation is allowed

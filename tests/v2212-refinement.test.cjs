@@ -8,7 +8,7 @@ for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module
 const { POSITION_FILTER_OPTIONS } = require('../src/components/PositionFilter.tsx')
 const { PositionFilter } = require('../src/components/PositionFilter.tsx')
 const { restoreScrollWhenReachable } = require('../src/lib/scrollRestoration.ts')
-const { createNavigationEntry, popNavigationEntry, teamDetailBackEntries } = require('../src/lib/navigation.ts')
+const { backFromTeamDetailEntries, createNavigationEntry, popNavigationEntry } = require('../src/lib/navigation.ts')
 const { presentMatchChanges } = require('../src/lib/matchChangePresentation.ts')
 const { buildGlobalRankingData } = require('../src/engine/stats.ts')
 
@@ -69,16 +69,17 @@ test('root scroll restoration survives a delayed layout beyond the first eight f
   cancel()
 })
 
-test('Team Detail page Back resets to Teams while drill-down pop and Match Back to Team stay distinct', () => {
+test('Team Detail page Back restores its browse source while orphan Team Detail falls back to Teams', () => {
   const team = createNavigationEntry({ name: 'team', id: 'A' }, undefined, 640)
   const player = createNavigationEntry({ name: 'player', id: 'p1' })
   assert.deepEqual(popNavigationEntry([team, player]), [team])
-  assert.deepEqual(teamDetailBackEntries(), [createNavigationEntry({ name: 'teams' })])
+  assert.deepEqual(backFromTeamDetailEntries([createNavigationEntry({ name: 'global-ranking' }), team]), [createNavigationEntry({ name: 'global-ranking' })])
+  assert.deepEqual(backFromTeamDetailEntries([team]), [createNavigationEntry({ name: 'teams' })])
   const app = fs.readFileSync(require.resolve('../src/App.tsx'), 'utf8')
   const teamScreen = fs.readFileSync(require.resolve('../src/screens/TeamDetailScreen.tsx'), 'utf8')
   const match = fs.readFileSync(require.resolve('../src/screens/MatchDetailScreen.tsx'), 'utf8')
-  assert.match(app, /onBackToTeams/)
-  assert.match(teamScreen, /onClick=\{onBackToTeams\}/)
+  assert.match(app, /onTeamDetailBack/)
+  assert.match(teamScreen, /onClick=\{onBack\}/)
   assert.match(match, /onBackToTeam\(teamId\)/)
 })
 

@@ -35,7 +35,7 @@ import { BootstrapShell, StartupRecovery } from './components/StartupBoundary'
 import { emptyFilters, type RankingFilters } from './screens/RankingFilters'
 import { appContentOverflowClass } from './lib/routeLayout'
 import { loadLocalModePreference, saveLocalModePreference } from './lib/localMode'
-import { createNavigationEntry, popNavigationEntry, pushNavigationEntry, replaceNavigationEntry, resetNavigationEntries, sameTeamBackTarget, teamDetailBackEntries, updateCurrentScreenState } from './lib/navigation'
+import { backFromTeamDetailEntries, closeTransientWorkflow, createNavigationEntry, enterTransientWorkflow, navigateBrowseEntry, popNavigationEntry, replaceNavigationEntry, resetNavigationEntries, updateCurrentScreenState } from './lib/navigation'
 import { restoreScrollWhenReachable } from './lib/scrollRestoration'
 import { resetCompetitionTypeScroll } from './lib/competitionTypeScroll'
 
@@ -120,7 +120,9 @@ export default function App() {
 
   function onNavigate(next: View) {
     restoreScroll.current = true
-    setHistory((prev) => pushNavigationEntry(prev, next, scrollRef.current?.scrollTop ?? 0))
+    setHistory((prev) => next.name === 'new-match' || next.name === 'edit-match'
+      ? enterTransientWorkflow(prev, next, scrollRef.current?.scrollTop ?? 0)
+      : navigateBrowseEntry(prev, next, scrollRef.current?.scrollTop ?? 0))
   }
 
   function onBack() {
@@ -128,9 +130,19 @@ export default function App() {
     setHistory(popNavigationEntry)
   }
 
-  function onBackToTeams() {
+  function onTeamDetailBack() {
     restoreScroll.current = true
-    setHistory(teamDetailBackEntries())
+    setHistory(backFromTeamDetailEntries)
+  }
+
+  function onCloseTransientWorkflow() {
+    restoreScroll.current = true
+    setHistory(prev => closeTransientWorkflow(prev, { name: 'home' }))
+  }
+
+  function onCompleteTransientWorkflow(next: View) {
+    restoreScroll.current = true
+    setHistory(prev => closeTransientWorkflow(prev, next))
   }
 
   function onReplace(next: View) {
@@ -154,10 +166,7 @@ export default function App() {
 
   function onBackToTeam(teamId: string) {
     restoreScroll.current = true
-    setHistory(prev => {
-      const target = sameTeamBackTarget(prev, teamId)
-      return target.action === 'pop' ? popNavigationEntry(prev) : replaceNavigationEntry(prev, target.entry.view, target.entry.screenState)
-    })
+    setHistory(prev => navigateBrowseEntry(prev, { name: 'team', id: teamId }, scrollRef.current?.scrollTop ?? 0))
   }
 
   function dismissPlayerEdit(playerId: string) {
@@ -195,7 +204,7 @@ export default function App() {
           {view.name === 'comparison' && <ComparisonScreen season={view.season ?? season} screenState={entry.screenState as ScreenStateByView['comparison']} onStateChange={onStateChange} onNavigate={onNavigate} />}
 
           {view.name === 'teams' && <TeamsScreen season={season} onNavigate={onNavigate} />}
-          {view.name === 'team' && <TeamDetailScreen teamId={view.id} season={season} screenState={entry.screenState as ScreenStateByView['team']} onStateChange={onStateChange} onNavigate={onNavigate} onBackToTeams={onBackToTeams} />}
+          {view.name === 'team' && <TeamDetailScreen teamId={view.id} season={season} screenState={entry.screenState as ScreenStateByView['team']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onTeamDetailBack} />}
           {view.name === 'import-squad' && <SquadImportScreen teamId={view.teamId} onBack={onBack} />}
           {view.name === 'players' && <PlayersScreen screenState={entry.screenState as ScreenStateByView['players']} onStateChange={onStateChange} onNavigate={onNavigate} appliedFilters={playerFilters} onFiltersChange={setPlayerFilters} />}
 
@@ -203,9 +212,9 @@ export default function App() {
             <PlayerDetailScreen playerId={view.id} season={season} screenState={entry.screenState as ScreenStateByView['player']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} />
           )}
           {view.name === 'match' && <MatchDetailScreen matchId={view.id} screenState={entry.screenState as ScreenStateByView['match']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} onBackToTeam={onBackToTeam} onReplace={onReplace} />}
-          {view.name === 'edit-match' && <EditMatchScreen matchId={view.id} onReplace={onReplace} onBack={onBack} />}
+          {view.name === 'edit-match' && <EditMatchScreen matchId={view.id} onReplace={onReplace} onBack={onCloseTransientWorkflow} onComplete={onCompleteTransientWorkflow} />}
           {view.name === 'new-match' && (
-            <NewMatchScreen teamId={view.teamId} requestedSeason={view.season} competitionType={view.competitionType} resumeDraft={view.resumeDraft} onReplace={onReplace} onBack={onBack} />
+            <NewMatchScreen teamId={view.teamId} requestedSeason={view.season} competitionType={view.competitionType} resumeDraft={view.resumeDraft} onReplace={onReplace} onBack={onCloseTransientWorkflow} onComplete={onCompleteTransientWorkflow} />
           )}
           {view.name === 'new-player' && (
             <NewPlayerScreen teamId={view.teamId} onReplace={onReplace} onBack={onBack} />
