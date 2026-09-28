@@ -67,10 +67,10 @@ test('one completion helper gates monthly finalization across partial MD3 and MD
   assert.equal(fullSix.latestMonthlyAwards.block.id, 2)
 })
 
-test('monthly eligibility uses ceil(50%), counts a stoppage-only appearance, and has no table bonus', () => {
+test('monthly eligibility uses ceil(40%), counts a stoppage-only appearance, and has no table bonus', () => {
   assert.equal(isAwardEligible(1, 3), false); assert.equal(isAwardEligible(2, 3), true); assert.equal(isAwardEligible(3, 3), true)
-  assert.equal(isAwardEligible(5, 11), false); assert.equal(isAwardEligible(6, 11), true)
-  assert.equal(isAwardEligible(2, 5), false); assert.equal(isAwardEligible(3, 5), true)
+  assert.equal(isAwardEligible(5, 11), true); assert.equal(isAwardEligible(4, 11), false)
+  assert.equal(isAwardEligible(2, 5), true); assert.equal(isAwardEligible(1, 5), false)
   assert.equal(monthlyAwardScore(7.42), 7.42)
   const p = player('late')
   const late = day => game(day, { duration: 95, appearances: [appearance(p, 'bench')], events: [{ id: `sub${day}`, type: 'sub', minute: 92, teamId: 'A', playerInId: p.id, playerOutId: 'out', position: 'ST' }] })
@@ -90,12 +90,12 @@ test('all award Best XIs share strict 4-3-3 families including tactical aliases'
   assert(xi.every(slot => slot.playerId)); assert.equal(new Set(xi.map(slot => slot.playerId)).size, 11)
 })
 
-test('League, Champions and Cup award bonuses and participation scaling are exact', () => {
-  assert.deepEqual(Array.from({ length: 16 }, (_, index) => leaguePositionBonus(index + 1)), [.15, .12, .10, .08, .05, .05, .02, .02, 0, 0, 0, 0, 0, 0, 0, 0])
-  assert.deepEqual(['roundOf16', 'quarterFinal', 'semiFinal', 'runnerUp', 'champion'].map(championsProgressBonus), [0, .07, .14, .22, .30])
-  assert.deepEqual(['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'stage6', 'stage7', 'runnerUp', 'champion'].map(cupProgressBonus), [0, .03, .06, .09, .12, .15, .18, .22, .30])
+test('League, Champions and Cup award bonuses are exact direct selection values', () => {
+  assert.deepEqual(Array.from({ length: 16 }, (_, index) => leaguePositionBonus(index + 1)), [.20, .08, .035, .025, .015, .015, .015, .015, 0, 0, 0, 0, 0, 0, 0, 0])
+  assert.deepEqual(['roundOf16', 'quarterFinal', 'semiFinal', 'runnerUp', 'champion'].map(championsProgressBonus), [0, .020, .035, .08, .20])
+  assert.deepEqual(['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'stage6', 'stage7', 'runnerUp', 'champion'].map(cupProgressBonus), [0, 0, 0, .015, .025, .030, .035, .08, .20])
   assert.equal(participationRatio(450, 10), .5); assert.equal(participationRatio(1000, 10), 1)
-  assert(Math.abs(ratingAwardScore(7.4, .3, 450, 10) - 7.55) < 1e-10)
+  assert(Math.abs(ratingAwardScore(7.4, .20, 450, 10) - 7.6) < 1e-10)
 })
 
 test('rank movement is snapshot-to-snapshot and neutral without a prior rank', () => {

@@ -1,13 +1,13 @@
 import type { Best11Slot, ChampionsStage, CompetitionState, CompetitionType, CupStage, Match, Player, Team } from '../types'
 import { competitionMatches, competitionSeasonStatus, type CompetitionSeasonStatus } from './competition'
-import { buildGlobalRankingData, unifiedBestEleven, type GlobalLeaderboardRow } from './stats'
-import { AWARD_433, isAwardEligible } from './awardRules'
+import { buildGlobalRankingData, type GlobalLeaderboardRow } from './stats'
+import { AWARD_433, isAwardEligible, rankAwardCandidates, seasonChampionsProgressBonus, seasonCupProgressBonus, seasonLeaguePositionBonus, selectAwardBestXI, type AwardCandidate } from './awardRules'
 import { scopedAwardFamilyByPlayer } from './positionScope'
 
 export { AWARD_433, awardPositionFamily, isAwardEligible } from './awardRules'
 
 export type AwardWinner = { playerId: string; value: number; label: string; awardScore?: number }
-export type CompetitionAwards = { complete: boolean; championId?: string; scorer?: AwardWinner; assists?: AwardWinner; mvp?: AwardWinner; goalkeeper?: AwardWinner; bestXI?: Best11Slot[] }
+export type CompetitionAwards = { complete: boolean; championId?: string; scorer?: AwardWinner; assists?: AwardWinner; mvp?: AwardWinner; goalkeeper?: AwardWinner; bestXI?: Best11Slot[]; candidates?: AwardCandidate[] }
 export type CompetitionAwardModels = Partial<Pick<CompetitionSeasonStatus, 'league' | 'cup' | 'champions'>>
 export type CanonicalAwardResult = {
   scopeLabel: string
@@ -30,18 +30,18 @@ export function monthlyCanonicalAwardResult(award: Pick<CanonicalAwardResult, 's
 }
 
 /**
- * The canonical competition-wide award read model.  Its Best XI keeps the
- * established scoped selection while player award ranking remains the existing
- * official awards selector.  Every consumer receives one shared result.
+ * One competition-wide selection source for Best Player and Best XI. A live
+ * result is display-only; official News remains gated by canonical champions.
  */
 export function competitionAwardResult(type: CompetitionType, season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], models?: CompetitionAwardModels): CanonicalAwardResult | undefined {
   const official = awardsForCompetition(type, season, teams, players, matches, states, models)
   const scope = competitionMatches(matches, season, type)
   const anchorMatch = scope.slice().sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0]
-  if (!official.complete || !official.mvp || !anchorMatch) return undefined
-  const xi = unifiedBestEleven(players, scope, season)
+  if (!official.mvp || !official.bestXI || !anchorMatch) return undefined
   const playerLabel = type === 'league' ? 'Player of the Season' : type === 'cup' ? 'Player of the Cup' : 'Player of the Tournament'
-  return { scopeLabel: season, playerLabel, teamLabel: competitionAwardLabel(type), bestPlayerId: official.mvp.playerId, bestXI: xi.slots, statsByPlayer: xi.statsByPlayer, anchorMatch }
+  const selected = official.bestXI.flatMap(slot => slot.playerId ? [official.candidates?.find(candidate => candidate.playerId === slot.playerId && candidate.teamId === slot.teamId)] : [])
+  const statsByPlayer = Object.fromEntries(selected.flatMap(candidate => candidate ? [[candidate.playerId, { goals: candidate.goals, assists: candidate.assists, avgRating: candidate.average }]] : []))
+  return { scopeLabel: season, playerLabel, teamLabel: competitionAwardLabel(type), bestPlayerId: official.mvp.playerId, bestXI: official.bestXI, statsByPlayer, anchorMatch }
 }
 
 const rawAverage = (row: GlobalLeaderboardRow) => row.ratings.length ? row.ratings.reduce((sum, rating) => sum + rating.raw, 0) / row.ratings.length : 0
@@ -53,26 +53,26 @@ const winner = (rows: GlobalLeaderboardRow[], measure: (row: GlobalLeaderboardRo
 }
 
 export function leaguePositionBonus(rank: number): number {
-  return rank === 1 ? .15 : rank === 2 ? .12 : rank === 3 ? .10 : rank === 4 ? .08 : rank <= 6 ? .05 : rank <= 8 ? .02 : 0
+  return rank === 1 ? .20 : rank === 2 ? .08 : rank === 3 ? .035 : rank === 4 ? .025 : rank <= 8 ? .015 : 0
 }
 
 export function championsProgressBonus(stage: ChampionsStage | 'champion' | 'runnerUp'): number {
-  return stage === 'champion' ? .30 : stage === 'runnerUp' || stage === 'final' || stage === 'finalReplay' ? .22 : stage === 'semiFinal' ? .14 : stage === 'quarterFinal' ? .07 : 0
+  return stage === 'champion' ? .20 : stage === 'runnerUp' ? .08 : stage === 'semiFinal' ? .035 : stage === 'quarterFinal' ? .020 : 0
 }
 
 export function cupProgressBonus(stage: CupStage | 'champion' | 'runnerUp'): number {
-  if (stage === 'champion') return .30
-  if (stage === 'runnerUp' || stage === 'final' || stage === 'finalReplay') return .22
+  if (stage === 'champion') return .20
+  if (stage === 'runnerUp') return .08
   const number = Number(stage.replace('stage', ''))
-  return Number.isFinite(number) ? [0, 0, .03, .06, .09, .12, .15, .18][number] ?? 0 : 0
+  return Number.isFinite(number) ? [0, 0, 0, 0, .015, .025, .030, .035][number] ?? 0 : 0
 }
 
 export function participationRatio(minutes: number, teamMatches: number): number {
   return Math.max(0, Math.min(1, teamMatches ? minutes / (teamMatches * 90) : 0))
 }
 
-export function ratingAwardScore(avgRating: number, progressBonus: number, minutes: number, teamMatches: number): number {
-  return avgRating + progressBonus * participationRatio(minutes, teamMatches)
+export function ratingAwardScore(avgRating: number, progressBonus: number, _minutes: number, _teamMatches: number): number {
+  return avgRating + progressBonus
 }
 
 export function buildAwardBestXI(players: Player[], ranked: { row: GlobalLeaderboardRow; score: number }[], matches: Match[]): Best11Slot[] {
@@ -87,6 +87,30 @@ export function buildAwardBestXI(players: Player[], ranked: { row: GlobalLeaderb
 }
 
 function teamIdFor(row: GlobalLeaderboardRow) { return row.historicalTeamId ?? row.teamId }
+function matchPlayedByTeam(match: Match, teamId: string) { return match.teamId === teamId || match.homeTeamId === teamId || match.awayTeamId === teamId }
+
+type ScoredAwardCandidate = { row: GlobalLeaderboardRow; candidate: AwardCandidate }
+
+function scoredCandidatesForScope(players: Player[], games: Match[], bonusFor: (teamId: string) => number, mode: 'cumulative' | 'monthly' = 'cumulative'): ScoredAwardCandidate[] {
+  const teamIds = [...new Set(games.flatMap(match => match.appearances.map(appearance => appearance.teamId)))]
+  const candidates = teamIds.flatMap(teamId => {
+    const teamMatches = games.filter(match => matchPlayedByTeam(match, teamId)).length
+    const families = scopedAwardFamilyByPlayer(players, games, { teams: [teamId] })
+    return buildGlobalRankingData(players, games, { seasons: [], teams: [teamId], positions: [] }, 'rating').flatMap(row => {
+      const family = families.get(row.playerId)
+      if (!isAwardEligible(appearances(row), teamMatches)) return []
+      const average = rawAverage(row)
+      return [{ row, candidate: { playerId: row.playerId, teamId, family, average, appearances: appearances(row), mom: row.mom, minutes: row.minutes, latestRating: row.ratings[row.ratings.length - 1]?.raw ?? 0, goals: row.goals, assists: row.assists, selectionScore: ratingAwardScore(average, bonusFor(teamId), row.minutes, teamMatches) } }]
+    })
+  })
+  const order = rankAwardCandidates(candidates.map(item => item.candidate), mode)
+  return order.map(candidate => candidates.find(item => item.candidate === candidate)!)
+}
+
+/** Shared derived selection input for zero-bonus cumulative award scopes. */
+export function awardCandidatesForScope(players: Player[], games: Match[], mode: 'cumulative' | 'monthly' = 'cumulative'): AwardCandidate[] {
+  return scoredCandidatesForScope(players, games, () => 0, mode).map(item => item.candidate)
+}
 
 const goalkeeperRatings = (row: GlobalLeaderboardRow) => row.ratings.filter(rating => rating.position === 'GK')
 const goalkeeperMinutes = (row: GlobalLeaderboardRow) => goalkeeperRatings(row).reduce((total, rating) => total + rating.minutes, 0)
@@ -133,46 +157,60 @@ export function awardsForCompetition(type: CompetitionType, season: string, team
   const champions = models?.champions ?? fallbackStatus?.champions
   const complete = type === 'league' ? Boolean(league?.complete) : type === 'cup' ? Boolean(cup?.championId) : Boolean(champions?.championId)
   const championId = type === 'league' ? league?.championId : type === 'cup' ? cup?.championId : champions?.championId
-  if (!complete) return { complete, championId }
   const bonusFor = (teamId: string) => {
     if (type === 'league') return leaguePositionBonus(league?.standings.find(row => row.teamId === teamId)?.rank ?? 99)
     if (type === 'cup') {
       if (cup?.championId === teamId) return cupProgressBonus('champion')
       if (cup?.runnerUpId === teamId) return cupProgressBonus('runnerUp')
-      const eliminated = cup?.eliminatedAtByTeam[teamId] ?? 1
-      return cupProgressBonus(`stage${Math.max(1, Math.min(7, eliminated))}` as CupStage)
+      const eliminated = cup?.eliminatedAtByTeam[teamId]
+      if (eliminated) return cupProgressBonus(`stage${Math.max(1, Math.min(7, eliminated))}` as CupStage)
+      if (!cup?.activeTeamIds.includes(teamId)) return 0
+      const stage = cup.stage
+      return stage === 'final' || stage === 'finalReplay' ? cupProgressBonus('stage7') : stage ? cupProgressBonus(stage) : 0
     }
     if (champions?.championId === teamId) return championsProgressBonus('champion')
     const final = champions?.rounds.final[0]
-    if (final?.teamIds.includes(teamId)) return championsProgressBonus('runnerUp')
-    const eliminated = (['semiFinal', 'quarterFinal', 'roundOf16'] as const).find(stage => champions?.rounds[stage].some(pair => pair.teamIds.includes(teamId) && pair.winnerId !== teamId)) ?? 'roundOf16'
-    return championsProgressBonus(eliminated)
+    if (champions?.runnerUpId === teamId) return championsProgressBonus('runnerUp')
+    const eliminated = (['semiFinal', 'quarterFinal', 'roundOf16'] as const).find(stage => champions?.rounds[stage].some(pair => pair.teamIds.includes(teamId) && pair.winnerId && pair.winnerId !== teamId))
+    if (eliminated) return championsProgressBonus(eliminated)
+    if (!final?.teamIds.includes(teamId) && !champions?.rounds.roundOf16.some(pair => pair.teamIds.includes(teamId))) return 0
+    const stage = champions?.currentStage
+    return championsProgressBonus(stage === 'final' || stage === 'finalReplay' ? 'semiFinal' : stage ?? 'roundOf16')
   }
-  const eligible = stats.flatMap(row => {
-    const teamId = teamIdFor(row)
-    const teamGames = games.filter(match => match.teamId ? match.teamId === teamId : match.homeTeamId === teamId || match.awayTeamId === teamId).length
-    if (!isAwardEligible(appearances(row), teamGames)) return []
-    const average = rawAverage(row)
-    return [{ row, score: ratingAwardScore(average, bonusFor(teamId), row.minutes, teamGames) }]
-  }).sort((a, b) => b.score - a.score || rawAverage(b.row) - rawAverage(a.row) || appearances(b.row) - appearances(a.row) || b.row.minutes - a.row.minutes || a.row.playerId.localeCompare(b.row.playerId))
+  const scored = scoredCandidatesForScope(players, games, bonusFor)
+  const eligible = scored.map(item => ({ row: item.row, score: item.candidate.selectionScore }))
   const best = eligible[0]
   const mvp = best ? { playerId: best.row.playerId, value: rawAverage(best.row), awardScore: best.score, label: 'Avg Rating' } : undefined
   const goalkeeperLabel = type === 'league' ? 'Goalkeeper of the Season' : type === 'cup' ? 'Goalkeeper of the Cup' : 'Goalkeeper of the Tournament'
   const goalkeeperEligible = eligible.map(candidate => ({ ...candidate, score: ratingAwardScore(goalkeeperAverage(candidate.row), bonusFor(teamIdFor(candidate.row)), goalkeeperMinutes(candidate.row), games.filter(match => match.teamId ? match.teamId === teamIdFor(candidate.row) : match.homeTeamId === teamIdFor(candidate.row) || match.awayTeamId === teamIdFor(candidate.row)).length) }))
-  return { complete, championId, scorer: winner(stats, row => row.goals, 'Goals'), assists: winner(stats, row => row.assists, 'Assists'), mvp, goalkeeper: goalkeeperWinner(goalkeeperEligible, goalkeeperLabel), bestXI: buildAwardBestXI(players, eligible, games) }
+  return { complete, championId, scorer: winner(stats, row => row.goals, 'Goals'), assists: winner(stats, row => row.assists, 'Assists'), mvp, goalkeeper: goalkeeperWinner(goalkeeperEligible, goalkeeperLabel), bestXI: selectAwardBestXI(scored.map(item => item.candidate)), candidates: scored.map(item => item.candidate) }
 }
 
 export function seasonAwards(season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[]) {
   const status = competitionSeasonStatus(teams, matches, season, players, states.find(state => state.kind === 'champions-draw' && state.season === season))
   const complete = status.complete
-  if (!complete) return { complete }
-  const stats = buildGlobalRankingData(players, matches.filter(match => match.season === season), { seasons: [season], teams: [], positions: [] }, 'rating')
-  const eligible = stats.filter(row => {
-    const teamId = teamIdFor(row)
-    const teamMatches = matches.filter(match => match.season === season && (match.teamId ? match.teamId === teamId : match.homeTeamId === teamId || match.awayTeamId === teamId)).length
-    return isAwardEligible(appearances(row), teamMatches)
-  }).sort((a, b) => rawAverage(b) - rawAverage(a) || appearances(b) - appearances(a) || b.minutes - a.minutes || a.playerId.localeCompare(b.playerId))
-  const ballon = eligible[0] ? { playerId: eligible[0].playerId, value: rawAverage(eligible[0]), label: 'Avg Rating' } : undefined
+  const games = matches.filter(match => match.season === season)
+  const stats = buildGlobalRankingData(players, games, { seasons: [season], teams: [], positions: [] }, 'rating')
+  const championsRounds = status.champions.rounds ?? { roundOf16: [], quarterFinal: [], semiFinal: [], final: [] }
+  const bonusFor = (teamId: string) => {
+    const league = seasonLeaguePositionBonus(status.league.standings.find(row => row.teamId === teamId)?.rank ?? 99)
+    const cup = status.cup.championId === teamId ? seasonCupProgressBonus('champion')
+      : status.cup.runnerUpId === teamId ? seasonCupProgressBonus('runnerUp')
+        : status.cup.eliminatedAtByTeam[teamId] ? seasonCupProgressBonus(`stage${Math.max(1, Math.min(7, status.cup.eliminatedAtByTeam[teamId]))}` as CupStage)
+          : !status.cup.activeTeamIds.includes(teamId) ? 0
+            : status.cup.stage === 'final' || status.cup.stage === 'finalReplay' ? seasonCupProgressBonus('stage7')
+              : seasonCupProgressBonus(status.cup.stage)
+    const eliminated = (['semiFinal', 'quarterFinal', 'roundOf16'] as const).find(stage => championsRounds[stage].some(pair => pair.teamIds.includes(teamId) && pair.winnerId && pair.winnerId !== teamId))
+    const champions = status.champions.championId === teamId ? seasonChampionsProgressBonus('champion')
+      : status.champions.runnerUpId === teamId ? seasonChampionsProgressBonus('runnerUp')
+        : eliminated ? seasonChampionsProgressBonus(eliminated)
+          : championsRounds.roundOf16.some(pair => pair.teamIds.includes(teamId)) ? seasonChampionsProgressBonus(status.champions.currentStage === 'final' || status.champions.currentStage === 'finalReplay' ? 'semiFinal' : status.champions.currentStage ?? 'roundOf16')
+            : 0
+    return league + cup + champions
+  }
+  const scored = scoredCandidatesForScope(players, games, bonusFor)
+  const best = scored[0]?.candidate
+  const ballon = best ? { playerId: best.playerId, value: best.average, awardScore: best.selectionScore, label: 'Avg Rating' } : undefined
   const goldenGlove = stats.filter(row => row.playedGoalkeeper).slice().sort((a, b) =>
     goalkeeperCleanSheets(b) - goalkeeperCleanSheets(a) ||
     goalkeeperCleanSheets(b) / Math.max(1, goalkeeperRatings(b).length) - goalkeeperCleanSheets(a) / Math.max(1, goalkeeperRatings(a).length) ||
@@ -182,5 +220,5 @@ export function seasonAwards(season: string, teams: Team[], players: Player[], m
     goalkeeperMinutes(b) - goalkeeperMinutes(a) ||
     a.playerId.localeCompare(b.playerId),
   )[0]
-  return { complete, goldenBoot: winner(stats, row => row.goals, 'Goals'), assistLeader: winner(stats, row => row.assists, 'Assists'), ballon, goldenGlove: goldenGlove ? { playerId: goldenGlove.playerId, value: goalkeeperCleanSheets(goldenGlove), label: 'Golden Glove' } : undefined }
+  return { complete, goldenBoot: winner(stats, row => row.goals, 'Goals'), assistLeader: winner(stats, row => row.assists, 'Assists'), ballon, bestXI: selectAwardBestXI(scored.map(item => item.candidate)), candidates: scored.map(item => item.candidate), goldenGlove: goldenGlove ? { playerId: goldenGlove.playerId, value: goalkeeperCleanSheets(goldenGlove), label: 'Golden Glove' } : undefined }
 }

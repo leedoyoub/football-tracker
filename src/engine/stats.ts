@@ -18,6 +18,7 @@ import { positionFamily, scopedAwardFamilyByPlayer, scopedPositionFamilyByPlayer
 import { matchCompetitionType } from './competitionContext'
 import { GOOD_RATING_THRESHOLD } from './constants'
 import { opponentSot } from './opponentSot'
+import { isAwardEligible, rankAwardCandidates, selectAwardBestXI, type AwardCandidate } from './awardRules'
 
 
 export function seasonsFromMatches(matches: Match[]): string[] {
@@ -544,28 +545,7 @@ const FORMATION_433: { slot: string; position: Position; pool: Position[] }[] = 
   { slot: 'RW', position: 'RW', pool: ['RW', 'RM', 'ST'] },
 ]
 
-const UNIFIED_433: { slot: string; position: Position; group: Position[]; fallback?: Position[] }[] = [
-  { slot: 'GK', position: 'GK', group: ['GK'] },
-  { slot: 'LB', position: 'LB', group: ['LB', 'LWB'] },
-  { slot: 'LCB', position: 'CB', group: ['CB', 'LCB', 'RCB'] },
-  { slot: 'RCB', position: 'CB', group: ['CB', 'LCB', 'RCB'] },
-  { slot: 'RB', position: 'RB', group: ['RB', 'RWB'] },
-  { slot: 'LCM', position: 'CM', group: ['CDM', 'LDM', 'RDM', 'CM', 'LCM', 'RCM', 'CAM', 'LM', 'RM'] },
-  { slot: 'CM', position: 'CM', group: ['CDM', 'LDM', 'RDM', 'CM', 'LCM', 'RCM', 'CAM', 'LM', 'RM'] },
-  { slot: 'RCM', position: 'CM', group: ['CDM', 'LDM', 'RDM', 'CM', 'LCM', 'RCM', 'CAM', 'LM', 'RM'] },
-  { slot: 'LW', position: 'LW', group: ['ST', 'LST', 'RST', 'SS', 'LW', 'RW'] },
-  { slot: 'ST', position: 'ST', group: ['ST', 'LST', 'RST', 'SS', 'LW', 'RW'] },
-  { slot: 'RW', position: 'RW', group: ['ST', 'LST', 'RST', 'SS', 'LW', 'RW'] },
-]
-
-type UnifiedCandidate = {
-  player: Player
-  teamId?: string
-  awardFamily?: import('./awardRules').AwardPositionFamily
-  average: number
-  matches: number
-  latestRating: number
-}
+type UnifiedCandidate = AwardCandidate
 
 type SeasonParticipation = {
   match: Match
@@ -584,13 +564,9 @@ function actuallyPlayed(match: Match, playerId: string): boolean {
   return Boolean(appearance && hasPitchAppearance(match, appearance))
 }
 
-function candidateOrder(a: UnifiedCandidate, b: UnifiedCandidate): number {
-  return b.average - a.average || b.matches - a.matches || b.latestRating - a.latestRating || (a.player.displayName ?? a.player.name).localeCompare(b.player.displayName ?? b.player.name) || a.player.id.localeCompare(b.player.id)
-}
-
 function unifiedCandidates(players: Player[], matches: Match[], season: string, recentOnly: boolean): UnifiedCandidate[] {
   const seasonMatches = matches.filter((match) => match.season === season)
-  return players.flatMap((player) => {
+  const candidates = players.flatMap((player) => {
     const participations: SeasonParticipation[] = seasonMatches.flatMap((match) => {
       const appearance = match.appearances.find((item) => item.playerId === player.id)
       return appearance && actuallyPlayed(match, player.id)
@@ -602,16 +578,25 @@ function unifiedCandidates(players: Player[], matches: Match[], season: string, 
     const teamIds = [...new Set(orderedParticipations.map((item) => item.teamId))]
     return teamIds.flatMap((teamId) => {
       const teamParticipations = orderedParticipations.filter((item) => item.teamId === teamId)
-      const ratings = teamParticipations.flatMap((item) => item.rating ? [item.rating] : [])
-      const selectedRatings = recentOnly ? ratings.slice(0, 3) : ratings
       const selectedParticipations = recentOnly ? teamParticipations.slice(0, 3) : teamParticipations
+      const selectedRatings = selectedParticipations.flatMap(item => item.rating ? [item.rating] : [])
       const completed = seasonMatches.filter((match) => matchRecordedForTeam(match, teamId)).length
-      const eligible = teamParticipations.length >= Math.ceil(completed * 0.5)
+      const eligible = isAwardEligible(teamParticipations.length, completed)
       if ((recentOnly && selectedRatings.length < 3) || (!recentOnly && !eligible)) return []
       const awardFamily = scopedAwardFamilyByPlayer([player], selectedParticipations.map(item => item.match), { teams: [teamId] }).get(player.id)
-      return [{ player, teamId, awardFamily, average: selectedRatings.reduce((sum, row) => sum + row.raw, 0) / selectedRatings.length, matches: selectedRatings.length, latestRating: selectedRatings[0]?.raw ?? 0 }]
+      if (!awardFamily) return []
+      const performance = selectedParticipations.reduce((total, item) => {
+        const appearance = item.match.appearances.find(row => row.playerId === player.id && row.teamId === teamId)
+        if (!appearance) return total
+        const goals = item.match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.playerId === player.id && isOnPitchAtEvent(item.match, appearance, event)).length
+        const assists = item.match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id && isOnPitchAtEvent(item.match, appearance, event)).length
+        return { goals: total.goals + goals, assists: total.assists + assists, mom: total.mom + Number(getMatchManOfTheMatch(item.match, players) === player.id) }
+      }, { goals: 0, assists: 0, mom: 0 })
+      const average = selectedRatings.reduce((sum, row) => sum + row.raw, 0) / selectedRatings.length
+      return [{ playerId: player.id, teamId, family: awardFamily, average, appearances: selectedRatings.length, mom: performance.mom, minutes: selectedRatings.reduce((sum, row) => sum + row.minutes, 0), latestRating: selectedRatings[0]?.raw ?? 0, goals: performance.goals, assists: performance.assists, selectionScore: average }]
     })
-  }).filter((candidate) => candidate.matches > 0).sort(candidateOrder)
+  }).filter((candidate) => candidate.appearances > 0)
+  return rankAwardCandidates(candidates, recentOnly ? 'recent' : 'cumulative') as UnifiedCandidate[]
 }
 
 type UnifiedBestEleven = { slots: Best11Slot[]; statsByPlayer: Record<string, { goals: number; assists: number }> }
@@ -631,15 +616,7 @@ export function unifiedBestEleven(
   const cached = byScope.get(cacheKey)
   if (cached) return cached
   const candidates = unifiedCandidates(players, matches, season, recentOnly)
-  const used = new Set<string>()
-  const familyForRole = (slot: string) => slot === 'GK' ? 'GK' : slot === 'LB' ? 'LB' : slot === 'RB' ? 'RB' : slot === 'LCB' || slot === 'RCB' ? 'CB' : ['LCM', 'CM', 'RCM'].includes(slot) ? 'MID' : 'ATT'
-  const pick = (slot: string): UnifiedCandidate | undefined => candidates.find(candidate => !used.has(candidate.player.id) && candidate.awardFamily === familyForRole(slot))
-  const slots = UNIFIED_433.map((role) => {
-    const candidate = pick(role.slot)
-    if (!candidate) return { slot: role.slot, position: role.position, playerId: null, avgRating: 0, matches: 0 }
-    used.add(candidate.player.id)
-    return { slot: role.slot, position: role.position, playerId: candidate.player.id, teamId: candidate.teamId, avgRating: candidate.average, matches: candidate.matches }
-  })
+  const slots = selectAwardBestXI(candidates)
   const statsByPlayer = Object.fromEntries(players.map((player) => {
     const stats = playerSeasonStats(player, players, matches, season)
     return [player.id, { goals: stats.goals, assists: stats.assists }]

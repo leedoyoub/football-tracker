@@ -86,7 +86,8 @@ export function historyAwardsForSeason(teams: Team[], players: Player[], matches
   const seasonal = seasonAwards(season, tournamentTeams, players, matches, states)
   const result = types.map(competition => {
     const award = awardsForCompetition(competition, season, tournamentTeams, players, matches, states)
-    return { season, competition, player: award.mvp, goalkeeper: award.goalkeeper, goldenGlove: competition === 'league' ? seasonal.goldenGlove : undefined }
+    const published = award.complete ? award : undefined
+    return { season, competition, player: published?.mvp, goalkeeper: published?.goalkeeper, goldenGlove: competition === 'league' && seasonal.complete ? seasonal.goldenGlove : undefined }
   })
   cached.set(key, result)
   return result

@@ -7,8 +7,8 @@ import { getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, ratePlayerMatch } 
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { compareStandings, type Standing } from './standings'
 import type { LeaderboardMetric } from './stats'
-import { AWARD_433, isAwardEligible, monthlyAwardScore } from './awardRules'
-import { scopedAwardFamilyByPlayer } from './positionScope'
+import { selectAwardBestXI } from './awardRules'
+import { awardCandidatesForScope } from './awards'
 
 export type RankMovement = number | null
 export type RankedStanding = Standing & { movement: RankMovement }
@@ -176,32 +176,17 @@ function buildPlayerSnapshots(players: Player[], teams: Team[], games: Match[]):
   return result
 }
 
-function monthlyAwardsFor(block: MonthlyBlock, teams: Team[], players: Player[], games: Match[], finalized: boolean): MonthlyAwards {
+function monthlyAwardsFor(block: MonthlyBlock, _teams: Team[], players: Player[], games: Match[], finalized: boolean): MonthlyAwards {
   const selected = games.filter(match => match.matchDay >= block.startMatchDay && match.matchDay <= block.endMatchDay)
-  const snapshot = buildPlayerSnapshots(players, teams, selected)
-  const snapshots = [...snapshot.values()]
-  const last = snapshots[snapshots.length - 1]
-  const teamCounts = new Map<string, number>()
-  const registered = new Set(teams.map(team => team.id))
-  for (const match of selected) for (const teamId of recordedTeams(match, registered)) teamCounts.set(teamId, (teamCounts.get(teamId) ?? 0) + 1)
-  const rows = [...(last?.rows.get('rating') ?? [])].filter(row => isAwardEligible(row.appearances, teamCounts.get(row.teamId) ?? 0))
-  const ordered = rows.slice().sort((a, b) => monthlyAwardScore(b.avgRating) - monthlyAwardScore(a.avgRating) || b.mom - a.mom || (b.goals + b.assists) - (a.goals + a.assists) || b.minutes - a.minutes || a.playerId.localeCompare(b.playerId))
-  const historicalFamilies = scopedAwardFamilyByPlayer(players, selected, {})
-  const used = new Set<string>()
-  const slots = AWARD_433.map(role => {
-    const pool = ordered.filter(row => historicalFamilies.get(row.playerId) === role.family)
-    const candidate = pool.find(row => !used.has(row.playerId))
-    if (!candidate) return { slot: role.slot, position: role.position, playerId: null, avgRating: 0, matches: 0 }
-    used.add(candidate.playerId)
-    return { slot: role.slot, position: role.position, playerId: candidate.playerId, teamId: candidate.teamId, avgRating: candidate.avgRating, matches: candidate.appearances }
-  })
+  const candidates = awardCandidatesForScope(players, selected, 'monthly')
+  const ordered = candidates.map(candidate => ({ playerId: candidate.playerId, teamId: candidate.teamId, appearances: candidate.appearances, minutes: candidate.minutes, goals: candidate.goals, assists: candidate.assists, mom: candidate.mom, goodMatches: 0, ratingTotal: candidate.average * candidate.appearances, avgRating: candidate.average }))
   return {
     block,
     scopeLabel: canonicalBlockLabel(games[0]?.season ?? 'Season', block.id),
     finalized,
     playerOfMonth: ordered[0],
     bestPlayerId: ordered[0]?.playerId,
-    bestXI: slots,
+    bestXI: selectAwardBestXI(candidates),
     statsByPlayer: Object.fromEntries(ordered.map(row => [row.playerId, { goals: row.goals, assists: row.assists, avgRating: row.avgRating }])),
   }
 }
