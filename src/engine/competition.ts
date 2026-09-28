@@ -598,11 +598,11 @@ export function compactTeamCompetitionProgressMap(teamIds: Iterable<string>, sta
 
 export type TeamCompetitionOverview = {
   league: Standing
-  champions: { status: string; goalsFor: number; goalsAgainst: number }
-  cup: { status: string; goalsFor: number; goalsAgainst: number }
+  champions: { status: string; wins: number; draws: number; losses: number; goalsFor: number; goalsAgainst: number }
+  cup: { status: string; wins: number; draws: number; losses: number; goalsFor: number; goalsAgainst: number }
 }
 
-const championsRoundLabel = (stage: ChampionsStage) => ({ roundOf16: 'Round of 16', quarterFinal: 'Quarter-finals', semiFinal: 'Semi-finals', final: 'Final', finalReplay: 'Final Replay' } as Record<ChampionsStage, string>)[stage]
+const championsRoundLabel = (stage: ChampionsStage) => ({ roundOf16: 'Round of 16', quarterFinal: 'Quarter Final', semiFinal: 'Semi Final', final: 'Final', finalReplay: 'Final Replay' } as Record<ChampionsStage, string>)[stage]
 const cupStageLabel = (stage: CupStage) => stage === 'final' ? 'Final' : stage === 'finalReplay' ? 'Final Replay' : `Stage ${stage.replace('stage', '')}`
 
 /** Actual recorded competition scores from the tracked team's perspective.
@@ -616,12 +616,19 @@ export function teamCompetitionGoals(teamId: string, matches: Match[], season: s
   }, { goalsFor: 0, goalsAgainst: 0 })
 }
 
+/** Canonical full-competition record for Team Detail; presentation never re-filters matches. */
+function teamCompetitionRecord(teamId: string, teams: Team[], matches: Match[], season: string, type: CompetitionType): Pick<Standing, 'wins' | 'draws' | 'losses'> {
+  const standing = seasonStandings(teams, competitionMatches(matches, season, type), season).find(row => row.teamId === teamId)
+  return standing ?? emptyStanding(teamId)
+}
+
 /** Canonical compact competition data shared by Team Detail consumers. */
 export function teamCompetitionOverview(teamId: string, teams: Team[], matches: Match[], season: string, players: Player[], states: CompetitionState[] = []): TeamCompetitionOverview {
   const draw = states.find(state => state.id === `champions:${season}` && state.kind === 'champions-draw')
   const league = leagueCompetition(teams, matches, season, players).standings.find(row => row.teamId === teamId) ?? emptyStanding(teamId)
   const cup = cupCompetition(teams, matches, season, players)
   const cupGoals = teamCompetitionGoals(teamId, matches, season, 'cup')
+  const cupRecord = teamCompetitionRecord(teamId, teams, matches, season, 'cup')
   const cupPlayed = competitionMatches(matches, season, 'cup').some(match => hasPlayed(match, teamId))
   const cupStatus = cup.championId === teamId ? 'Champion'
     : cup.eliminatedAtByTeam[teamId] ? `Eliminated · Stage ${cup.eliminatedAtByTeam[teamId]}`
@@ -629,6 +636,7 @@ export function teamCompetitionOverview(teamId: string, teams: Team[], matches: 
 
   const champions = championsCompetition(draw, matches, season, players)
   const championsGoals = teamCompetitionGoals(teamId, matches, season, 'champions')
+  const championsRecord = teamCompetitionRecord(teamId, teams, matches, season, 'champions')
   let championsStatus = 'Not Started'
   if (draw?.teamIds.includes(teamId)) {
     if (champions.championId === teamId) championsStatus = 'Champion'
@@ -642,12 +650,10 @@ export function teamCompetitionOverview(teamId: string, teams: Team[], matches: 
         if (pairing) {
           const ownGames = pairing.teamGames?.[teamId] ?? pairing.matches.filter(match => match.teamId === teamId || (!match.teamId && hasPlayed(match, teamId)))
           const required = pairing.requiredMatches
-          championsStatus = ownGames.length >= required
-            ? `${championsRoundLabel(stage)} · ${required}/${required} Played`
-            : `${championsRoundLabel(stage)} · Game ${ownGames.length + 1}/${required}`
+          championsStatus = `${championsRoundLabel(stage)} (${Math.min(ownGames.length + 1, required)}/${required})`
         }
       }
     }
   }
-  return { league, champions: { status: championsStatus, ...championsGoals }, cup: { status: cupStatus, ...cupGoals } }
+  return { league, champions: { status: championsStatus, ...championsRecord, ...championsGoals }, cup: { status: cupStatus, ...cupRecord, ...cupGoals } }
 }

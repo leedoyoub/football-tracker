@@ -22,18 +22,18 @@ test('v2.1.9 Team Detail summary uses canonical League data in the required orde
   assert(source.indexOf("['Rank'") < source.indexOf("['W-D-L'") && source.indexOf("['W-D-L'") < source.indexOf("['GF-GA'") && source.indexOf("['GF-GA'") < source.indexOf("['Pts'"))
   assert(!source.includes("['Matches', recent.length]"))
   assert(!source.includes('const record = recent.reduce'))
-  assert(source.includes('col-span-3') && source.includes('overview.champions.goalsFor') && source.includes('overview.cup.goalsFor'))
+  assert(source.includes('col-span-2') && source.includes('overview.champions.goalsFor') && source.includes('overview.cup.goalsFor'))
 })
 
 test('Champions progress uses own series games, waits at a completed round, and reports elimination without a game number', () => {
   const otherTeamGames = [game('other-1', 't1', 'champions', 'roundOf16', 'roundOf16:0', 1), game('other-2', 't1', 'champions', 'roundOf16', 'roundOf16:0', 2)]
-  assert.equal(teamCompetitionOverview('t0', teams, otherTeamGames, season, [], [draw]).champions.status, 'Round of 16 · Game 1/3')
+  assert.equal(teamCompetitionOverview('t0', teams, otherTeamGames, season, [], [draw]).champions.status, 'Round of 16 (1/3)')
   for (const count of [1, 2]) {
     const own = Array.from({ length: count }, (_, index) => game(`own-${index}`, 't0', 'champions', 'roundOf16', 'roundOf16:0', index + 1))
-    assert.equal(teamCompetitionOverview('t0', teams, own, season, [], [draw]).champions.status, `Round of 16 · Game ${count + 1}/3`)
+    assert.equal(teamCompetitionOverview('t0', teams, own, season, [], [draw]).champions.status, `Round of 16 (${count + 1}/3)`)
   }
   const completeOwn = Array.from({ length: 3 }, (_, index) => game(`complete-${index}`, 't0', 'champions', 'roundOf16', 'roundOf16:0', index + 1))
-  assert.equal(teamCompetitionOverview('t0', teams, completeOwn, season, [], [draw]).champions.status, 'Round of 16 · 3/3 Played')
+  assert.equal(teamCompetitionOverview('t0', teams, completeOwn, season, [], [draw]).champions.status, 'Round of 16 (3/3)')
   const eliminated = [...Array.from({ length: 3 }, (_, index) => game(`lost-${index}`, 't0', 'champions', 'roundOf16', 'roundOf16:0', index + 1, 0, 1)), ...Array.from({ length: 3 }, (_, index) => game(`won-${index}`, 't1', 'champions', 'roundOf16', 'roundOf16:0', index + 1, 1, 0))]
   assert.equal(teamCompetitionOverview('t0', teams, eliminated, season, [], [draw]).champions.status, 'Eliminated · Round of 16')
 })
@@ -44,9 +44,9 @@ test('Champions Final uses its two-game format and competition GF-GA stays indep
   const semi = series([['t0', 't4'], ['t8', 't12']], 'semiFinal')
   const finalOne = game('final-one', 't0', 'champions', 'final', 'final:0', 1, 2, 1)
   const finalTwo = game('final-two', 't0', 'champions', 'final', 'final:0', 2, 2, 1)
-  assert.equal(teamCompetitionOverview('t0', teams, [...r16, ...qf, ...semi], season, [], [draw]).champions.status, 'Final · Game 1/2')
-  assert.equal(teamCompetitionOverview('t0', teams, [...r16, ...qf, ...semi, finalOne], season, [], [draw]).champions.status, 'Final · Game 2/2')
-  assert.equal(teamCompetitionOverview('t0', teams, [...r16, ...qf, ...semi, finalOne, finalTwo], season, [], [draw]).champions.status, 'Final · 2/2 Played')
+  assert.equal(teamCompetitionOverview('t0', teams, [...r16, ...qf, ...semi], season, [], [draw]).champions.status, 'Final (1/2)')
+  assert.equal(teamCompetitionOverview('t0', teams, [...r16, ...qf, ...semi, finalOne], season, [], [draw]).champions.status, 'Final (2/2)')
+  assert.equal(teamCompetitionOverview('t0', teams, [...r16, ...qf, ...semi, finalOne, finalTwo], season, [], [draw]).champions.status, 'Final (2/2)')
   assert.equal(teamCompetitionOverview('t0', teams, [...r16, ...qf, ...semi, ...series([['t0', 't8']], 'final', 2)], season, [], [draw]).champions.status, 'Champion')
   const cup = game('cup', 't0', 'cup', 'stage1', undefined, undefined, 9, 5)
   const overview = teamCompetitionOverview('t0', teams, [...r16, ...qf, ...semi, finalOne, cup], season, [], [draw])
@@ -66,8 +66,8 @@ test('Home keeps stable source arrays for ranking and reuses News for immutable 
 })
 
 test('v2.2.1 version is consistent and rating revision advances once', () => {
-  assert.equal(APP_VERSION, '2.3.4')
-  assert.equal(require('../package.json').version, '2.3.4')
-  assert.equal(require('../package-lock.json').version, '2.3.4')
+  assert.equal(APP_VERSION, '2.4.1')
+  assert.equal(require('../package.json').version, '2.4.1')
+  assert.equal(require('../package-lock.json').version, '2.4.1')
   assert.equal(RATING_ENGINE_REVISION, 11)
 })

@@ -175,7 +175,7 @@ test('all four ranking surfaces consume the one canonical thirteen-metric catalo
     assert(screen.includes('RankingRow'))
   }
   const home = fs.readFileSync('src/screens/HomeScreen.tsx', 'utf8'); const team = fs.readFileSync('src/screens/TeamDetailScreen.tsx', 'utf8'); const league = fs.readFileSync('src/screens/CompetitionScreen.tsx', 'utf8')
-  assert(home.includes('leaderRows.slice(0, 5)')); assert(home.includes("competitionType: 'all', rankingMetric: metric"))
+  assert(home.includes('leaderRows.slice(0, 10)')); assert(home.includes("competitionType: 'all', rankingMetric: metric"))
   assert(team.includes('slice(0, 5)')); assert(team.includes('competitionType: bestCompetition, rankingMetric: metric, teamId'))
   assert(league.includes('slice(0, 10)')); assert(league.includes('subtitle="Top 10"')); assert(league.includes("competitionType: 'league', rankingMetric: playerMetric"))
 })

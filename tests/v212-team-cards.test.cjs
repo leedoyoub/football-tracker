@@ -64,6 +64,6 @@ test('Teams uses one global mode for compact fronts/progress backs and stable ca
   assert(source.includes('aria-label={`Open ${team.name} team details`}') && source.includes('aria-pressed={showProgress}'))
   assert(source.includes("showProgress ? 'Teams' : 'Progress'") && source.includes('motion-reduce:transition-none'))
   assert(!source.includes('flippedTeamIds') && !source.includes('onFlip') && !source.includes('rotateY'))
-  assert(source.includes('progressByTeamId = useMemo') && source.includes('[teams, status]'))
+  assert(source.includes('progressByTeamId = useMemo') && source.includes('[catalogTeams, status]'))
   assert(!source.includes('competitionHistory') && !source.includes('players.filter'))
 })

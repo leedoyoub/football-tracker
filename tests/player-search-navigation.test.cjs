@@ -68,9 +68,9 @@ test('Edit Player refreshes only pending names using the linked exact API ID', (
   assert(!refresh.includes('photoUrl') && !refresh.includes('externalPlayerId:'), 'name refresh must not alter identity or photo state')
 })
 
-test('standings team identity uses a dedicated link, while TeamIcon remains visual only', () => {
+test('standings team identity uses the shared canonical action, while TeamIcon remains visual only', () => {
   const link = read('src/components/TeamLink.tsx'); const table = read('src/components/StandingsTable.tsx'); const detail = read('src/screens/TeamDetailScreen.tsx')
-  assert(link.includes('onNavigate(team.id)'))
+  assert(link.includes('TeamIdentityAction'))
   assert(table.includes('onTeamNavigate ? <TeamLink'))
   assert(detail.includes('<TeamIcon team={team}') && !detail.includes('TeamLink'))
 })

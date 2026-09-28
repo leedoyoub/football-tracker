@@ -37,7 +37,7 @@ test('position filter is applied before ranking Top N on Home and Global Ranking
     assert.match(source, /positions:\s*positionFilterFamilies\(screenState\.positionFilter\)/)
   }
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
-  assert.match(home, /rankGlobalRankingRows\(rankingIndex, players, metric\)\.slice\(0, 5\)/)
+  assert.match(home, /rankGlobalRankingRows\(rankingIndex, players, metric\)\.slice\(0, 10\)/)
   assert(!home.includes('new Map(RANKING_METRICS.map'), 'Home must not eagerly rank every metric')
 })
 
@@ -120,14 +120,14 @@ test('Match Changes keeps canonical labels atomic and prioritizes rare event ide
   assert.equal(presented[0].category, 'rare')
 })
 
-test('v2.3.4 keeps package, lockfile, app version, rating revision, and storage namespace aligned', () => {
+test('v2.4.1 keeps package, lockfile, app version, rating revision, and storage namespace aligned', () => {
   const { APP_VERSION } = require('../src/config.ts')
   const { RATING_ENGINE_REVISION } = require('../src/engine/ratingRevision.ts')
   const repository = fs.readFileSync(require.resolve('../src/lib/repository.ts'), 'utf8')
-  assert.equal(APP_VERSION, '2.3.4')
-  assert.equal(require('../package.json').version, '2.3.4')
-  assert.equal(require('../package-lock.json').version, '2.3.4')
-  assert.equal(require('../package-lock.json').packages[''].version, '2.3.4')
+  assert.equal(APP_VERSION, '2.4.1')
+  assert.equal(require('../package.json').version, '2.4.1')
+  assert.equal(require('../package-lock.json').version, '2.4.1')
+  assert.equal(require('../package-lock.json').packages[''].version, '2.4.1')
   assert.equal(RATING_ENGINE_REVISION, 11)
   assert(repository.includes("STORAGE_KEY = 'football-tracker-v1'"))
 })

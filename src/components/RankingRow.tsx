@@ -1,14 +1,15 @@
 import { useEffect, useRef } from 'react'
-import { PlayerAvatar } from './PlayerAvatar'
+import { PlayerIdentityAction, TeamIdentityAction } from './EntityActions'
 import { RankDelta } from './SeasonUI'
 import { playerFullName } from './ui'
 import { ensureHorizontalTabVisible } from '../lib/horizontalTabScroll'
 import type { Player, Team } from '../types'
 
-export function RankingRow({ rank, player, team, value, movement = null, onClick, compact = false, selected = false }: { rank: number; player?: Player; team?: Team; value: string; movement?: number | null; onClick?: () => void; compact?: boolean; selected?: boolean }) {
-  const content = <><b className="w-5 text-xs text-zinc-500">{rank}</b><RankDelta value={movement} /><PlayerAvatar photoUrl={player?.photoUrl || player?.image} number={player?.number} className={compact ? 'h-7 w-7 text-[7px]' : 'h-9 w-9 text-[9px]'} /><span className="min-w-0 flex-1"><b className="block truncate text-xs">{playerFullName(player)}</b><small className="block truncate text-[10px] text-zinc-500">{team?.shortName ?? team?.name ?? 'No team'} · {player?.position ?? '—'}</small></span><b className="text-xs text-emerald-300">{value}</b></>
-  const className = `flex w-full items-center gap-2 px-3 py-2 text-left ${compact ? 'min-h-11' : 'min-h-13'} ${onClick ? 'active:bg-white/5' : ''}`
-  return onClick ? <button type="button" disabled={!player} aria-pressed={selected || undefined} onClick={onClick} className={`${className} ${selected ? 'bg-emerald-500/10' : ''} disabled:opacity-50`}>{content}</button> : <div className={className}>{content}</div>
+export function RankingRow({ rank, player, team, value, movement = null, onClick, onPlayerNavigate, onTeamNavigate, compact = false, selected = false }: { rank: number; player?: Player; team?: Team; value: string; movement?: number | null; onClick?: () => void; onPlayerNavigate?: (playerId: string) => void; onTeamNavigate?: (teamId: string) => void; compact?: boolean; selected?: boolean }) {
+  const playerNavigate: ((playerId: string) => void) | undefined = onPlayerNavigate ?? (onClick ? () => onClick() : undefined)
+  const className = `flex w-full items-center gap-2 px-3 py-2 text-left ${compact ? 'min-h-11' : 'min-h-13'} ${selected ? 'bg-emerald-500/10' : ''}`
+  const playerContent = <><b className="block truncate text-xs">{playerFullName(player)}</b><small className="block truncate text-[10px] text-zinc-500">{team?.shortName ?? team?.name ?? 'No team'} · {player?.position ?? '—'}</small></>
+  return <div className={className}><b className="w-5 text-xs text-zinc-500">{rank}</b><RankDelta value={movement} /><PlayerIdentityAction player={player} onNavigate={playerNavigate} avatarClassName={compact ? 'h-7 w-7 text-[7px]' : 'h-9 w-9 text-[9px]'} /><TeamIdentityAction team={team} onNavigate={onTeamNavigate} iconClassName={compact ? 'h-5 w-5 text-[6px]' : 'h-6 w-6 text-[7px]'} />{playerNavigate && player ? <button type="button" aria-pressed={selected || undefined} onClick={() => playerNavigate(player.id)} className="min-w-0 flex-1 rounded-md active:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-300">{playerContent}</button> : <span className="min-w-0 flex-1">{playerContent}</span>}<b className="text-xs text-emerald-300">{value}</b></div>
 }
 
 export function useMetricSwipe<T extends string>(values: readonly T[], value: T, onChange: (value: T) => void) {
