@@ -7,7 +7,7 @@ export function defaultScreenState<V extends View>(view: V): ScreenStateByView[V
     case 'latest-changes': state = { name: 'latest-changes' }; break
     case 'competition': state = {
       name: 'competition', competitionType: view.competitionType ?? 'league', tab: 'players', rankingMetric: view.rankingMetric ?? 'rating',
-      positionFilter: 'all', bestXiMode: 'season', viewAllMetric: null, cupViewAll: false, compareMode: false, comparedPlayerIds: [], rankingTeamIds: [],
+      positionFilter: 'all', bestXiMode: 'season', monthlyAwardBlock: null, cupAwardStage: null, championsAwardRound: null, viewAllMetric: null, cupViewAll: false, compareMode: false, comparedPlayerIds: [], rankingTeamIds: [],
       historyMatchday: null, historyComparedTeamIds: [],
     }; break
     case 'global-ranking': state = { name: 'global-ranking', metric: view.rankingMetric ?? 'rating', scope: view.competitionType ?? 'all', positionFilter: 'all', teamId: view.teamId ?? null, viewAll: false }; break

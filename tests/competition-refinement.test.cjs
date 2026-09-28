@@ -120,19 +120,19 @@ test('Champions bracket keeps native horizontal scrolling while hiding its brows
   assert.doesNotMatch(bracketSource, /on(?:Touch|Pointer)[A-Z]/)
 })
 
-test('Home has the four compact dashboard responsibilities and no active play-style product', () => {
+test('Home keeps its compact dashboard and adds the canonical Season Best XI', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
-  const order = ['recent-matches', 'latest-changes', 'season-leaders'].map(token => source.indexOf(`data-home-section="${token}"`))
+  const order = ['recent-matches', 'latest-changes', 'season-leaders', 'season-best-xi'].map(token => source.indexOf(`data-home-section="${token}"`))
   assert(order.every((value, index) => value >= 0 && (!index || value > order[index - 1])))
   assert(!source.includes('Global Rankings') && !source.includes('Team of the Week') && !source.includes('Team of the Season') && !source.includes('StandingsTable'))
   assert(source.includes('recentDerivedResults(matches, teams, 5)') && source.includes('deriveLatestChanges'))
   assert(!/play.?style/i.test(source) && !source.includes('Show More'))
 })
 
-test('Competition Best XI labels and sources are scoped to League, Cup stages and Champions rounds', () => {
+test('Competition Best XI uses canonical started historical scope selectors', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
-  for (const token of ['Team of the Stage ${index + 1}', 'Team of the Round ${index + 1}', 'Team of the Final', 'Season Best XI', 'indexCompetitionMatchesByStage(matches)']) assert(source.includes(token), token)
-  assert(source.includes("if (type === 'league') return []"))
+  for (const token of ['startedMonthlyAwardBlocks', 'startedCupAwardStages', 'startedChampionsAwardRounds', 'League Best XI', 'Cup Team of', 'Champions']) assert(source.includes(token), token)
+  assert(source.includes('AwardScopeSelector'))
   assert(!source.includes('Team of the Year'))
 })
 

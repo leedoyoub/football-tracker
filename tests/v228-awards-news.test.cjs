@@ -61,11 +61,11 @@ test('v2.2.8 News is newest-first with a deterministic id tie-break', () => {
   assert.deepEqual(rows.map(row => row.id), ['z', 'a', 'middle'])
 })
 
-test('v2.2.8 competition award labels do not call Cup or Champions a Team of the Season', () => {
-  assert.equal(competitionAwardLabel('league', 'season'), 'Team of the Season')
+test('Phase 4B competition award labels use the Best XI terminology', () => {
+  assert.equal(competitionAwardLabel('league', 'season'), 'League Best XI')
   assert.equal(competitionAwardLabel('league', 'monthly'), 'Team of the Month')
-  assert.equal(competitionAwardLabel('cup'), 'Team of the Cup')
-  assert.equal(competitionAwardLabel('champions'), 'Team of the Tournament')
+  assert.equal(competitionAwardLabel('cup'), 'Cup Best XI')
+  assert.equal(competitionAwardLabel('champions'), 'Champions Best XI')
 })
 
 test('v2.2.8 award News projects canonical Cup and Tournament results without selecting a winner again', () => {

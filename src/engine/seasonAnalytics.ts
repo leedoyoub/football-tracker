@@ -7,8 +7,7 @@ import { getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, ratePlayerMatch } 
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { compareStandings, type Standing } from './standings'
 import type { LeaderboardMetric } from './stats'
-import { selectAwardBestXI } from './awardRules'
-import { awardCandidatesForScope } from './awards'
+import { performanceAwardResult } from './awards'
 
 export type RankMovement = number | null
 export type RankedStanding = Standing & { movement: RankMovement }
@@ -178,16 +177,17 @@ function buildPlayerSnapshots(players: Player[], teams: Team[], games: Match[]):
 
 function monthlyAwardsFor(block: MonthlyBlock, _teams: Team[], players: Player[], games: Match[], finalized: boolean): MonthlyAwards {
   const selected = games.filter(match => match.matchDay >= block.startMatchDay && match.matchDay <= block.endMatchDay)
-  const candidates = awardCandidatesForScope(players, selected, 'monthly')
+  const result = performanceAwardResult(players, selected, 'monthly')
+  const candidates = result.candidates
   const ordered = candidates.map(candidate => ({ playerId: candidate.playerId, teamId: candidate.teamId, appearances: candidate.appearances, minutes: candidate.minutes, goals: candidate.goals, assists: candidate.assists, mom: candidate.mom, goodMatches: 0, ratingTotal: candidate.average * candidate.appearances, avgRating: candidate.average }))
   return {
     block,
     scopeLabel: canonicalBlockLabel(games[0]?.season ?? 'Season', block.id),
     finalized,
     playerOfMonth: ordered[0],
-    bestPlayerId: ordered[0]?.playerId,
-    bestXI: selectAwardBestXI(candidates),
-    statsByPlayer: Object.fromEntries(ordered.map(row => [row.playerId, { goals: row.goals, assists: row.assists, avgRating: row.avgRating }])),
+    bestPlayerId: result.bestPlayerId,
+    bestXI: result.bestXI,
+    statsByPlayer: result.statsByPlayer,
   }
 }
 
@@ -198,6 +198,15 @@ export function monthlyAwardForBlock(teams: Team[], players: Player[], matches: 
   const leagueMatches = competitionMatches(matches, season, 'league')
   if (!isLeagueMatchdayComplete(teams, leagueMatches, season, block.endMatchDay)) return undefined
   return monthlyAwardsFor(block, teams, players, leagueMatches, true)
+}
+
+/** Projects any already-started canonical monthly block, finalized or live. */
+export function monthlyAwardForStartedBlock(teams: Team[], players: Player[], matches: Match[], season: string, blockId: number): MonthlyAwards | undefined {
+  const block = monthlyBlockRange(blockId)
+  if (!block) return undefined
+  const leagueMatches = competitionMatches(matches, season, 'league')
+  if (!leagueMatches.some(match => match.matchDay >= block.startMatchDay && match.matchDay <= block.endMatchDay)) return undefined
+  return monthlyAwardsFor(block, teams, players, leagueMatches, isLeagueMatchdayComplete(teams, leagueMatches, season, block.endMatchDay))
 }
 
 function buildReview(day: number, snapshots: Map<number, LeagueSnapshot>, playerSnapshots: Map<number, PlayerRankingSnapshot>): MatchdayReview {

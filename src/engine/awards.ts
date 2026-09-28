@@ -1,7 +1,7 @@
 import type { Best11Slot, ChampionsStage, CompetitionState, CompetitionType, CupStage, Match, Player, Team } from '../types'
 import { competitionMatches, competitionSeasonStatus, type CompetitionSeasonStatus } from './competition'
 import { buildGlobalRankingData, type GlobalLeaderboardRow } from './stats'
-import { AWARD_433, isAwardEligible, rankAwardCandidates, seasonChampionsProgressBonus, seasonCupProgressBonus, seasonLeaguePositionBonus, selectAwardBestXI, type AwardCandidate } from './awardRules'
+import { AWARD_433, isAwardEligible, rankAwardCandidates, seasonChampionsProgressBonus, seasonCupProgressBonus, seasonLeaguePositionBonus, selectAwardBestXI, type AwardCandidate, type AwardCandidateMode } from './awardRules'
 import { scopedAwardFamilyByPlayer } from './positionScope'
 
 export { AWARD_433, awardPositionFamily, isAwardEligible } from './awardRules'
@@ -21,8 +21,8 @@ export type CanonicalAwardResult = {
 
 /** One competition-aware source for Team/Best XI wording. */
 export function competitionAwardLabel(type: CompetitionType, scope: 'season' | 'monthly' = 'season'): string {
-  if (type === 'league') return scope === 'monthly' ? 'Team of the Month' : 'Team of the Season'
-  return type === 'cup' ? 'Team of the Cup' : 'Team of the Tournament'
+  if (type === 'league') return scope === 'monthly' ? 'Team of the Month' : 'League Best XI'
+  return type === 'cup' ? 'Cup Best XI' : 'Champions Best XI'
 }
 
 export function monthlyCanonicalAwardResult(award: Pick<CanonicalAwardResult, 'scopeLabel' | 'bestPlayerId' | 'bestXI' | 'statsByPlayer'>, anchorMatch: Match): CanonicalAwardResult {
@@ -112,6 +112,23 @@ export function awardCandidatesForScope(players: Player[], games: Match[], mode:
   return scoredCandidatesForScope(players, games, () => 0, mode).map(item => item.candidate)
 }
 
+/** Converts one canonical candidate ordering into the display data shared by award pitches. */
+export function awardPresentationFromCandidates(candidates: AwardCandidate[]) {
+  const bestXI = selectAwardBestXI(candidates)
+  const selected = bestXI.flatMap(slot => slot.playerId ? [candidates.find(candidate => candidate.playerId === slot.playerId && candidate.teamId === slot.teamId)] : [])
+  return {
+    bestXI,
+    bestPlayerId: candidates[0]?.playerId,
+    statsByPlayer: Object.fromEntries(selected.flatMap(candidate => candidate ? [[candidate.playerId, { goals: candidate.goals, assists: candidate.assists, avgRating: candidate.average }]] : [])),
+  }
+}
+
+/** Performance-only awards (month, stage, round, and final) project the Phase 4A candidate source. */
+export function performanceAwardResult(players: Player[], games: Match[], mode: AwardCandidateMode = 'cumulative') {
+  const candidates = awardCandidatesForScope(players, games, mode === 'monthly' ? 'monthly' : 'cumulative')
+  return { candidates, ...awardPresentationFromCandidates(candidates) }
+}
+
 const goalkeeperRatings = (row: GlobalLeaderboardRow) => row.ratings.filter(rating => rating.position === 'GK')
 const goalkeeperMinutes = (row: GlobalLeaderboardRow) => goalkeeperRatings(row).reduce((total, rating) => total + rating.minutes, 0)
 const goalkeeperAverage = (row: GlobalLeaderboardRow) => {
@@ -183,7 +200,8 @@ export function awardsForCompetition(type: CompetitionType, season: string, team
   const mvp = best ? { playerId: best.row.playerId, value: rawAverage(best.row), awardScore: best.score, label: 'Avg Rating' } : undefined
   const goalkeeperLabel = type === 'league' ? 'Goalkeeper of the Season' : type === 'cup' ? 'Goalkeeper of the Cup' : 'Goalkeeper of the Tournament'
   const goalkeeperEligible = eligible.map(candidate => ({ ...candidate, score: ratingAwardScore(goalkeeperAverage(candidate.row), bonusFor(teamIdFor(candidate.row)), goalkeeperMinutes(candidate.row), games.filter(match => match.teamId ? match.teamId === teamIdFor(candidate.row) : match.homeTeamId === teamIdFor(candidate.row) || match.awayTeamId === teamIdFor(candidate.row)).length) }))
-  return { complete, championId, scorer: winner(stats, row => row.goals, 'Goals'), assists: winner(stats, row => row.assists, 'Assists'), mvp, goalkeeper: goalkeeperWinner(goalkeeperEligible, goalkeeperLabel), bestXI: selectAwardBestXI(scored.map(item => item.candidate)), candidates: scored.map(item => item.candidate) }
+  const presentation = awardPresentationFromCandidates(scored.map(item => item.candidate))
+  return { complete, championId, scorer: winner(stats, row => row.goals, 'Goals'), assists: winner(stats, row => row.assists, 'Assists'), mvp, goalkeeper: goalkeeperWinner(goalkeeperEligible, goalkeeperLabel), ...presentation, candidates: scored.map(item => item.candidate) }
 }
 
 export function seasonAwards(season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[]) {
@@ -220,5 +238,6 @@ export function seasonAwards(season: string, teams: Team[], players: Player[], m
     goalkeeperMinutes(b) - goalkeeperMinutes(a) ||
     a.playerId.localeCompare(b.playerId),
   )[0]
-  return { complete, goldenBoot: winner(stats, row => row.goals, 'Goals'), assistLeader: winner(stats, row => row.assists, 'Assists'), ballon, bestXI: selectAwardBestXI(scored.map(item => item.candidate)), candidates: scored.map(item => item.candidate), goldenGlove: goldenGlove ? { playerId: goldenGlove.playerId, value: goalkeeperCleanSheets(goldenGlove), label: 'Golden Glove' } : undefined }
+  const presentation = awardPresentationFromCandidates(scored.map(item => item.candidate))
+  return { complete, goldenBoot: winner(stats, row => row.goals, 'Goals'), assistLeader: winner(stats, row => row.assists, 'Assists'), ballon, ...presentation, candidates: scored.map(item => item.candidate), goldenGlove: goldenGlove ? { playerId: goldenGlove.playerId, value: goalkeeperCleanSheets(goldenGlove), label: 'Golden Glove' } : undefined }
 }

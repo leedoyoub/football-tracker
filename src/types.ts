@@ -246,6 +246,9 @@ export interface ScreenStateByView {
     rankingMetric: RankSort
     positionFilter: PositionFilterKey
     bestXiMode: 'season' | 'monthly'
+    monthlyAwardBlock: number | null
+    cupAwardStage: CupStage | null
+    championsAwardRound: Exclude<ChampionsStage, 'finalReplay'> | null
     viewAllMetric: RankSort | null
     cupViewAll: boolean
     compareMode: boolean
