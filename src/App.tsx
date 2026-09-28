@@ -35,7 +35,7 @@ import { BootstrapShell, StartupRecovery } from './components/StartupBoundary'
 import { emptyFilters, type RankingFilters } from './screens/RankingFilters'
 import { appContentOverflowClass } from './lib/routeLayout'
 import { loadLocalModePreference, saveLocalModePreference } from './lib/localMode'
-import { backFromTeamDetailEntries, closeTransientWorkflow, createNavigationEntry, enterTransientWorkflow, navigateBrowseEntry, popNavigationEntry, replaceNavigationEntry, resetNavigationEntries, updateCurrentScreenState } from './lib/navigation'
+import { backFromTeamDetailEntries, closeTransientWorkflow, completeTransientWorkflowToBrowse, createNavigationEntry, enterTransientWorkflow, navigateBrowseEntry, popNavigationEntry, replaceNavigationEntry, resetNavigationEntries, updateCurrentScreenState } from './lib/navigation'
 import { restoreScrollWhenReachable } from './lib/scrollRestoration'
 import { resetCompetitionTypeScroll } from './lib/competitionTypeScroll'
 
@@ -145,6 +145,11 @@ export default function App() {
     setHistory(prev => closeTransientWorkflow(prev, next))
   }
 
+  function onCompleteNewMatchWorkflow(next: View) {
+    restoreScroll.current = true
+    setHistory(prev => completeTransientWorkflowToBrowse(prev, next))
+  }
+
   function onReplace(next: View) {
     restoreScroll.current = true
     setHistory(prev => replaceNavigationEntry(prev, next))
@@ -214,7 +219,7 @@ export default function App() {
           {view.name === 'match' && <MatchDetailScreen matchId={view.id} screenState={entry.screenState as ScreenStateByView['match']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} onBackToTeam={onBackToTeam} onReplace={onReplace} />}
           {view.name === 'edit-match' && <EditMatchScreen matchId={view.id} onReplace={onReplace} onBack={onCloseTransientWorkflow} onComplete={onCompleteTransientWorkflow} />}
           {view.name === 'new-match' && (
-            <NewMatchScreen teamId={view.teamId} requestedSeason={view.season} competitionType={view.competitionType} resumeDraft={view.resumeDraft} onReplace={onReplace} onBack={onCloseTransientWorkflow} onComplete={onCompleteTransientWorkflow} />
+            <NewMatchScreen teamId={view.teamId} requestedSeason={view.season} competitionType={view.competitionType} resumeDraft={view.resumeDraft} onReplace={onReplace} onBack={onCloseTransientWorkflow} onComplete={onCompleteNewMatchWorkflow} />
           )}
           {view.name === 'new-player' && (
             <NewPlayerScreen teamId={view.teamId} onReplace={onReplace} onBack={onBack} />

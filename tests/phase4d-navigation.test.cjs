@@ -36,6 +36,26 @@ test('new-match and edit-match are transient workflow entries that close back to
   assert.deepEqual(navigation.closeTransientWorkflow(editing, { name: 'match', id: 'M' }), [entry({ name: 'match', id: 'M' }, match.screenState, 22)])
 })
 
+test('new-match completion consumes its transient entry before browsing to the exact saved Match Detail', () => {
+  assert.equal(typeof navigation.completeTransientWorkflowToBrowse, 'function')
+  const ranking = entry(
+    { name: 'global-ranking', season: 'Season 4', competitionType: 'cup', rankingMetric: 'assists' },
+    { ...navigation.defaultScreenState({ name: 'global-ranking' }), metric: 'assists', scope: 'cup', positionFilter: 'cam', teamId: 'A', viewAll: true },
+    481,
+  )
+  const teamState = { ...navigation.defaultScreenState({ name: 'team', id: 'A' }), tab: 'matches', bestPlayersSeason: 'Season 3', bestPlayersCompetition: 'cup', bestPlayersMetric: 'saves', matchesCompetition: 'cup' }
+  const team = entry({ name: 'team', id: 'A' }, teamState)
+  const logging = navigation.enterTransientWorkflow([ranking, team], { name: 'new-match', teamId: 'A' }, 273)
+
+  const completed = navigation.completeTransientWorkflowToBrowse(logging, { name: 'match', id: 'saved-match' })
+
+  assert.deepEqual(completed.map(item => item.view), [ranking.view, team.view, { name: 'match', id: 'saved-match' }])
+  assert.deepEqual(completed[0], ranking)
+  assert.deepEqual(completed[1], entry(team.view, teamState, 273))
+  assert.deepEqual(navigation.popNavigationEntry(completed), [ranking, entry(team.view, teamState, 273)])
+  assert.deepEqual(navigation.backFromTeamDetailEntries(navigation.popNavigationEntry(completed)), [ranking])
+})
+
 test('App routes Team Back and editor completion through root navigation helpers', () => {
   const app = fs.readFileSync('src/App.tsx', 'utf8')
   const team = fs.readFileSync('src/screens/TeamDetailScreen.tsx', 'utf8')

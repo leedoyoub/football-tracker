@@ -80,6 +80,12 @@ export function closeTransientWorkflow<V extends View>(entries: NavigationEntry[
   return current && isTransientWorkflow(current.view) && entries.length > 1 ? entries.slice(0, -1) : replaceNavigationEntry(entries, fallback)
 }
 
+/** Successful New Match saves consume the editor, then open the persisted match as browse history. */
+export function completeTransientWorkflowToBrowse<V extends View>(entries: NavigationEntry[], destination: V): NavigationEntry[] {
+  const browseEntries = closeTransientWorkflow(entries, destination)
+  return navigateBrowseEntry(browseEntries, destination, browseEntries[browseEntries.length - 1]?.scrollTop ?? 0)
+}
+
 /** Team Back returns to its actual browse source, with Teams only for an orphan detail entry. */
 export function backFromTeamDetailEntries(entries: NavigationEntry[]): NavigationEntry[] {
   const browseEntries = entries.slice(0, -1).filter(entry => !isTransientWorkflow(entry.view))
