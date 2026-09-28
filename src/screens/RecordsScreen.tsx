@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { CompetitionScopeSelector } from '../components/CompetitionScopeSelector'
 import { PlayerIdentityAction, TeamIdentityAction } from '../components/EntityActions'
+import { CombinationPairIdentity } from '../components/CombinationPairIdentity'
 import { PositionFilter } from '../components/PositionFilter'
 import { TeamFilter } from '../components/TeamFilter'
 import { RecordsSeasonFilter } from '../components/RecordsSeasonFilter'
@@ -43,6 +44,7 @@ function RecordsRankingPreviews({ category, players, teams, matches, filters, co
 }
 
 function RecordIdentity({ row, playerById, teamById, onNavigate }: { row: RecordsLeaderboardRow; playerById: Map<string, Player>; teamById: Map<string, Team>; onNavigate: (view: View) => void }) {
+  if (row.combinationPair) return <CombinationPairIdentity pair={row.combinationPair} playerById={playerById} onNavigate={onNavigate} />
   if (row.playerIds) return <span className="flex min-w-0 items-center gap-1 overflow-hidden">{row.playerIds.map(id => { const player = playerById.get(id); return <PlayerIdentityAction key={id} player={player} onNavigate={player ? playerId => onNavigate({ name: 'player', id: playerId }) : undefined} className="min-w-0 truncate text-left font-semibold" avatarClassName="hidden">{player?.displayName ?? player?.name ?? 'Unknown player'}</PlayerIdentityAction> })}</span>
   const team = teamById.get(row.id)
   if (team) return <TeamIdentityAction team={team} onNavigate={teamId => onNavigate({ name: 'team', id: teamId })} className="min-w-0 truncate text-left font-semibold">{team.name}</TeamIdentityAction>

@@ -80,7 +80,7 @@ test('Team Detail presents canonical competition fields in a 2 plus 1 plus 1 lay
   assert.doesNotMatch(engine, /\$\{championsRoundLabel\(stage\)\} · Game/)
 })
 
-test('Player Detail Overview presents canonical Apps, Minutes, and MOM while unused bench remains outside Apps', () => {
+test('Player Detail Overview presents canonical Apps with starts/subs, Minutes, and MOM while unused bench remains outside Apps', () => {
   const player = { id: 'P1', name: 'Player', displayName: 'Player', number: 8, teamId: 'T1', position: 'CM', rating: 6.5 }
   const base = { season: 'S', matchDay: 1, date: '2026-01-01', duration: 90, homeTeamId: 'T1', awayTeamId: 'T2', teamId: 'T1', competitionType: 'league', competitionStage: 'regular', events: [] }
   const started = { ...base, id: 'played', appearances: [{ playerId: 'P1', teamId: 'T1', role: 'starter', position: 'CM', matchPosition: 'CM' }] }
@@ -89,7 +89,7 @@ test('Player Detail Overview presents canonical Apps, Minutes, and MOM while unu
   assert.equal(data.apps, 1)
   const source = fs.readFileSync(path.join(root, 'src/screens/PlayerDetailScreen.tsx'), 'utf8')
   assert.match(source, /RankedMetric label="Avg Rating"[\s\S]*RankedMetric label="Goals"[\s\S]*RankedMetric label="Assists"/)
-  assert.match(source, /grid grid-cols-3 gap-1\.5">\{metric\('Apps', data\.apps\)\}\{metric\('Minutes', data\.minutes\)\}\{metric\('MOM', data\.mom\)\}/)
+  assert.match(source, /<AppsMetric apps=\{data\.apps\} starts=\{data\.starts\} subs=\{data\.subs\} \/>\{metric\('Minutes', data\.minutes\)\}\{metric\('MOM', data\.mom\)\}/)
 })
 
 test('Home limits only final selected-metric rows to ten after the filtered ranking index', () => {

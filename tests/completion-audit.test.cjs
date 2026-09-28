@@ -93,7 +93,7 @@ test('Combination leaders reuse the canonical Records first-place highlight and 
   const records = source('src/screens/recordsLeaderboards.ts')
   const labels = ['Most Goal Combinations', 'Most Mutual Goal Combinations', 'Most Matches Both Scored', 'Most Matches Both Had G+A', 'Best Duo Combined G+A', 'Best CB Partnership · Shot Suppression']
   assert(records.includes('combinationGroups') && records.includes('entries(rows, ascending)'))
-  assert(records.includes("], '→')") && records.includes("], '↔')") && records.includes("], '+')"))
+  for (const connector of ["'goal-combinations': { connector: '→'", "'mutual-goal-combinations': { connector: '↔'", "'both-scored': { connector: '&'", "'both-ga': { connector: '&'", "'duo-ga': { connector: '+'", "'cb-suppression': { connector: '&'"]) assert(records.includes(connector))
   for (const label of labels) assert(records.includes(label))
   assert(records.includes('filter(row => row.togetherMinutes >= 180)') && records.includes("group('cb-suppression'"))
 })
