@@ -55,8 +55,12 @@ test('season award presentation preserves raw ratings while its canonical Best X
 
 test('award pitches opt into historical team crests without affecting standard pitch callers', () => {
   const props = awardBestXIProps({ bestXI: [], statsByPlayer: {} })
+  const pitch = fs.readFileSync('src/components/Pitch.tsx', 'utf8')
   assert.equal(props.showAwardTeamCrest, true)
-  assert.match(fs.readFileSync('src/components/Pitch.tsx', 'utf8'), /showAwardTeamCrest/)
+  assert.match(pitch, /showAwardTeamCrest = false/)
+  assert.match(pitch, /data-award-team-crest="top-left"/)
+  assert.match(pitch, /teamById\[slot\.teamId \?\? ''\]/)
+  assert.match(pitch, /h-3\.5 w-3\.5 border-white\/30/)
 })
 
 test('Home renders canonical Season Best XI beneath Global Ranking and Player Detail exposes canonical app subcounts', () => {

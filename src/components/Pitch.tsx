@@ -140,7 +140,7 @@ export function Pitch({ compact = false, slots, players, teams, statsByPlayer, o
         {draggable ? <PitchSlotDrop slot={slot} draggable={draggable}>
           <PlayerIcon player={player} team={representativeTeam} position={showPositionBadge ? displayPosition : undefined} badges={badges} className="h-10 w-10 text-[11px]" />
         </PitchSlotDrop> : <PlayerIcon player={player} team={representativeTeam} position={showPositionBadge ? displayPosition : undefined} badges={badges} className="h-10 w-10 text-[11px]" />}
-        {showAwardTeamCrest && representativeTeam && <span data-award-team-crest="top-left" className="pointer-events-none absolute -left-1 -top-1 z-20"><TeamIcon team={representativeTeam} showAbbreviation={false} className="h-2.5 w-2.5 border-white/30" /></span>}
+        {showAwardTeamCrest && representativeTeam && <span data-award-team-crest="top-left" className="pointer-events-none absolute -left-1 -top-1 z-20"><TeamIcon team={representativeTeam} showAbbreviation={false} className="h-3.5 w-3.5 border-white/30" /></span>}
         </div>
         {((stats?.goals ?? 0) > 0 || (stats?.assists ?? 0) > 0 || (showGoalkeeperSaves && matchPosition === 'GK')) && <div className="relative z-10 -mt-1 grid h-3.5 w-16 grid-cols-2 items-center text-[8px] font-bold leading-none text-white">
           <span className="justify-self-start">{(stats?.assists ?? 0) > 0 && <span className="flex items-center gap-0.5 rounded-full bg-black/80 px-1 py-0.5"><AssistIcon />{stats?.assists}</span>}</span>
