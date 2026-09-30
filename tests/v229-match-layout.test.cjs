@@ -23,7 +23,7 @@ test('v2.2.9 canonical context parts provide full two-line Champions wording', (
 
 test('v2.2.9 Team Detail match rows keep scores at the mathematical card center', () => {
   const team = source('../src/screens/TeamDetailScreen.tsx')
-  const rows = team.slice(team.indexOf('{visibleMatches.map'), team.indexOf('{!visibleMatches.length'))
+  const rows = team.slice(team.indexOf('{matchData.map'), team.indexOf('{!matchData.length'))
   assert(rows.includes('grid-cols-[1fr_auto_1fr]') && rows.includes('items-center'))
   assert(rows.includes('justify-self-start') && rows.includes('justify-self-center') && rows.includes('justify-self-end'))
   assert(rows.includes('formatCompactCompetitionContext(assignmentSnapshotForMatch(match))'))

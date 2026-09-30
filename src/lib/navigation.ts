@@ -14,7 +14,7 @@ export function defaultScreenState<V extends View>(view: V): ScreenStateByView[V
     case 'records': state = { name: 'records', category: 'player', competition: 'all', positionFilter: 'all', filterSeasonIds: [], filterTeamIds: [], historyPanel: null, historySeason: null, historyBlock: null }; break
     case 'records-leaderboard': state = { name: 'records-leaderboard', category: view.category, leaderboardId: view.leaderboardId, competition: view.competition ?? 'all', positionFilter: view.positionFilter ?? 'all', filterSeasonIds: view.seasonIds ?? [], filterTeamIds: view.teamIds ?? [] }; break
     case 'comparison': state = { name: 'comparison', leftId: view.leftId ?? null, rightId: view.rightId ?? null, season: view.season ?? null, competition: view.competitionType ?? 'all', teamId: null }; break
-    case 'team': state = { name: 'team', tab: 'overview', bestPlayersSeason: null, bestPlayersCompetition: 'all', bestPlayersMetric: 'rating', matchesCompetition: 'all', expandedContext: null }; break
+    case 'team': state = { name: 'team', tab: 'overview', bestPlayersSeason: null, bestPlayersCompetition: 'all', bestPlayersMetric: 'rating', matchesCompetition: 'all' }; break
     case 'players': state = { name: 'players', search: '' }; break
     case 'player': state = { name: 'player', season: null, competition: 'all' }; break
     case 'match': state = { name: 'match', tab: 'facts' }; break

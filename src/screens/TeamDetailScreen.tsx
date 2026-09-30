@@ -18,10 +18,9 @@ import type { CompetitionType, ScreenStateByView, Team, View } from '../types'
 
 export function TeamDetailScreen({ teamId, season, screenState, onStateChange, onNavigate, onBack }: { teamId: string; season: string; screenState: ScreenStateByView['team']; onStateChange: (state: ScreenStateByView['team']) => void; onNavigate: (view: View) => void; onBack: () => void }) {
   const { teams, players, matches, competitionStates = [] } = useStore()
-  const { expandedContext, bestPlayersCompetition: bestCompetition, matchesCompetition, tab } = screenState
+  const { bestPlayersCompetition: bestCompetition, matchesCompetition, tab } = screenState
   const bestSeason = screenState.bestPlayersSeason ?? season
   const patchState = (patch: Partial<ScreenStateByView['team']>) => onStateChange({ ...screenState, ...patch })
-  const setExpandedContext = (value: string | null) => patchState({ expandedContext: value })
   const setBestSeason = (value: string) => patchState({ bestPlayersSeason: value })
   const setBestCompetition = (value: CompetitionType | 'all') => patchState({ bestPlayersCompetition: value })
   const setMatchesCompetition = (value: CompetitionType | 'all') => patchState({ matchesCompetition: value })
@@ -52,10 +51,6 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
   const statsByPlayer = playerData?.statsByPlayer ?? {}
   const starterIds = playerData?.starterIds ?? new Set<string>()
   const allTeamPlayers = playerData?.allTeamPlayers ?? []
-  const recent = matchData
-  const context = JSON.stringify([teamId, activeSeason, matchesCompetition])
-  const showAll = expandedContext === context
-  const visibleMatches = showAll ? recent : recent.slice(0, 5)
   const leagueRow = analytics?.leagueSnapshots.get(analytics.currentMatchDay)?.standings.find(row => row.teamId === teamId)
   return <div className="px-4 pb-8 pt-6">
     <button type="button" onClick={onBack} className="mb-3 min-h-9 px-1 text-xs font-semibold text-emerald-400">← Back</button>
@@ -94,7 +89,7 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
       )}
     </section></>}
 
-    {tab === 'matches' && <section className="mt-4"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-semibold">Matches</h2><CompetitionScopeSelector value={matchesCompetition} onChange={value => setMatchesCompetition(value)} /></div>{recent.length > 5 && <button type="button" aria-expanded={showAll} onClick={() => setExpandedContext(showAll ? null : context)} className="secondary-view-all mb-2">{showAll ? 'Show Less' : 'View All'}</button>}{visibleMatches.map((match) => { const score = matchScore(match); const home = teams.find((item) => item.id === match.homeTeamId); const away = teams.find((item) => item.id === match.awayTeamId); return <button key={match.id} type="button" onClick={() => onNavigate({ name: 'match', id: match.id })} className="mb-2 grid min-h-12 w-full grid-cols-[1fr_auto_1fr] items-center rounded-xl bg-zinc-900 px-3 py-3 text-left"><span className="min-w-0 justify-self-start text-[10px] text-zinc-500">{formatCompactCompetitionContext(assignmentSnapshotForMatch(match))}</span><span className="shrink-0 justify-self-center text-center text-sm font-bold tabular-nums">{home?.shortName} {score.home}–{score.away} {away?.shortName}</span><span className="justify-self-end text-right text-[10px] text-zinc-500">{formatDate(match.date)}</span></button> })}{!visibleMatches.length && <p className="rounded-xl bg-zinc-900 p-3 text-xs text-zinc-500">No matches in this scope.</p>}</section>}
+    {tab === 'matches' && <section className="mt-4"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-semibold">Matches</h2><CompetitionScopeSelector value={matchesCompetition} onChange={value => setMatchesCompetition(value)} /></div>{matchData.map((match) => { const score = matchScore(match); const home = teams.find((item) => item.id === match.homeTeamId); const away = teams.find((item) => item.id === match.awayTeamId); return <button key={match.id} type="button" onClick={() => onNavigate({ name: 'match', id: match.id })} className="mb-2 grid min-h-12 w-full grid-cols-[1fr_auto_1fr] items-center rounded-xl bg-zinc-900 px-3 py-3 text-left"><span className="min-w-0 justify-self-start text-[10px] text-zinc-500">{formatCompactCompetitionContext(assignmentSnapshotForMatch(match))}</span><span className="shrink-0 justify-self-center text-center text-sm font-bold tabular-nums">{home?.shortName} {score.home}–{score.away} {away?.shortName}</span><span className="justify-self-end text-right text-[10px] text-zinc-500">{formatDate(match.date)}</span></button> })}{!matchData.length && <p className="rounded-xl bg-zinc-900 p-3 text-xs text-zinc-500">No matches in this scope.</p>}</section>}
   </div>
 }
 

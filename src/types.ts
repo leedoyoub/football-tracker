@@ -294,7 +294,6 @@ export interface ScreenStateByView {
     bestPlayersCompetition: CompetitionType | 'all'
     bestPlayersMetric: RankSort
     matchesCompetition: CompetitionType | 'all'
-    expandedContext: string | null
   }
   'import-squad': { name: 'import-squad' }
   players: { name: 'players'; search: string }
