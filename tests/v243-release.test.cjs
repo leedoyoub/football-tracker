@@ -6,7 +6,7 @@ const ts = require('typescript')
 for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename)
 
 const { matchContributionSequences } = require('../src/engine/matchContributionSequences.ts')
-const { competitionProgressLabels, formatChampionsStage, formatContributionOrdinals, formatCupProgress, formatLeagueProgress } = require('../src/lib/competitionProgressPresentation.ts')
+const { competitionProgressLabels, formatChampionsStage, formatContributionDetail, formatContributionOrdinals, formatCupProgress, formatLeagueProgress, formatOrdinal } = require('../src/lib/competitionProgressPresentation.ts')
 const { seasonAwards } = require('../src/engine/awards.ts')
 const { APP_VERSION } = require('../src/config.ts')
 const { RATING_ENGINE_REVISION } = require('../src/engine/ratingRevision.ts')
@@ -63,7 +63,30 @@ test('dashboard progress labels and competition stages use shared user-facing fo
   assert.equal(formatChampionsStage('final'), 'Final')
   assert.equal(formatChampionsStage('finalReplay'), 'Final Replay')
   assert.equal(formatChampionsStage('roundOf16').includes('round Of16'), false)
-  assert.equal(formatContributionOrdinals([5, 6]), '5' + String.fromCharCode(0x2013) + '6')
+  assert.equal(formatContributionOrdinals([5, 6]), '5th\u20136th')
+})
+
+test('English contribution ordinals use the correct suffix around teen exceptions', () => {
+  for (const [value, expected] of [[1, '1st'], [2, '2nd'], [3, '3rd'], [4, '4th'], [10, '10th'], [11, '11th'], [12, '12th'], [13, '13th'], [21, '21st'], [22, '22nd'], [23, '23rd'], [111, '111th']]) {
+    assert.equal(formatOrdinal(value), expected)
+  }
+})
+
+test('contribution details use ordinal football wording and plural ranges', () => {
+  for (const [goals, assists, expected] of [
+    [[8], [], '8th goal'],
+    [[], [3], '3rd assist'],
+    [[8], [3], '8th goal \u00B7 3rd assist'],
+    [[12], [2], '12th goal \u00B7 2nd assist'],
+    [[5, 6], [], '5th\u20136th goals'],
+    [[10, 11, 12], [], '10th\u201312th goals'],
+    [[], [4, 5], '4th\u20135th assists'],
+    [[5, 6], [3], '5th\u20136th goals \u00B7 3rd assist'],
+    [[8], [4, 5], '8th goal \u00B7 4th\u20135th assists'],
+  ]) {
+    assert.equal(formatContributionDetail(goals, assists), expected)
+  }
+  assert.equal(formatContributionDetail([], []), undefined)
 })
 
 test('seasonAwards reuses the result for identical source identities and invalidates on match replacement', () => {
@@ -100,12 +123,15 @@ test('Team Detail guards tab-specific heavy derivations behind the active tab', 
   assert.doesNotMatch(team, /best\.slots\.forEach\(/)
 })
 
-test('What Changed presents numbered contributions beside the competition and player', () => {
+test('What Changed wires the contribution formatter and an expanded middle-dot count', () => {
   const detail = fs.readFileSync(require.resolve('../src/screens/MatchDetailScreen.tsx'), 'utf8')
   assert.match(detail, /matchContributionSequences\(matches, matchId\)/)
-  assert.match(detail, /Goals ' \+ goals/)
-  assert.match(detail, /Assists ' \+ assists/)
+  assert.match(detail, /formatContributionDetail\(sequence\.goals, sequence\.assists\)/)
+  assert(detail.includes(String.raw`What Changed{open ? ' \u00B7 ' + changeCount`))
   assert.match(detail, /row\.competition/)
+  for (const path of ['../src/screens/MatchDetailScreen.tsx', '../src/lib/competitionProgressPresentation.ts', '../src/engine/matchContributionSequences.ts', '../tests/v243-release.test.cjs']) {
+    assert.equal(fs.readFileSync(require.resolve(path), 'utf8').includes('\uFFFD'), false, path)
+  }
 })
 
 test('award candidate calculation indexes team matches once and season analytics keeps identity caching', () => {

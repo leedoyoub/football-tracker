@@ -8,7 +8,7 @@ import { matchChangesForMatch } from '../engine/matchChanges'
 import { matchContributionSequences } from '../engine/matchContributionSequences'
 import { matchCompetitionType } from '../engine/competitionContext'
 import { presentMatchChanges } from '../lib/matchChangePresentation'
-import { competitionProgressLabels, formatContributionOrdinals } from '../lib/competitionProgressPresentation'
+import { competitionProgressLabels, formatContributionDetail } from '../lib/competitionProgressPresentation'
 import { measureInDevelopment } from '../lib/developmentMeasurement'
 import { useStore } from '../store'
 import { useMemo, useState } from 'react'
@@ -31,16 +31,15 @@ function MatchChangesPanel({ matchId, players, teams, matches, competitionStates
     const labels = competitionProgressLabels()
     const competition = type === 'cup' ? labels.cup : type === 'champions' ? labels.champions : labels.league
     return Object.entries(matchContributionSequences(matches, matchId)).flatMap(([playerId, sequence]) => {
-      const goals = formatContributionOrdinals(sequence.goals)
-      const assists = formatContributionOrdinals(sequence.assists)
-      if (!goals && !assists) return []
+      const detail = formatContributionDetail(sequence.goals, sequence.assists)
+      if (!detail) return []
       const player = players.find(item => item.id === playerId)
-      return [{ playerId, title: player?.displayName ?? player?.name ?? 'Player', competition, detail: [goals ? 'Goals ' + goals : '', assists ? 'Assists ' + assists : ''].filter(Boolean).join(' �� ') }]
+      return [{ playerId, title: player?.displayName ?? player?.name ?? 'Player', competition, detail }]
     })
   }, [open, matches, matchId, players])
   const changeCount = changes.length + contributions.length
   return <details className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3" onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary className="min-h-10 cursor-pointer text-sm font-black text-emerald-300">What Changed{open ? ' �� ' + changeCount : ''}</summary>
+    <summary className="min-h-10 cursor-pointer text-sm font-black text-emerald-300">What Changed{open ? ' \u00B7 ' + changeCount : ''}</summary>
     {open && <div className="mt-2 space-y-2">
       {changes.map(change => <article key={change.id} className={'rounded-lg border p-2 ' + (change.fallback ? 'border-white/10 bg-black/20' : 'border-emerald-400/15 bg-black/10')}><div className="flex items-center justify-between gap-2"><b className="truncate text-xs">{change.title}</b><span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-zinc-300">milestone</span></div><p className="mt-1 text-xs font-black text-emerald-200">{change.primary}</p>{change.secondary.map((detail, index) => <p key={change.id + ':' + index} className="mt-1 text-[10px] text-zinc-400">{detail}</p>)}</article>)}
       {contributions.map(row => <article key={'contribution:' + row.playerId} className="rounded-lg border border-emerald-400/15 bg-black/10 p-2"><div className="flex items-center justify-between gap-2"><b className="truncate text-xs">{row.title}</b><span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-zinc-300">contribution</span></div><p className="mt-1 text-[10px] font-bold text-emerald-200">{row.competition}</p><p className="mt-1 text-xs font-black text-emerald-200">{row.detail}</p></article>)}
