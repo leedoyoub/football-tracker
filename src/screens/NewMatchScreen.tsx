@@ -494,9 +494,6 @@ function MatchEditor({
   const draftCheckpoint = useMemo<Match>(() => ({ ...finalMatchData, fulltimeOpponentSotAutoLinked: fulltimeOpponentSotAutoLinked }), [finalMatchData, fulltimeOpponentSotAutoLinked])
 
   function applyOpponentSot(next: OpponentSotDraftState) {
-    const candidate = { ...finalMatchData, halftimeOpponentSot: parseOpponentSot(next.halftimeOpponentSot), fulltimeOpponentSot: parseOpponentSot(next.fulltimeOpponentSot) }
-    const validation = validateManualOpponentSot(candidate, selectedTeamId)
-    if (validation.kind === 'invalid') { setSaveError(validation.message); return }
     setOpponentSotDraft(next)
     setSaveError('')
   }

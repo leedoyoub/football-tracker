@@ -3,6 +3,7 @@ import { competitionMatches, competitionSeasonStatus, type CompetitionSeasonStat
 import { buildGlobalRankingData, type GlobalLeaderboardRow } from './stats'
 import { AWARD_433, isAwardEligible, rankAwardCandidates, seasonChampionsProgressBonus, seasonCupProgressBonus, seasonLeaguePositionBonus, selectAwardBestXI, type AwardCandidate, type AwardCandidateMode } from './awardRules'
 import { scopedAwardFamilyByPlayer } from './positionScope'
+import { RATING_ENGINE_REVISION } from './ratingRevision'
 
 export { AWARD_433, awardPositionFamily, isAwardEligible } from './awardRules'
 
@@ -87,16 +88,20 @@ export function buildAwardBestXI(players: Player[], ranked: { row: GlobalLeaderb
 }
 
 function teamIdFor(row: GlobalLeaderboardRow) { return row.historicalTeamId ?? row.teamId }
-function matchPlayedByTeam(match: Match, teamId: string) { return match.teamId === teamId || match.homeTeamId === teamId || match.awayTeamId === teamId }
-
 type ScoredAwardCandidate = { row: GlobalLeaderboardRow; candidate: AwardCandidate }
 
 function scoredCandidatesForScope(players: Player[], games: Match[], bonusFor: (teamId: string) => number, mode: 'cumulative' | 'monthly' = 'cumulative'): ScoredAwardCandidate[] {
   const teamIds = [...new Set(games.flatMap(match => match.appearances.map(appearance => appearance.teamId)))]
+  const gamesByTeam = new Map(teamIds.map(teamId => [teamId, [] as Match[]]))
+  for (const match of games) {
+    const playedTeams = new Set([match.teamId, match.homeTeamId, match.awayTeamId])
+    for (const teamId of playedTeams) if (teamId && gamesByTeam.has(teamId)) gamesByTeam.get(teamId)!.push(match)
+  }
   const candidates = teamIds.flatMap(teamId => {
-    const teamMatches = games.filter(match => matchPlayedByTeam(match, teamId)).length
-    const families = scopedAwardFamilyByPlayer(players, games, { teams: [teamId] })
-    return buildGlobalRankingData(players, games, { seasons: [], teams: [teamId], positions: [] }, 'rating').flatMap(row => {
+    const teamGames = gamesByTeam.get(teamId) ?? []
+    const teamMatches = teamGames.length
+    const families = scopedAwardFamilyByPlayer(players, teamGames, { teams: [teamId] })
+    return buildGlobalRankingData(players, teamGames, { seasons: [], teams: [teamId], positions: [] }, 'rating').flatMap(row => {
       const family = families.get(row.playerId)
       if (!isAwardEligible(appearances(row), teamMatches)) return []
       const average = rawAverage(row)
@@ -204,7 +209,7 @@ export function awardsForCompetition(type: CompetitionType, season: string, team
   return { complete, championId, scorer: winner(stats, row => row.goals, 'Goals'), assists: winner(stats, row => row.assists, 'Assists'), mvp, goalkeeper: goalkeeperWinner(goalkeeperEligible, goalkeeperLabel), ...presentation, candidates: scored.map(item => item.candidate) }
 }
 
-export function seasonAwards(season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[]) {
+function computeSeasonAwards(season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[]) {
   const status = competitionSeasonStatus(teams, matches, season, players, states.find(state => state.kind === 'champions-draw' && state.season === season))
   const complete = status.complete
   const games = matches.filter(match => match.season === season)
@@ -240,4 +245,26 @@ export function seasonAwards(season: string, teams: Team[], players: Player[], m
   )[0]
   const presentation = awardPresentationFromCandidates(scored.map(item => item.candidate))
   return { complete, goldenBoot: winner(stats, row => row.goals, 'Goals'), assistLeader: winner(stats, row => row.assists, 'Assists'), ballon, ...presentation, candidates: scored.map(item => item.candidate), goldenGlove: goldenGlove ? { playerId: goldenGlove.playerId, value: goalkeeperCleanSheets(goldenGlove), label: 'Golden Glove' } : undefined }
+}
+
+type SeasonAwardResult = ReturnType<typeof computeSeasonAwards>
+type SeasonAwardEntry = { revision: number; value: SeasonAwardResult }
+let seasonAwardCache = new WeakMap<Team[], WeakMap<Player[], WeakMap<Match[], WeakMap<CompetitionState[], Map<string, SeasonAwardEntry>>>>>()
+
+/** Reuses the derived season award model while all immutable source identities stay unchanged. */
+export function seasonAwards(season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[]): SeasonAwardResult {
+  let byPlayers = seasonAwardCache.get(teams)
+  if (!byPlayers) { byPlayers = new WeakMap(); seasonAwardCache.set(teams, byPlayers) }
+  let byMatches = byPlayers.get(players)
+  if (!byMatches) { byMatches = new WeakMap(); byPlayers.set(players, byMatches) }
+  let byStates = byMatches.get(matches)
+  if (!byStates) { byStates = new WeakMap(); byMatches.set(matches, byStates) }
+  let bySeason = byStates.get(states)
+  if (!bySeason) { bySeason = new Map(); byStates.set(states, bySeason) }
+  const key = `${RATING_ENGINE_REVISION}:${season}`
+  const existing = bySeason.get(key)
+  if (existing?.revision === RATING_ENGINE_REVISION) return existing.value
+  const value = computeSeasonAwards(season, teams, players, matches, states)
+  bySeason.set(key, { revision: RATING_ENGINE_REVISION, value })
+  return value
 }

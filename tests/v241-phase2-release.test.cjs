@@ -20,13 +20,13 @@ const approvedTeamIds = [
   'ac-milan', 'inter-milan', 'juventus', 'paris-saint-germain',
 ]
 
-test('v2.4.2 aligns actual release metadata while preserving rating revision 11', () => {
+test('v2.4.3 aligns actual release metadata while preserving rating revision 11', () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
   const lockfile = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'))
-  assert.equal(packageJson.version, '2.4.2')
-  assert.equal(lockfile.version, '2.4.2')
-  assert.equal(lockfile.packages[''].version, '2.4.2')
-  assert.equal(APP_VERSION, '2.4.2')
+  assert.equal(packageJson.version, '2.4.3')
+  assert.equal(lockfile.version, '2.4.3')
+  assert.equal(lockfile.packages[''].version, '2.4.3')
+  assert.equal(APP_VERSION, '2.4.3')
   assert.equal(RATING_ENGINE_REVISION, 11)
 })
 

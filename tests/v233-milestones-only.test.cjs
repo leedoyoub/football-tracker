@@ -21,14 +21,14 @@ test('What Changed returns all canonical milestones but excludes personal-best, 
   assert(deriveNews([player], teams, matches, []).some(item => item.id === 'rare:crossing:P:performance'))
 })
 
-test('Match Detail keeps What Changed lazy and renders the milestone-only empty state', () => {
+test('Match Detail keeps What Changed lazy and includes attacking contributions in its empty state', () => {
   const index = fs.readFileSync(require.resolve('../src/engine/matchChangeIndex.ts'), 'utf8')
   const detail = fs.readFileSync(require.resolve('../src/screens/MatchDetailScreen.tsx'), 'utf8')
   assert.equal(index.includes('compareCoreLeaderboardRows'), false)
   assert.equal(index.includes('Personal best'), false)
   assert.equal(index.includes('const rare ='), false)
   assert.match(detail, /open \? presentMatchChanges\(matchChangesForMatch/)
-  assert(detail.includes('>What Changed{open &&'))
+  assert.match(detail, />What Changed\{open \?/)
   assert.equal(detail.includes('What Changed?'), false)
-  assert(detail.includes('No milestones reached in this match.'))
+  assert(detail.includes('No milestones or attacking contributions in this match.'))
 })

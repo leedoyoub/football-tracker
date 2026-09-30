@@ -11,12 +11,14 @@ export type OpponentSotDraftState = {
 const inputValue = (value: number | undefined) => value === undefined ? '' : String(value)
 
 export function initialOpponentSotDraft(source: Pick<Match, 'halftimeOpponentSot' | 'fulltimeOpponentSot' | 'fulltimeOpponentSotAutoLinked'> | undefined, autoLinkWhenUntouched: boolean): OpponentSotDraftState {
+  const fulltimeOpponentSotAutoLinked = source?.fulltimeOpponentSotAutoLinked ?? autoLinkWhenUntouched
+  const defaultValue = fulltimeOpponentSotAutoLinked ? '0' : ''
   return {
-    halftimeOpponentSot: inputValue(source?.halftimeOpponentSot),
-    fulltimeOpponentSot: inputValue(source?.fulltimeOpponentSot),
+    halftimeOpponentSot: source?.halftimeOpponentSot === undefined ? defaultValue : inputValue(source.halftimeOpponentSot),
+    fulltimeOpponentSot: source?.fulltimeOpponentSot === undefined ? defaultValue : inputValue(source.fulltimeOpponentSot),
     // Older records/checkpoints predate the workflow flag. Never infer it from
     // equal totals, because equal values can have been entered manually.
-    fulltimeOpponentSotAutoLinked: source?.fulltimeOpponentSotAutoLinked ?? autoLinkWhenUntouched,
+    fulltimeOpponentSotAutoLinked,
   }
 }
 

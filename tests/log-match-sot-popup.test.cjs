@@ -9,10 +9,11 @@ const {
   updateHalftimeOpponentSot,
   updateFulltimeOpponentSot,
 } = require('../src/screens/opponentSotWorkflow.ts')
+const { validateManualOpponentSot } = require('../src/engine/opponentSot.ts')
 
 test('SOT workflow auto-links cumulative FT to HT until the user changes FT', () => {
   let state = initialOpponentSotDraft(undefined, true)
-  assert.deepEqual(state, { halftimeOpponentSot: '', fulltimeOpponentSot: '', fulltimeOpponentSotAutoLinked: true })
+  assert.deepEqual(state, { halftimeOpponentSot: '0', fulltimeOpponentSot: '0', fulltimeOpponentSotAutoLinked: true })
   state = updateHalftimeOpponentSot(state, '3')
   assert.deepEqual(state, { halftimeOpponentSot: '3', fulltimeOpponentSot: '3', fulltimeOpponentSotAutoLinked: true })
   state = updateHalftimeOpponentSot(state, '4')
@@ -22,12 +23,25 @@ test('SOT workflow auto-links cumulative FT to HT until the user changes FT', ()
   assert.deepEqual(updateHalftimeOpponentSot(state, '5'), { halftimeOpponentSot: '5', fulltimeOpponentSot: '7', fulltimeOpponentSotAutoLinked: false })
 })
 
-test('SOT workflow keeps unknown distinct from explicit zero and never infers old draft auto state', () => {
+test('fresh SOT defaults to zero while legacy edit stays unknown and equal totals do not imply AUTO', () => {
   const untouched = initialOpponentSotDraft(undefined, true)
-  assert.equal(untouched.halftimeOpponentSot, '')
-  assert.equal(untouched.fulltimeOpponentSot, '')
+  assert.equal(untouched.halftimeOpponentSot, '0')
+  assert.equal(untouched.fulltimeOpponentSot, '0')
   assert.deepEqual(updateHalftimeOpponentSot(untouched, '0'), { halftimeOpponentSot: '0', fulltimeOpponentSot: '0', fulltimeOpponentSotAutoLinked: true })
+  assert.deepEqual(initialOpponentSotDraft(undefined, false), { halftimeOpponentSot: '', fulltimeOpponentSot: '', fulltimeOpponentSotAutoLinked: false })
   assert.deepEqual(initialOpponentSotDraft({ halftimeOpponentSot: 3, fulltimeOpponentSot: 3 }, false), { halftimeOpponentSot: '3', fulltimeOpponentSot: '3', fulltimeOpponentSotAutoLinked: false })
+})
+
+test('HT 5 and FT 3 stay in the draft through resume until final validation rejects them', () => {
+  let draft = initialOpponentSotDraft(undefined, true)
+  draft = updateHalftimeOpponentSot(draft, '5')
+  draft = updateFulltimeOpponentSot(draft, '3')
+  assert.deepEqual(draft, { halftimeOpponentSot: '5', fulltimeOpponentSot: '3', fulltimeOpponentSotAutoLinked: false })
+  const resumed = initialOpponentSotDraft({ ...draft, halftimeOpponentSot: 5, fulltimeOpponentSot: 3 }, false)
+  assert.deepEqual(resumed, draft)
+  const savedMatch = { id: 'draft', teamId: 'A', homeTeamId: 'A', awayTeamId: 'B', halftimeOpponentSot: 5, fulltimeOpponentSot: 3, events: [] }
+  assert.equal(validateManualOpponentSot(savedMatch, 'A').kind, 'invalid')
+  assert.equal(validateManualOpponentSot({ ...savedMatch, fulltimeOpponentSot: 5 }, 'A').kind, 'manual')
 })
 
 test('Log Match owns the one editable SOT popup while End Match retains only Saves', () => {

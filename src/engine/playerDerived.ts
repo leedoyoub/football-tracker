@@ -79,7 +79,8 @@ export function derivePlayerScope(player: Player, players: Player[], matches: Ma
     const rating = ratePlayerMatch(match, player)
     if (rating) appearances.push({ match, appearance, rating })
   }
-  const actual = ordered(appearances.map(row => row.match)).map(match => appearances.find(row => row.match === match)!)
+  const appearanceByMatch = new Map(appearances.map(row => [row.match, row]))
+  const actual = ordered(appearances.map(row => row.match)).map(match => appearanceByMatch.get(match)!)
   const starts = actual.filter(row => row.appearance.role === 'starter').length; const subs = actual.length - starts
   const minutes = actual.reduce((total, row) => total + row.rating.minutes, 0)
   let goals = 0; let assists = 0; let saves = 0; let onPitchGoalsFor = 0; let onPitchGoalsAgainst = 0; let goalInvolvementGoals = 0; let goalInvolvementTeamGoals = 0

@@ -5,7 +5,10 @@ import { getMatchManOfTheMatch, matchScore, rateMatch } from '../engine/rating'
 import { assignmentSnapshotForMatch, formatCompetitionContext } from '../engine/competitionContext'
 import { matchStory } from '../engine/matchStory'
 import { matchChangesForMatch } from '../engine/matchChanges'
+import { matchContributionSequences } from '../engine/matchContributionSequences'
+import { matchCompetitionType } from '../engine/competitionContext'
 import { presentMatchChanges } from '../lib/matchChangePresentation'
+import { competitionProgressLabels, formatContributionOrdinals } from '../lib/competitionProgressPresentation'
 import { measureInDevelopment } from '../lib/developmentMeasurement'
 import { useStore } from '../store'
 import { useMemo, useState } from 'react'
@@ -20,9 +23,29 @@ const statsFor = (events: MatchEvent[], id: string) => ({ goals: events.filter(e
 function MatchChangesPanel({ matchId, players, teams, matches, competitionStates }: { matchId: string; players: Player[]; teams: Team[]; matches: ReturnType<typeof useStore>['matches']; competitionStates: CompetitionState[] }) {
   const [open, setOpen] = useState(false)
   const changes = useMemo(() => open ? presentMatchChanges(matchChangesForMatch(players, teams, matches, competitionStates, matchId)) : [], [open, players, teams, matches, competitionStates, matchId])
+  const contributions = useMemo(() => {
+    if (!open) return []
+    const match = matches.find(item => item.id === matchId)
+    if (!match) return []
+    const type = matchCompetitionType(match)
+    const labels = competitionProgressLabels()
+    const competition = type === 'cup' ? labels.cup : type === 'champions' ? labels.champions : labels.league
+    return Object.entries(matchContributionSequences(matches, matchId)).flatMap(([playerId, sequence]) => {
+      const goals = formatContributionOrdinals(sequence.goals)
+      const assists = formatContributionOrdinals(sequence.assists)
+      if (!goals && !assists) return []
+      const player = players.find(item => item.id === playerId)
+      return [{ playerId, title: player?.displayName ?? player?.name ?? 'Player', competition, detail: [goals ? 'Goals ' + goals : '', assists ? 'Assists ' + assists : ''].filter(Boolean).join(' �� ') }]
+    })
+  }, [open, matches, matchId, players])
+  const changeCount = changes.length + contributions.length
   return <details className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3" onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary className="min-h-10 cursor-pointer text-sm font-black text-emerald-300">What Changed{open && ` · ${changes.length}`}</summary>
-    {open && <div className="mt-2 space-y-2">{changes.length ? changes.map(change => <article key={change.id} className={`rounded-lg border p-2 ${change.fallback ? 'border-white/10 bg-black/20' : 'border-emerald-400/15 bg-black/10'}`}><div className="flex items-center justify-between gap-2"><b className="truncate text-xs">{change.title}</b><span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-zinc-300">milestone</span></div><p className="mt-1 text-xs font-black text-emerald-200">{change.primary}</p>{change.secondary.map((detail, index) => <p key={`${change.id}:${index}`} className="mt-1 text-[10px] text-zinc-400">{detail}</p>)}</article>) : <p className="rounded-lg bg-black/20 px-2 py-2 text-xs text-zinc-400">No milestones reached in this match.</p>}</div>}
+    <summary className="min-h-10 cursor-pointer text-sm font-black text-emerald-300">What Changed{open ? ' �� ' + changeCount : ''}</summary>
+    {open && <div className="mt-2 space-y-2">
+      {changes.map(change => <article key={change.id} className={'rounded-lg border p-2 ' + (change.fallback ? 'border-white/10 bg-black/20' : 'border-emerald-400/15 bg-black/10')}><div className="flex items-center justify-between gap-2"><b className="truncate text-xs">{change.title}</b><span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-zinc-300">milestone</span></div><p className="mt-1 text-xs font-black text-emerald-200">{change.primary}</p>{change.secondary.map((detail, index) => <p key={change.id + ':' + index} className="mt-1 text-[10px] text-zinc-400">{detail}</p>)}</article>)}
+      {contributions.map(row => <article key={'contribution:' + row.playerId} className="rounded-lg border border-emerald-400/15 bg-black/10 p-2"><div className="flex items-center justify-between gap-2"><b className="truncate text-xs">{row.title}</b><span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-zinc-300">contribution</span></div><p className="mt-1 text-[10px] font-bold text-emerald-200">{row.competition}</p><p className="mt-1 text-xs font-black text-emerald-200">{row.detail}</p></article>)}
+      {!changeCount && <p className="rounded-lg bg-black/20 px-2 py-2 text-xs text-zinc-400">No milestones or attacking contributions in this match.</p>}
+    </div>}
   </details>
 }
 

@@ -280,25 +280,42 @@ export function raceHistory(analytics: SeasonAnalytics, metric: 'goals' | 'assis
 }
 
 export function scopedPlayerRanks(rows: PlayerSnapshotRow[], players: Player[], playerId: string) {
-  const player = players.find(item => item.id === playerId)
+  const playerById = new Map(players.map(item => [item.id, item]))
+  const player = playerById.get(playerId)
+  const target = rows.find(row => row.playerId === playerId)
   const overall = rows.findIndex(row => row.playerId === playerId)
-  const familyRows = player ? rows.filter(row => positionFamily(players.find(item => item.id === row.playerId)?.position ?? 'ST') === positionFamily(player.position)) : []
-  const teamRows = rows.filter(row => row.teamId === rows.find(item => item.playerId === playerId)?.teamId)
-  const position = familyRows.findIndex(row => row.playerId === playerId)
-  const team = teamRows.findIndex(row => row.playerId === playerId)
+  let position = -1; let team = -1; let familyRank = 0; let teamRank = 0
+  for (const row of rows) {
+    if (player && positionFamily(playerById.get(row.playerId)?.position ?? 'ST') === positionFamily(player.position)) {
+      familyRank++
+      if (row.playerId === playerId) position = familyRank - 1
+    }
+    if (row.teamId === target?.teamId) {
+      teamRank++
+      if (row.playerId === playerId) team = teamRank - 1
+    }
+  }
   return { overall: overall < 0 ? null : overall + 1, position: position < 0 ? null : position + 1, team: team < 0 ? null : team + 1 }
 }
 
 /** Rank within the supplied, already-scoped leaderboard population. */
 export function scopedMetricRanks(rows: { playerId: string; teamId: string; historicalTeamId?: string }[], players: Player[], playerId: string) {
+  const playerById = new Map(players.map(item => [item.id, item]))
   const target = rows.find(row => row.playerId === playerId)
-  const player = players.find(item => item.id === playerId)
+  const player = playerById.get(playerId)
   const teamId = target?.historicalTeamId ?? target?.teamId ?? player?.teamId
   const overall = rows.findIndex(row => row.playerId === playerId)
-  const familyRows = player ? rows.filter(row => positionFamily(players.find(item => item.id === row.playerId)?.position ?? 'ST') === positionFamily(player.position)) : []
-  const teamRows = rows.filter(row => (row.historicalTeamId ?? row.teamId) === teamId)
-  const position = familyRows.findIndex(row => row.playerId === playerId)
-  const team = teamRows.findIndex(row => row.playerId === playerId)
+  let position = -1; let team = -1; let familyRank = 0; let teamRank = 0
+  for (const row of rows) {
+    if (player && positionFamily(playerById.get(row.playerId)?.position ?? 'ST') === positionFamily(player.position)) {
+      familyRank++
+      if (row.playerId === playerId) position = familyRank - 1
+    }
+    if ((row.historicalTeamId ?? row.teamId) === teamId) {
+      teamRank++
+      if (row.playerId === playerId) team = teamRank - 1
+    }
+  }
   return { overall: overall < 0 ? null : overall + 1, position: position < 0 ? null : position + 1, team: team < 0 ? null : team + 1 }
 }
 
