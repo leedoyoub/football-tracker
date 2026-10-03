@@ -1,4 +1,4 @@
-import type { Position } from '../types'
+import type { FormationSlot, Position } from '../types'
 
 const DEFENDERS: Position[] = ['LB', 'LWB', 'LCB', 'CB', 'RCB', 'RWB', 'RB']
 const MIDFIELDERS: Position[] = ['LDM', 'CDM', 'RDM', 'LM', 'LCM', 'CM', 'RCM', 'RM']
@@ -13,6 +13,10 @@ export function calculateFormation(matchPositions: Position[]): string {
   return cams > 0
     ? `${defenders}-${midfielders}-${cams}-${attackers}`
     : `${defenders}-${midfielders}-${attackers}`
+}
+
+export function kickoffFormation(snapshot: FormationSlot[]): string {
+  return calculateFormation(snapshot.map(slot => slot.ratingPosition ?? slot.matchPosition))
 }
 
 const ZONES: { position: Position; x: number; y: number }[] = [

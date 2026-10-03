@@ -2,6 +2,7 @@ import type { Match, Player, Team } from '../types'
 import { matchScore } from './rating'
 import { isOnPitchAtEvent, matchPositionSegments, normalizeMatchPosition, pitchWindow } from './timeline'
 import { validateKickoffLineup } from './kickoffLineup'
+import { tacticalSlotById } from './tacticalSlots'
 
 export type IntegritySeverity = 'error' | 'warning' | 'info'
 export type IntegrityIssue = { severity: IntegritySeverity; matchId?: string; message: string }
@@ -39,6 +40,7 @@ export function auditDataIntegrity(matches: Match[], players: Player[], teams: T
       for (let index = 0; index < history.length; index++) {
         const change = history[index]
         if (!Number.isFinite(change.minute) || change.minute < 0 || change.minute > 99 || !normalizeMatchPosition(change.position)) add(issues, 'error', match, 'Malformed position-change timeline.')
+        if (change.tacticalSlotId && !tacticalSlotById[change.tacticalSlotId]) add(issues, 'warning', match, 'Position change has an unknown tactical slot.')
         if (index && change.minute < history[index - 1].minute) add(issues, 'warning', match, 'Position changes are not chronological.')
       }
       const segments = matchPositionSegments(match, appearance)
@@ -52,6 +54,7 @@ export function auditDataIntegrity(matches: Match[], players: Player[], teams: T
       if (event.minute !== undefined && (!Number.isFinite(event.minute) || event.minute < 0 || event.minute > 99)) add(issues, 'error', match, 'Event minute is outside supported range.')
       if (!matchTeamIds.has(event.teamId)) add(issues, 'error', match, 'Event references a team that is not in this match.')
       if (event.type === 'sub') {
+        if (event.tacticalSlotId && !tacticalSlotById[event.tacticalSlotId]) add(issues, 'warning', match, 'Substitution has an unknown tactical slot.')
         if (!playerIds.has(event.playerInId) || !playerIds.has(event.playerOutId)) add(issues, 'error', match, 'Substitution references an unknown player.')
         const fingerprint = [event.teamId, event.minute, event.playerOutId, event.playerInId].join('|')
         if (subFingerprints.has(fingerprint)) add(issues, 'warning', match, 'Duplicate logically identical substitution event.')

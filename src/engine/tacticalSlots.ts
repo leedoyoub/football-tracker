@@ -22,7 +22,7 @@ const slots: Array<[string, Position, string, number, number]> = [
 
 export const TACTICAL_SLOT_DEFINITIONS: TacticalSlotDefinition[] = slots.map(([id, ratingPosition, displayPosition, x, y]) => ({ id, ratingPosition, displayPosition, x, y }))
 
-export const tacticalSlotById = Object.fromEntries(TACTICAL_SLOT_DEFINITIONS.map(slot => [slot.id, slot])) as Record<string, TacticalSlotDefinition>
+export const tacticalSlotById = Object.assign(Object.create(null) as Record<string, TacticalSlotDefinition>, Object.fromEntries(TACTICAL_SLOT_DEFINITIONS.map(slot => [slot.id, slot])))
 export const ratingPositionForSlot = (slotId: string): Position | undefined => tacticalSlotById[slotId]?.ratingPosition
 export const displayPositionForSlot = (slotId: string): string | undefined => tacticalSlotById[slotId]?.displayPosition
 

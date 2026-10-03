@@ -41,7 +41,7 @@ function orderRawEvents(match: Match): OrderedEvent[] {
   return rows
 }
 
-function changeOrder(change: PositionChange, appearance: Appearance, events: OrderedEvent[], order: Map<MatchEvent, number>): number {
+export function positionChangeOrder(change: PositionChange, appearance: Appearance, events: OrderedEvent[], order: Map<MatchEvent, number>): number {
   const sameMinute = events.filter(row => row.event.minute === change.minute)
   if (Number.isFinite(change.sequence)) {
     const after = sameMinute.find(row => Number.isFinite(row.event.sequence) && row.event.sequence! > change.sequence!)
@@ -81,7 +81,7 @@ export function normalizeMatchTimeline(match: Match, revision = RATING_ENGINE_RE
     if (!initial) continue
     const changes = (appearance.positionHistory ?? []).flatMap((change, index): Change[] => {
       const position = normalizeMatchPosition(change.position)
-      return position && Number.isFinite(change.minute) && change.minute >= 0 && change.minute <= end ? [{ minute: change.minute, position, index, order: changeOrder(change, appearance, events, order) }] : []
+      return position && Number.isFinite(change.minute) && change.minute >= 0 && change.minute <= end ? [{ minute: change.minute, position, index, order: positionChangeOrder(change, appearance, events, order) }] : []
     }).sort((a, b) => a.minute - b.minute || a.order - b.order || a.index - b.index)
     const intervals: PitchInterval[] = []
     let active: PitchInterval | undefined = appearance.role === 'starter' ? { enter: 0, exit: end, position: initial } : undefined

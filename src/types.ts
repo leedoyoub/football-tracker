@@ -100,6 +100,8 @@ export interface Player {
 export interface PositionChange {
   minute: number
   position: Position
+  /** Exact tactical destination; optional for saved legacy histories. */
+  tacticalSlotId?: string
   /** Shares ordering with MatchEvent.sequence; absent in legacy histories. */
   sequence?: number
 }
@@ -152,6 +154,8 @@ export type MatchEvent =
       playerOutId: string
       playerInId: string
       position: Position
+      /** Exact tactical destination; optional for saved legacy events. */
+      tacticalSlotId?: string
     }
 
 export interface Match {

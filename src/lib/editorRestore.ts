@@ -20,7 +20,8 @@ export function restoreDraft(match: Match | undefined, players: Player[]): Resto
     const bench = [...new Set(match.appearances.filter(item => item.role === 'bench' && playerIds.has(item.playerId) && !Object.values(starters).includes(item.playerId)).map(item => item.playerId))]
     const histories = Object.fromEntries(match.appearances.filter(item => item.positionHistory?.length).map(item => [item.playerId, item.positionHistory!])) as Record<string, PositionChange[]>
     const roster = [...new Set([...Object.values(starters), ...bench])]
-    const replayed = match.events.length ? rebuildLiveHistory(starters, roster, match.events, histories, slotPositions) : undefined
+    const hasExactTacticalMove = Object.values(histories).some(changes => changes.some(change => change.tacticalSlotId))
+    const replayed = match.events.length || hasExactTacticalMove ? rebuildLiveHistory(starters, roster, match.events, histories, slotPositions) : undefined
     // Replay produces the current slot layout, but the persisted position
     // timeline is authoritative and must never be narrowed during resume.
     const draft = replayed ? { ...replayed, events: match.events, positionHistories: histories } : { slotAssignments: starters, homeBench: bench, events: match.events, positionHistories: histories }

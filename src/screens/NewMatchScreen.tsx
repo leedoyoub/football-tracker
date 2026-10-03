@@ -1,10 +1,11 @@
 import { getMostRecentStartingLineup } from '../engine/recentLineup'
 import { nextTimelineSequence } from '../engine/timeline'
+import { eligibleAtEvent, previewGoalEvent, tacticalAssignmentsAtMoment, tacticalPreviewSlots } from '../engine/tacticalHistory'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FORMATION_SLOTS, Pitch, UNIVERSAL_TACTICAL_SLOTS, type TacticalSlot } from '../components/Pitch'
-import { calculateFormation } from '../engine/formation'
+import { calculateFormation, kickoffFormation } from '../engine/formation'
 import { playerSeasonStats } from '../engine/stats'
-import { matchScore, pitchWindow } from '../engine/rating'
+import { matchScore } from '../engine/rating'
 import { allowsGoalkeeperLineupMove, canConfirmSubstitution, moveLineup, moveSubstitution, type LineupTarget, type SubstitutionDraft } from './matchLineup'
 import { getNextMatchDayForTeam } from '../engine/match'
 import { competitionAssignment, matchCompetitionType } from '../engine/competition'
@@ -260,12 +261,13 @@ function MatchEditor({
     const writeEvent = (event: MatchEvent) => setMatchDraft(prev => ({ ...prev, events: editingEventId ? prev.events.map((e) => e.id === editingEventId ? { ...e, ...event, sequence: e.sequence } : e) : [...prev.events, { ...event, sequence: nextTimelineSequence(prev.events, prev.positionHistories) }] }))
     const minute = Number(minuteInput); if (!Number.isInteger(minute) || minute < 0 || minute > 99) return
     setAppliedMinute(minute)
+    const eligibleNow = new Set(eligibleAt(minute).map(appearance => appearance.playerId))
     if (liveEvent === 'goal') {
-      if (!liveScorerId || !assistChosen || !eligibleGoalIds.includes(liveScorerId) || (liveAssistId && (!eligibleGoalIds.includes(liveAssistId) || liveScorerId === liveAssistId))) return
+      if (!liveScorerId || !assistChosen || !eligibleNow.has(liveScorerId) || (liveAssistId && (!eligibleNow.has(liveAssistId) || liveScorerId === liveAssistId))) return
       const existingGoal = editingEventId ? matchDraft.events.find((event): event is Extract<MatchEvent, { type: 'goal' }> => event.id === editingEventId && event.type === 'goal') : undefined
       writeEvent({ ...existingGoal, id: editingEventId ?? id, type: 'goal', minute, teamId: selectedTeamId, playerId: liveScorerId || undefined, assistPlayerId: liveScorerId ? liveAssistId || undefined : undefined, goalType: existingGoal?.goalType ?? 'normal' })
     } else if (liveEvent === 'conceded') {
-      if (liveCauseId && !eligibleGoalIds.includes(liveCauseId)) return
+      if (liveCauseId && !eligibleNow.has(liveCauseId)) return
       writeEvent({ id: editingEventId ?? id, type: 'goal', minute, teamId: opponentId, playerId: undefined, concededGoalCausePlayerId: liveCauseId || undefined })
     } else if (substitutionDraft) {
       if (substitutionError || !canConfirmSubstitution(substitutionDraft, matchDraft)) return
@@ -391,6 +393,7 @@ function MatchEditor({
   }
 
   const kickoffSnapshot = useMemo(() => kickoffFromAssignments(startingSnapshot), [startingSnapshot])
+  const kickoffFormationName = kickoffSnapshot.length ? kickoffFormation(kickoffSnapshot) : activeFormationName
   const kickoffIsValid = validateKickoffLineup(kickoffSnapshot).valid && isGoalkeeperPlayer(startingSnapshot.GK) && Object.values(startingSnapshot).filter(isGoalkeeperPlayer).length === 1
   const appearances: Appearance[] = useMemo(() => {
     const res: Appearance[] = []
@@ -419,29 +422,27 @@ function MatchEditor({
       : appearance)
   }, [selectedTeamId, players, matchDraft, startingSnapshot, startingBenchSnapshot, lineupLocked])
 
-  const eventMatch = { id: draftId, season, matchDay, date, duration: 90, homeTeamId, awayTeamId, appearances, events: matchDraft.events }
+  const eventMatch: Match = { id: draftId, season, matchDay, date, duration: 90, homeTeamId, awayTeamId, appearances, events: matchDraft.events }
   const liveBenchPlayers = sortPlayersByPosition(activeDraft.homeBench.filter(Boolean).map((id) => draftPlayers.find((player) => player.id === id)).filter((player): player is Player => Boolean(player)), appearances)
-  function eligibleAt(minute: number) {
-    return appearances.filter(appearance => {
-      const window = pitchWindow(eventMatch, appearance)
-      const offAtMinute = matchDraft.events.some(event => event.type === 'sub' && event.playerOutId === appearance.playerId && event.minute === minute)
-      return window && minute >= window.enter && (minute < window.exit || (minute >= 90 && window.exit === 90 && !offAtMinute))
-    })
+  function previewAt(minute: number) {
+    return previewGoalEvent(eventMatch, matchDraft.positionHistories, minute, liveEvent === 'conceded' ? opponentId : selectedTeamId, editingEventId)
   }
-  const eligibleAppearances = Number.isFinite(appliedMinute) ? eligibleAt(appliedMinute) : appearances.filter(a => liveSlots.some(slot => slot.playerId === a.playerId))
+  function eligibleAt(minute: number) {
+    const { match, event } = previewAt(minute)
+    return eligibleAtEvent(match, event)
+  }
+  const eventPreviewMinute = minuteIsValid ? liveMinute : appliedMinute
+  const eligibleAppearances = minuteInput !== '' ? eligibleAt(eventPreviewMinute) : appearances.filter(a => liveSlots.some(slot => slot.playerId === a.playerId))
   const eligibleGoalIds = eligibleAppearances.map(a => a.playerId)
-  const occupiedGoalSlots = new Set<string>()
-  const goalSlots: Best11Slot[] = Number.isFinite(appliedMinute) ? eligibleAppearances.map(a => {
-    const on = matchDraft.events.find(event => event.type === 'sub' && event.playerInId === a.playerId)
-    const history = [...(a.positionHistory ?? [])].filter(change => change.minute <= appliedMinute).sort((a, b) => a.minute - b.minute)
-    const position = history[history.length - 1]?.position ?? (a.role === 'bench' && on?.type === 'sub' ? on.position : a.matchPosition ?? a.position)
-    const originalSlot = Object.keys(startingSnapshot).find(slot => startingSnapshot[slot] === a.playerId)
-    const candidates = UNIVERSAL_TACTICAL_SLOTS.filter(slot => slot.matchPosition === position && !occupiedGoalSlots.has(slot.slot))
-    const tactical = candidates.find(slot => slot.slot === originalSlot) ?? candidates.find(slot => slot.slot === position) ?? candidates[0]
-    const slotId = tactical?.slot ?? position
-    occupiedGoalSlots.add(slotId)
-    return { slot: slotId, position: a.position, matchPosition: position, playerId: a.playerId, teamId: a.teamId, avgRating: 0, matches: 0 }
-  }) : liveSlots
+  const goalSlots = (() => {
+    if (minuteInput === '') return liveSlots
+    const { match, event } = previewAt(eventPreviewMinute)
+    try {
+      const assignments = tacticalAssignmentsAtMoment(startingSnapshot, match.events, matchDraft.positionHistories, slotPositions, event)
+      const eligible = new Set(eligibleGoalIds)
+      return tacticalPreviewSlots(assignments, selectedTeamId).filter(slot => slot.playerId && eligible.has(slot.playerId))
+    } catch { return liveSlots.filter(slot => slot.playerId && eligibleGoalIds.includes(slot.playerId)) }
+  })()
   function chooseScorer(id: string) {
     if (!eligibleGoalIds.includes(id)) return
     setLiveScorerId(id); setLiveAssistId(''); setAssistChosen(false); setLivePicker('assist')
@@ -488,9 +489,9 @@ function MatchEditor({
 
   const finalMatchData = useMemo<Match>(() => ({
     id: draftId,
-    season, competitionType: activeAssignment.competitionType, competitionStage: activeAssignment.stage, competitionPairingId: activeAssignment.pairingId, competitionSeriesGame: activeAssignment.seriesGame, competitionAssignment: activeAssignment, matchDay, date, formation: activeFormationName, homeAway: 'home' as const, homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90,
+    season, competitionType: activeAssignment.competitionType, competitionStage: activeAssignment.stage, competitionPairingId: activeAssignment.pairingId, competitionSeriesGame: activeAssignment.seriesGame, competitionAssignment: activeAssignment, matchDay, date, formation: kickoffFormationName, homeAway: 'home' as const, homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: 90,
     halftimeOpponentSot: parseOpponentSot(halftimeOpponentSot), fulltimeOpponentSot: parseOpponentSot(fulltimeOpponentSot), appearances, events: matchDraft.events, kickoffLineup: kickoffSnapshot,
-  }), [draftId, season, activeAssignment, matchDay, date, activeFormationName, homeTeamId, awayTeamId, selectedTeamId, opponentName, halftimeOpponentSot, fulltimeOpponentSot, appearances, matchDraft.events, kickoffSnapshot])
+  }), [draftId, season, activeAssignment, matchDay, date, kickoffFormationName, homeTeamId, awayTeamId, selectedTeamId, opponentName, halftimeOpponentSot, fulltimeOpponentSot, appearances, matchDraft.events, kickoffSnapshot])
   const draftCheckpoint = useMemo<Match>(() => ({ ...finalMatchData, fulltimeOpponentSotAutoLinked: fulltimeOpponentSotAutoLinked }), [finalMatchData, fulltimeOpponentSotAutoLinked])
 
   function applyOpponentSot(next: OpponentSotDraftState) {
