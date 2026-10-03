@@ -95,7 +95,7 @@ test('Combination leaders reuse the canonical Records first-place highlight and 
   assert(records.includes('combinationGroups') && records.includes('entries(rows, ascending)'))
   for (const connector of ["'goal-combinations': { connector: '→'", "'mutual-goal-combinations': { connector: '↔'", "'both-scored': { connector: '&'", "'both-ga': { connector: '&'", "'duo-ga': { connector: '+'", "'cb-suppression': { connector: '&'"]) assert(records.includes(connector))
   for (const label of labels) assert(records.includes(label))
-  assert(records.includes('filter(row => row.togetherMinutes >= 180)') && records.includes("group('cb-suppression'"))
+  assert(records.includes('teamIds.includes(row.teamId)) && row.togetherMinutes >= 180') && records.includes("group('cb-suppression'"))
 })
 
 test('Player Detail, Match Story, Match Log, and Data Integrity remain reachable from rendered screens', () => {

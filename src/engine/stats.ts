@@ -10,7 +10,7 @@ import type {
   TeamSeasonStats,
   PartnershipStats,
 } from '../types'
-import { hasPitchAppearance, ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, pitchWindow, matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './rating'
+import { hasPitchAppearance, ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, pitchWindow, matchPositionSegments } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import { kickoffLineupForMatch } from './kickoffLineup'
 import { newestMatches, oldestMatches } from './matchChronology'
@@ -18,6 +18,7 @@ import { positionFamily, scopedAwardFamilyByPlayer, scopedPositionFamilyByPlayer
 import { matchCompetitionType } from './competitionContext'
 import { GOOD_RATING_THRESHOLD } from './constants'
 import { opponentSot } from './opponentSot'
+import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts, playerSaveCount } from './playerMatchFacts'
 import { isAwardEligible, rankAwardCandidates, selectAwardBestXI, type AwardCandidate } from './awardRules'
 
 
@@ -53,12 +54,7 @@ export function aggregatePlayerStats(
     ratings.push(rating)
     if (actuallyPlayed(match, player.id)) {
       // Counts are raw events, not the weighted saves contribution in RatingBreakdown.
-      saves += match.events.reduce((total, event) => {
-        if (event.type !== 'save' || event.playerId !== player.id || event.teamId !== appearance.teamId) return total
-        if (event.minute === undefined ? !matchPositionSegments(match, appearance).some(segment => segment.position === 'GK') : matchPositionAtEvent(match, appearance, event) !== 'GK') return total
-        const count = event.count ?? 1
-        return Number.isInteger(count) && count > 0 ? total + count : total
-      }, 0)
+      saves += playerSaveCount(match, appearance)
     }
     if (appearance.role === 'starter') starts++
     else subs++
@@ -74,18 +70,18 @@ export function aggregatePlayerStats(
 
   const goals = matches.reduce((sum, match) => {
     const appearance = match.appearances.find(item => item.playerId === player.id)
-    return sum + (appearance ? match.events.filter(e => e.type === 'goal' && !e.ownGoal && e.playerId === player.id && isOnPitchAtEvent(match, appearance, e)).length : 0)
+    return sum + (appearance ? playerGoalEvents(match, appearance).length : 0)
   }, 0)
   const assists = matches.reduce((sum, match) => {
     const appearance = match.appearances.find(item => item.playerId === player.id)
-    return sum + (appearance ? match.events.filter(e => e.type === 'goal' && !e.ownGoal && e.assistPlayerId === player.id && isOnPitchAtEvent(match, appearance, e)).length : 0)
+    return sum + (appearance ? playerAssistEvents(match, appearance).length : 0)
   }, 0)
   const minutes = ratings.reduce((sum, r) => sum + r.minutes, 0)
   const avgRating =
     ratings.length === 0
       ? 0
       : ratings.reduce((sum, r) => sum + r.raw, 0) / ratings.length
-  const mom = matches.filter((match) => getMatchManOfTheMatch(match, allPlayers) === player.id).length
+  const mom = matches.filter((match) => ratePlayerMatch(match, player) && getMatchManOfTheMatch(match, allPlayers) === player.id).length
   
   return {
     playerId: player.id,
@@ -256,6 +252,12 @@ export type GlobalLeaderboardRow = PlayerSeasonStats & {
   concededOnPitch?: number
   qualifyingGoalkeeperAppearances?: number
   qualifyingSaves?: number
+  cleanSheets?: number
+  goalkeeperRatings?: RatingBreakdown[]
+  goalkeeperMinutes?: number
+  goalkeeperAppearances?: number
+  goalkeeperConceded?: number
+  scopedPositionFamily?: PositionFamily
 }
 
 const defenderRankingPosition = (position: Position) => ['CB', 'LB', 'RB'].includes(position)
@@ -300,9 +302,7 @@ export function buildGlobalRankingData(
     return rows
   }
   const selected = matches.filter(match => (!filters.seasons.length || filters.seasons.includes(match.season)))
-  const historicalPositionFamilies = filters.positions.length
-    ? scopedPositionFamilyByPlayer(players, selected, { teams: filters.teams })
-    : undefined
+  const historicalPositionFamilies = scopedPositionFamilyByPlayer(players, selected, { teams: filters.teams })
   const allowedPositionFamilies = new Set(filters.positions.map(positionFamily).filter((family): family is NonNullable<typeof family> => Boolean(family)))
   const playerById = new Map(players.map(player => [player.id, player]))
   const matchesByPlayer = new Map<string, Match[]>()
@@ -333,7 +333,8 @@ export function buildGlobalRankingData(
     if (allowedPositionFamilies.size && !allowedPositionFamilies.has(historicalPositionFamilies?.get(player.id) as NonNullable<ReturnType<typeof positionFamily>>)) return []
     const playerMatches = oldestMatches(matchesByPlayer.get(player.id) ?? [])
     const ratingRows: RatingBreakdown[] = []
-    let starts = 0; let subs = 0; let saves = 0; let wins = 0; let draws = 0; let losses = 0
+    let starts = 0; let subs = 0; let saves = 0; let cleanSheets = 0; let goalkeeperMinutes = 0; let goalkeeperAppearances = 0; let goalkeeperConceded = 0; let wins = 0; let draws = 0; let losses = 0
+    const goalkeeperRatings: RatingBreakdown[] = []
     let sotAllowedTotal = 0; let sotAllowedAppearances = 0; let concededOnPitch = 0; let qualifyingGoalkeeperAppearances = 0; let qualifyingSaves = 0
     const recentForm: ('W' | 'D' | 'L')[] = []
     for (const match of playerMatches) {
@@ -343,13 +344,12 @@ export function buildGlobalRankingData(
       if (!rating) continue
       ratingRows.push(rating)
       if (appearance.role === 'starter') starts++; else subs++
-      const matchSaves = match.events.reduce((total, event) => {
-        if (event.type !== 'save' || event.playerId !== player.id || event.teamId !== appearance.teamId) return total
-        if (event.minute === undefined ? !matchPositionSegments(match, appearance).some(segment => segment.position === 'GK') : matchPositionAtEvent(match, appearance, event) !== 'GK') return total
-        const count = event.count ?? 1
-        return Number.isInteger(count) && count > 0 ? total + count : total
-      }, 0)
+      const goalkeeper = playerGoalkeeperFacts(match, appearance)
+      const matchSaves = goalkeeper.saves
       saves += matchSaves
+      cleanSheets += Number(goalkeeper.cleanSheet)
+      goalkeeperMinutes += goalkeeper.minutes; goalkeeperAppearances += goalkeeper.appearances; goalkeeperConceded += goalkeeper.conceded
+      if (goalkeeper.appearances) goalkeeperRatings.push(rating)
       const window = pitchWindow(match, appearance)
       // Ranking eligibility follows the historical match role, just like the
       // rating engine; a later transfer or role change cannot rewrite it.
@@ -360,29 +360,25 @@ export function buildGlobalRankingData(
         sotAllowedTotal += opponentSot(match, appearance.teamId)
         sotAllowedAppearances++
       }
-      if (window && isGoalkeeper && rating.minutes >= 60) {
+      if (window && isGoalkeeper && goalkeeper.minutes >= 60) {
         qualifyingGoalkeeperAppearances++
         qualifyingSaves += matchSaves
-        concededOnPitch += match.events.filter(event => event.type === 'goal' && scoringTeamId(match, event) !== appearance.teamId && isOnPitchAtEvent(match, appearance, event)).length
+        concededOnPitch += goalkeeper.conceded
       }
       const score = matchScore(match); const ours = appearance.teamId === match.homeTeamId ? score.home : score.away; const theirs = appearance.teamId === match.homeTeamId ? score.away : score.home
       if (ours > theirs) { wins++; recentForm.push('W') } else if (ours === theirs) { draws++; recentForm.push('D') } else { losses++; recentForm.push('L') }
     }
     if (!ratingRows.length) return []
-    const goals = playerMatches.reduce((sum, match) => { const appearance = match.appearances.find(item => item.playerId === player.id); return sum + (appearance ? match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.playerId === player.id && isOnPitchAtEvent(match, appearance, event)).length : 0) }, 0)
-    const assists = playerMatches.reduce((sum, match) => { const appearance = match.appearances.find(item => item.playerId === player.id); return sum + (appearance ? match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id && isOnPitchAtEvent(match, appearance, event)).length : 0) }, 0)
+    const goals = playerMatches.reduce((sum, match) => { const appearance = match.appearances.find(item => item.playerId === player.id); return sum + (appearance ? playerGoalEvents(match, appearance).length : 0) }, 0)
+    const assists = playerMatches.reduce((sum, match) => { const appearance = match.appearances.find(item => item.playerId === player.id); return sum + (appearance ? playerAssistEvents(match, appearance).length : 0) }, 0)
     const minutes = ratingRows.reduce((sum, rating) => sum + rating.minutes, 0)
     const avgRating = ratingRows.reduce((sum, rating) => sum + rating.raw, 0) / ratingRows.length
     const latest = newestMatches(playerMatches)[0]
     const stats: PlayerSeasonStats = { playerId: player.id, teamId: player.teamId, season: 'All', matches: ratingRows.length, starts, subs, minutes, goals, assists, avgRating, mom: playerMatches.filter(match => momFor(match) === player.id).length, goodMatches: ratingRows.filter(rating => rating.raw >= GOOD_RATING_THRESHOLD).length, saves, wins, draws, losses, recentForm: recentForm.slice(-5).reverse(), ratings: ratingRows }
-    const playedGoalkeeper = ratingRows.some(rating => {
-      const match = playerMatches.find(item => item.id === rating.matchId)
-      const appearance = match?.appearances.find(item => item.playerId === player.id)
-      return match && appearance && matchPositionSegments(match, appearance).some(segment => segment.position === 'GK')
-    })
+    const playedGoalkeeper = goalkeeperAppearances > 0
     const per90 = (value: number) => stats.minutes ? value / stats.minutes * 90 : 0
     const value = _metric === 'goals' ? stats.goals : _metric === 'assists' ? stats.assists : _metric === 'g+a' ? stats.goals + stats.assists : _metric === 'minutes' ? stats.minutes : _metric === 'mom' ? stats.mom : _metric === 'goodMatches' ? stats.goodMatches : _metric === 'goals/90' ? per90(stats.goals) : _metric === 'assists/90' ? per90(stats.assists) : _metric === 'g+a/90' ? per90(stats.goals + stats.assists) : stats.avgRating
-    return [{ ...stats, value, historicalTeamId: latest?.appearances.find(item => item.playerId === player.id)?.teamId, playedGoalkeeper, sotAllowedAppearances, sotAllowedTotal, concededOnPitch, qualifyingGoalkeeperAppearances, qualifyingSaves }]
+    return [{ ...stats, value, historicalTeamId: latest?.appearances.find(item => item.playerId === player.id)?.teamId, playedGoalkeeper, sotAllowedAppearances, sotAllowedTotal, concededOnPitch, qualifyingGoalkeeperAppearances, qualifyingSaves, cleanSheets, goalkeeperRatings, goalkeeperMinutes, goalkeeperAppearances, goalkeeperConceded, scopedPositionFamily: historicalPositionFamilies.get(player.id) }]
   })
   const presented = presentMetric(rows, _metric)
   byFilter.set(cacheKey, { rows, presented: new Map([[_metric, presented]]) })
@@ -416,7 +412,7 @@ export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Pla
       case 'assists/90': return row.minutes ? row.assists / row.minutes * 90 : 0
       case 'g+a/90': return row.minutes ? (row.goals + row.assists) / row.minutes * 90 : 0
       case 'sotAllowed': return row.sotAllowedAppearances ? (row.sotAllowedTotal ?? 0) / row.sotAllowedAppearances : Number.NaN
-      case 'cleanSheets': return row.ratings.filter(rating => rating.minutes > 0 && rating.conceded === 0).length
+      case 'cleanSheets': return row.cleanSheets ?? 0
       case 'saves': return row.saves
       case 'goalsConceded': return row.qualifyingGoalkeeperAppearances ? (row.concededOnPitch ?? 0) / row.qualifyingGoalkeeperAppearances : Number.NaN
       case 'savePercentage': { const saves = row.qualifyingSaves ?? 0; const denominator = saves + (row.concededOnPitch ?? 0); return denominator ? saves / denominator * 100 : Number.NaN }
@@ -434,6 +430,7 @@ export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Pla
   return ranked
 }
 
+/** @deprecated Compatibility API for historical callers; production ranking screens use buildGlobalRankingData. */
 export function getLeaderboard(
   players: Player[],
   matches: Match[],
@@ -496,6 +493,7 @@ export function getLeaderboard(
   return stats
 }
 
+/** @deprecated Compatibility API; production screens use buildGlobalRankingData and rankGlobalRankingRows. */
 export function globalRankings(
   players: Player[],
   matches: Match[],
@@ -588,8 +586,8 @@ function unifiedCandidates(players: Player[], matches: Match[], season: string, 
       const performance = selectedParticipations.reduce((total, item) => {
         const appearance = item.match.appearances.find(row => row.playerId === player.id && row.teamId === teamId)
         if (!appearance) return total
-        const goals = item.match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.playerId === player.id && isOnPitchAtEvent(item.match, appearance, event)).length
-        const assists = item.match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id && isOnPitchAtEvent(item.match, appearance, event)).length
+        const goals = playerGoalEvents(item.match, appearance).length
+        const assists = playerAssistEvents(item.match, appearance).length
         return { goals: total.goals + goals, assists: total.assists + assists, mom: total.mom + Number(getMatchManOfTheMatch(item.match, players) === player.id) }
       }, { goals: 0, assists: 0, mom: 0 })
       const average = selectedRatings.reduce((sum, row) => sum + row.raw, 0) / selectedRatings.length

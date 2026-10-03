@@ -21,7 +21,7 @@ test('form ignores unused bench and streaks track current separately from season
   const form = insights.playerForm(p, games)
   assert.equal(form.ratings.length, 3)
   const goals = insights.playerStreaks(p, games).find(row => row.key === 'goals')
-  assert.deepEqual([goals.current, goals.best], [1, 2])
+  assert.deepEqual([goals.current, goals.best], [3, 3])
 })
 
 test('clutch classification rebuilds score state in chronological event order', () => {

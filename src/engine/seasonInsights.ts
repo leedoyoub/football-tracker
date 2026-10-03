@@ -1,11 +1,13 @@
 import { matchScore, ratePlayerMatch } from './rating'
-import { playerSeasonStats, unifiedBestEleven } from './stats'
+import { playerSeasonStats } from './stats'
+import { seasonAwards } from './awards'
 import { combinationStats, goalPartnerships, starterSubstituteSplits } from './analytics'
 import { GOOD_RATING_THRESHOLD } from './constants'
 import { classifyGoalTypes } from './goalTypes'
-import type { CompetitionState, Match, MatchEvent, Player } from '../types'
+import type { CompetitionState, Match, MatchEvent, Player, Team } from '../types'
 import { oldestMatches } from './matchChronology'
 import { matchCompetitionType } from './competitionContext'
+import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts } from './playerMatchFacts'
 
 /** All season insight calculations live here so none of them require extra match input. */
 export const STARTING_XI_MIN_SAMPLE = 3
@@ -76,10 +78,10 @@ export function playerStreaks(player: Player, matches: Match[]): PlayerStreak[] 
     const appearance = match.appearances.find(item => item.playerId === player.id)
     if (!appearance) return []
     const rating = ratePlayerMatch(match, player)
-    const goals = match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.playerId === player.id).length
-    const assists = match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id).length
-    const score = matchScore(match); const conceded = appearance.teamId === match.homeTeamId ? score.away : score.home
-    return [{ goals, assists, rating: rating?.rating ?? 0, started: appearance.role === 'starter', cleanSheet: Boolean(rating) && conceded === 0 }]
+    if (!rating) return []
+    const goals = playerGoalEvents(match, appearance).length
+    const assists = playerAssistEvents(match, appearance).length
+    return [{ goals, assists, rating: rating.rating, started: appearance.role === 'starter', cleanSheet: playerGoalkeeperFacts(match, appearance).cleanSheet }]
   })
   const definitions: { key: StreakName; label: string; passes: (entry: typeof entries[number]) => boolean }[] = [
     { key: 'goals', label: 'Goals', passes: entry => entry.goals > 0 },
@@ -132,10 +134,10 @@ export function startingXILeaders(players: Player[], matches: Match[], season: s
 }
 
 export type SeasonAward = { id: string; title: string; playerIds: string[]; detail: string }
-export type SeasonRecap = { season: string; complete: boolean; matchDays: number; awards: SeasonAward[]; bestXI: ReturnType<typeof unifiedBestEleven>['slots'] }
+export type SeasonRecap = { season: string; complete: boolean; matchDays: number; awards: SeasonAward[]; bestXI: ReturnType<typeof seasonAwards>['bestXI'] }
 export function isSeasonComplete(_matches: Match[], season: string, states: CompetitionState[] = []) { return states.some(state => state.kind === 'season-complete' && state.season === season) }
 
-export function seasonRecap(players: Player[], matches: Match[], season: string, states: CompetitionState[] = []): SeasonRecap {
+export function seasonRecap(players: Player[], matches: Match[], season: string, states: CompetitionState[] = [], teams: Team[] = []): SeasonRecap {
   const stats = players.map(player => ({ player, stats: playerSeasonStats(player, players, matches, season) })).filter(row => row.stats.matches > 0)
   const pick = (rows: typeof stats, value: (row: typeof stats[number]) => number) => rows.slice().sort((a, b) => value(b) - value(a) || b.stats.minutes - a.stats.minutes)[0]
   const awardFor = (id: string, title: string, row: typeof stats[number] | undefined, detail: (row: typeof stats[number]) => string): SeasonAward | undefined => row && { id, title, playerIds: [row.player.id], detail: detail(row) }
@@ -145,11 +147,13 @@ export function seasonRecap(players: Player[], matches: Match[], season: string,
   const comboAward = (id: string, title: string, kind: Parameters<typeof combinationStats>[3], detail: (row: ReturnType<typeof combinationStats>[number]) => string): SeasonAward | undefined => { const row = combination(kind); return row ? { id, title, playerIds: row.playerIds, detail: detail(row) } : undefined }
   const bestSub = pick(stats.filter(row => starterSubstituteSplits(row.player, matches, filter).substitute.apps >= 3), row => starterSubstituteSplits(row.player, matches, filter).substitute.averageRating)
   const xi = startingXILeaders(players, matches, season).mostUsed
-  const bestXI = unifiedBestEleven(players, matches, season).slots
+  const official = seasonAwards(season, teams, players, matches, states)
+  const bestXI = official.bestXI
+  const officialAward = (id: string, title: string, winner: { playerId: string; value: number } | undefined, detail: (value: number) => string): SeasonAward | undefined => winner && { id, title, playerIds: [winner.playerId], detail: detail(winner.value) }
   const awards = [
-    awardFor('player', 'Player of the Season', pick(stats, row => row.stats.avgRating), row => `${row.stats.avgRating.toFixed(2)} average rating`),
-    awardFor('scorer', 'Top Scorer', pick(stats, row => row.stats.goals), row => `${row.stats.goals} goals`),
-    awardFor('assists', 'Assist King', pick(stats, row => row.stats.assists), row => `${row.stats.assists} assists`),
+    officialAward('player', 'Player of the Season', official.ballon, value => `${value.toFixed(2)} average rating`),
+    officialAward('scorer', 'Top Scorer', official.goldenBoot, value => `${value} goals`),
+    officialAward('assists', 'Assist King', official.assistLeader, value => `${value} assists`),
     awardFor('mom', 'Most MOM', pick(stats, row => row.stats.mom), row => `${row.stats.mom} Player of the Match awards`),
     { id: 'best-xi', title: 'Best XI', playerIds: bestXI.flatMap(slot => slot.playerId ? [slot.playerId] : []), detail: 'Season average rating · 4-3-3' },
     partnership && { id: 'goal-partnership', title: 'Best Goal Partnership', playerIds: [partnership.assisterId, partnership.scorerId], detail: `${partnership.assistedGoals} assisted goals` },

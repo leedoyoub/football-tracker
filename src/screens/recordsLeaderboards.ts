@@ -2,6 +2,7 @@ import { combinationStats } from '../engine/analytics'
 import { matchCompetitionType } from '../engine/competition'
 import { oldestMatches } from '../engine/matchChronology'
 import { buildPlayerRecordLeaderboards } from '../engine/playerRecords'
+import { isPlayerAssistEvent, isPlayerGoalEvent } from '../engine/playerMatchFacts'
 import { matchScore } from '../engine/rating'
 import { teamMetrics } from '../engine/teamMetrics'
 import { playerFullName } from '../components/ui'
@@ -37,7 +38,7 @@ export function combinationPairPresentation(leaderboardId: string, playerIds: st
 export function recordsLeaderboardGroups({ category, players, teams, matches, scope }: { category: RecordsLeaderboardKind; players: Player[]; teams: Team[]; matches: Match[]; scope: RecordsScope }): RecordsLeaderboardGroup[] {
   if (category === 'player') { const byId = new Map(players.map(player => [player.id, player])); return buildPlayerRecordLeaderboards(players, matches, { seasons: scope.seasons, teamIds: scope.teamIds, competition: scope.competition, positionFilter: scope.positionFilter }).map(group => ({ id: group.id, title: group.title, kind: 'player' as const, applicableFilters: { position: true, team: true }, rows: group.rows.map(row => ({ id: row.playerId, name: playerFullName(byId.get(row.playerId)), numeric: row.numeric, value: row.value, detail: row.detail, rank: row.rank })) })) }
   const scoped = scopedMatches(matches, scope)
-  return category === 'team' ? teamGroups(teams, scoped) : combinationGroups(players, scoped)
+  return category === 'team' ? teamGroups(teams.filter(team => !scope.teamIds.length || scope.teamIds.includes(team.id)), scoped) : combinationGroups(players, scoped, scope.teamIds)
 }
 
 function teamGroups(teams: Team[], matches: Match[]): RecordsLeaderboardGroup[] {
@@ -46,10 +47,34 @@ function teamGroups(teams: Team[], matches: Match[]): RecordsLeaderboardGroup[] 
   return [group('wins', 'Most Wins', row => row.summary.wins, ' wins'), group('win-rate', 'Highest Win Percentage', row => row.winRate, '%', true), group('team-goals', 'Most Goals', row => row.summary.goals, ' goals'), group('gf-rate', 'Highest GF per Match', row => row.gfPerGame, '', true), group('clean', 'Most Clean Sheets', row => row.summary.cleanSheets, ' CS'), group('ga-rate', 'Lowest Goals Conceded per Match', row => row.gaPerGame, '', true, true), group('scoring-streak', 'Longest Scoring Streak', row => row.scoring, ' matches'), group('unbeaten-streak', 'Longest Undefeated Streak', row => row.unbeaten, ' matches'), group('win-streak', 'Longest Winning Streak', row => row.winning, ' matches'), group('goal-difference', 'Best Goal Difference', row => row.gd, ' GD'), group('goal-difference-per-match', 'Best Goal Difference per Match', row => row.gdPerGame, '', true, false, formatSignedTwoDecimals), group('saves', 'Most Team Saves', row => row.summary.saves, ' saves'), group('high-score', 'Highest Score in One Match', row => row.highFor, ' goals'), group('high-conceded', 'Most Conceded in One Match', row => row.highAgainst, ' goals')]
 }
 
-function combinationGroups(players: Player[], matches: Match[]): RecordsLeaderboardGroup[] {
+function combinationGroups(players: Player[], matches: Match[], teamIds: string[]): RecordsLeaderboardGroup[] {
   const direct = new Map<string, { ids: string[]; value: number }>(); const mutual = new Map<string, { ids: string[]; value: number }>(); const bothScored = new Map<string, { ids: string[]; value: number }>(); const bothGA = new Map<string, { ids: string[]; value: number }>()
-  for (const match of matches) { const appeared = (id: string | undefined, teamId: string) => Boolean(id && match.appearances.some(row => row.playerId === id && row.teamId === teamId)); const contributors = new Map<string, Set<string>>(); for (const event of match.events) if (event.type === 'goal' && !event.ownGoal) { if (appeared(event.playerId, event.teamId)) contributors.set(event.playerId!, new Set([...(contributors.get(event.playerId!) ?? []), 'g'])); if (appeared(event.assistPlayerId, event.teamId)) contributors.set(event.assistPlayerId!, new Set([...(contributors.get(event.assistPlayerId!) ?? []), 'a'])); if (appeared(event.playerId, event.teamId) && appeared(event.assistPlayerId, event.teamId)) { const key = `${event.assistPlayerId}:${event.playerId}`; direct.set(key, { ids: [event.assistPlayerId!, event.playerId!], value: (direct.get(key)?.value ?? 0) + 1 }); const unordered = combinationKey([event.assistPlayerId!, event.playerId!]); mutual.set(unordered, { ids: unordered.split(':'), value: (mutual.get(unordered)?.value ?? 0) + 1 }) } }; const ids = [...contributors.keys()]; for (let left = 0; left < ids.length; left++) for (let right = left + 1; right < ids.length; right++) { const key = combinationKey([ids[left], ids[right]]); if (contributors.get(ids[left])?.has('g') && contributors.get(ids[right])?.has('g')) bothScored.set(key, { ids: key.split(':'), value: (bothScored.get(key)?.value ?? 0) + 1 }); bothGA.set(key, { ids: key.split(':'), value: (bothGA.get(key)?.value ?? 0) + 1 }) } }
-  const byId = new Map(players.map(player => [player.id, player])); const name = (pair: CombinationPairPresentation) => pair.playerIds.map(id => playerFullName(byId.get(id))).join(` ${pair.connector} `); const entries = (rows: { ids: string[]; value: number; minutes?: number }[], ascending = false) => rows.filter(row => row.value > 0 || row.minutes).sort((left, right) => (ascending ? left.value - right.value : right.value - left.value) || combinationKey(left.ids).localeCompare(combinationKey(right.ids))); const duo = combinationStats(players, matches, {}, 'duo').map(row => ({ ids: row.playerIds, value: row.combinedGA })); const cb = combinationStats(players, matches, {}, 'cb').filter(row => row.togetherMinutes >= 180).map(row => ({ ids: row.playerIds, value: row.weightedOpponentSot / (row.togetherMinutes / 90), minutes: row.togetherMinutes }))
+  for (const match of matches) for (const teamId of new Set(match.appearances.map(row => row.teamId))) {
+    if (teamIds.length && !teamIds.includes(teamId)) continue
+    const contributors = new Map<string, Set<'g' | 'a'>>()
+    const appearanceFor = (id?: string) => match.appearances.find(row => row.playerId === id && row.teamId === teamId)
+    for (const event of match.events) {
+      if (event.type !== 'goal' || event.ownGoal || event.teamId !== teamId) continue
+      const scorer = appearanceFor(event.playerId); const assister = appearanceFor(event.assistPlayerId)
+      const validGoal = Boolean(scorer && isPlayerGoalEvent(match, scorer, event))
+      const validAssist = Boolean(assister && isPlayerAssistEvent(match, assister, event))
+      if (validGoal) contributors.set(event.playerId!, new Set([...(contributors.get(event.playerId!) ?? []), 'g']))
+      if (validAssist) contributors.set(event.assistPlayerId!, new Set([...(contributors.get(event.assistPlayerId!) ?? []), 'a']))
+      if (validGoal && validAssist) {
+        const key = `${event.assistPlayerId}:${event.playerId}`
+        direct.set(key, { ids: [event.assistPlayerId!, event.playerId!], value: (direct.get(key)?.value ?? 0) + 1 })
+        const unordered = combinationKey([event.assistPlayerId!, event.playerId!])
+        mutual.set(unordered, { ids: unordered.split(':'), value: (mutual.get(unordered)?.value ?? 0) + 1 })
+      }
+    }
+    const ids = [...contributors.keys()]
+    for (let left = 0; left < ids.length; left++) for (let right = left + 1; right < ids.length; right++) {
+      const key = combinationKey([ids[left], ids[right]])
+      if (contributors.get(ids[left])?.has('g') && contributors.get(ids[right])?.has('g')) bothScored.set(key, { ids: key.split(':'), value: (bothScored.get(key)?.value ?? 0) + 1 })
+      bothGA.set(key, { ids: key.split(':'), value: (bothGA.get(key)?.value ?? 0) + 1 })
+    }
+  }
+  const byId = new Map(players.map(player => [player.id, player])); const name = (pair: CombinationPairPresentation) => pair.playerIds.map(id => playerFullName(byId.get(id))).join(` ${pair.connector} `); const entries = (rows: { ids: string[]; value: number; minutes?: number }[], ascending = false) => rows.filter(row => row.value > 0 || row.minutes).sort((left, right) => (ascending ? left.value - right.value : right.value - left.value) || combinationKey(left.ids).localeCompare(combinationKey(right.ids))); const duo = combinationStats(players, matches, {}, 'duo').filter(row => !teamIds.length || teamIds.includes(row.teamId)).map(row => ({ ids: row.playerIds, value: row.combinedGA })); const cb = combinationStats(players, matches, {}, 'cb').filter(row => (!teamIds.length || teamIds.includes(row.teamId)) && row.togetherMinutes >= 180).map(row => ({ ids: row.playerIds, value: row.weightedOpponentSot / (row.togetherMinutes / 90), minutes: row.togetherMinutes }))
   const group = (id: string, title: string, rows: { ids: string[]; value: number; minutes?: number }[], cbGroup = false, ascending = false): RecordsLeaderboardGroup => ({ id, title, kind: 'combination', applicableFilters: { position: false, team: true }, rows: entries(rows, ascending).map((row, index) => { const combinationPair = combinationPairPresentation(id, row.ids); return { id: `${id}:${combinationPair.directional ? row.ids.join(':') : combinationKey(row.ids)}`, playerIds: row.ids, combinationPair, name: name(combinationPair), numeric: row.value, value: cbGroup ? `${row.value.toFixed(2)} SOT/90 · ${row.minutes}'` : String(row.value), detail: cbGroup ? `${row.minutes}' shared CB minutes` : 'Combination record', rank: index + 1 } }) })
   return [group('goal-combinations', 'Most Goal Combinations', [...direct.values()]), group('mutual-goal-combinations', 'Most Mutual Goal Combinations', [...mutual.values()]), group('both-scored', 'Most Matches Both Scored', [...bothScored.values()]), group('both-ga', 'Most Matches Both Had G+A', [...bothGA.values()]), group('duo-ga', 'Best Duo Combined G+A', duo), group('cb-suppression', 'Best CB Partnership · Shot Suppression', cb, true, true)]
 }

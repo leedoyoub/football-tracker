@@ -1,5 +1,5 @@
 import type { Match, MatchEvent } from '../types'
-import { orderedEvents, scoringTeamId } from './timeline'
+import { isOnPitchAtEvent, orderedEvents, scoringTeamId } from './timeline'
 
 export type BaseGoalType = 'opening' | 'equalizer' | 'goAhead' | 'leadExtending' | 'deficitReducing'
 export type SpecialGoalType = 'gameWinning' | 'comeback' | 'stoppageTime'
@@ -67,6 +67,10 @@ export function goalTypeTotals(match: Match, playerId?: string, teamId?: string)
   for (const row of classifyGoalTypes(match)) {
     if (playerId && row.event.playerId !== playerId) continue
     if (teamId && row.teamId !== teamId) continue
+    if (playerId) {
+      const appearance = match.appearances.find(item => item.playerId === playerId && item.teamId === row.event.teamId)
+      if (row.event.ownGoal || !appearance || !isOnPitchAtEvent(match, appearance, row.event)) continue
+    }
     for (const tag of row.tags) totals[tag]++
   }
   return totals

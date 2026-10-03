@@ -3,9 +3,11 @@ import { GOOD_RATING_THRESHOLD, isGoodRating } from './constants'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { combineGoalTypeTotals, goalTypeTotals, type GoalTypeTotals } from './goalTypes'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
-import { creditedPositionSegments, isOnPitchAtEvent, matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './timeline'
+import { creditedPositionSegments, isOnPitchAtEvent, scoringTeamId } from './timeline'
 import { newestMatches, oldestMatches } from './matchChronology'
 import { matchCompetitionType } from './competitionContext'
+import { isPlayerAssistEvent, isPlayerGoalEvent, playerGoalkeeperFacts } from './playerMatchFacts'
+import { seasonsFromMatches } from './stats'
 
 export type PlayerScope = { season?: string; competition?: CompetitionType | 'all'; teamIds?: string[] }
 export type DerivedAppearance = { match: Match; appearance: Appearance; rating: RatingBreakdown }
@@ -15,7 +17,7 @@ export type CareerEntry = { season: string; teamId: string; apps: number; goals:
 export type PersonalRecords = { highestRating: number; mostGoals: number; mostAssists: number; mostGA: number; scoringStreak: number; contributionStreak: number; goodMatchStreak: number }
 export type PlayerDerived = {
   appearances: DerivedAppearance[]; apps: number; starts: number; subs: number; minutes: number; goals: number; assists: number; saves: number; cleanSheets: number; mom: number; averageRating: number; goodMatches: number; goodMatchRate: number
-  onPitchGoalsFor: number; onPitchGoalsAgainst: number; onPitchGdPer90: number; onPitchGaPer90: number; goalInvolvement: number | null; positionMinutes: Map<Position, number>; goalTypes: GoalTypeTotals; starter: RoleSummary; substitute: RoleSummary; startingPerformance: StartingTeamPerformance[]
+  onPitchGoalsFor: number; onPitchGoalsAgainst: number; onPitchGdPer90: number; onPitchGaPer90: number; goalInvolvement: number | null; positionMinutes: Map<Position, number>; goalTypes: GoalTypeTotals; starter: RoleSummary; substitute: RoleSummary; startingPerformance: StartingTeamPerformance[]; goalkeeperAppearances: number; goalkeeperConceded: number; goalkeeperMinutes: number; savePercentage: number | null
 }
 
 const cache = new WeakMap<Match[], WeakMap<Player[], Map<string, Map<string, PlayerDerived>>>>()
@@ -25,10 +27,10 @@ const scoped = (matches: Match[], scope: PlayerScope) => matches.filter(match =>
 
 /** Historical match lists belong to recorded appearances, never a player's current team. */
 export function playerAppearanceMatches(player: Player, matches: Match[]): Match[] {
-  return newestMatches(matches.filter(match => match.appearances.some(appearance => appearance.playerId === player.id)))
+  return newestMatches(matches.filter(match => match.appearances.some(appearance => appearance.playerId === player.id && ratePlayerMatch(match, player))))
 }
-const goalForPlayer = (match: Match, appearance: Appearance, playerId: string, event: Match['events'][number]) => event.type === 'goal' && !event.ownGoal && event.playerId === playerId && isOnPitchAtEvent(match, appearance, event)
-const assistForPlayer = (match: Match, appearance: Appearance, playerId: string, event: Match['events'][number]) => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === playerId && isOnPitchAtEvent(match, appearance, event)
+const goalForPlayer = (match: Match, appearance: Appearance, _playerId: string, event: Match['events'][number]) => isPlayerGoalEvent(match, appearance, event)
+const assistForPlayer = (match: Match, appearance: Appearance, _playerId: string, event: Match['events'][number]) => isPlayerAssistEvent(match, appearance, event)
 const safeRate = (sum: number, denominator: number) => denominator ? sum / denominator : 0
 
 function roleSummary(rows: DerivedAppearance[], playerId: string): RoleSummary {
@@ -83,27 +85,27 @@ export function derivePlayerScope(player: Player, players: Player[], matches: Ma
   const actual = ordered(appearances.map(row => row.match)).map(match => appearanceByMatch.get(match)!)
   const starts = actual.filter(row => row.appearance.role === 'starter').length; const subs = actual.length - starts
   const minutes = actual.reduce((total, row) => total + row.rating.minutes, 0)
-  let goals = 0; let assists = 0; let saves = 0; let onPitchGoalsFor = 0; let onPitchGoalsAgainst = 0; let goalInvolvementGoals = 0; let goalInvolvementTeamGoals = 0
+  let goals = 0; let assists = 0; let saves = 0; let goalkeeperAppearances = 0; let goalkeeperConceded = 0; let goalkeeperMinutes = 0; let onPitchGoalsFor = 0; let onPitchGoalsAgainst = 0; let goalInvolvementGoals = 0; let goalInvolvementTeamGoals = 0
   const positionMinutes = new Map<Position, number>(); let cleanSheets = 0
   for (const row of actual) {
-    let concededAsGoalkeeper = 0
+    const goalkeeper = playerGoalkeeperFacts(row.match, row.appearance)
+    saves += goalkeeper.saves; goalkeeperAppearances += goalkeeper.appearances; goalkeeperConceded += goalkeeper.conceded; goalkeeperMinutes += goalkeeper.minutes
     for (const segment of creditedPositionSegments(row.match, row.appearance)) positionMinutes.set(segment.position, (positionMinutes.get(segment.position) ?? 0) + segment.exit - segment.enter)
     for (const event of row.match.events) {
-      if (event.type === 'save' && event.playerId === player.id && event.teamId === row.appearance.teamId && (event.minute === undefined ? matchPositionSegments(row.match, row.appearance).some(segment => segment.position === 'GK') : matchPositionAtEvent(row.match, row.appearance, event) === 'GK')) saves += Number.isInteger(event.count) && (event.count ?? 0) > 0 ? event.count! : 1
       if (event.type !== 'goal' || !isOnPitchAtEvent(row.match, row.appearance, event)) continue
       const ours = scoringTeamId(row.match, event) === row.appearance.teamId
-      if (ours) { onPitchGoalsFor++; goalInvolvementTeamGoals++; if (!event.ownGoal && (event.playerId === player.id || event.assistPlayerId === player.id)) goalInvolvementGoals++ } else { onPitchGoalsAgainst++; if (matchPositionAtEvent(row.match, row.appearance, event) === 'GK') concededAsGoalkeeper++ }
+      if (ours) { onPitchGoalsFor++; goalInvolvementTeamGoals++; if (goalForPlayer(row.match, row.appearance, player.id, event) || assistForPlayer(row.match, row.appearance, player.id, event)) goalInvolvementGoals++ } else onPitchGoalsAgainst++
       if (goalForPlayer(row.match, row.appearance, player.id, event)) goals++
       if (assistForPlayer(row.match, row.appearance, player.id, event)) assists++
     }
-    if (matchPositionSegments(row.match, row.appearance).some(segment => segment.position === 'GK') && concededAsGoalkeeper === 0) cleanSheets++
+    if (goalkeeper.cleanSheet) cleanSheets++
   }
   const mom = actual.filter(row => getMatchManOfTheMatch(row.match, players) === player.id).length
   const averageRating = safeRate(actual.reduce((total, row) => total + row.rating.raw, 0), actual.length)
   const goodMatches = actual.filter(row => isGoodRating(row.rating.raw)).length
   const goalTypes = combineGoalTypeTotals(actual.map(row => goalTypeTotals(row.match, player.id, row.appearance.teamId)))
   const result: PlayerDerived = {
-    appearances: actual, apps: actual.length, starts, subs, minutes, goals, assists, saves, cleanSheets, mom, averageRating, goodMatches, goodMatchRate: safeRate(goodMatches * 100, actual.length), onPitchGoalsFor, onPitchGoalsAgainst, onPitchGdPer90: safeRate((onPitchGoalsFor - onPitchGoalsAgainst) * 90, minutes), onPitchGaPer90: safeRate(onPitchGoalsAgainst * 90, minutes), goalInvolvement: goalInvolvementTeamGoals ? goalInvolvementGoals / goalInvolvementTeamGoals * 100 : null, positionMinutes, goalTypes,
+    appearances: actual, apps: actual.length, starts, subs, minutes, goals, assists, saves, cleanSheets, mom, averageRating, goodMatches, goodMatchRate: safeRate(goodMatches * 100, actual.length), onPitchGoalsFor, onPitchGoalsAgainst, onPitchGdPer90: safeRate((onPitchGoalsFor - onPitchGoalsAgainst) * 90, minutes), onPitchGaPer90: safeRate(onPitchGoalsAgainst * 90, minutes), goalInvolvement: goalInvolvementTeamGoals ? goalInvolvementGoals / goalInvolvementTeamGoals * 100 : null, positionMinutes, goalTypes, goalkeeperAppearances, goalkeeperConceded, goalkeeperMinutes, savePercentage: saves + goalkeeperConceded ? saves / (saves + goalkeeperConceded) * 100 : null,
     starter: roleSummary(actual.filter(row => row.appearance.role === 'starter'), player.id), substitute: roleSummary(actual.filter(row => row.appearance.role !== 'starter'), player.id), startingPerformance: startingPerformance(matches, player.id, scope),
   }
   byPlayer.set(player.id, result)
@@ -116,7 +118,8 @@ export function playerCareerTimeline(player: Player, players: Player[], matches:
   for (const match of matches) for (const appearance of match.appearances) if (appearance.playerId === player.id) {
     const key = `${match.season}:${appearance.teamId}`; const group = groups.get(key) ?? { season: match.season, teamId: appearance.teamId, matches: [] }; if (!group.matches.includes(match)) group.matches.push(match); groups.set(key, group)
   }
-  return [...groups.values()].map(group => { const data = derivePlayerScope(player, players, group.matches, { teamIds: [group.teamId] }); return { season: group.season, teamId: group.teamId, apps: data.apps, goals: data.goals, assists: data.assists, averageRating: data.averageRating } }).sort((left, right) => right.season.localeCompare(left.season) || right.teamId.localeCompare(left.teamId))
+  const seasonOrder = seasonsFromMatches(matches)
+  return [...groups.values()].map(group => { const data = derivePlayerScope(player, players, group.matches, { teamIds: [group.teamId] }); return { season: group.season, teamId: group.teamId, apps: data.apps, goals: data.goals, assists: data.assists, averageRating: data.averageRating } }).filter(row => row.apps > 0).sort((left, right) => seasonOrder.indexOf(left.season) - seasonOrder.indexOf(right.season) || right.teamId.localeCompare(left.teamId))
 }
 
 export function playerPersonalRecords(player: Player, _players: Player[], matches: Match[]): PersonalRecords {

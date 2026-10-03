@@ -105,14 +105,14 @@ test('list and ranking names use Full Name, compact helpers retain Display Name,
   }
 })
 
-test('player Matches preserve unused bench in multi-team chronological order without adding appearances to stats', () => {
+test('player Matches exclude unused bench in multi-team chronological order without adding appearances to stats', () => {
   const p = player('p', 'CM')
   const played = match('played', [p], { matchDay: 38, createdAt: '2026-09-02' })
   const bench = match('unused', [p], { teamId: 'B', homeTeamId: 'B', matchDay: 1, createdAt: '2026-09-03', appearances: [{ playerId: 'p', teamId: 'B', position: 'CM', role: 'bench' }] })
   const sub = match('sub', [p], { createdAt: '2026-09-01', appearances: [{ playerId: 'p', teamId: 'A', position: 'CM', role: 'bench' }], events: [{ id: 'on', type: 'sub', teamId: 'A', minute: 60, playerOutId: 'other', playerInId: 'p', position: 'CAM' }] })
   const store = { players: [p], teams, matches: [played, bench, sub] }, before = JSON.stringify(store)
   const source = fs.readFileSync(require.resolve('../src/screens/PlayerDetailScreen.tsx'), 'utf8')
-  assert(source.includes('Full selected Season + Competition match history.') && source.includes('function MatchRow'))
+  assert(source.includes('Actual appearances in the selected scope.') && source.includes('function MatchRow'))
   const orderedIds = store.matches.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(row => row.id)
   assert.deepEqual(orderedIds, ['unused', 'played', 'sub'])
   assert.equal(ratePlayerMatch(bench, p), null)

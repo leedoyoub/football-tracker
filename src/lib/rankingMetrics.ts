@@ -16,7 +16,7 @@ export const RANKING_METRICS = [
   { value: 'g+a/90', label: 'G+A/90' },
   { value: 'cleanSheets', label: 'Clean Sheets' },
   { value: 'saves', label: 'Saves' },
-  { value: 'savePercentage', label: 'Save %' },
+  { value: 'savePercentage', label: 'Qualifying GK Save %' },
 ] as const satisfies readonly { value: LeaderboardMetric; label: string }[]
 
 export type RankingDisplayMetric = typeof RANKING_METRICS[number]['value']

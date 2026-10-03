@@ -3,10 +3,11 @@ import { matchCompetitionType } from './competition'
 import { GOOD_RATING_THRESHOLD } from './constants'
 import { newestMatches } from './matchChronology'
 import { positionFilterFamilies, scopedPositionFamilyByPlayer } from './positionScope'
-import { getMatchManOfTheMatch, isOnPitchAtEvent, matchPositionAtEvent, matchPositionSegments, ratePlayerMatch } from './rating'
+import { getMatchManOfTheMatch, ratePlayerMatch } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { playerStreaks } from './seasonInsights'
 import { goalTypeTotals } from './goalTypes'
+import { playerGoalkeeperFacts, playerGoalEvents, playerAssistEvents } from './playerMatchFacts'
 
 export type PlayerRecordLeaderboardId =
   | 'goals' | 'assists' | 'matches-scored-in' | 'braces' | 'hat-tricks'
@@ -61,22 +62,16 @@ function buildFacts(players: Player[], matches: Match[], scope: PlayerRecordScop
       if (!appearance) return []
       const rating = ratePlayerMatch(match, player)
       if (!rating) return []
-      const goals = match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.playerId === player.id && isOnPitchAtEvent(match, appearance, event)).length
-      const assists = match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id && isOnPitchAtEvent(match, appearance, event)).length
-      const playedGoalkeeper = matchPositionSegments(match, appearance).some(segment => segment.position === 'GK')
-      const saves = match.events.reduce((total, event) => {
-        if (event.type !== 'save' || event.playerId !== player.id || event.teamId !== appearance.teamId) return total
-        if (event.minute === undefined ? !playedGoalkeeper : matchPositionAtEvent(match, appearance, event) !== 'GK') return total
-        const value = event.count ?? 1
-        return Number.isInteger(value) && value > 0 ? total + value : total
-      }, 0)
-      return [{ match, rating, goals, assists, saves, cleanSheet: playedGoalkeeper && rating.minutes > 0 && rating.conceded === 0 }]
+      const goals = playerGoalEvents(match, appearance).length
+      const assists = playerAssistEvents(match, appearance).length
+      const goalkeeper = playerGoalkeeperFacts(match, appearance)
+      return [{ match, teamId: appearance.teamId, rating, goals, assists, saves: goalkeeper.saves, cleanSheet: goalkeeper.cleanSheet }]
     })
     if (!rated.length) return []
     const count = (predicate: (row: typeof rated[number]) => boolean) => rated.filter(predicate).length
     const sum = (metric: (row: typeof rated[number]) => number) => rated.reduce((total, row) => total + metric(row), 0)
     const streak = (key: 'goodRating' | 'goals' | 'goalContributions') => playerStreaks(player, games).find(row => row.key === key)?.best ?? 0
-    const goalTypes = (key: Parameters<typeof goalTypeTotals>[0] extends never ? never : keyof ReturnType<typeof goalTypeTotals>) => rated.reduce((total, row) => total + goalTypeTotals(row.match, player.id)[key], 0)
+    const goalTypes = (key: Parameters<typeof goalTypeTotals>[0] extends never ? never : keyof ReturnType<typeof goalTypeTotals>) => rated.reduce((total, row) => total + goalTypeTotals(row.match, player.id, row.teamId)[key], 0)
     return [{
       playerId: player.id, appearances: rated.length,
       goals: sum(row => row.goals), assists: sum(row => row.assists), matchesScoredIn: count(row => row.goals >= 1), braces: count(row => row.goals >= 2), hatTricks: count(row => row.goals >= 3),

@@ -7,7 +7,7 @@ for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module
 const { classifyGoalTypes, goalTypeTotals } = require('../src/engine/goalTypes.ts')
 const { buildPlayerRecordLeaderboards } = require('../src/engine/playerRecords.ts')
 
-const game = (events) => ({ id: 'goal-types', season: 'Season 1', matchDay: 1, date: '2026-09-20', duration: 90, homeTeamId: 'H', awayTeamId: 'A', appearances: [], events })
+const game = (events) => ({ id: 'goal-types', season: 'Season 1', matchDay: 1, date: '2026-09-20', duration: 90, homeTeamId: 'H', awayTeamId: 'A', appearances: [{ playerId: 'P1', teamId: 'H', role: 'starter', position: 'ST', minuteIn: 0, minuteOut: 90 }], events })
 const goal = (id, minute, teamId, playerId, extra = {}) => ({ id, minute, sequence: Number(id.replace(/\D/g, '')) || undefined, type: 'goal', teamId, playerId, ...extra })
 
 test('v2.2.13 classifies every credited goal into exactly one requested base type using stable score replay', () => {

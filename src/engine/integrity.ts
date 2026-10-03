@@ -80,6 +80,7 @@ export function auditDataIntegrity(matches: Match[], players: Player[], teams: T
         }
       }
       if (event.type === 'save') {
+        if (event.count !== undefined && (!Number.isInteger(event.count) || event.count < 0)) add(issues, 'error', match, 'Save count is malformed; expected a non-negative whole number.')
         if (!playerIds.has(event.playerId)) add(issues, 'error', match, 'Save references an unknown player.')
         const appearance = match.appearances.find(item => item.playerId === event.playerId && item.teamId === event.teamId)
         const goalkeeper = appearance && matchPositionSegments(match, appearance).some(segment => segment.position === 'GK')

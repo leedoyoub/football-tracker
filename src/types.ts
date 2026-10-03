@@ -218,7 +218,7 @@ export type View =
   | { name: 'team'; id: string }
   | { name: 'import-squad'; teamId: string }
   | { name: 'players' }
-  | { name: 'player'; id: string }
+  | { name: 'player'; id: string; season?: string; competitionType?: CompetitionType | 'all'; teamId?: string }
   | { name: 'match'; id: string }
   | { name: 'edit-match'; id: string }
   | { name: 'new-match'; teamId?: string; season?: string; competitionType?: CompetitionType; resumeDraft?: boolean }
@@ -297,7 +297,7 @@ export interface ScreenStateByView {
   }
   'import-squad': { name: 'import-squad' }
   players: { name: 'players'; search: string }
-  player: { name: 'player'; season: string | null; competition: CompetitionType | 'all' }
+  player: { name: 'player'; season: string | null; competition: CompetitionType | 'all'; teamId: string | null }
   match: { name: 'match'; tab: 'facts' | 'lineup' | 'ratings' }
   'edit-match': { name: 'edit-match' }
   'new-match': { name: 'new-match' }

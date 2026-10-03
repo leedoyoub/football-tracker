@@ -1,12 +1,12 @@
 import type { Appearance, Match, MatchEvent, Position } from '../types'
-import { matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './timeline'
+import { matchPositionAtEvent, scoringTeamId } from './timeline'
+import { saveEventCount, validPlayerSaveEvents } from './playerMatchFacts'
 
 export type ManualOpponentSot =
   | { kind: 'legacy' }
   | { kind: 'manual'; halftime: number; fulltime: number }
   | { kind: 'invalid'; message: string }
 
-const count = (value: unknown) => Number.isInteger(value) && Number(value) > 0 ? Number(value) : 0
 const trackedTeam = (match: Match) => match.teamId ?? match.homeTeamId
 const overlap = (start: number, end: number, rangeStart: number, rangeEnd: number) => Math.max(0, Math.min(end, rangeEnd) - Math.max(start, rangeStart))
 
@@ -21,19 +21,11 @@ export function legacyOpponentSot(match: Match, teamId: string): number {
 
 /** Actual goalkeeper saves remain independent from manual Opponent SOT. */
 export function teamGoalkeeperSaves(match: Match, teamId: string): number {
-  return validTeamSaveEvents(match, teamId).reduce((total, event) => total + count(event.count ?? 1), 0)
+  return validTeamSaveEvents(match, teamId).reduce((total, event) => total + saveEventCount(event), 0)
 }
 
 function validTeamSaveEvents(match: Match, teamId: string): Extract<MatchEvent, { type: 'save' }>[] {
-  return match.events.flatMap((event): Extract<MatchEvent, { type: 'save' }>[] => {
-    if (event.type !== 'save' || event.teamId !== teamId || !count(event.count ?? 1)) return []
-    const keeper = match.appearances.find(appearance => appearance.playerId === event.playerId && appearance.teamId === teamId)
-    if (!keeper) return []
-    const isGoalkeeper = event.minute === undefined
-      ? matchPositionSegments(match, keeper).some(segment => segment.position === 'GK')
-      : matchPositionAtEvent(match, keeper, event) === 'GK'
-    return isGoalkeeper ? [event] : []
-  })
+  return match.appearances.filter(appearance => appearance.teamId === teamId).flatMap(appearance => validPlayerSaveEvents(match, appearance))
 }
 
 /** A manual pair belongs only to the team for which this match was recorded. */
@@ -84,8 +76,8 @@ export function opponentSotExposureForPositionSegment(match: Match, appearance: 
   const manual = validateManualOpponentSot(match, appearance.teamId)
   if (manual.kind === 'manual') return opponentSotExposure(match, appearance.teamId, start, end)
   const saves = validTeamSaveEvents(match, appearance.teamId)
-  const timedSaves = saves.filter(event => event.minute !== undefined && event.minute >= start && event.minute <= end && matchPositionAtEvent(match, appearance, event) === position).reduce((total, event) => total + count(event.count ?? 1), 0)
-  const undatedSaves = saves.filter(event => event.minute === undefined).reduce((total, event) => total + count(event.count ?? 1), 0)
+  const timedSaves = saves.filter(event => event.minute !== undefined && event.minute >= start && event.minute <= end && matchPositionAtEvent(match, appearance, event) === position).reduce((total, event) => total + saveEventCount(event), 0)
+  const undatedSaves = saves.filter(event => event.minute === undefined).reduce((total, event) => total + saveEventCount(event), 0)
   const goals = concededGoals(match, appearance.teamId).filter(event => event.minute >= start && event.minute <= end && matchPositionAtEvent(match, appearance, event) === position).length
   return timedSaves + undatedSaves * overlap(start, end, 0, 90) / 90 + goals
 }

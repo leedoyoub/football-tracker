@@ -12,15 +12,19 @@ const { APP_VERSION } = require('../src/config.ts')
 const { RATING_ENGINE_REVISION } = require('../src/engine/ratingRevision.ts')
 
 const contribution = (playerId, assistPlayerId) => ({ type: 'goal', playerId, assistPlayerId })
-const match = (id, date, competitionType, events, season = 'Season 1') => ({ id, date, season, competitionType, events, appearances: [] })
+const match = (id, date, competitionType, events, season = 'Season 1') => ({
+  id, date, season, competitionType, homeTeamId: 'A', awayTeamId: 'B', teamId: 'A', duration: 90,
+  events: events.map((event, index) => ({ id: `${id}-${index}`, minute: 10 + index, teamId: 'A', ...event })),
+  appearances: [...new Set(events.flatMap(event => [event.playerId, event.assistPlayerId]).filter(Boolean))].map(playerId => ({ playerId, teamId: 'A', role: 'starter', position: 'ST', matchPosition: 'ST' })),
+})
 
-test('v2.4.3 release metadata preserves rating revision 11', () => {
+test('v2.4.4 release metadata preserves rating revision 11', () => {
   const packageJson = require('../package.json')
   const lockfile = require('../package-lock.json')
-  assert.equal(packageJson.version, '2.4.3')
-  assert.equal(lockfile.version, '2.4.3')
-  assert.equal(lockfile.packages[''].version, '2.4.3')
-  assert.equal(APP_VERSION, '2.4.3')
+  assert.equal(packageJson.version, '2.4.4')
+  assert.equal(lockfile.version, '2.4.4')
+  assert.equal(lockfile.packages[''].version, '2.4.4')
+  assert.equal(APP_VERSION, '2.4.4')
   assert.equal(RATING_ENGINE_REVISION, 11)
 })
 

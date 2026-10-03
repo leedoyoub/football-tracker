@@ -2,6 +2,7 @@ import type { Match, Player } from '../types'
 import { classifyGoalTypes } from './goalTypes'
 import { matchScore, ratePlayerMatch } from './rating'
 import { compareEvents, isOnPitchAtEvent, orderedEvents, scoringTeamId } from './timeline'
+import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts } from './playerMatchFacts'
 
 export type MatchStoryTag = 'Comeback Win' | 'Comeback Draw' | 'Lead Lost' | 'Late Winner' | 'Late Equalizer' | 'Multiple Lead Changes' | 'Clean Sheet' | 'Hat-trick' | '4+ Goal Performance' | '3+ Assist Performance' | '5+ G+A Performance' | 'High-Save GK Performance' | 'Super Sub' | 'Dominant Win'
 export type ScoreFlow = { minute: number; home: number; away: number; playerId?: string; teamId: string }
@@ -47,26 +48,29 @@ export function matchStory(match: Match, players: Player[]): MatchStory {
     const rating = ratePlayerMatch(match, player); const entry = match.events.find((event): event is Extract<Match['events'][number], { type: 'sub' }> => event.type === 'sub' && event.playerInId === player.id && event.teamId === appearance.teamId)
     if (!rating || !entry) continue
     let goals = 0; let assists = 0; let entryHome = 0; let entryAway = 0
+    const creditedGoals = new Set(playerGoalEvents(match, appearance))
+    const creditedAssists = new Set(playerAssistEvents(match, appearance))
     for (const { event } of orderedEvents(match)) {
       if (event.type !== 'goal') continue
       if (compareEvents(match, event, entry) < 0) { if (scoringTeamId(match, event) === match.homeTeamId) entryHome++; else entryAway++ }
       if (compareEvents(match, event, entry) < 0 || !isOnPitchAtEvent(match, appearance, event) || event.ownGoal) continue
-      if (event.playerId === player.id) goals++
-      if (event.assistPlayerId === player.id) assists++
+      if (creditedGoals.has(event)) goals++
+      if (creditedAssists.has(event)) assists++
     }
     if (goals + assists) { tags.add('Super Sub'); superSubs.push({ playerId: player.id, teamId: appearance.teamId, entryMinute: entry.minute, goals, assists, scoreAtEntry: { home: entryHome, away: entryAway }, finalScore: final }) }
   }
   for (const player of players) {
-    const goals = match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.playerId === player.id).length
-    const assists = match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id).length
+    const appearance = match.appearances.find(item => item.playerId === player.id)
+    if (!appearance) continue
+    const goals = playerGoalEvents(match, appearance).length
+    const assists = playerAssistEvents(match, appearance).length
     if (goals >= 3) tags.add('Hat-trick')
     if (assists >= 3) tags.add('3+ Assist Performance')
     if (goals + assists >= 5) tags.add('5+ G+A Performance')
   }
   for (const appearance of match.appearances) {
     const player = players.find(item => item.id === appearance.playerId); if (!player) continue
-    const saves = match.events.reduce((sum, event) => sum + (event.type === 'save' && event.playerId === player.id && event.teamId === appearance.teamId ? event.count ?? 1 : 0), 0)
-    if (saves >= 5 && ratePlayerMatch(match, player)?.position === 'GK') tags.add('High-Save GK Performance')
+    if (playerGoalkeeperFacts(match, appearance).saves >= 5) tags.add('High-Save GK Performance')
   }
   return { scoreFlow, tags: [...tags], superSubs }
 }

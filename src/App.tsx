@@ -214,7 +214,7 @@ export default function App() {
           {view.name === 'players' && <PlayersScreen screenState={entry.screenState as ScreenStateByView['players']} onStateChange={onStateChange} onNavigate={onNavigate} appliedFilters={playerFilters} onFiltersChange={setPlayerFilters} />}
 
           {view.name === 'player' && (
-            <PlayerDetailScreen playerId={view.id} season={season} screenState={entry.screenState as ScreenStateByView['player']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} />
+            <PlayerDetailScreen playerId={view.id} season={view.season ?? season} screenState={entry.screenState as ScreenStateByView['player']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} />
           )}
           {view.name === 'match' && <MatchDetailScreen matchId={view.id} screenState={entry.screenState as ScreenStateByView['match']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} onBackToTeam={onBackToTeam} onReplace={onReplace} />}
           {view.name === 'edit-match' && <EditMatchScreen matchId={view.id} onReplace={onReplace} onBack={onCloseTransientWorkflow} onComplete={onCompleteTransientWorkflow} />}

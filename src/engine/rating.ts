@@ -13,6 +13,7 @@ import {
   scoringTeamId,
 } from './timeline.ts'
 import { opponentSot, opponentSotExposureForPositionSegment } from './opponentSot.ts'
+import { playerSaveCount } from './playerMatchFacts.ts'
 
 export { creditedMinutesPlayed, creditedPitchIntervals, creditedPositionSegments, hasPitchAppearance, isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchPositionSegments, normalizeMatchPosition, normalizePositionFamily, pitchWindow, scoringTeamId } from './timeline.ts'
 
@@ -78,16 +79,6 @@ function eventValue(match: Match, appearance: Appearance, event: MatchEvent, key
   const position = matchPositionAtEvent(match, appearance, event)
   return position ? POSITION_RULES[position][key] : 0
 }
-function validCount(value: unknown): number { return Number.isInteger(value) && Number(value) > 0 ? Number(value) : 0 }
-
-function saveCount(match: Match, appearance: Appearance): number {
-  return match.events.reduce((total, event) => {
-    if (event.type !== 'save' || event.playerId !== appearance.playerId || event.teamId !== appearance.teamId) return total
-    if (event.minute === undefined) return matchPositionSegments(match, appearance).some(segment => segment.position === 'GK') ? total + validCount(event.count ?? 1) : total
-    return matchPositionAtEvent(match, appearance, event) === 'GK' ? total + validCount(event.count ?? 1) : total
-  }, 0)
-}
-
 /** Team-level SOT proxy: every applicable own-team GK save plus goals conceded. */
 /** Compatibility alias; all consumers now use the canonical domain. */
 export function opponentSotProxy(match: Match, teamId: string): number { return opponentSot(match, teamId) }
@@ -232,7 +223,7 @@ function calculatePlayerMatch(match: Match, player: Player): RatingBreakdown | n
   const concededGoals = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && scoringTeamId(match, event) !== teamId && isOnPitchAtEvent(match, appearance, event))
   const caused = concededGoals.filter(event => event.concededGoalCausePlayerId === player.id || (event.ownGoal && event.playerId === player.id)).length
   const suppression = suppressionByInterval(match, appearance).reduce((total, row) => total + row.bonus, 0)
-  const goalkeeperSaves = saveCount(match, appearance)
+  const goalkeeperSaves = playerSaveCount(match, appearance)
   const goalkeeperConceded = concededGoals.filter(event => matchPositionAtEvent(match, appearance, event) === 'GK').length
   const saveRate = goalkeeperSaves + goalkeeperConceded ? goalkeeperSaves / (goalkeeperSaves + goalkeeperConceded) : 0
   const saveBonus = goalkeeperSaves ? goalkeeperSaves * saveBonusPerSave(saveRate) : 0

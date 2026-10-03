@@ -16,7 +16,7 @@ export function defaultScreenState<V extends View>(view: V): ScreenStateByView[V
     case 'comparison': state = { name: 'comparison', leftId: view.leftId ?? null, rightId: view.rightId ?? null, season: view.season ?? null, competition: view.competitionType ?? 'all', teamId: null }; break
     case 'team': state = { name: 'team', tab: 'overview', bestPlayersSeason: null, bestPlayersCompetition: 'all', bestPlayersMetric: 'rating', matchesCompetition: 'all' }; break
     case 'players': state = { name: 'players', search: '' }; break
-    case 'player': state = { name: 'player', season: null, competition: 'all' }; break
+    case 'player': state = { name: 'player', season: view.season ?? null, competition: view.competitionType ?? 'all', teamId: view.teamId ?? null }; break
     case 'match': state = { name: 'match', tab: 'facts' }; break
     default: state = { name: view.name } as ScreenStateByView[keyof ScreenStateByView]
   }
@@ -52,7 +52,7 @@ export function resetNavigationEntries<V extends View>(view: V, screenState?: Sc
 type DetailView = Extract<View, { name: 'team' | 'player' | 'match' }>
 const isDetailView = (view: View): view is DetailView => view.name === 'team' || view.name === 'player' || view.name === 'match'
 const isTransientWorkflow = (view: View) => view.name === 'new-match' || view.name === 'edit-match'
-const sameDetailDestination = (left: View, right: View) => isDetailView(left) && isDetailView(right) && left.name === right.name && left.id === right.id
+const sameDetailDestination = (left: View, right: View) => isDetailView(left) && isDetailView(right) && left.name === right.name && left.id === right.id && (left.name !== 'player' || right.name !== 'player' || (left.season ?? null) === (right.season ?? null) && (left.competitionType ?? 'all') === (right.competitionType ?? 'all') && (left.teamId ?? null) === (right.teamId ?? null))
 
 /** Returns the nearest prior instance of an exact Team, Player, or Match detail. */
 export function popToExistingNavigationEntry(entries: NavigationEntry[], view: View, currentScrollTop: number): NavigationEntry[] | undefined {

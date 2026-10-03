@@ -6,6 +6,8 @@ import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import type { CompetitionState, CompetitionType, EventSurface, Match, MatchChangePayload, Player, Team } from '../types'
 import { oldestMatches } from './matchChronology'
 import { buildSeasonAnalytics, rankingMovement } from './seasonAnalytics'
+import { hasPitchAppearance, isOnPitchAtEvent } from './timeline'
+import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts } from './playerMatchFacts'
 
 export type NewsKind = 'player' | 'match' | 'team'
 export type NewsImportance = 'major' | 'medium' | 'minor'
@@ -71,7 +73,7 @@ const attackingImportance = (scope: MilestoneScope, threshold: number, type: Att
   if (scope === 'champions' || scope === 'cup') return threshold >= 10 ? 'medium' : 'minor'
   return threshold >= 30 ? 'medium' : 'minor'
 }
-const didAppear = (match: Match, playerId: string) => { const appearance = match.appearances.find(item => item.playerId === playerId); return Boolean(appearance && (appearance.role === 'starter' || match.events.some(event => event.type === 'sub' && event.playerInId === playerId))) }
+const didAppear = (match: Match, playerId: string) => { const appearance = match.appearances.find(item => item.playerId === playerId); return Boolean(appearance && hasPitchAppearance(match, appearance)) }
 const newsEmoji = (item: NewsDraft) => {
   const text = `${item.eyebrow} ${item.title}`.toLowerCase()
   if (text.includes('champion')) return text.includes('league') ? '👑' : text.includes('cup') ? '🥇' : text.includes('champions') ? '🏆' : '🏆'
@@ -214,29 +216,28 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
         }
     }
 
-    const perPlayer = new Map<string, { goals: number; assists: number; saves: number }>()
-    const rowFor = (id: string) => { const row = perPlayer.get(id) ?? { goals: 0, assists: 0, saves: 0 }; perPlayer.set(id, row); return row }
     for (const event of match.events) {
       if (event.type === 'goal' && !event.ownGoal) {
-        if (event.playerId) rowFor(event.playerId).goals++
-        if (event.assistPlayerId) rowFor(event.assistPlayerId).assists++
         if (event.playerId && event.assistPlayerId) {
+          const scorer = match.appearances.find(item => item.playerId === event.playerId && item.teamId === event.teamId)
+          const assister = match.appearances.find(item => item.playerId === event.assistPlayerId && item.teamId === event.teamId)
+          if (!scorer || !assister || !isOnPitchAtEvent(match, scorer, event) || !isOnPitchAtEvent(match, assister, event)) continue
           const pair = [event.playerId, event.assistPlayerId].sort()
           const key = `${pair[0]}:${pair[1]}`; const before = partnerships.get(key) ?? 0; const after = before + 1; partnerships.set(key, after)
           for (const value of crossed(before, after, [10, 20, 30, 50, ...multiples(25, after, 75)])) add({ id: `combo-goals:${key}:${value}`, kind: 'player', date: match.date, matchId: match.id, eyebrow: 'PARTNERSHIP MILESTONE', title: `${playerName(players, pair[0])} & ${playerName(players, pair[1])} combine for their ${value}th goal`, detail: 'Both assist directions count toward this partnership.', context })
         }
       }
-      if (event.type === 'save') rowFor(event.playerId).saves += event.count ?? 1
     }
     // ...
     const momId = getMatchManOfTheMatch(match, players)
     for (const player of players) {
       if (!didAppear(match, player.id)) continue
-      const performance = perPlayer.get(player.id) ?? { goals: 0, assists: 0, saves: 0 }
       const appearance = match.appearances.find(item => item.playerId === player.id)!
-      const isGoalkeeper = appearance.position === 'GK' || appearance.matchPosition === 'GK'
+      const goalkeeper = playerGoalkeeperFacts(match, appearance)
+      const performance = { goals: playerGoalEvents(match, appearance).length, assists: playerAssistEvents(match, appearance).length, saves: goalkeeper.saves }
+      const isGoalkeeper = Boolean(goalkeeper.appearances)
       const score = matchScore(match); const conceded = appearance.teamId === match.homeTeamId ? score.away : score.home
-      const cleanSheet = Number(isGoalkeeper && conceded === 0)
+      const cleanSheet = Number(goalkeeper.cleanSheet)
       const isMom = Number(momId === player.id)
       const careerBefore = career.get(player.id) ?? emptyTotals()
       const seasonKey = `${match.season}:${player.id}`; const seasonBefore = season.get(seasonKey) ?? emptyTotals()
@@ -407,7 +408,10 @@ export function deriveFootballEvents(players: Player[], teams: Team[], matches: 
   const contributions: DerivedFootballEvent[] = ordered(matches).flatMap(match => {
     const byPlayer = new Map<string, { goals: number; assists: number }>()
     const add = (playerId: string, key: 'goals' | 'assists') => { const row = byPlayer.get(playerId) ?? { goals: 0, assists: 0 }; row[key]++; byPlayer.set(playerId, row) }
-    for (const event of match.events) if (event.type === 'goal' && !event.ownGoal) { if (event.playerId) add(event.playerId, 'goals'); if (event.assistPlayerId) add(event.assistPlayerId, 'assists') }
+    for (const appearance of match.appearances) {
+      for (const _event of playerGoalEvents(match, appearance)) add(appearance.playerId, 'goals')
+      for (const _event of playerAssistEvents(match, appearance)) add(appearance.playerId, 'assists')
+    }
     return [...byPlayer.entries()].map(([playerId, row]) => {
       const name = playerName(players, playerId)
       const summary = [row.goals && `${row.goals} goal${row.goals === 1 ? '' : 's'}`, row.assists && `${row.assists} assist${row.assists === 1 ? '' : 's'}`].filter(Boolean).join(', ')

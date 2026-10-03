@@ -134,13 +134,13 @@ export function performanceAwardResult(players: Player[], games: Match[], mode: 
   return { candidates, ...awardPresentationFromCandidates(candidates) }
 }
 
-const goalkeeperRatings = (row: GlobalLeaderboardRow) => row.ratings.filter(rating => rating.position === 'GK')
-const goalkeeperMinutes = (row: GlobalLeaderboardRow) => goalkeeperRatings(row).reduce((total, rating) => total + rating.minutes, 0)
+const goalkeeperRatings = (row: GlobalLeaderboardRow) => row.goalkeeperRatings ?? []
+const goalkeeperMinutes = (row: GlobalLeaderboardRow) => row.goalkeeperMinutes ?? 0
 const goalkeeperAverage = (row: GlobalLeaderboardRow) => {
   const ratings = goalkeeperRatings(row)
   return ratings.length ? ratings.reduce((total, rating) => total + rating.raw, 0) / ratings.length : 0
 }
-const goalkeeperCleanSheets = (row: GlobalLeaderboardRow) => goalkeeperRatings(row).filter(rating => rating.minutes > 0 && rating.conceded === 0).length
+const goalkeeperCleanSheets = (row: GlobalLeaderboardRow) => row.cleanSheets ?? 0
 const goalkeeperSavePercentage = (row: GlobalLeaderboardRow) => {
   const saves = row.qualifyingSaves ?? 0
   const faced = saves + (row.concededOnPitch ?? 0)

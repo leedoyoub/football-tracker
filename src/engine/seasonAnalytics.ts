@@ -1,9 +1,10 @@
 import type { Best11Slot, CompetitionType, Match, Player, Position, Team } from '../types'
 import { GOOD_RATING_THRESHOLD } from './constants'
+import { playerAssistEvents, playerGoalEvents } from './playerMatchFacts'
 import { competitionMatches, leagueCompetition, matchCompetitionType } from './competition'
 import { LEAGUE_MATCHES_PER_TEAM } from './leagueFormat'
 import { newestMatches } from './matchChronology'
-import { getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, ratePlayerMatch } from './rating'
+import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { compareStandings, type Standing } from './standings'
 import type { LeaderboardMetric } from './stats'
@@ -142,20 +143,17 @@ function playerRowOrder(metric: LeaderboardMetric) {
   return (left: PlayerSnapshotRow, right: PlayerSnapshotRow) => value(right) - value(left) || right.avgRating - left.avgRating || left.playerId.localeCompare(right.playerId)
 }
 
-function clonePlayerRows(rows: Map<string, PlayerSnapshotRow>, teamMatches: Map<string, number>): Map<LeaderboardMetric, PlayerSnapshotRow[]> {
+function clonePlayerRows(rows: Map<string, PlayerSnapshotRow>): Map<LeaderboardMetric, PlayerSnapshotRow[]> {
   const all = [...rows.values()].map(row => ({ ...row, avgRating: row.appearances ? row.ratingTotal / row.appearances : 0 }))
-  return new Map(METRICS.map(metric => [metric, all.filter(row => metric !== 'rating' || row.appearances >= Math.ceil((teamMatches.get(row.teamId) ?? 0) * .5)).sort(playerRowOrder(metric))]))
+  return new Map(METRICS.map(metric => [metric, all.slice().sort(playerRowOrder(metric))]))
 }
 
-function buildPlayerSnapshots(players: Player[], teams: Team[], games: Match[]): Map<number, PlayerRankingSnapshot> {
+function buildPlayerSnapshots(players: Player[], games: Match[]): Map<number, PlayerRankingSnapshot> {
   const rows = new Map<string, PlayerSnapshotRow>()
-  const teamMatches = new Map<string, number>()
-  const registered = new Set(teams.map(team => team.id))
   const byPlayer = new Map(players.map(player => [player.id, player]))
   const result = new Map<number, PlayerRankingSnapshot>()
   for (let day = 1; day <= LEAGUE_MATCHES_PER_TEAM; day++) {
     for (const match of games.filter(item => item.matchDay === day)) {
-      for (const teamId of recordedTeams(match, registered)) teamMatches.set(teamId, (teamMatches.get(teamId) ?? 0) + 1)
       const mom = getMatchManOfTheMatch(match, players)
       for (const appearance of match.appearances) {
         const player = byPlayer.get(appearance.playerId)
@@ -164,13 +162,13 @@ function buildPlayerSnapshots(players: Player[], teams: Team[], games: Match[]):
         if (!rating) continue
         const row = rows.get(player.id) ?? { playerId: player.id, teamId: appearance.teamId, appearances: 0, minutes: 0, goals: 0, assists: 0, mom: 0, goodMatches: 0, ratingTotal: 0, avgRating: 0 }
         row.teamId = appearance.teamId; row.appearances++; row.minutes += rating.minutes; row.ratingTotal += rating.raw; row.avgRating = row.ratingTotal / row.appearances
-        row.goals += match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.playerId === player.id && isOnPitchAtEvent(match, appearance, event)).length
-        row.assists += match.events.filter(event => event.type === 'goal' && !event.ownGoal && event.assistPlayerId === player.id && isOnPitchAtEvent(match, appearance, event)).length
+        row.goals += playerGoalEvents(match, appearance).length
+        row.assists += playerAssistEvents(match, appearance).length
         row.mom += Number(mom === player.id); row.goodMatches += Number(rating.raw >= GOOD_RATING_THRESHOLD)
         rows.set(player.id, row)
       }
     }
-    if (games.some(match => match.matchDay === day)) result.set(day, { matchDay: day, rows: clonePlayerRows(rows, teamMatches) })
+    if (games.some(match => match.matchDay === day)) result.set(day, { matchDay: day, rows: clonePlayerRows(rows) })
   }
   return result
 }
@@ -239,7 +237,7 @@ export function buildSeasonAnalytics(teams: Team[], players: Player[], matches: 
   }
   const completedSnapshots = [...leagueSnapshots.values()].filter(snapshot => snapshot.complete)
   const latestCompletedMatchDay = completedSnapshots[completedSnapshots.length - 1]?.matchDay ?? 0
-  const playerSnapshots = buildPlayerSnapshots(players, teams, leagueMatches)
+  const playerSnapshots = buildPlayerSnapshots(players, leagueMatches)
   const monthlyAwards = new Map<number, MonthlyAwards>()
   for (let blockId = 1; blockId <= 10; blockId++) {
     const block = monthlyBlockRange(blockId)!
@@ -299,7 +297,7 @@ export function scopedPlayerRanks(rows: PlayerSnapshotRow[], players: Player[], 
 }
 
 /** Rank within the supplied, already-scoped leaderboard population. */
-export function scopedMetricRanks(rows: { playerId: string; teamId: string; historicalTeamId?: string }[], players: Player[], playerId: string) {
+export function scopedMetricRanks(rows: { playerId: string; teamId: string; historicalTeamId?: string }[], players: Player[], playerId: string, scopedFamilies?: Map<string, string>) {
   const playerById = new Map(players.map(item => [item.id, item]))
   const target = rows.find(row => row.playerId === playerId)
   const player = playerById.get(playerId)
@@ -307,7 +305,7 @@ export function scopedMetricRanks(rows: { playerId: string; teamId: string; hist
   const overall = rows.findIndex(row => row.playerId === playerId)
   let position = -1; let team = -1; let familyRank = 0; let teamRank = 0
   for (const row of rows) {
-    if (player && positionFamily(playerById.get(row.playerId)?.position ?? 'ST') === positionFamily(player.position)) {
+    if (player && (scopedFamilies?.get(row.playerId) ?? positionFamily(playerById.get(row.playerId)?.position ?? 'ST')) === (scopedFamilies?.get(player.id) ?? positionFamily(player.position))) {
       familyRank++
       if (row.playerId === playerId) position = familyRank - 1
     }

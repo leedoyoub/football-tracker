@@ -2,7 +2,7 @@ import type { CompetitionState, CompetitionType, Match, Player, Team } from '../
 import { currentStaticTeams } from '../data/teams'
 import { competitionSeasonStatus } from './competition'
 import { awardsForCompetition, seasonAwards } from './awards'
-import { buildGlobalRankingData, unifiedBestEleven } from './stats'
+import { buildGlobalRankingData, rankGlobalRankingRows, unifiedBestEleven } from './stats'
 import { monthlyAwardForBlock, type MonthlyAwards } from './seasonAnalytics'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 
@@ -68,11 +68,12 @@ export function historyTimelineForSeason(teams: Team[], players: Player[], match
   const draw = states.find(state => state.kind === 'champions-draw' && state.season === season)
   const status = competitionSeasonStatus(tournamentTeams, matches, season, players, draw)
   const rows = buildGlobalRankingData(players, matches, { seasons: [season], teams: [], positions: [] }, 'rating')
-  const scorer = rows.slice().sort((left, right) => right.goals - left.goals || left.playerId.localeCompare(right.playerId))[0]
-  const assister = rows.slice().sort((left, right) => right.assists - left.assists || left.playerId.localeCompare(right.playerId))[0]
-  const mom = rows.slice().sort((left, right) => right.mom - left.mom || left.playerId.localeCompare(right.playerId))[0]
+  const scorer = rankGlobalRankingRows(rows, players, 'goals')[0]
+  const assister = rankGlobalRankingRows(rows, players, 'assists')[0]
+  const mom = rankGlobalRankingRows(rows, players, 'mom')[0]
+  const rating = rankGlobalRankingRows(rows, players, 'rating')[0]
   const xi = unifiedBestEleven(players, matches, season).slots.flatMap(slot => slot.playerId ? [slot.playerId] : [])
-  const result: HistoryTimeline = { season, league: status.league.championId, cup: status.cup.championId, champions: status.champions.championId, scorer: scorer ? { playerId: scorer.playerId, goals: scorer.goals } : undefined, assists: assister ? { playerId: assister.playerId, assists: assister.assists } : undefined, rating: rows[0] ? { playerId: rows[0].playerId, avgRating: rows[0].avgRating } : undefined, mom: mom ? { playerId: mom.playerId, mom: mom.mom } : undefined, bestXI: xi }
+  const result: HistoryTimeline = { season, league: status.league.championId, cup: status.cup.championId, champions: status.champions.championId, scorer: scorer ? { playerId: scorer.playerId, goals: scorer.goals } : undefined, assists: assister ? { playerId: assister.playerId, assists: assister.assists } : undefined, rating: rating ? { playerId: rating.playerId, avgRating: rating.avgRating } : undefined, mom: mom ? { playerId: mom.playerId, mom: mom.mom } : undefined, bestXI: xi }
   cached.set(key, result)
   return result
 }

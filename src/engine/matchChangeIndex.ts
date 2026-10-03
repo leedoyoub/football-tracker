@@ -4,6 +4,8 @@ import { matchCompetitionType } from './competitionContext'
 import { getMatchManOfTheMatch, matchScore } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { measureInDevelopment } from '../lib/developmentMeasurement'
+import { hasPitchAppearance } from './timeline'
+import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts } from './playerMatchFacts'
 
 export type GroupedMatchChangeItem = { id: string; label: string; kind: MatchChangePayload['kind'] }
 export type GroupedMatchChange = { id: string; playerId?: string; title: string; detail: string; eventIds: string[]; items: GroupedMatchChangeItem[] }
@@ -33,17 +35,22 @@ function milestone(groups: Map<string, GroupedMatchChange>, players: Player[], m
   for (const value of crossed(Math.min(before.goals, before.assists), Math.min(after.goals, after.assists), multiples(5, Math.min(after.goals, after.assists), 10))) emit('balanced', value, `${value} Goals + ${value} Assists`)
 }
 
-function participants(match: Match, id: string) { const row = match.appearances.find(a => a.playerId === id); return Boolean(row && (row.role === 'starter' || match.events.some(e => e.type === 'sub' && e.playerInId === id))) }
+function participants(match: Match, id: string) { const row = match.appearances.find(a => a.playerId === id); return Boolean(row && hasPitchAppearance(match, row)) }
 
 function uncached(players: Player[], matches: Match[]) {
   const output = new Map<string, GroupedMatchChange[]>(); const career = new Map<string, Totals>(); const season = new Map<string, Totals>(); const competition = new Map<string, Totals>(); const runs = new Map<string, Streak>(); const teamRuns = new Map<string, { wins: number; unbeaten: number; cleanSheets: number; goals: number; seasonSheets: number }>()
   for (const match of oldestMatches(matches)) {
-    const groups = new Map<string, GroupedMatchChange>(); const type = matchCompetitionType(match); const perPlayer = new Map<string, { goals: number; assists: number; saves: number }>(); const stat = (id: string) => { const row = perPlayer.get(id) ?? { goals: 0, assists: 0, saves: 0 }; perPlayer.set(id, row); return row }
-    for (const event of match.events) { if (event.type === 'goal' && !event.ownGoal) { if (event.playerId) stat(event.playerId).goals++; if (event.assistPlayerId) stat(event.assistPlayerId).assists++ } if (event.type === 'save') stat(event.playerId).saves += event.count ?? 1 }
+    const groups = new Map<string, GroupedMatchChange>(); const type = matchCompetitionType(match)
     const mom = getMatchManOfTheMatch(match, players)
     for (const player of players) {
       if (!participants(match, player.id)) continue
-      const p = perPlayer.get(player.id) ?? { goals: 0, assists: 0, saves: 0 }; const appearance = match.appearances.find(a => a.playerId === player.id)!; const score = matchScore(match); const conceded = appearance.teamId === match.homeTeamId ? score.away : score.home; const keeper = appearance.position === 'GK' || appearance.matchPosition === 'GK'; const delta: Totals = { goals: p.goals, assists: p.assists, apps: 1, mom: Number(mom === player.id), saves: p.saves, cleanSheets: Number(keeper && conceded === 0) }; const sum = (base: Totals): Totals => ({ goals: base.goals + delta.goals, assists: base.assists + delta.assists, apps: base.apps + 1, mom: base.mom + delta.mom, saves: base.saves + delta.saves, cleanSheets: base.cleanSheets + delta.cleanSheets }); const c0 = career.get(player.id) ?? empty(); const sKey = `${match.season}:${player.id}`; const s0 = season.get(sKey) ?? empty(); const xKey = `${match.season}:${type}:${player.id}`; const x0 = competition.get(xKey) ?? empty(); const c1 = sum(c0); const s1 = sum(s0); const x1 = sum(x0); career.set(player.id, c1); season.set(sKey, s1); competition.set(xKey, x1); milestone(groups, players, match, player, 'career', c0, c1); milestone(groups, players, match, player, 'season', s0, s1); milestone(groups, players, match, player, type, x0, x1)
+      const appearance = match.appearances.find(a => a.playerId === player.id)!
+      const goalkeeper = playerGoalkeeperFacts(match, appearance)
+      const p = { goals: playerGoalEvents(match, appearance).length, assists: playerAssistEvents(match, appearance).length, saves: goalkeeper.saves }
+      const keeper = Boolean(goalkeeper.appearances)
+      const delta: Totals = { goals: p.goals, assists: p.assists, apps: 1, mom: Number(mom === player.id), saves: p.saves, cleanSheets: Number(goalkeeper.cleanSheet) }
+      const sum = (base: Totals): Totals => ({ goals: base.goals + delta.goals, assists: base.assists + delta.assists, apps: base.apps + 1, mom: base.mom + delta.mom, saves: base.saves + delta.saves, cleanSheets: base.cleanSheets + delta.cleanSheets })
+      const c0 = career.get(player.id) ?? empty(); const sKey = `${match.season}:${player.id}`; const s0 = season.get(sKey) ?? empty(); const xKey = `${match.season}:${type}:${player.id}`; const x0 = competition.get(xKey) ?? empty(); const c1 = sum(c0); const s1 = sum(s0); const x1 = sum(x0); career.set(player.id, c1); season.set(sKey, s1); competition.set(xKey, x1); milestone(groups, players, match, player, 'career', c0, c1); milestone(groups, players, match, player, 'season', s0, s1); milestone(groups, players, match, player, type, x0, x1)
       for (const value of crossed(s0.mom, s1.mom, multiples(10, s1.mom))) add(groups, match.id, players, player.id, `season-mom:${match.season}:${player.id}:${value}`, `Season ${value} MOM`, 'milestone'); for (const [field, step, label] of [['apps', 100, 'career appearances'], ['mom', 50, 'career MOM']] as const) for (const value of crossed(c0[field], c1[field], multiples(step, c1[field]))) add(groups, match.id, players, player.id, `career-${field}:${player.id}:${value}`, `${value} ${label}`, 'milestone'); if (keeper) { for (const value of crossed(s0.cleanSheets, s1.cleanSheets, [10, 20])) add(groups, match.id, players, player.id, `season-cs:${player.id}:${value}`, `Season ${value} clean sheets`, 'milestone'); for (const value of crossed(c0.cleanSheets, c1.cleanSheets, multiples(50, c1.cleanSheets))) add(groups, match.id, players, player.id, `career-cs:${player.id}:${value}`, `${value} career clean sheets`, 'milestone'); for (const value of crossed(c0.saves, c1.saves, [100, 250, 500, 750, 1000, ...multiples(250, c1.saves, 1250)])) add(groups, match.id, players, player.id, `career-saves:${player.id}:${value}`, `${value} career saves`, 'milestone') }
       const run = runs.get(player.id) ?? { scoring: 0, contribution: 0 }; run.scoring = p.goals ? run.scoring + 1 : 0; run.contribution = p.goals + p.assists ? run.contribution + 1 : 0; runs.set(player.id, run); if (run.scoring === 5) add(groups, match.id, players, player.id, `streak:scoring:${match.id}:${player.id}`, '5-match scoring streak', 'milestone'); if (run.contribution === 5) add(groups, match.id, players, player.id, `streak:contribution:${match.id}:${player.id}`, '5-match contribution streak', 'milestone')
     }

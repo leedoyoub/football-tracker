@@ -1,10 +1,7 @@
 import type { Match, Team } from '../types'
 import { matchScore } from './rating'
 import { opponentSot, teamGoalkeeperSaves } from './opponentSot'
-
-function newestMatches(matches: Match[]) {
-  return [...matches].sort((left, right) => right.date.localeCompare(left.date) || right.matchDay - left.matchDay)
-}
+import { newestMatches } from './matchChronology'
 
 /** Raw team facts for Records and Insights. Opponent SOT is canonical; saves
  * remain their own event-derived statistic. */

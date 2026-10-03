@@ -5,7 +5,7 @@ import { useStore } from '../store'
 import type { View } from '../types'
 
 export function SeasonRecapScreen({ season, onNavigate, onBack }: { season: string; onNavigate: (view: View) => void; onBack: () => void }) {
-  const { players, teams, matches, competitionStates = [] } = useStore(); const recap = seasonRecap(players, matches, season, competitionStates); const xiLeaders = startingXILeaders(players, matches, season)
+  const { players, teams, matches, competitionStates = [] } = useStore(); const recap = seasonRecap(players, matches, season, competitionStates, teams); const xiLeaders = startingXILeaders(players, matches, season)
   const byId = Object.fromEntries(players.map(player => [player.id, player]))
   const xiRows: { label: string; row: StartingXIStat | undefined; value: (row: StartingXIStat) => string }[] = [
     { label: 'Most Used XI', row: xiLeaders.mostUsed, value: row => `${row.matches} matches` },

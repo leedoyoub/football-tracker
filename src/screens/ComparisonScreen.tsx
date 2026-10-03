@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
-import { onPitchStats, starterSubstituteSplits } from '../engine/analytics'
-import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from '../engine/rating'
+import { onPitchStats } from '../engine/analytics'
+import { matchScore } from '../engine/rating'
+import { derivePlayerScope } from '../engine/playerDerived'
+import { scopedPositionFamilyByPlayer } from '../engine/positionScope'
 import { matchCompetitionType } from '../engine/competition'
 import { buildGlobalRankingData, rankGlobalRankingRows } from '../engine/stats'
 import { scopedMetricRanks } from '../engine/seasonAnalytics'
@@ -48,4 +50,27 @@ function PlayerSelect({ label, value, players, teams, excludedId, onChange }: { 
   const teamName = (player: Player) => teams.find(team => team.id === player.teamId)?.name ?? 'No Team'
   return <section aria-label={label} className="rounded-xl bg-zinc-900 p-2"><label className="block text-[10px] text-zinc-400">{label}<input aria-label={`${label} search`} value={query} onChange={event => setQuery(event.target.value)} placeholder="Search player" className="mt-1 w-full rounded-lg bg-black/30 px-2 py-1.5 text-xs text-white" /></label><div className="mt-1 max-h-32 overflow-y-auto">{value && <button type="button" onClick={() => onChange('')} className="w-full rounded-lg px-1 py-1 text-left text-[10px] text-zinc-400">Clear selection</button>}{candidates.map(player => <button key={player.id} type="button" onClick={() => onChange(player.id)} className={`block w-full rounded-lg px-1 py-1.5 text-left ${player.id === value ? 'bg-emerald-500/15' : ''}`}><b className="block truncate text-xs">{playerFullName(player)}</b><span className="block truncate text-[10px] text-zinc-400">{teamName(player)} · {player.position}</span></button>)}{!candidates.length && <p className="px-1 py-2 text-[10px] text-zinc-500">No matching player.</p>}</div></section>
 }
-function summary(player: Player, allPlayers: Player[], matches: Match[], filter: { season: string; competition: CompetitionType | 'all'; teamId?: string }, ranking: ReturnType<typeof rankGlobalRankingRows>): Summary { const scoped = matches.filter(match => !filter.teamId || match.appearances.some(appearance => appearance.playerId === player.id && appearance.teamId === filter.teamId)); const roles = starterSubstituteSplits(player, scoped, filter); const rows = [roles.starter, roles.substitute]; const minutes = rows.reduce((total, row) => total + row.minutes, 0); const goals = rows.reduce((total, row) => total + row.goals, 0); const assists = rows.reduce((total, row) => total + row.assists, 0); const apps = rows.reduce((total, row) => total + row.apps, 0); const rating = apps ? rows.reduce((total, row) => total + row.averageRating * row.apps, 0) / apps : 0; const onPitch = onPitchStats([player], scoped, filter).reduce((total, row) => total + row.plusMinus, 0); let wins = 0; let draws = 0; let losses = 0; for (const match of scoped) { const appearance = match.appearances.find(item => item.playerId === player.id && (!filter.teamId || item.teamId === filter.teamId)); if (!appearance || !ratePlayerMatch(match, player)) continue; const score = matchScore(match); const ours = appearance.teamId === match.homeTeamId ? score.home : score.away; const theirs = appearance.teamId === match.homeTeamId ? score.away : score.home; if (ours > theirs) wins++; else if (ours === theirs) draws++; else losses++ }; const rated = scoped.flatMap(match => { const row = ratePlayerMatch(match, player); return row ? [row] : [] }); const recent = rated.slice(-5); const last5 = recent.length ? recent.reduce((sum, row) => sum + row.raw, 0) / recent.length : 0; const active = playerStreaks(player, scoped).filter(row => row.current > 1).sort((a, b) => b.current - a.current)[0]; const ranks = scopedMetricRanks(ranking, allPlayers, player.id); return { rating, last5, goals, assists, combined: goals + assists, minutes, mom: scoped.filter(match => getMatchManOfTheMatch(match, allPlayers) === player.id).length, goodMatches: rated.filter(row => row.raw >= GOOD_RATING_THRESHOLD).length, streak: active ? `${active.current} straight · ${active.label}` : 'No active streak', streakValue: active?.current ?? 0, overallRank: ranks.overall, positionRank: ranks.position, teamRank: ranks.team, starts: roles.starter.apps, subs: roles.substitute.apps, goals90: minutes ? goals / minutes * 90 : 0, assists90: minutes ? assists / minutes * 90 : 0, combined90: minutes ? (goals + assists) / minutes * 90 : 0, plusMinus: onPitch, wins, draws, losses } }
+function summary(player: Player, allPlayers: Player[], matches: Match[], filter: { season: string; competition: CompetitionType | 'all'; teamId?: string }, ranking: ReturnType<typeof rankGlobalRankingRows>): Summary {
+  const data = derivePlayerScope(player, allPlayers, matches, { season: filter.season, competition: filter.competition, teamIds: filter.teamId ? [filter.teamId] : undefined })
+  const scoped = data.appearances.map(row => row.match)
+  const onPitch = onPitchStats([player], scoped, filter).reduce((total, row) => total + row.plusMinus, 0)
+  let wins = 0; let draws = 0; let losses = 0
+  for (const { match, appearance } of data.appearances) {
+    const score = matchScore(match)
+    const ours = appearance.teamId === match.homeTeamId ? score.home : score.away
+    const theirs = appearance.teamId === match.homeTeamId ? score.away : score.home
+    if (ours > theirs) wins++; else if (ours === theirs) draws++; else losses++
+  }
+  const recent = data.appearances.slice(-5)
+  const last5 = recent.length ? recent.reduce((sum, row) => sum + row.rating.raw, 0) / recent.length : 0
+  const active = playerStreaks(player, scoped).filter(row => row.current > 1).sort((a, b) => b.current - a.current)[0]
+  const families = scopedPositionFamilyByPlayer(allPlayers, matches, { teams: filter.teamId ? [filter.teamId] : [] })
+  const ranks = scopedMetricRanks(ranking, allPlayers, player.id, families)
+  const historicalTeamId = filter.teamId ?? data.appearances[data.appearances.length - 1]?.appearance.teamId
+  const teamRanking = historicalTeamId && !filter.teamId
+    ? rankGlobalRankingRows(buildGlobalRankingData(allPlayers, matches, { seasons: [filter.season], teams: [historicalTeamId], positions: [] }, 'rating'), allPlayers, 'rating')
+    : ranking
+  const teamRank = scopedMetricRanks(teamRanking, allPlayers, player.id).team
+  const { goals, assists, minutes } = data
+  return { rating: data.averageRating, last5, goals, assists, combined: goals + assists, minutes, mom: data.mom, goodMatches: data.goodMatches, streak: active ? `${active.current} straight · ${active.label}` : 'No active streak', streakValue: active?.current ?? 0, overallRank: ranks.overall, positionRank: ranks.position, teamRank, starts: data.starts, subs: data.subs, goals90: minutes ? goals / minutes * 90 : 0, assists90: minutes ? assists / minutes * 90 : 0, combined90: minutes ? (goals + assists) / minutes * 90 : 0, plusMinus: onPitch, wins, draws, losses }
+}

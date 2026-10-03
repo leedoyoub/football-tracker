@@ -1,5 +1,6 @@
 import { creditedPositionSegments, hasPitchAppearance, isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchScore, ratePlayerMatch } from './rating'
 import { opponentSot } from './opponentSot'
+import { isPlayerAssistEvent, isPlayerGoalEvent, playerAssistEvents, playerGoalEvents } from './playerMatchFacts'
 import type { Match, Player, Position } from '../types'
 
 export type AnalyticsFilter = { season?: string; teamId?: string }
@@ -73,21 +74,24 @@ function buildCombination(match: Match, playerIds: string[], teamId: string, rol
   const overlap = sharedIntervals(match, playerIds, teamId, roles)
   const togetherMinutes = minutes(overlap)
   if (!togetherMinutes) return null
+  const appearances = playerIds.flatMap(playerId => { const appearance = match.appearances.find(item => item.playerId === playerId && item.teamId === teamId); return appearance ? [appearance] : [] })
+  const credited = (event: Match['events'][number]) => ({ goals: appearances.filter(appearance => isPlayerGoalEvent(match, appearance, event)).length, assists: appearances.filter(appearance => isPlayerAssistEvent(match, appearance, event)).length })
   let goalsFor = 0; let goalsAgainst = 0; let combinedGoals = 0; let combinedAssists = 0
   for (const event of match.events) {
     if (event.type !== 'goal' || !playersOnPitchForEvent(match, playerIds, teamId, roles, event)) continue
     if (scoringTeam(event, match) === teamId) goalsFor++; else goalsAgainst++
-    if (!event.ownGoal && playerIds.includes(event.playerId ?? '')) combinedGoals++
-    if (!event.ownGoal && playerIds.includes(event.assistPlayerId ?? '')) combinedAssists++
+    const contribution = credited(event)
+    combinedGoals += contribution.goals
+    combinedAssists += contribution.assists
   }
   const score = matchScore(match); const ours = teamId === match.homeTeamId ? score.home : score.away; const theirs = teamId === match.homeTeamId ? score.away : score.home
   const ratings = playerIds.flatMap(playerId => { const player = playersById.get(playerId); const rating = player && ratePlayerMatch(match, player); return rating ? [rating.rating] : [] })
   const startsTogether = playerIds.every(id => { const appearance = match.appearances.find(item => item.playerId === id && item.teamId === teamId); return appearance?.role === 'starter' && Boolean(appearance && roles[id]?.(matchPositionAt(match, appearance, 0) ?? appearance.position)) }) ? 1 : 0
   let startingCombinedGA = 0; let startingGoalInvolvements = 0
   if (startsTogether) for (const event of match.events) if (event.type === 'goal' && !event.ownGoal && scoringTeam(event, match) === teamId) {
-    const scorer = playerIds.includes(event.playerId ?? ''); const assister = playerIds.includes(event.assistPlayerId ?? '')
-    startingCombinedGA += Number(scorer) + Number(assister)
-    startingGoalInvolvements += Number(scorer || assister)
+    const contribution = credited(event)
+    startingCombinedGA += contribution.goals + contribution.assists
+    startingGoalInvolvements += Number(contribution.goals + contribution.assists > 0)
   }
   const onPitchGoalDifference = goalsFor - goalsAgainst
   const weightedOpponentSot = opponentSot(match, teamId) * togetherMinutes / 90
@@ -164,7 +168,7 @@ export type PlayerChemistry = {
 
 /** Evidence-first chemistry: direct links, relevant positional overlap, then
  * team outcomes when starting together. There is deliberately no opaque score. */
-export function playerChemistry(player: Player, players: Player[], matches: Match[], filter: AnalyticsFilter): PlayerChemistry {
+export function playerChemistry(player: Player, players: Player[], matches: Match[], filter: AnalyticsFilter, scopedPosition: string = player.position): PlayerChemistry {
   const directions = goalPartnerships(players, matches, filter).filter(row => row.assisterId === player.id || row.scorerId === player.id)
   const duoRows = combinationStats(players, matches, filter, 'duo').filter(row => row.playerIds.includes(player.id))
   const duoFor = (id: string) => duoRows.find(row => row.playerIds.includes(id))
@@ -177,7 +181,7 @@ export function playerChemistry(player: Player, players: Player[], matches: Matc
     directRows.set(partnerId, current)
   }
   const bestDirect = [...directRows.entries()].map(([partnerId, row]) => ({ partnerId, ...row, matchesTogether: duoFor(partnerId)?.matches ?? 0, minutesTogether: duoFor(partnerId)?.togetherMinutes ?? 0 })).sort((left, right) => right.connections - left.connections || right.minutesTogether - left.minutesTogether || left.partnerId.localeCompare(right.partnerId))[0]
-  const positionalKind: CombinationKind = centreBacks.has(player.position) ? 'cb' : leftBacks.has(player.position) || rightBacks.has(player.position) ? 'fullback' : attackers.has(player.position) ? 'attack' : midfielders.has(player.position) ? 'midfield' : 'duo'
+  const positionalKind: CombinationKind = centreBacks.has(scopedPosition as Position) ? 'cb' : scopedPosition === 'FB' || leftBacks.has(scopedPosition as Position) || rightBacks.has(scopedPosition as Position) ? 'fullback' : attackers.has(scopedPosition as Position) ? 'attack' : midfielders.has(scopedPosition as Position) ? 'midfield' : 'duo'
   const positional = combinationStats(players, matches, filter, positionalKind).filter(row => row.playerIds.includes(player.id)).sort((left, right) => {
     const leftValue = positionalKind === 'cb' || positionalKind === 'fullback' ? left.goalsAgainst / Math.max(left.matches, 1) : (left.wins * 3 + left.draws) / Math.max(left.matches, 1)
     const rightValue = positionalKind === 'cb' || positionalKind === 'fullback' ? right.goalsAgainst / Math.max(right.matches, 1) : (right.wins * 3 + right.draws) / Math.max(right.matches, 1)
@@ -199,12 +203,14 @@ export function positionSplits(player: Player, matches: Match[], filter: Analyti
     for (const segment of segments) { const row = totals.get(segment.position) ?? { position: segment.position, matches: 0, minutes: 0, averageRating: 0, goals: 0, assists: 0, combinedGA: 0 }; const seen = seenMatches.get(segment.position) ?? new Set<string>(); if (!seen.has(match.id)) { row.matches++; seen.add(match.id); seenMatches.set(segment.position, seen) }; const segmentMinutes = segment.end - segment.start; row.minutes += segmentMinutes; ratingMinutes.set(segment.position, (ratingMinutes.get(segment.position) ?? 0) + (rating?.rating ?? 0) * segmentMinutes)
       row.combinedGA = row.goals + row.assists; totals.set(segment.position, row)
     }
+    const creditedGoals = new Set(playerGoalEvents(match, appearance))
+    const creditedAssists = new Set(playerAssistEvents(match, appearance))
     for (const event of match.events) if (event.type === 'goal' && !event.ownGoal) {
       const position = matchPositionAtEvent(match, appearance, event)
       const row = position ? totals.get(position) : undefined
       if (!row) continue
-      if (event.playerId === player.id) row.goals++
-      if (event.assistPlayerId === player.id) row.assists++
+      if (creditedGoals.has(event)) row.goals++
+      if (creditedAssists.has(event)) row.assists++
       row.combinedGA = row.goals + row.assists
     }
   }
@@ -218,7 +224,8 @@ export function starterSubstituteSplits(player: Player, matches: Match[], filter
     const intervals = teamIntervals(match, player.id, appearance.teamId); const totalMinutes = minutes(intervals)
     const rating = ratePlayerMatch(match, player); if (!rating) continue
     const row = appearance.role === 'starter' ? result.starter : result.substitute; row.apps++; row.minutes += totalMinutes; row.averageRating += rating.rating
-    for (const event of match.events) if (event.type === 'goal' && !event.ownGoal && isOnPitchAtEvent(match, appearance, event)) { if (event.playerId === player.id) row.goals++; if (event.assistPlayerId === player.id) row.assists++ }
+    row.goals += playerGoalEvents(match, appearance).length
+    row.assists += playerAssistEvents(match, appearance).length
   }
   for (const row of Object.values(result)) { row.combinedGA = row.goals + row.assists; row.averageRating = row.apps ? row.averageRating / row.apps : 0; row.goalsPer90 = row.minutes ? row.goals / row.minutes * 90 : 0; row.assistsPer90 = row.minutes ? row.assists / row.minutes * 90 : 0; row.gaPer90 = row.minutes ? row.combinedGA / row.minutes * 90 : 0 }
   return result

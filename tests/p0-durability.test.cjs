@@ -166,7 +166,7 @@ test('verified primary getAppState resolves while the IndexedDB mirror never res
 
 test('all four ranking surfaces consume the one canonical thirteen-metric catalog', () => {
   const metrics = require('../src/lib/rankingMetrics.ts').RANKING_METRICS
-  assert.deepEqual(metrics.map(metric => metric.label), ['Rating', 'Goals', 'Assists', 'G+A', 'Minutes', 'MOM', '7.2+ Matches', 'Goals/90', 'Assists/90', 'G+A/90', 'Clean Sheets', 'Saves', 'Save %'])
+  assert.deepEqual(metrics.map(metric => metric.label), ['Rating', 'Goals', 'Assists', 'G+A', 'Minutes', 'MOM', '7.2+ Matches', 'Goals/90', 'Assists/90', 'G+A/90', 'Clean Sheets', 'Saves', 'Qualifying GK Save %'])
   for (const file of ['HomeScreen.tsx', 'TeamDetailScreen.tsx', 'CompetitionScreen.tsx', 'GlobalRankingScreen.tsx']) {
     const screen = fs.readFileSync(`src/screens/${file}`, 'utf8')
     assert(screen.includes("from '../lib/rankingMetrics'"))
