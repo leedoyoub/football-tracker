@@ -33,8 +33,8 @@ test('Gerard Martín: both 89 and 90 count after entering CB at 77 in a 4–2 wi
   assert.deepEqual(rating.matchScore(m), { home: 4, away: 2 })
   assert.deepEqual(trace.concededGoals.map(row => [row.minute, row.onPitch, row.position, row.penalty]), [[89, true, 'CB', -.25], [90, true, 'CB', -.25]])
   assert.deepEqual([result.enter, result.exit, result.minutes], [77, 90, 13])
-  near(result.conceded, -.5); near(result.result, .1); near(result.noConceded, 1.4 * .2 * 13 / 90)
-  near(result.raw, 6.140444444444444); near(trace.componentSum, result.preClamp)
+  near(result.conceded, -.5); near(result.result, .1); near(result.noConceded, 1.3 * .2 * 13 / 90)
+  near(result.raw, 6.5 + .1 - .5 + 1.3 * .2 * 13 / 90); near(trace.componentSum, result.preClamp)
   assert.equal(result.rating.toFixed(1), '6.1'); assert.equal(trace.opponentSot, 2)
   assert.equal(JSON.stringify({ p, m }), before)
 })
@@ -77,7 +77,7 @@ test('uninvolved goal bonus changes with position and excludes scorer/assister',
 test('SOT suppression splits 60 CB / 30 CDM with full precision', () => {
   const p = player(), m = game(p, [goal('g', 80)], { appearances: [app(p, 'starter', { positionHistory: [{ minute: 60, position: 'CDM' }] })] })
   const trace = rating.tracePlayerMatchRating(m, p)
-  near(trace.sotBonus, 1.0986666666666667)
+  near(trace.sotBonus, 1.3 * 60 / 90 + .8 * .62 * 30 / 90)
   near(trace.suppressionIntervals.reduce((sum, row) => sum + row.bonus, 0), trace.sotBonus)
 })
 for (const first of [true, false]) test(`same-minute substitution ${first ? 'before' : 'after'} goal`, () => {
@@ -108,7 +108,7 @@ for (const minute of [91, 95, 99]) test(`stoppage-time goal at ${minute} keeps r
 })
 test('multiple position intervals cannot exceed the 1.0 minutes factor in stoppage time', () => {
   const p = player(), m = game(p, [goal('end', 99)], { appearances: [app(p, 'starter', { positionHistory: [{ minute: 60, position: 'CDM' }] })] })
-  near(rating.ratePlayerMatch(m, p).noConceded, 1.0986666666666667)
+  near(rating.ratePlayerMatch(m, p).noConceded, 1.3 * 60 / 90 + .8 * .62 * 30 / 90)
 })
 test('supported repeated on/off intervals exclude bench gaps from minutes and goals', () => {
   const p = player(), m = game(p, [sub(20, 'other', 'p'), goal('gap', 30), sub(40), goal('on', 50), sub(60, 'next', 'p'), goal('off', 70)])
@@ -123,7 +123,7 @@ test('multi-GK match uses each keeper’s on-pitch GA and all own-team untimed s
   near(rating.ratePlayerMatch(m, a).conceded, -.25); near(rating.ratePlayerMatch(m, b).conceded, -.25)
   near(rating.ratePlayerMatch(m, a).saves, 1.2); near(rating.ratePlayerMatch(m, b).saves, .81)
   assert.equal(rating.opponentSotProxy(m, 'A'), 9)
-  near(rating.ratePlayerMatch(m, defender).noConceded, 1.4 * .23)
+  near(rating.ratePlayerMatch(m, defender).noConceded, 1.3 * .23)
   assert.equal(JSON.stringify(m), before)
 })
 for (const [saves, conceded, perSave] of [[4, 1, .30], [3, 2, .27], [2, 3, .25], [1, 4, .21], [1, 5, .17], [0, 0, 0]]) test(`GK save band ${saves}/${saves + conceded} is finite`, () => {
@@ -169,7 +169,7 @@ test('all historical consumers reuse the same precise Gerard rating despite obso
   const { p, m } = gerardFixture(), players = [p], matches = [m], r = rating.ratePlayerMatch(m, p)
   const scope = derivePlayerScope(p, players, matches), global = stats.buildGlobalRankingData(players, matches, filters, 'rating')[0]
   assert.strictEqual(rating.rateMatch(m, players)[0], r); assert.strictEqual(scope.appearances[0].rating, r); assert.strictEqual(global.ratings[0], r)
-  for (const number of [scope.averageRating, global.avgRating, stats.aggregatePlayerStats(p, players, matches).avgRating, rating.tracePlayerMatchRating(m, p).raw, playerForm(p, matches).last5Average, substituteImpact(p, matches).summary.averageRating]) near(number, 6.140444444444444)
+  for (const number of [scope.averageRating, global.avgRating, stats.aggregatePlayerStats(p, players, matches).avgRating, rating.tracePlayerMatchRating(m, p).raw, playerForm(p, matches).last5Average, substituteImpact(p, matches).summary.averageRating]) near(number, 6.5 + .1 - .5 + 1.3 * .2 * 13 / 90)
   assert.equal(rating.getMatchManOfTheMatch(m, players), p.id)
   near(stats.unifiedBestEleven(players, matches, 'S1').slots.find(row => row.playerId === p.id).avgRating, r.raw)
 })

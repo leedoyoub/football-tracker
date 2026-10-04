@@ -21,15 +21,15 @@ test('realistic 17-minute CB fixture produces the exact shared raw rating and di
   const fixture = match([substitution('on', 73), opponentGoal('g75', 75), opponentGoal('g88', 88)])
   const rating = ratePlayerMatch(fixture, cb)
   const trace = tracePlayerMatchRating(fixture, cb)
-  near(rating.raw, 5.752888888888889)
-  assert.equal(rating.rating.toFixed(1), '5.8')
+  near(rating.raw, 6.5 - .3 - .5 + 1.3 * .2 * 17 / 90)
+  assert.equal(rating.rating.toFixed(1), '5.7')
   assert.equal(trace.minutes, 17)
   assert.deepEqual(trace.concededGoals.map(goal => [goal.minute, goal.onPitch, goal.position, goal.penalty]), [[75, true, 'CB', -.25], [88, true, 'CB', -.25]])
   assert.equal(trace.opponentSot, 2)
   assert.equal(trace.sotMultiplier, .73)
-  near(trace.sotBonus, 1.4 * .2 * 17 / 90)
+  near(trace.sotBonus, 1.3 * .2 * 17 / 90)
   near(trace.componentSum, trace.raw)
-  assert.equal(trace.display, '5.8')
+  assert.equal(trace.display, '5.7')
   assert.equal(trace.cacheHit, false)
   assert.equal(trace.legacyStoredPlayerRating, 9.9)
   assert.equal(trace.legacyStoredRatingUsed, false)
@@ -39,7 +39,7 @@ test('a pre-entry goal is SOT but not an on-pitch conceded penalty', () => {
   const fixture = match([opponentGoal('g60', 60), substitution('on', 73), opponentGoal('g88', 88)])
   const trace = tracePlayerMatchRating(fixture, cb)
   assert.deepEqual(trace.concededGoals.map(goal => [goal.minute, goal.onPitch]), [[60, false], [88, true]])
-  near(trace.raw, 6.063555555555555)
+  near(trace.raw, 6.5 - .3 - .25 + 1.3 * (.45 - .07 * (90 / 17 - 5)) * 17 / 90)
 })
 
 test('same-minute legacy saved order decides whether the entering CB concedes', () => {
@@ -47,8 +47,8 @@ test('same-minute legacy saved order decides whether the entering CB concedes', 
   const goalFirst = match([opponentGoal('g73', 73), substitution('on', 73), opponentGoal('g88', 88)])
   assert.deepEqual(tracePlayerMatchRating(substitutionFirst, cb).concededGoals.map(goal => goal.onPitch), [true, true])
   assert.deepEqual(tracePlayerMatchRating(goalFirst, cb).concededGoals.map(goal => goal.onPitch), [false, true])
-  near(ratePlayerMatch(substitutionFirst, cb).raw, 5.752888888888889)
-  near(ratePlayerMatch(goalFirst, cb).raw, 6.063555555555555)
+  near(ratePlayerMatch(substitutionFirst, cb).raw, 6.5 - .3 - .5 + 1.3 * .2 * 17 / 90)
+  near(ratePlayerMatch(goalFirst, cb).raw, 6.5 - .3 - .25 + 1.3 * (.45 - .07 * (90 / 17 - 5)) * 17 / 90)
 })
 
 test('on-pitch and combination consumers use the same saved-order boundary rule', () => {
@@ -74,7 +74,7 @@ test('event-time position applies CB then CDM penalties and suppression interval
   const fixture = match([substitution('on', 73), opponentGoal('g75', 75), opponentGoal('g88', 88)], { appearances: [{ playerId: 'cb', teamId: 'A', role: 'bench', position: 'CB', matchPosition: 'CB', positionHistory: [{ minute: 80, position: 'CDM' }] }] })
   const trace = tracePlayerMatchRating(fixture, cb)
   assert.deepEqual(trace.concededGoals.map(goal => [goal.position, goal.penalty]), [['CB', -.25], ['CDM', -.12]])
-  near(trace.raw, 5.872222222222222)
+  near(trace.raw, 6.5 - .3 - .25 - .12 + 1.3 * .2 * 7 / 90 + .8 * .23 * 10 / 90)
 })
 
 test('an exit before the second goal ends both minutes and conceded attribution', () => {
@@ -82,7 +82,7 @@ test('an exit before the second goal ends both minutes and conceded attribution'
   const trace = tracePlayerMatchRating(fixture, cb)
   assert.equal(trace.minutes, 9)
   assert.deepEqual(trace.concededGoals.map(goal => goal.onPitch), [true, false])
-  near(trace.raw, 5.978)
+  near(trace.raw, 6.5 - .3 - .25 + 1.3 * .2 * 9 / 90)
 })
 
 test('legacy unsequenced substitution and minimal conceded-goal records remain compatible', () => {
@@ -91,7 +91,7 @@ test('legacy unsequenced substitution and minimal conceded-goal records remain c
     { id: 'legacy-goal', type: 'goal', minute: 75, teamId: 'B' },
     { id: 'legacy-goal-2', type: 'goal', minute: 88, teamId: 'B' },
   ])
-  near(ratePlayerMatch(fixture, cb).raw, 5.752888888888889)
+  near(ratePlayerMatch(fixture, cb).raw, 6.5 - .3 - .5 + 1.3 * .2 * 17 / 90)
 })
 
 test('edited Match arrays invalidate derived player values while all consumers share one match rating', () => {

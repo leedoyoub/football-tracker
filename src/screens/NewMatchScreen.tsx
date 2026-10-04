@@ -6,7 +6,7 @@ import { FORMATION_SLOTS, Pitch, UNIVERSAL_TACTICAL_SLOTS, type TacticalSlot } f
 import { calculateFormation, kickoffFormation } from '../engine/formation'
 import { playerSeasonStats } from '../engine/stats'
 import { matchScore } from '../engine/rating'
-import { allowsGoalkeeperLineupMove, canConfirmSubstitution, moveLineup, moveSubstitution, type LineupTarget, type SubstitutionDraft } from './matchLineup'
+import { allowsGoalkeeperLineupMove, canConfirmSubstitution, linkSubstitutionHistory, moveLineup, moveSubstitution, type LineupTarget, type SubstitutionDraft } from './matchLineup'
 import { getNextMatchDayForTeam } from '../engine/match'
 import { competitionAssignment, matchCompetitionType } from '../engine/competition'
 import { assignmentSnapshotForMatch, canonicalScheduleOrdinal, competitionContextParts, formatCompetitionContext, freezeCompetitionAssignment, matchesCompetitionAssignmentExactly } from '../engine/competitionContext'
@@ -149,11 +149,8 @@ function MatchEditor({
   // 기타 Live Events 관련 상태들 (matchDraft 외부 유지)
   const [liveEvent, setLiveEvent] = useState<'goal' | 'conceded' | 'substitution' | null>(null)
   const [draftMinute, setDraftMinute] = useState('')
-  const minuteInput = draftMinute
-  const setMinuteInput = setDraftMinute
-  const [appliedMinute, setAppliedMinute] = useState(0)
+  const [appliedMinute, setAppliedMinute] = useState<number | null>(null)
   const liveMinute = Number(draftMinute)
-  // Replaced direct liveMinute with appliedMinute for formation logic where needed
   const [assistChosen, setAssistChosen] = useState(false)
   const [liveScorerId, setLiveScorerId] = useState('')
   const [liveAssistId, setLiveAssistId] = useState('')
@@ -161,6 +158,7 @@ function MatchEditor({
   const [livePicker, setLivePicker] = useState<'scorer' | 'assist' | 'cause' | 'minute'>('scorer')
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
   const [substitutionDraft, setSubstitutionDraft] = useState<SubstitutionDraft | null>(null)
+  const [pendingMoveCount, setPendingMoveCount] = useState(0)
   const [subSelection, setSubSelection] = useState<LineupTarget | null>(null)
   const [substitutionError, setSubstitutionError] = useState('')
   const pendingMoves = useRef<{ source: LineupTarget; target: LineupTarget }[]>([])
@@ -234,14 +232,16 @@ function MatchEditor({
       assists: committed.filter((e) => e.type === 'goal' && e.assistPlayerId === player.id).length + (liveEvent === 'goal' && liveAssistId === player.id ? 1 : 0),
     }]
   }))
-  const minuteIsValid = /^\d{1,2}$/.test(minuteInput) && liveMinute >= 0 && liveMinute <= 99
+  const minuteIsValid = /^\d{1,2}$/.test(draftMinute) && liveMinute >= 0 && liveMinute <= 99
 
   function openLiveEvent(type: NonNullable<typeof liveEvent>) {
     pendingMoves.current = []; pendingBase.current = null
+    setPendingMoveCount(0)
     setHistoryError('')
     setEditingEventId(null)
     setLiveEvent(type)
-    setMinuteInput('')
+    setDraftMinute('')
+    setAppliedMinute(null)
     setAssistChosen(false)
     setSubSelection(null)
     setSubstitutionError('')
@@ -259,7 +259,7 @@ function MatchEditor({
     if (!liveEvent || !minuteIsValid) return
     const id = crypto.randomUUID()
     const writeEvent = (event: MatchEvent) => setMatchDraft(prev => ({ ...prev, events: editingEventId ? prev.events.map((e) => e.id === editingEventId ? { ...e, ...event, sequence: e.sequence } : e) : [...prev.events, { ...event, sequence: nextTimelineSequence(prev.events, prev.positionHistories) }] }))
-    const minute = Number(minuteInput); if (!Number.isInteger(minute) || minute < 0 || minute > 99) return
+    const minute = Number(draftMinute); if (!Number.isInteger(minute) || minute < 0 || minute > 99) return
     setAppliedMinute(minute)
     const eligibleNow = new Set(eligibleAt(minute).map(appearance => appearance.playerId))
     if (liveEvent === 'goal') {
@@ -270,19 +270,23 @@ function MatchEditor({
       if (liveCauseId && !eligibleNow.has(liveCauseId)) return
       writeEvent({ id: editingEventId ?? id, type: 'goal', minute, teamId: opponentId, playerId: undefined, concededGoalCausePlayerId: liveCauseId || undefined })
     } else if (substitutionDraft) {
-      if (substitutionError || !canConfirmSubstitution(substitutionDraft, matchDraft)) return
-      setMatchDraft(prev => ({ ...prev, slotAssignments: substitutionDraft.slotAssignments, homeBench: substitutionDraft.homeBench, events: substitutionDraft.events, positionHistories: substitutionDraft.positionHistories }))
+      const finalDraft = replayPendingMoves(minute)
+      if (!finalDraft || !canConfirmSubstitution(finalDraft, matchDraft)) return
+      const confirmed = linkSubstitutionHistory(finalDraft, matchDraft)
+      setMatchDraft(prev => ({ ...prev, slotAssignments: confirmed.slotAssignments, homeBench: confirmed.homeBench, events: confirmed.events, positionHistories: confirmed.positionHistories }))
     }
     if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) document.activeElement.blur()
-    setMinuteInput(''); setLiveScorerId(''); setLiveAssistId(''); setLiveCauseId(''); setAssistChosen(false)
+    setDraftMinute(''); setLiveScorerId(''); setLiveAssistId(''); setLiveCauseId(''); setAssistChosen(false)
     setLiveEvent(null)
     setEditingEventId(null)
     setSubstitutionDraft(null)
     setSubSelection(null)
     setSubstitutionError('')
+    pendingMoves.current = []; pendingBase.current = null; setPendingMoveCount(0)
   }
 
   function cancelLiveEvent() {
+    pendingMoves.current = []; pendingBase.current = null; setPendingMoveCount(0)
     setSubstitutionDraft(null)
     setSubSelection(null)
     setSubstitutionError('')
@@ -298,7 +302,7 @@ function MatchEditor({
     cancelLiveEvent()
     setEditingEventId(event.id)
     if (event.type === 'save') return
-    setMinuteInput(String(event.minute))
+    setDraftMinute(String(event.minute))
     setAppliedMinute(event.minute)
     if (event.teamId === selectedTeamId) {
       setLiveEvent('goal'); setLiveScorerId(event.playerId ?? ''); setLiveAssistId(event.assistPlayerId ?? ''); setAssistChosen(true); setLivePicker('minute')
@@ -324,7 +328,16 @@ function MatchEditor({
     if (!subEdit || !/^\d{1,2}$/.test(subEditMinute) || Number(subEditMinute) > 99) return
     const original = matchDraft.events.find(e => e.id === subEdit.id)!
     const minute = Number(subEditMinute)
-    const histories = Object.fromEntries(Object.entries(matchDraft.positionHistories).map(([id, changes]) => [id, changes.map(c => c.minute === original.minute && !matchDraft.events.some(e => e.type === 'sub' && e.id !== original.id && e.minute === original.minute) ? { ...c, minute } : c)]))
+    if (minute !== original.minute && Object.values(matchDraft.positionHistories).some(changes => changes.some(change =>
+      change.sourceSubstitutionIds?.includes(original.id) && change.sourceSubstitutionIds.some(id => id !== original.id && matchDraft.events.some(event => event.id === id))))) {
+      setHistoryError('These substitutions share tactical moves. Undo and re-enter the linked substitutions to change their time.')
+      return
+    }
+    const histories = Object.fromEntries(Object.entries(matchDraft.positionHistories).map(([id, changes]) => [id, changes.map(c => {
+      const linked = c.sourceSubstitutionIds?.includes(original.id)
+      const legacy = !c.sourceSubstitutionIds && !c.tacticalSlotId && c.minute === original.minute && !matchDraft.events.some(e => e.type === 'sub' && e.id !== original.id && e.minute === original.minute)
+      return linked || legacy ? { ...c, minute } : c
+    })]))
     if (correctEvents(matchDraft.events.map(e => e.id === subEdit.id ? { ...subEdit, minute } : e), histories)) setSubEdit(null)
   }
 
@@ -335,36 +348,32 @@ function MatchEditor({
   function applyLiveMove(source: LineupTarget, target: LineupTarget) {
     if (!substitutionDraft) return
     if (!allowsGoalkeeperLineupMove(source, target, substitutionDraft, slotPositions, playerPositions, 'in-match')) { setSubstitutionError('The goalkeeper is fixed for this match.'); setSubSelection(null); return }
-    if (minuteInput === '' || pendingMoves.current.length) {
-      const preview = moveLineup(substitutionDraft, source, target)
-      if (preview === substitutionDraft) return
-      if (!pendingBase.current) pendingBase.current = substitutionDraft
-      pendingMoves.current.push({ source, target })
-      setSubstitutionDraft({ ...substitutionDraft, ...preview })
-      setSubSelection(null)
-      if (minuteInput !== '') replayPendingMoves(appliedMinute)
-      return
-    }
-    const next = moveSubstitution(substitutionDraft, source, target, startingSnapshot, slotPositions, appliedMinute, selectedTeamId, () => crypto.randomUUID())
-    if (next === substitutionDraft) {
-      setSubstitutionError('Invalid substitution or time.')
-      setSubSelection(null)
-      return
-    }
-    setSubstitutionDraft(next)
+    const preview = moveLineup(substitutionDraft, source, target)
+    if (preview === substitutionDraft) return
+    if (!pendingBase.current) pendingBase.current = substitutionDraft
+    pendingMoves.current.push({ source, target })
+    setPendingMoveCount(pendingMoves.current.length)
+    setSubstitutionDraft({ ...substitutionDraft, ...preview })
     setSubSelection(null)
     setSubstitutionError('')
+    if (appliedMinute !== null && !replayPendingMoves(appliedMinute)) {
+      pendingMoves.current.pop()
+      setPendingMoveCount(pendingMoves.current.length)
+      if (!pendingMoves.current.length) pendingBase.current = null
+      setSubstitutionDraft(substitutionDraft)
+    }
   }
 
   function replayPendingMoves(minute: number) {
-    if (!pendingBase.current || !Number.isInteger(minute) || minute < 0 || minute > 99) return
+    if (!pendingBase.current || !Number.isInteger(minute) || minute < 0 || minute > 99) return null
     let draft = pendingBase.current
     for (const move of pendingMoves.current) {
       const next = moveSubstitution(draft, move.source, move.target, startingSnapshot, slotPositions, minute, selectedTeamId, () => crypto.randomUUID())
-      if (next === draft) { setSubstitutionError('Invalid substitution or time.'); return }
+      if (next === draft) { setSubstitutionError('Invalid substitution or time.'); return null }
       draft = next
     }
     setSubstitutionDraft(draft); setSubstitutionError('')
+    return draft
   }
 
   function selectSubstitutionTarget(target: LineupTarget) {
@@ -431,11 +440,12 @@ function MatchEditor({
     const { match, event } = previewAt(minute)
     return eligibleAtEvent(match, event)
   }
-  const eventPreviewMinute = minuteIsValid ? liveMinute : appliedMinute
-  const eligibleAppearances = minuteInput !== '' ? eligibleAt(eventPreviewMinute) : appearances.filter(a => liveSlots.some(slot => slot.playerId === a.playerId))
+  // A draft (including an empty draft) never changes the committed preview.
+  const eventPreviewMinute = appliedMinute
+  const eligibleAppearances = eventPreviewMinute !== null ? eligibleAt(eventPreviewMinute) : appearances.filter(a => liveSlots.some(slot => slot.playerId === a.playerId))
   const eligibleGoalIds = eligibleAppearances.map(a => a.playerId)
   const goalSlots = (() => {
-    if (minuteInput === '') return liveSlots
+    if (eventPreviewMinute === null) return liveSlots
     const { match, event } = previewAt(eventPreviewMinute)
     try {
       const assignments = tacticalAssignmentsAtMoment(startingSnapshot, match.events, matchDraft.positionHistories, slotPositions, event)
@@ -452,6 +462,7 @@ function MatchEditor({
     setLiveAssistId(id); setAssistChosen(true); setLivePicker('minute')
   }
   function applyMinute(value: string) {
+    if (!/^\d{1,2}$/.test(value)) return
     const minute = Number(value)
     if (!Number.isInteger(minute) || minute < 0 || minute > 99) return
     setAppliedMinute(minute)
@@ -470,7 +481,7 @@ function MatchEditor({
   function changeMinute(value: string | number) {
     const input = String(value)
     if (!/^\d{0,2}$/.test(input)) return
-    setMinuteInput(input)
+    setDraftMinute(input)
   }
 
   const startingGoalkeeperId = startingSnapshot.GK
@@ -585,9 +596,9 @@ function MatchEditor({
           onSubBench={() => selectSubstitutionTarget({ group: 'substitute', id: '' })}
           onSubOut={(id) => { const slot = Object.keys(activeDraft.slotAssignments).find(slotId => activeDraft.slotAssignments[slotId] === id); if (slot) selectSubstitutionTarget({ group: 'starting', id: slot }) }}
           onSubIn={(id) => selectSubstitutionTarget({ group: 'substitute', id })}
-          canConfirmSubstitutions={!substitutionError && !!substitutionDraft && canConfirmSubstitution(substitutionDraft, matchDraft)}
-          liveEvent={liveEvent} liveMinute={minuteInput} liveScorerId={liveScorerId} liveAssistId={liveAssistId} liveCauseId={liveCauseId} livePicker={livePicker}
-          onOpen={openLiveEvent} onSave={saveLiveEvent} onCancel={cancelLiveEvent} onMinute={changeMinute} onCommitMinute={() => applyMinute(minuteInput)} onScorer={chooseScorer} onAssist={chooseAssist} onCause={setLiveCauseId} onPicker={setLivePicker}
+          canConfirmSubstitutions={!!substitutionDraft && pendingMoveCount > 0 && Object.values(substitutionDraft.slotAssignments).filter(Boolean).length === 11}
+          liveEvent={liveEvent} liveMinute={draftMinute} liveScorerId={liveScorerId} liveAssistId={liveAssistId} liveCauseId={liveCauseId} livePicker={livePicker}
+          onOpen={openLiveEvent} onSave={saveLiveEvent} onCancel={cancelLiveEvent} onMinute={changeMinute} onCommitMinute={() => applyMinute(draftMinute)} onScorer={chooseScorer} onAssist={chooseAssist} onCause={setLiveCauseId} onPicker={setLivePicker}
           validMinute={minuteIsValid} onPitchClick={(id) => { if (liveEvent === 'goal') { if (livePicker === 'scorer') chooseScorer(id); else if (livePicker === 'assist') chooseAssist(id) }  else if (liveEvent === 'conceded' && livePicker === 'cause' && eligibleGoalIds.includes(id)) { setLiveCauseId(id === liveCauseId ? '' : id); setLivePicker('minute') } }}
           onBack={() => { cancelLiveEvent(); setStep(0) }} onFinish={save} startingGoalkeeperName={playerDisplayName(players.find(p => p.id === startingGoalkeeperId))} selectedTeamId={selectedTeamId} onEditEvent={editLiveEvent} onDeleteEvent={deleteLiveEvent} />}
       </div>

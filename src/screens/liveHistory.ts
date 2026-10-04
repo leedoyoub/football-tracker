@@ -10,7 +10,11 @@ export function rebuildLiveHistory(starters: Record<string, string>, roster: str
   const teamId = events.find(event => event.type === 'sub')?.teamId ?? events[0]?.teamId ?? ''
   const timelineMatch = { id: 'preview', season: '', matchDay: 0, date: '', duration: 90, homeTeamId: '', awayTeamId: '', events, appearances: roster.map(playerId => ({ playerId, teamId, role: Object.values(starters).includes(playerId) ? 'starter' as const : 'bench' as const, position: positions[Object.keys(starters).find(slot => starters[slot] === playerId) ?? ''] ?? 'CM' as Position, positionHistory: histories[playerId] })) }
   const subs = orderedEvents(timelineMatch).flatMap(({ event }) => event.type === 'sub' ? [event] : [])
-  const positionHistories = Object.fromEntries(Object.entries(histories).map(([id, changes]) => [id, changes.filter(c => c.tacticalSlotId || subs.some(e => e.minute === c.minute))]))
+  const positionHistories = Object.fromEntries(Object.entries(histories).map(([id, changes]) => [id, changes.filter(c =>
+    c.sourceSubstitutionIds?.length
+      ? c.sourceSubstitutionIds.every(sourceId => subs.some(event => event.id === sourceId))
+      : c.tacticalSlotId || subs.some(e => e.minute === c.minute))]))
+  timelineMatch.appearances = timelineMatch.appearances.map(appearance => ({ ...appearance, positionHistory: positionHistories[appearance.playerId] }))
   for (const event of subs) {
     if (enteredAt.get(event.playerOutId) === event.minute || entered.has(event.playerInId) || !roster.includes(event.playerInId) || event.minute < 0 || event.minute > 99) throw new Error('This change conflicts with a later substitution.')
     entered.add(event.playerInId)

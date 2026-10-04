@@ -104,6 +104,8 @@ export interface PositionChange {
   tacticalSlotId?: string
   /** Shares ordering with MatchEvent.sequence; absent in legacy histories. */
   sequence?: number
+  /** Substitutions confirmed in the same editor action; absent on independent/legacy moves. */
+  sourceSubstitutionIds?: string[]
 }
 
 export interface Appearance {

@@ -144,3 +144,14 @@ export function canConfirmSubstitution(draft: SubstitutionDraft, baseline: { eve
   return Object.values(draft.positionHistories).every(history => history.every(change =>
     (change.tacticalSlotId && ratingPositionForSlot(change.tacticalSlotId) === change.position) || draft.events.some(event => event.type === 'sub' && event.minute === change.minute)))
 }
+
+/** Associate only new histories from this confirmation, never same-minute
+ * histories from an earlier, independently confirmed tactical action. */
+export function linkSubstitutionHistory(draft: SubstitutionDraft, baseline: Pick<SubstitutionDraft, 'events' | 'positionHistories'>): SubstitutionDraft {
+  const sourceSubstitutionIds = draft.events.filter(event => event.type === 'sub' && !baseline.events.some(saved => saved.id === event.id)).map(event => event.id)
+  if (!sourceSubstitutionIds.length) return draft
+  const positionHistories = Object.fromEntries(Object.entries(draft.positionHistories).map(([id, changes]) => [id,
+    changes.map((change, index) => index < (baseline.positionHistories[id]?.length ?? 0) ? change : { ...change, sourceSubstitutionIds }),
+  ]))
+  return { ...draft, positionHistories }
+}

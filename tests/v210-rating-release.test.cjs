@@ -14,10 +14,10 @@ const near = (actual, expected) => assert(Math.abs(actual - expected) < 1e-10, `
 const player = (id, position, rating = 1) => ({ id, name: id, displayName: id, teamId: 'A', position, number: 1, rating })
 const appearance = player => ({ playerId: player.id, teamId: 'A', position: player.position, matchPosition: player.position, role: 'starter' })
 
-test('revision 11 has the approved balance table and result modifier', () => {
-  assert.equal(revision.RATING_ENGINE_REVISION, 11)
+test('revision 12 has the approved balance table and result modifier', () => {
+  assert.equal(revision.RATING_ENGINE_REVISION, 12)
   assert.equal(rating.GOALKEEPER_BASE_RATING, 7.0)
-  for (const position of ['CB', 'LCB', 'RCB']) assert.equal(rating.POSITION_RULES[position].suppressionMax, 1.40)
+  for (const position of ['CB', 'LCB', 'RCB']) assert.equal(rating.POSITION_RULES[position].suppressionMax, 1.30)
   for (const position of ['LB', 'LWB', 'RB', 'RWB']) assert.equal(rating.POSITION_RULES[position].suppressionMax, 1)
   for (const position of ['CDM', 'LDM', 'RDM']) assert.equal(rating.POSITION_RULES[position].suppressionMax, .80)
   for (const position of ['CM', 'LCM', 'RCM']) assert.equal(rating.POSITION_RULES[position].suppressionMax, .30)

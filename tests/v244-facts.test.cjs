@@ -105,12 +105,12 @@ test('League, Cup and Champions navigation scopes resolve distinct player goal t
   }
 })
 
-test('REV11 reference fixture keeps its rating and position coefficients unchanged', () => {
+test('REV12 preserves the striker reference rating and non-CB coefficients', () => {
   const striker = player('P', 'ST')
   const game = match('rating', '2026-01-01', [appearance('P', 'A', 'ST')], [goal('g')])
-  assert.equal(RATING_ENGINE_REVISION, 11)
+  assert.equal(RATING_ENGINE_REVISION, 12)
   assert.equal(POSITION_RULES.ST.goal, 0.9)
-  assert.equal(POSITION_RULES.CB.suppressionMax, 1.4)
+  assert.equal(POSITION_RULES.CB.suppressionMax, 1.3)
   assert.equal(POSITION_RULES.GK.assist, 1)
   assert.equal(ratePlayerMatch(game, striker).raw, 7.5)
 })

@@ -20,14 +20,14 @@ const approvedTeamIds = [
   'ac-milan', 'inter-milan', 'juventus', 'paris-saint-germain',
 ]
 
-test('v2.4.4 aligns actual release metadata while preserving rating revision 11', () => {
+test('v2.4.5 aligns actual release metadata while preserving rating revision 12', () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
   const lockfile = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'))
-  assert.equal(packageJson.version, '2.4.4')
-  assert.equal(lockfile.version, '2.4.4')
-  assert.equal(lockfile.packages[''].version, '2.4.4')
-  assert.equal(APP_VERSION, '2.4.4')
-  assert.equal(RATING_ENGINE_REVISION, 11)
+  assert.equal(packageJson.version, '2.4.5')
+  assert.equal(lockfile.version, '2.4.5')
+  assert.equal(lockfile.packages[''].version, '2.4.5')
+  assert.equal(APP_VERSION, '2.4.5')
+  assert.equal(RATING_ENGINE_REVISION, 12)
 })
 
 test('the current catalog has the exact approved order without mutating saved records or match references', () => {

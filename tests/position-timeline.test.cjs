@@ -29,7 +29,7 @@ test('uninvolved team goals exclude scorer and assister and use event-time posit
 
 test('SOT curve and minute-prorated suppression use the finalized values', () => {
   assert.deepEqual([0, 1, 2, 3, 5, 10].map(sotMultiplier), [1, .86, .73, .62, .45, .20])
-  for (const [minutes, expected] of [[30, 1.4 / 3], [45, .70], [60, 1.4 * 2 / 3], [90, 1.4]]) {
+  for (const [minutes, expected] of [[30, 1.3 / 3], [45, .65], [60, 1.3 * 2 / 3], [90, 1.3]]) {
     const cb = player(`cb${minutes}`, 'CB'); const match = game(cb); match.appearances[0].role = 'bench'; match.events = [{ id: 'on', type: 'sub', minute: 90 - minutes, teamId: 'A', playerOutId: 'out', playerInId: cb.id, position: 'CB' }]
     near(ratePlayerMatch(match, cb).noConceded, expected)
   }
