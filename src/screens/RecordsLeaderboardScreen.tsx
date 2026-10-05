@@ -29,8 +29,8 @@ export function RecordsLeaderboardScreen({ screenState, onStateChange, onNavigat
 }
 
 function LeaderboardIdentity({ row, playerById, teamById, onNavigate }: { row: RecordsLeaderboardRow; playerById: Map<string, import('../types').Player>; teamById: Map<string, import('../types').Team>; onNavigate: (view: View) => void }) {
-  if (row.combinationPair) return <CombinationPairIdentity pair={row.combinationPair} playerById={playerById} onNavigate={onNavigate} />
-  if (row.playerIds) return <span className="flex min-w-0 items-center gap-1 overflow-hidden">{row.playerIds.map(id => { const player = playerById.get(id); return <PlayerIdentityAction key={id} player={player} onNavigate={player ? playerId => onNavigate({ name: 'player', id: playerId }) : undefined} className="min-w-0 truncate text-left font-semibold" avatarClassName="hidden">{player?.displayName ?? player?.name ?? 'Unknown player'}</PlayerIdentityAction> })}</span>
+  if (row.combinationPair) return <span className="min-w-0 overflow-hidden"><CombinationPairIdentity pair={row.combinationPair} playerById={playerById} onNavigate={onNavigate} />{row.detail !== 'Combination record' && <small className="block truncate text-[9px] text-zinc-500">{row.detail}</small>}</span>
+  if (row.playerIds) return <span className="min-w-0 overflow-hidden"><span className="flex min-w-0 items-center gap-1 overflow-hidden">{row.playerIds.map(id => { const player = playerById.get(id); return <PlayerIdentityAction key={id} player={player} onNavigate={player ? playerId => onNavigate({ name: 'player', id: playerId }) : undefined} className="min-w-0 truncate text-left font-semibold" avatarClassName="hidden">{player?.displayName ?? player?.name ?? 'Unknown player'}</PlayerIdentityAction> })}</span><small className="block truncate text-[9px] text-zinc-500">{row.detail}</small></span>
   const team = teamById.get(row.id)
   if (team) return <TeamIdentityAction team={team} onNavigate={teamId => onNavigate({ name: 'team', id: teamId })} className="min-w-0 truncate text-left font-semibold">{team.name}</TeamIdentityAction>
   const player = playerById.get(row.id)

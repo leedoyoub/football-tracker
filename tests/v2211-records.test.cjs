@@ -17,7 +17,7 @@ test('canonical occurrence boards count scored-in, braces 2+, and hat-tricks 3+ 
   const one = player('one'), two = player('two'), three = player('three'), zero = player('zero')
   const boards = buildPlayerRecordLeaderboards([one, two, three, zero], [match('one', one, 1), match('two', two, 2), match('three', three, 3), match('zero', zero, 0)], {})
   const byId = id => boards.find(board => board.id === id)
-  assert.deepEqual(boards.slice(2, 5).map(board => board.id), ['matches-scored-in', 'braces', 'hat-tricks'])
+  assert.deepEqual(boards.slice(2, 7).map(board => board.id), ['ga', 'matches-scored-in', 'matches-ga', 'braces', 'hat-tricks'])
   assert.deepEqual(byId('matches-scored-in').rows.map(row => [row.playerId, row.numeric]), [['one', 1], ['three', 1], ['two', 1]])
   assert.deepEqual(byId('braces').rows.map(row => row.playerId).sort(), ['three', 'two'])
   assert.deepEqual(byId('hat-tricks').rows.map(row => row.playerId), ['three'])

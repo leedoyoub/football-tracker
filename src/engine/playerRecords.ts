@@ -10,7 +10,7 @@ import { goalTypeTotals } from './goalTypes'
 import { playerGoalkeeperFacts, playerGoalEvents, playerAssistEvents } from './playerMatchFacts'
 
 export type PlayerRecordLeaderboardId =
-  | 'goals' | 'assists' | 'matches-scored-in' | 'braces' | 'hat-tricks'
+  | 'goals' | 'assists' | 'ga' | 'matches-scored-in' | 'matches-ga' | 'braces' | 'hat-tricks'
   | 'four-goals' | 'three-assists' | 'four-ga' | 'mom'
   | 'good' | 'eight' | 'nine' | 'ten' | 'clean-sheets' | 'saves'
   | 'good-streak' | 'scoring-streak' | 'ga-streak'
@@ -22,7 +22,7 @@ export type PlayerRecordGroup = { id: PlayerRecordLeaderboardId; title: string; 
 export type PlayerRecordScope = { seasons?: string[]; teamIds?: string[]; competition?: CompetitionType | 'all'; positionFilter?: PositionFilterKey }
 
 type PlayerRecordFacts = {
-  playerId: string; appearances: number; goals: number; assists: number; matchesScoredIn: number; braces: number; hatTricks: number
+  playerId: string; appearances: number; goals: number; assists: number; matchesScoredIn: number; matchesGA: number; braces: number; hatTricks: number
   fourGoalGames: number; threeAssistGames: number; fourGAGames: number; mom: number; goodRatings: number; eightRatings: number
   nineRatings: number; tenRatings: number; cleanSheets: number; saves: number; goodStreak: number; scoringStreak: number; gaStreak: number
   highestRating: number; highestGoals: number; highestAssists: number; highestGA: number
@@ -74,7 +74,7 @@ function buildFacts(players: Player[], matches: Match[], scope: PlayerRecordScop
     const goalTypes = (key: Parameters<typeof goalTypeTotals>[0] extends never ? never : keyof ReturnType<typeof goalTypeTotals>) => rated.reduce((total, row) => total + goalTypeTotals(row.match, player.id, row.teamId)[key], 0)
     return [{
       playerId: player.id, appearances: rated.length,
-      goals: sum(row => row.goals), assists: sum(row => row.assists), matchesScoredIn: count(row => row.goals >= 1), braces: count(row => row.goals >= 2), hatTricks: count(row => row.goals >= 3),
+      goals: sum(row => row.goals), assists: sum(row => row.assists), matchesScoredIn: count(row => row.goals >= 1), matchesGA: count(row => row.goals + row.assists >= 1), braces: count(row => row.goals >= 2), hatTricks: count(row => row.goals >= 3),
       fourGoalGames: count(row => row.goals >= 4), threeAssistGames: count(row => row.assists >= 3), fourGAGames: count(row => row.goals + row.assists >= 4), mom: count(row => momByMatch.get(row.match.id) === player.id),
       goodRatings: count(row => row.rating.raw >= GOOD_RATING_THRESHOLD), eightRatings: count(row => row.rating.raw >= 8), nineRatings: count(row => row.rating.raw >= 9), tenRatings: count(row => row.rating.raw === 10),
       cleanSheets: count(row => row.cleanSheet), saves: sum(row => row.saves), goodStreak: streak('goodRating'), scoringStreak: streak('goals'), gaStreak: streak('goalContributions'),
@@ -98,8 +98,8 @@ export function buildPlayerRecordLeaderboards(players: Player[], matches: Match[
     })),
   })
   const result: PlayerRecordGroup[] = [
-    group('goals', 'All-time Goals', row => row.goals, ' goals'), group('assists', 'All-time Assists', row => row.assists, ' assists'),
-    group('matches-scored-in', 'Most Matches Scored In', row => row.matchesScoredIn), group('braces', 'Most Braces', row => row.braces), group('hat-tricks', 'Most Hat-tricks', row => row.hatTricks),
+    group('goals', 'All-time Goals', row => row.goals, ' goals'), group('assists', 'All-time Assists', row => row.assists, ' assists'), group('ga', 'All-time G+A', row => row.goals + row.assists, ' G+A'),
+    group('matches-scored-in', 'Most Matches Scored In', row => row.matchesScoredIn), group('matches-ga', 'Most Matches with G+A', row => row.matchesGA), group('braces', 'Most Braces', row => row.braces), group('hat-tricks', 'Most Hat-tricks', row => row.hatTricks),
     group('four-goals', 'Most 4+ Goal Games', row => row.fourGoalGames), group('three-assists', 'Most 3+ Assist Games', row => row.threeAssistGames), group('four-ga', 'Most 4+ G+A Games', row => row.fourGAGames),
     group('mom', 'Most MOM Awards', row => row.mom, ' MOM'), group('good', 'Most 7.2+ Matches', row => row.goodRatings), group('eight', 'Most 8.0+ Ratings', row => row.eightRatings), group('nine', 'Most 9.0+ Ratings', row => row.nineRatings),
     group('ten', 'Most 10.0 Ratings', row => row.tenRatings, '', () => 'final canonical 10.0 ratings'), group('clean-sheets', 'Most Clean Sheets', row => row.cleanSheets, ' CS'), group('saves', 'Most Career Saves', row => row.saves, ' saves'),

@@ -64,6 +64,7 @@ test('defaults retain every approved state-bearing screen field', () => {
   })
   assert.deepEqual(defaultScreenState({ name: 'records' }), {
     name: 'records', category: 'player', competition: 'all', positionFilter: 'all', filterSeasonIds: [], filterTeamIds: [],
+    combinationPosition: 'attack', combinationPlayers: 2, combinationMetric: 'starts', bestUnitId: 'best-unit:attack:2:goals',
     historyPanel: null, historySeason: null, historyBlock: null,
   })
   assert.deepEqual(defaultScreenState({ name: 'comparison', leftId: 'p1', rightId: 'p2', season: 'Season 3', competitionType: 'cup' }), {

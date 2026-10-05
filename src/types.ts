@@ -274,6 +274,10 @@ export interface ScreenStateByView {
     positionFilter: PositionFilterKey
     filterSeasonIds: string[]
     filterTeamIds: string[]
+    combinationPosition?: 'attack' | 'midfield' | 'defence'
+    combinationPlayers?: 2 | 3 | 4
+    combinationMetric?: 'starts' | 'minutes' | 'ppg'
+    bestUnitId?: string
     historyPanel: string | null
     historySeason: string | null
     historyBlock: number | null

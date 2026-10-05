@@ -14,7 +14,7 @@ export type DerivedAppearance = { match: Match; appearance: Appearance; rating: 
 export type RoleSummary = { apps: number; minutes: number; averageRating: number; goals: number; assists: number; goalsPer90: number; assistsPer90: number; gaPer90: number }
 export type StartingTeamPerformance = { teamId: string; starts: number; wins: number; draws: number; losses: number; starterPpg: number; teamPpg: number; ppgDifference: number; starterGdPerMatch: number; teamGdPerMatch: number; gdDifference: number }
 export type CareerEntry = { season: string; teamId: string; apps: number; goals: number; assists: number; averageRating: number }
-export type PersonalRecords = { highestRating: number; mostGoals: number; mostAssists: number; mostGA: number; scoringStreak: number; contributionStreak: number; goodMatchStreak: number }
+export type PersonalRecords = { highestRating: number; bestFiveAverage: number | null; mostGoals: number; mostAssists: number; mostGA: number; scoringStreak: number; contributionStreak: number; goodMatchStreak: number }
 export type PlayerDerived = {
   appearances: DerivedAppearance[]; apps: number; starts: number; subs: number; minutes: number; goals: number; assists: number; saves: number; cleanSheets: number; mom: number; averageRating: number; goodMatches: number; goodMatchRate: number
   onPitchGoalsFor: number; onPitchGoalsAgainst: number; onPitchGdPer90: number; onPitchGaPer90: number; goalInvolvement: number | null; positionMinutes: Map<Position, number>; goalTypes: GoalTypeTotals; starter: RoleSummary; substitute: RoleSummary; startingPerformance: StartingTeamPerformance[]; goalkeeperAppearances: number; goalkeeperConceded: number; goalkeeperMinutes: number; savePercentage: number | null
@@ -129,14 +129,18 @@ export function playerPersonalRecords(player: Player, _players: Player[], matche
     const rating = appearance ? ratePlayerMatch(match, player) : null
     if (appearance && rating) rows.push({ match, appearance, rating })
   }
-  let scoring = 0; let contribution = 0; let good = 0; let scoringBest = 0; let contributionBest = 0; let goodBest = 0; let highestRating = 0; let mostGoals = 0; let mostAssists = 0; let mostGA = 0
+  let scoring = 0; let contribution = 0; let good = 0; let scoringBest = 0; let contributionBest = 0; let goodBest = 0; let highestRating = 0; let bestFiveAverage: number | null = null; let mostGoals = 0; let mostAssists = 0; let mostGA = 0
+  const recentRatings: number[] = []
   for (const row of rows) {
     const goals = row.match.events.filter(event => goalForPlayer(row.match, row.appearance, player.id, event)).length; const assists = row.match.events.filter(event => assistForPlayer(row.match, row.appearance, player.id, event)).length
     highestRating = Math.max(highestRating, row.rating.raw); mostGoals = Math.max(mostGoals, goals); mostAssists = Math.max(mostAssists, assists); mostGA = Math.max(mostGA, goals + assists)
+    recentRatings.push(row.rating.raw)
+    if (recentRatings.length > 5) recentRatings.shift()
+    if (recentRatings.length === 5) bestFiveAverage = Math.max(bestFiveAverage ?? -Infinity, recentRatings.reduce((total, rating) => total + rating, 0) / 5)
     scoring = goals ? scoring + 1 : 0; contribution = goals + assists ? contribution + 1 : 0; good = isGoodRating(row.rating.raw) ? good + 1 : 0
     scoringBest = Math.max(scoringBest, scoring); contributionBest = Math.max(contributionBest, contribution); goodBest = Math.max(goodBest, good)
   }
-  return { highestRating, mostGoals, mostAssists, mostGA, scoringStreak: scoringBest, contributionStreak: contributionBest, goodMatchStreak: goodBest }
+  return { highestRating, bestFiveAverage, mostGoals, mostAssists, mostGA, scoringStreak: scoringBest, contributionStreak: contributionBest, goodMatchStreak: goodBest }
 }
 
 export { GOOD_RATING_THRESHOLD }
