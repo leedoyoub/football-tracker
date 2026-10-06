@@ -14,6 +14,8 @@ import { RankDelta, SegmentedControl } from '../components/SeasonUI'
 import { CompetitionScopeSelector } from '../components/CompetitionScopeSelector'
 import { useStore } from '../store'
 import { sortPlayersByPosition } from '../lib/positionOrder'
+import { scopedPositionFamilyByPlayer } from '../engine/positionScope'
+import { CompactFilterMenu } from '../components/CompactFilterMenu'
 import type { CompetitionType, ScreenStateByView, Team, View } from '../types'
 
 export function TeamDetailScreen({ teamId, season, screenState, onStateChange, onNavigate, onBack }: { teamId: string; season: string; screenState: ScreenStateByView['team']; onStateChange: (state: ScreenStateByView['team']) => void; onNavigate: (view: View) => void; onBack: () => void }) {
@@ -28,6 +30,7 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
   const team = teams.find((item) => item.id === teamId)
   const seasons = seasonsFromMatches(matches)
   const activeSeason = seasons.includes(season) ? season : seasons[0] ?? season
+  const representative = useMemo(() => scopedPositionFamilyByPlayer(players, matches, {}), [players, matches])
   const selectedBestSeason = seasons.includes(bestSeason) ? bestSeason : activeSeason
   const overview = useMemo(() => tab === 'overview' ? teamCompetitionOverview(teamId, teams, matches, activeSeason, players, competitionStates) : undefined, [tab, teamId, teams, matches, activeSeason, players, competitionStates])
   const analytics = useMemo(() => tab === 'overview' ? buildSeasonAnalytics(teams, players, matches, activeSeason) : undefined, [tab, teams, players, matches, activeSeason])
@@ -42,8 +45,8 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
       const stats = slot.playerId ? statsByPlayer[slot.playerId] : undefined
       return stats ? { ...slot, avgRating: stats.avgRating, matches: stats.matches } : { ...slot }
     })
-    return { best: { ...canonicalBest, slots }, statsByPlayer, starterIds: new Set(slots.flatMap(slot => slot.playerId ? [slot.playerId] : [])), allTeamPlayers: sortPlayersByPosition(players.filter(player => (player.teamIds ?? [player.teamId]).includes(teamId)), []) }
-  }, [tab, players, matches, teamId, activeSeason])
+    return { best: { ...canonicalBest, slots }, statsByPlayer, starterIds: new Set(slots.flatMap(slot => slot.playerId ? [slot.playerId] : [])), allTeamPlayers: sortPlayersByPosition(players.filter(player => (player.teamIds ?? [player.teamId]).includes(teamId)), [], representative) }
+  }, [tab, players, matches, teamId, activeSeason, representative])
   const matchData = useMemo(() => tab === 'matches' ? recentMatches(matches.filter(match => match.season === activeSeason && (matchesCompetition === 'all' || matchCompetitionType(match) === matchesCompetition) && (match.homeTeamId === teamId || match.awayTeamId === teamId))) : [], [tab, matches, activeSeason, matchesCompetition, teamId])
   if (!team) return <div className="p-6 text-sm text-zinc-400">Team not found.</div>
 
@@ -77,7 +80,7 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
                 player={player}
                 team={team}
                 rating={stats?.matches === 0 ? undefined : stats?.avgRating}
-                position={player.position}
+                position={representative.get(player.id)}
                 stats={{ goals: stats?.goals ?? 0, assists: stats?.assists ?? 0 }}
                 onClick={() => onNavigate({ name: 'player', id: player.id })}
               />
@@ -100,5 +103,5 @@ function TeamBestPlayers({ team, teamId, selectedSeason, competition, metric, se
   const byId = useMemo(() => new Map(players.map(player => [player.id, player])), [players])
   const rows = rankGlobalRankingRows(index, players, metric).slice(0, 5)
   const swipe = useMetricSwipe(RANKING_METRICS.map(item => item.value), metric, onMetric)
-  return <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">Best Players</h2><CompetitionScopeSelector value={competition} onChange={onCompetition} /></div><div className="mb-3"><select aria-label="Best Players season" value={selectedSeason} onChange={event => onSeason(event.target.value)} className="w-full rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold">{seasons.map(item => <option key={item}>{item}</option>)}</select></div><RankingMetricTabs label="Best Players category" value={metric} onChange={onMetric} options={RANKING_METRICS} /><div {...swipe} className="mt-2 overflow-hidden rounded-xl bg-zinc-900 touch-pan-y" aria-label="Swipe Team Best Player metrics">{rows.map((row, index) => { const player = byId.get(row.playerId); return <div key={row.playerId} className="border-b border-white/5 last:border-0"><RankingRow positionLabel={row.scopedPositionFamily} rank={index + 1} player={player} team={team} value={formatRankingMetricValue(metric, row.value)} onClick={() => player && onPlayer(player.id)} /></div> })}{!rows.length && <p className="p-3 text-xs text-zinc-500">No qualifying players yet.</p>}</div><button type="button" onClick={() => onViewAll(metric)} className="secondary-view-all mt-3 w-full">View All</button></section>
+  return <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">Best Players</h2><CompetitionScopeSelector value={competition} onChange={onCompetition} /></div><div className="mb-3"><CompactFilterMenu value={selectedSeason} options={seasons.map(item => ({ value: item, label: item }))} onChange={onSeason} label="Best Players season" popupAlign="start" /></div><RankingMetricTabs label="Best Players category" value={metric} onChange={onMetric} options={RANKING_METRICS} /><div {...swipe} className="mt-2 overflow-hidden rounded-xl bg-zinc-900 touch-pan-y" aria-label="Swipe Team Best Player metrics">{rows.map((row, index) => { const player = byId.get(row.playerId); return <div key={row.playerId} className="border-b border-white/5 last:border-0"><RankingRow positionLabel={row.scopedPositionFamily} rank={index + 1} player={player} team={team} value={formatRankingMetricValue(metric, row.value)} onClick={() => player && onPlayer(player.id)} /></div> })}{!rows.length && <p className="p-3 text-xs text-zinc-500">No qualifying players yet.</p>}</div><button type="button" onClick={() => onViewAll(metric)} className="secondary-view-all mt-3 w-full">View All</button></section>
 }

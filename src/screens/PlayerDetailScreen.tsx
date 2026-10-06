@@ -14,6 +14,7 @@ import { playerStreaks } from '../engine/seasonInsights'
 import { deriveNews } from '../engine/news'
 import { playerTeamTitles } from '../engine/historyReadModels'
 import { scopedPositionFamilyByPlayer } from '../engine/positionScope'
+import { CompactFilterMenu } from '../components/CompactFilterMenu'
 import { useStore } from '../store'
 import type { CompetitionType, Match, Player, RatingBreakdown, ScreenStateByView, View } from '../types'
 
@@ -35,13 +36,14 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
   const scopedMatches = useMemo(() => matches.filter(match => match.season === selectedSeason && (competition === 'all' || matchCompetitionType(match) === competition)), [matches, selectedSeason, competition])
   const playerScopedMatches = useMemo(() => scopedMatches.filter(match => !teamId || match.appearances.some(appearance => appearance.playerId === playerId && appearance.teamId === teamId)), [scopedMatches, teamId, playerId])
   const scopedFamilies = useMemo(() => scopedPositionFamilyByPlayer(players, scopedMatches, { teams: teamId ? [teamId] : [] }), [players, scopedMatches, teamId])
-  const dominantPosition = scopedFamilies.get(playerId) ?? player?.position
+  const careerFamilies = useMemo(() => scopedPositionFamilyByPlayer(players, matches, {}), [players, matches])
   const rankingIndex = useMemo(() => buildGlobalRankingData(players, scopedMatches, { seasons: [selectedSeason], teams: teamId ? [teamId] : [], positions: [] }, 'rating'), [players, scopedMatches, selectedSeason, teamId])
   const rankingRows = useMemo(() => ({ rating: rankGlobalRankingRows(rankingIndex, players, 'rating'), goals: rankGlobalRankingRows(rankingIndex, players, 'goals'), assists: rankGlobalRankingRows(rankingIndex, players, 'assists') }), [rankingIndex, players])
   const activeStreaks = useMemo(() => player ? playerStreaks(player, playerScopedMatches).filter(row => row.current > 1).sort((a, b) => b.current - a.current).slice(0, 3) : [], [player, playerScopedMatches])
   const leagueAnalytics = useMemo(() => buildSeasonAnalytics(teams, players, matches, selectedSeason), [teams, players, matches, selectedSeason])
   let playerDerivedCacheHit = false
   const data = player ? derivePlayerScope(player, players, matches, { season: selectedSeason, competition, teamIds: teamId ? [teamId] : undefined }, diagnostic => { playerDerivedCacheHit = diagnostic.cacheHit }) : null
+  const dominantPosition = (data?.minutes ? scopedFamilies.get(playerId) : careerFamilies.get(playerId)) ?? player?.position
   const historicalTeamId = teamId ?? data?.appearances[data.appearances.length - 1]?.appearance.teamId ?? player?.teamId
   const teamRankingIndex = historicalTeamId ? teamId ? rankingIndex : buildGlobalRankingData(players, scopedMatches, { seasons: [selectedSeason], teams: [historicalTeamId], positions: [] }, 'rating') : []
   const teamRankingRows = { rating: rankGlobalRankingRows(teamRankingIndex, players, 'rating'), goals: rankGlobalRankingRows(teamRankingIndex, players, 'goals'), assists: rankGlobalRankingRows(teamRankingIndex, players, 'assists') }
@@ -60,7 +62,7 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
   return <div className="px-4 pb-8 pt-6">
     <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">Back</button>
     <header className="mb-4 flex items-start gap-3"><PlayerAvatar photoUrl={player.photoUrl || player.image} number={player.number} className="h-14 w-14 text-sm" /><div className="min-w-0 flex-1"><p className="text-xs text-zinc-400"><TeamIdentityAction team={currentTeam} onNavigate={id => onNavigate({ name: 'team', id })} className="inline-flex items-center gap-1">{currentTeam?.name ?? 'No Team'}</TeamIdentityAction> · #{player.number} · {dominantPosition}</p><h1 className="break-words text-2xl font-semibold">{playerFullName(player)}</h1><div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => onNavigate({ name: 'edit-player', id: player.id })} className="rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-bold">Edit player</button><button type="button" onClick={() => onNavigate({ name: 'comparison', leftId: player.id, season: selectedSeason, competitionType: competition })} className="rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-bold">Compare</button></div></div></header>
-    <div className="mb-4 grid grid-cols-2 gap-2"><label className="text-[10px] text-zinc-500">Season<select aria-label="Player detail season" value={selectedSeason} onChange={event => setSelectedSeason(event.target.value)} className="mt-1 w-full rounded-xl bg-zinc-900 px-3 py-2 text-xs text-white">{seasons.map(item => <option key={item}>{item}</option>)}</select></label><label className="text-[10px] text-zinc-500">Competition<select aria-label="Player detail competition" value={competition} onChange={event => setCompetition(event.target.value as CompetitionType | 'all')} className="mt-1 w-full rounded-xl bg-zinc-900 px-3 py-2 text-xs text-white">{competitions.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label></div>
+    <div className="mb-4 grid grid-cols-2 gap-2"><CompactFilterMenu value={selectedSeason} options={seasons.map(item => ({ value: item, label: item }))} onChange={setSelectedSeason} label="Player detail season" popupAlign="start" /><CompactFilterMenu value={competition} options={competitions} onChange={setCompetition} label="Player detail competition" allValue="all" allLabel="All competitions" allAccessibilityLabel="All competitions" /></div>
     <Overview data={data} ranks={ranks} />
     <RecentForm recent={recent} overall={data.averageRating} change={formChange} onNavigate={onNavigate} />
     <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Active Streaks</h2>{activeStreaks.length ? <div className="mt-2 flex flex-wrap gap-2">{activeStreaks.map(row => <span key={row.key} className="rounded-full bg-emerald-500/10 px-2.5 py-1.5 text-[10px] font-bold text-emerald-300">{row.current} straight · {row.label}</span>)}</div> : <p className="mt-2 text-xs text-zinc-500">No active streak.</p>}</section>
@@ -80,7 +82,7 @@ function RecentForm({ recent, overall, change, onNavigate }: { recent: PlayerDer
 function PositionStats({ data, position }: { data: PlayerDerived; position: string }) {
   const contents: [string, string | number][] = position === 'GK'
     ? [['Saves', data.saves], ['Overall GK Save %', data.savePercentage === null ? '—' : pct(data.savePercentage)], ['GA / match', data.goalkeeperAppearances ? value(data.goalkeeperConceded / data.goalkeeperAppearances) : '—'], ['Clean sheets', data.cleanSheets]]
-    : fieldPositions.has(position) || position === 'FB'
+    : fieldPositions.has(position)
       ? [['On-pitch GA/90', value(data.onPitchGaPer90)], ['On-pitch GD/90', value(data.onPitchGdPer90)], ['Goals', data.goals], ['Assists', data.assists]]
       : [['Goals/90', data.minutes ? value(data.goals * 90 / data.minutes) : '—'], ['Assists/90', data.minutes ? value(data.assists * 90 / data.minutes) : '—'], ['G+A/90', data.minutes ? value((data.goals + data.assists) * 90 / data.minutes) : '—'], ['Goal involvement', data.goalInvolvement === null ? '—' : pct(data.goalInvolvement)]]
   return <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Position Stats</h2><p className="mt-1 text-[10px] text-zinc-500">Relevant to {position}; core totals remain in Overview.</p><div className="mt-3 grid grid-cols-2 gap-1.5">{contents.map(([label, content]) => metric(label, String(content)))}</div></section>

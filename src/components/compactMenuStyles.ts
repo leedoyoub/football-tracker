@@ -1,0 +1,3 @@
+export const compactTrigger = (active: boolean) => `min-h-9 max-w-[min(75vw,18rem)] truncate rounded-lg border px-2.5 py-1.5 text-[10px] font-black ${active ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-300' : 'border-white/10 bg-zinc-900 text-zinc-300'}`
+export const compactPopup = 'absolute top-full z-30 mt-1 grid max-w-[min(85vw,22rem)] min-w-28 gap-1 rounded-xl border border-white/10 bg-zinc-900 p-1 shadow-xl'
+export const compactItem = (selected: boolean) => `min-h-8 rounded-lg px-2 text-left text-[10px] font-bold ${selected ? 'bg-emerald-500 text-black' : 'text-zinc-300 hover:bg-white/10'}`

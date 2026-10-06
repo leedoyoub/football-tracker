@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { CompactFilterMenu } from '../components/CompactFilterMenu'
 import { AwardBestXI } from '../components/AwardBestXI'
 import { RankingMetricTabs, RankingRow, useMetricSwipe } from '../components/RankingRow'
 import { RANKING_METRICS, formatRankingMetricValue, rankingTitle, type RankingDisplayMetric } from '../lib/rankingMetrics'
@@ -93,7 +94,7 @@ export function CompetitionScreen({ season, screenState, onStateChange, onCompet
   })
 
   return <div className="px-4 pb-8 pt-6">
-    <div className="mb-3 flex items-center justify-between gap-3"><div><h1 className="text-2xl font-semibold">Competitions</h1><p className="text-xs text-zinc-500">Season and tournament detail</p></div><select aria-label="Competition season" value={season} onChange={event => onSeason(event.target.value)} className="rounded-full border border-white/10 bg-zinc-900 px-3 py-1.5 text-xs font-bold">{seasons.map(item => <option key={item}>{item}</option>)}</select></div>
+    <div className="mb-3 flex items-center justify-between gap-3"><div><h1 className="text-2xl font-semibold">Competitions</h1><p className="text-xs text-zinc-500">Season and tournament detail</p></div><CompactFilterMenu value={season} options={seasons.map(item => ({ value: item, label: item }))} onChange={onSeason} label="Competition season" /></div>
     <div role="tablist" aria-label="Competition type" className="mb-5 grid grid-cols-3 gap-1 rounded-xl bg-zinc-900 p-1">{(['league', 'cup', 'champions'] as CompetitionType[]).map(item => <button key={item} role="tab" aria-selected={type === item} type="button" onClick={() => setType(item)} className={`rounded-lg py-2 text-xs font-black ${type === item ? 'bg-emerald-500 text-black' : 'text-zinc-400'}`}><span aria-hidden>{SYMBOLS[item]}</span> {LABELS[item]}</button>)}</div>
 
     {type === 'league' && league && <LeagueView season={season} teams={teams} players={players} matches={matches} league={league} screenState={screenState} onStateChange={onStateChange} onNavigate={onNavigate} />}

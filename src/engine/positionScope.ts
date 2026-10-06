@@ -2,19 +2,18 @@ import type { Match, Player, Position, PositionFilterKey } from '../types'
 import { creditedPositionSegments, normalizePositionFamily } from './timeline'
 import { awardPositionFamily, type AwardPositionFamily } from './awardRules'
 
-export type PositionFamily = 'ST' | 'SS' | 'LW' | 'RW' | 'CAM' | 'LM' | 'RM' | 'CM' | 'CDM' | 'FB' | 'CB' | 'GK'
+export type PositionFamily = 'ST' | 'SS' | 'LW' | 'RW' | 'CAM' | 'LM' | 'RM' | 'CM' | 'CDM' | 'LB' | 'CB' | 'RB' | 'GK'
 export type { PositionFilterKey } from '../types'
 export type PositionScope = { seasons?: string[]; teams?: string[] }
 
-const FAMILY_ORDER: PositionFamily[] = ['GK', 'CB', 'FB', 'CDM', 'CM', 'LM', 'RM', 'CAM', 'LW', 'RW', 'SS', 'ST']
+const FAMILY_ORDER: PositionFamily[] = ['GK', 'CB', 'LB', 'RB', 'CDM', 'CM', 'LM', 'RM', 'CAM', 'LW', 'RW', 'SS', 'ST']
 const AWARD_ORDER: AwardPositionFamily[] = ['GK', 'LB', 'CB', 'RB', 'MID', 'ATT']
 
 export function positionFamily(position?: string): PositionFamily | undefined {
-  // Filters use the normalized FB family while appearances retain LB/RB variants.
-  if (position === 'FB') return 'FB'
   const value = normalizePositionFamily(position)
   if (!value) return undefined
-  if (value === 'LB' || value === 'LWB' || value === 'RB' || value === 'RWB') return 'FB'
+  if (value === 'LWB') return 'LB'
+  if (value === 'RWB') return 'RB'
   return value as PositionFamily
 }
 
@@ -23,6 +22,7 @@ export function positionFilterFamilies(key: PositionFilterKey): PositionFamily[]
   if (key === 'st-ss') return ['ST', 'SS']
   if (key === 'lw-rw') return ['LW', 'RW']
   if (key === 'lm-rm') return ['LM', 'RM']
+  if (key === 'lb-rb' || key === 'fb') return ['LB', 'RB']
   return [key.toUpperCase() as PositionFamily]
 }
 
@@ -59,6 +59,12 @@ export function scopedPositionFamilyByPlayer(players: Player[], matches: Match[]
     }
     const family = dominant(minutes, FAMILY_ORDER)
     if (family) result.set(playerId, family)
+  }
+  const hasScope = Boolean(scope.seasons?.length || scope.teams?.length)
+  const career = hasScope ? scopedPositionFamilyByPlayer(players, matches, {}) : undefined
+  for (const player of players) if (!result.has(player.id)) {
+    const fallback = career?.get(player.id) ?? positionFamily(player.position)
+    if (fallback) result.set(player.id, fallback)
   }
   return result
 }

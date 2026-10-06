@@ -17,7 +17,7 @@ export type UnitRecord = {
 const groupOf = (family?: PositionFamily): Exclude<UnitPosition, 'cb'> | undefined => {
   if (family === 'ST' || family === 'SS' || family === 'LW' || family === 'RW') return 'attack'
   if (family === 'CAM' || family === 'LM' || family === 'RM' || family === 'CM' || family === 'CDM') return 'midfield'
-  if (family === 'FB' || family === 'CB') return 'defence'
+  if (family === 'LB' || family === 'RB' || family === 'CB') return 'defence'
 }
 
 function combinations<T>(items: T[], size: number): T[][] {

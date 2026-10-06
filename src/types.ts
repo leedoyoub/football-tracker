@@ -234,7 +234,7 @@ export type View =
   | { name: 'edit-player'; id: string }
   | { name: 'data-management' }
 
-export type PositionFilterKey = 'all' | 'st-ss' | 'lw-rw' | 'cam' | 'lm-rm' | 'cm' | 'cdm' | 'fb' | 'cb' | 'gk'
+export type PositionFilterKey = 'all' | 'st-ss' | 'lw-rw' | 'cam' | 'lm-rm' | 'cm' | 'cdm' | 'lb-rb' | 'fb' | 'cb' | 'gk'
 
 /** Derived event visibility is ephemeral and never written into football history. */
 export type EventSurface = 'news' | 'match-change' | 'both'

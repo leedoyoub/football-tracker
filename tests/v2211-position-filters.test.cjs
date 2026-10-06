@@ -21,7 +21,7 @@ test('historical position family comes from credited participation rather than c
 test('approved compact filter families normalize tactical aliases', () => {
   assert.deepEqual(positionFilterFamilies('st-ss'), ['ST', 'SS'])
   assert.deepEqual(positionFilterFamilies('cam'), ['CAM'])
-  assert.deepEqual(positionFilterFamilies('fb'), ['FB'])
+  assert.deepEqual(positionFilterFamilies('fb'), ['LB', 'RB'])
 })
 
 test('historical award family preserves the dominant award role without reading current player position', () => {

@@ -1,25 +1,27 @@
 import { useEffect, useRef, useState } from 'react'
+import { compactItem, compactPopup, compactTrigger } from './compactMenuStyles'
 
 export type CompactFilterOption<T> = { value: T; label: string; accessibilityLabel?: string }
 
-export function CompactFilterMenu<T>({ value, options, onChange, label, allValue, allLabel, allAccessibilityLabel, menuClassName = '' }: {
+export function CompactFilterMenu<T>({ value, options, onChange, label, allValue, allLabel, allAccessibilityLabel, menuClassName = '', popupAlign = 'end' }: {
   value: T
   options: CompactFilterOption<T>[]
   onChange: (value: T) => void
   label: string
-  allValue: T
-  allLabel: string
-  allAccessibilityLabel: string
+  allValue?: T
+  allLabel?: string
+  allAccessibilityLabel?: string
   menuClassName?: string
+  popupAlign?: 'start' | 'end'
 }) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLDivElement>(null)
   const selected = options.find(option => Object.is(option.value, value))
-  const isAll = Object.is(value, allValue)
-  const visibleSelected = isAll ? allLabel : selected?.label ?? allLabel
-  const accessibleSelected = isAll ? allAccessibilityLabel : selected?.accessibilityLabel ?? selected?.label ?? allAccessibilityLabel
+  const isAll = allValue !== undefined && Object.is(value, allValue)
+  const visibleSelected = isAll ? allLabel ?? label : selected?.label ?? allLabel ?? label
+  const accessibleSelected = isAll ? allAccessibilityLabel ?? allLabel ?? label : selected?.accessibilityLabel ?? selected?.label ?? allAccessibilityLabel ?? label
 
   useEffect(() => {
     if (!open) return
@@ -43,11 +45,11 @@ export function CompactFilterMenu<T>({ value, options, onChange, label, allValue
   }
 
   return <div ref={root} className="relative inline-flex">
-    <button ref={trigger} type="button" aria-label={`${label}: ${accessibleSelected}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(current => !current)} className={`min-h-9 rounded-lg border px-2.5 py-1.5 text-[10px] font-black ${isAll ? 'border-white/10 bg-zinc-900 text-zinc-300' : 'border-emerald-400/40 bg-emerald-500/15 text-emerald-300'}`}>
+    <button ref={trigger} type="button" aria-label={`${label}: ${accessibleSelected}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(current => !current)} className={compactTrigger(!isAll)}>
       {visibleSelected} <span aria-hidden="true">⌄</span>
     </button>
-    {open && <div ref={menu} role="menu" aria-label={`${label} filter`} onKeyDown={moveMenuFocus} className={`absolute right-0 top-full z-30 mt-1 grid min-w-28 gap-1 rounded-xl border border-white/10 bg-zinc-900 p-1 shadow-xl ${menuClassName}`}>
-      {options.map(option => <button key={String(option.value)} type="button" role="menuitemradio" tabIndex={-1} aria-checked={Object.is(option.value, value)} onClick={() => { onChange(option.value); setOpen(false); trigger.current?.focus() }} className={`min-h-8 rounded-lg px-2 text-left text-[10px] font-bold ${Object.is(option.value, value) ? 'bg-emerald-500 text-black' : 'text-zinc-300 hover:bg-white/10'}`}>{option.label}</button>)}
+    {open && <div ref={menu} role="menu" aria-label={`${label} filter`} onKeyDown={moveMenuFocus} className={`${compactPopup} ${popupAlign === 'start' ? 'left-0' : 'right-0'} ${menuClassName}`}>
+      {options.map(option => <button key={String(option.value)} type="button" role="menuitemradio" tabIndex={-1} aria-checked={Object.is(option.value, value)} onClick={() => { onChange(option.value); setOpen(false); trigger.current?.focus() }} className={compactItem(Object.is(option.value, value))}>{option.label}</button>)}
     </div>}
   </div>
 }

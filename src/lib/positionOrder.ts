@@ -14,10 +14,10 @@ export function positionRank(position?: string): number {
 }
 
 /** Returns a new array; player records and their stored positions are never changed. */
-export function sortPlayersByPosition<T extends Player>(players: readonly T[], appearances?: readonly Appearance[]): T[] {
+export function sortPlayersByPosition<T extends Player>(players: readonly T[], appearances?: readonly Appearance[], representative?: Map<string, string>): T[] {
   const matchPositions = new Map(appearances?.map(appearance => [appearance.playerId, appearance.matchPosition ?? appearance.position]))
   return players
-    .map((player, index) => ({ player, index, rank: positionRank(matchPositions.get(player.id) ?? player.position) }))
+    .map((player, index) => ({ player, index, rank: positionRank(matchPositions.get(player.id) ?? representative?.get(player.id) ?? player.position) }))
     .sort((a, b) => a.rank - b.rank || a.index - b.index)
     .map(({ player }) => player)
 }

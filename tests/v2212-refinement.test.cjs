@@ -13,7 +13,7 @@ const { presentMatchChanges } = require('../src/lib/matchChangePresentation.ts')
 const { buildGlobalRankingData } = require('../src/engine/stats.ts')
 
 test('shared compact PositionFilter exposes exactly the approved families', () => {
-  assert.deepEqual(POSITION_FILTER_OPTIONS.map(option => option.label), ['All', 'ST/SS', 'LW/RW', 'CAM', 'LM/RM', 'CM', 'CDM', 'FB', 'CB', 'GK'])
+  assert.deepEqual(POSITION_FILTER_OPTIONS.map(option => option.label), ['All', 'ST/SS', 'LW/RW', 'CAM', 'LM/RM', 'CM', 'CDM', 'LB/RB', 'CB', 'GK'])
   for (const file of ['HomeScreen.tsx', 'GlobalRankingScreen.tsx', 'RecordsScreen.tsx']) {
     const source = fs.readFileSync(require.resolve(`../src/screens/${file}`), 'utf8')
     assert.match(source, /<PositionFilter/)
@@ -41,7 +41,7 @@ test('position filter is applied before ranking Top N on Home and Global Ranking
   assert(!home.includes('new Map(RANKING_METRICS.map'), 'Home must not eagerly rank every metric')
 })
 
-test('the FB filter keeps historically credited fullbacks and excludes other position families', () => {
+test('the LB/RB filter keeps historically credited fullbacks and excludes other position families', () => {
   const players = [
     { id: 'fb', name: 'Fullback', teamId: 'A', position: 'LB', number: 3 },
     { id: 'st', name: 'Striker', teamId: 'A', position: 'ST', number: 9 },
@@ -50,7 +50,7 @@ test('the FB filter keeps historically credited fullbacks and excludes other pos
     { playerId: 'fb', teamId: 'A', position: 'LB', role: 'starter' },
     { playerId: 'st', teamId: 'A', position: 'ST', role: 'starter' },
   ] }
-  assert.deepEqual(buildGlobalRankingData(players, [match], { seasons: ['Season 1'], teams: [], positions: ['FB'] }, 'rating').map(row => row.playerId), ['fb'])
+  assert.deepEqual(buildGlobalRankingData(players, [match], { seasons: ['Season 1'], teams: [], positions: ['LB', 'RB'] }, 'rating').map(row => row.playerId), ['fb'])
 })
 
 test('root scroll restoration survives a delayed layout beyond the first eight frames', () => {
@@ -121,14 +121,14 @@ test('Match Changes keeps canonical labels atomic and prioritizes rare event ide
   assert.equal(presented[0].category, 'rare')
 })
 
-test('v2.4.6 keeps package, lockfile, app version, rating revision, and storage namespace aligned', () => {
+test('v2.4.7 keeps package, lockfile, app version, rating revision, and storage namespace aligned', () => {
   const { APP_VERSION } = require('../src/config.ts')
   const { RATING_ENGINE_REVISION } = require('../src/engine/ratingRevision.ts')
   const repository = fs.readFileSync(require.resolve('../src/lib/repository.ts'), 'utf8')
-  assert.equal(APP_VERSION, '2.4.6')
-  assert.equal(require('../package.json').version, '2.4.6')
-  assert.equal(require('../package-lock.json').version, '2.4.6')
-  assert.equal(require('../package-lock.json').packages[''].version, '2.4.6')
+  assert.equal(APP_VERSION, '2.4.7')
+  assert.equal(require('../package.json').version, '2.4.7')
+  assert.equal(require('../package-lock.json').version, '2.4.7')
+  assert.equal(require('../package-lock.json').packages[''].version, '2.4.7')
   assert.equal(RATING_ENGINE_REVISION, 12)
   assert(repository.includes("STORAGE_KEY = 'football-tracker-v1'"))
 })

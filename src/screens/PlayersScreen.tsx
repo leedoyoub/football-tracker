@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { playerFullName } from '../components/ui'
 import { PlayerIcon } from '../components/PlayerIcon'
 import { seasonsFromMatches } from '../engine/stats'
+import { positionFamily, scopedPositionFamilyByPlayer } from '../engine/positionScope'
 import { useStore } from '../store'
 import { emptyFilters, matchesForPlayer, playerHasNoCurrentTeam, RankingFilterButton } from './RankingFilters'
 import type { ScreenStateByView, View } from '../types'
@@ -10,12 +11,13 @@ import type { RankingFilters } from './RankingFilters'
 export function PlayersScreen({ screenState, onStateChange, onNavigate, appliedFilters = emptyFilters, onFiltersChange = () => {} }: { screenState: ScreenStateByView['players']; onStateChange: (state: ScreenStateByView['players']) => void; onNavigate: (view: View) => void; appliedFilters: RankingFilters; onFiltersChange: (filters: RankingFilters) => void }) {
   const { players, teams, matches } = useStore()
   const seasons = useMemo(() => seasonsFromMatches(matches), [matches])
+  const representative = useMemo(() => scopedPositionFamilyByPlayer(players, matches, {}), [players, matches])
   const search = screenState.search
   const setSearch = (value: string) => onStateChange({ ...screenState, search: value })
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
     return players
-      .filter(player => !appliedFilters.positions.length || appliedFilters.positions.includes(player.position))
+      .filter(player => !appliedFilters.positions.length || appliedFilters.positions.some(position => positionFamily(position) === representative.get(player.id)))
       .filter(player => [player.displayName, player.fullName, player.name].some(name => name?.toLowerCase().includes(query)))
       .map(player => {
         const playerMatches = matchesForPlayer(player, matches, appliedFilters)
@@ -23,6 +25,6 @@ export function PlayersScreen({ screenState, onStateChange, onNavigate, appliedF
       })
       .filter(row => row.matchesFilter)
       .sort((left, right) => playerFullName(left.player).localeCompare(playerFullName(right.player)))
-  }, [players, teams, matches, appliedFilters, search])
-  return <div className="px-4 pb-8 pt-6"><div className="mb-4 flex items-center justify-between"><h1 className="text-2xl font-semibold">Players</h1><button type="button" onClick={() => onNavigate({ name: 'new-player' })} className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-bold text-black">Add</button></div><div className="mb-4 flex gap-2"><input type="search" aria-label="Search players" placeholder="Search players" value={search} onChange={event => setSearch(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm" /><RankingFilterButton applied={appliedFilters} onApply={onFiltersChange} seasons={seasons} teams={teams} /></div><div className="space-y-2">{rows.length === 0 && <p className="py-4 text-sm text-zinc-400">No players found.</p>}{rows.map(({ player, team }) => <button key={player.id} type="button" onClick={() => onNavigate({ name: 'player', id: player.id })} className="flex w-full items-center gap-3 rounded-2xl bg-zinc-900 px-3 py-2.5 text-left"><PlayerIcon player={player} team={team} className="h-10 w-10 text-[10px]" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{playerFullName(player)}</span><span className="text-[11px] text-zinc-400">{team?.shortName ?? (playerHasNoCurrentTeam(player) ? 'No Team' : 'Unassigned')} · {player.position}</span></span></button>)}</div></div>
+  }, [players, teams, matches, appliedFilters, search, representative])
+  return <div className="px-4 pb-8 pt-6"><div className="mb-4 flex items-center justify-between"><h1 className="text-2xl font-semibold">Players</h1><button type="button" onClick={() => onNavigate({ name: 'new-player' })} className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-bold text-black">Add</button></div><div className="mb-4 flex gap-2"><input type="search" aria-label="Search players" placeholder="Search players" value={search} onChange={event => setSearch(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm" /><RankingFilterButton applied={appliedFilters} onApply={onFiltersChange} seasons={seasons} teams={teams} /></div><div className="space-y-2">{rows.length === 0 && <p className="py-4 text-sm text-zinc-400">No players found.</p>}{rows.map(({ player, team }) => <button key={player.id} type="button" onClick={() => onNavigate({ name: 'player', id: player.id })} className="flex w-full items-center gap-3 rounded-2xl bg-zinc-900 px-3 py-2.5 text-left"><PlayerIcon player={player} team={team} className="h-10 w-10 text-[10px]" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{playerFullName(player)}</span><span className="text-[11px] text-zinc-400">{team?.shortName ?? (playerHasNoCurrentTeam(player) ? 'No Team' : 'Unassigned')} · {representative.get(player.id) ?? player.position}</span></span></button>)}</div></div>
 }
