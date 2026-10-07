@@ -17,6 +17,19 @@ export type CombinationPairPresentation = { playerIds: string[]; connector: Comb
 export type RecordsLeaderboardRow = { id: string; name: string; value: string; numeric: number; detail: string; rank: number; playerIds?: string[]; combinationPair?: CombinationPairPresentation }
 export type RecordsLeaderboardGroup = { id: string; title: string; kind: RecordsLeaderboardKind; rows: RecordsLeaderboardRow[]; applicableFilters: { position: boolean; team: boolean } }
 export type RecordsScope = { seasons: string[]; teamIds: string[]; competition: CompetitionType | 'all'; positionFilter: PositionFilterKey }
+type RecordsInput = { category: RecordsLeaderboardKind; players: Player[]; teams: Team[]; matches: Match[]; scope: RecordsScope; selectedIds?: string[] }
+
+export const combinationBestUnitOptions = [
+  ...([2, 3] as const).map(size => ({ id: `best-unit:attack:${size}:goals`, title: `Best Attack ${size === 2 ? 'Pair' : 'Trio'} · Goals / Match` })),
+  ...([2, 3, 4] as const).map(size => ({ id: `best-unit:midfield:${size}:gd`, title: `Best Midfield ${{ 2: 'Pair', 3: 'Trio', 4: 'Four' }[size]} · GD / Match` })),
+  ...([3, 4] as const).flatMap(size => [
+    { id: `best-unit:defence:${size}:ga`, title: `Best Back ${size === 3 ? 'Three' : 'Four'} · Lowest GA/90` },
+    { id: `best-unit:defence:${size}:sot`, title: `Best Back ${size === 3 ? 'Three' : 'Four'} · Lowest Opponent SOT/90` },
+  ]),
+]
+
+const recordsCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], Map<string, RecordsLeaderboardGroup[]>>>>()
+const scopeKey = ({ category, scope, selectedIds }: RecordsInput) => JSON.stringify([category, scope.competition, scope.positionFilter, scope.seasons.slice().sort(), scope.teamIds.slice().sort(), selectedIds ?? null])
 
 const rank = (rows: Omit<RecordsLeaderboardRow, 'rank'>[], ascending = false) => { let prior: number | undefined; let priorRank = 0; return rows.slice().sort((a, b) => (ascending ? a.numeric - b.numeric : b.numeric - a.numeric) || a.name.localeCompare(b.name)).map((row, index) => { const next = prior === row.numeric ? priorRank : index + 1; prior = row.numeric; priorRank = next; return { ...row, rank: next } }) }
 const combinationKey = (ids: string[]) => ids.slice().sort().join(':')
@@ -37,10 +50,27 @@ export function combinationPairPresentation(leaderboardId: string, playerIds: st
   return { playerIds: [...playerIds], ...rule }
 }
 
-export function recordsLeaderboardGroups({ category, players, teams, matches, scope }: { category: RecordsLeaderboardKind; players: Player[]; teams: Team[]; matches: Match[]; scope: RecordsScope }): RecordsLeaderboardGroup[] {
-  if (category === 'player') { const byId = new Map(players.map(player => [player.id, player])); return buildPlayerRecordLeaderboards(players, matches, { seasons: scope.seasons, teamIds: scope.teamIds, competition: scope.competition, positionFilter: scope.positionFilter }).map(group => ({ id: group.id, title: group.title, kind: 'player' as const, applicableFilters: { position: true, team: true }, rows: group.rows.map(row => ({ id: row.playerId, name: playerFullName(byId.get(row.playerId)), numeric: row.numeric, value: row.value, detail: row.detail, rank: row.rank })) })) }
-  const scoped = recordsScopedMatches(matches, scope, category)
-  return category === 'team' ? teamGroups(teams.filter(team => !scope.teamIds.length || scope.teamIds.includes(team.id)), scoped) : combinationGroups(players, teams, scoped, scope.teamIds)
+export function recordsLeaderboardGroups(input: RecordsInput): RecordsLeaderboardGroup[] {
+  const { category, players, teams, matches, scope, selectedIds } = input
+  let byPlayers = recordsCache.get(matches)
+  if (!byPlayers) { byPlayers = new WeakMap(); recordsCache.set(matches, byPlayers) }
+  let byTeams = byPlayers.get(players)
+  if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
+  let byScope = byTeams.get(teams)
+  if (!byScope) { byScope = new Map(); byTeams.set(teams, byScope) }
+  const key = scopeKey(input)
+  const cached = byScope.get(key)
+  if (cached) return cached
+  let groups: RecordsLeaderboardGroup[]
+  if (category === 'player') { const byId = new Map(players.map(player => [player.id, player])); groups = buildPlayerRecordLeaderboards(players, matches, { seasons: scope.seasons, teamIds: scope.teamIds, competition: scope.competition, positionFilter: scope.positionFilter }).map(group => ({ id: group.id, title: group.title, kind: 'player' as const, applicableFilters: { position: true, team: true }, rows: group.rows.map(row => ({ id: row.playerId, name: playerFullName(byId.get(row.playerId)), numeric: row.numeric, value: row.value, detail: row.detail, rank: row.rank })) })) }
+  else {
+    const scoped = recordsScopedMatches(matches, scope, category)
+    groups = category === 'team' ? teamGroups(teams.filter(team => !scope.teamIds.length || scope.teamIds.includes(team.id)), scoped) : combinationGroups(players, teams, scoped, scope.teamIds, selectedIds)
+  }
+  if (selectedIds) { const wanted = new Set(selectedIds); groups = groups.filter(group => wanted.has(group.id)) }
+  if (byScope.size >= 24) byScope.delete(byScope.keys().next().value!)
+  byScope.set(key, groups)
+  return groups
 }
 
 function teamGroups(teams: Team[], matches: Match[]): RecordsLeaderboardGroup[] {
@@ -71,9 +101,11 @@ function teamGroups(teams: Team[], matches: Match[]): RecordsLeaderboardGroup[] 
   ]
 }
 
-function combinationGroups(players: Player[], teams: Team[], matches: Match[], teamIds: string[]): RecordsLeaderboardGroup[] {
+function combinationGroups(players: Player[], teams: Team[], matches: Match[], teamIds: string[], selectedIds?: string[]): RecordsLeaderboardGroup[] {
+  const needs = (id: string) => !selectedIds || selectedIds.includes(id)
+  const goalIds = ['goal-combinations', 'mutual-goal-combinations', 'both-scored', 'both-ga']
   const direct = new Map<string, { ids: string[]; value: number }>(); const mutual = new Map<string, { ids: string[]; value: number }>(); const bothScored = new Map<string, { ids: string[]; value: number }>(); const bothGA = new Map<string, { ids: string[]; value: number }>()
-  for (const match of matches) for (const teamId of new Set(match.appearances.map(row => row.teamId))) {
+  if (goalIds.some(needs)) for (const match of matches) for (const teamId of new Set(match.appearances.map(row => row.teamId))) {
     if (teamIds.length && !teamIds.includes(teamId)) continue
     const contributors = new Map<string, Set<'g' | 'a'>>()
     const appearanceFor = (id?: string) => match.appearances.find(row => row.playerId === id && row.teamId === teamId)
@@ -98,9 +130,13 @@ function combinationGroups(players: Player[], teams: Team[], matches: Match[], t
       bothGA.set(key, { ids: key.split(':'), value: (bothGA.get(key)?.value ?? 0) + 1 })
     }
   }
-  const byId = new Map(players.map(player => [player.id, player])); const name = (pair: CombinationPairPresentation) => pair.playerIds.map(id => playerFullName(byId.get(id))).join(` ${pair.connector} `); const entries = (rows: { ids: string[]; value: number; minutes?: number }[], ascending = false) => rows.filter(row => row.value > 0 || row.minutes).sort((left, right) => (ascending ? left.value - right.value : right.value - left.value) || combinationKey(left.ids).localeCompare(combinationKey(right.ids))); const duo = combinationStats(players, matches, {}, 'duo').filter(row => !teamIds.length || teamIds.includes(row.teamId)).map(row => ({ ids: row.playerIds, value: row.combinedGA })); const cb = combinationStats(players, matches, {}, 'cb').filter(row => (!teamIds.length || teamIds.includes(row.teamId)) && row.togetherMinutes >= 180).map(row => ({ ids: row.playerIds, value: row.weightedOpponentSot / (row.togetherMinutes / 90), minutes: row.togetherMinutes }))
+  const byId = new Map(players.map(player => [player.id, player])); const name = (pair: CombinationPairPresentation) => pair.playerIds.map(id => playerFullName(byId.get(id))).join(` ${pair.connector} `); const entries = (rows: { ids: string[]; value: number; minutes?: number }[], ascending = false) => rows.filter(row => row.value > 0 || row.minutes).sort((left, right) => (ascending ? left.value - right.value : right.value - left.value) || combinationKey(left.ids).localeCompare(combinationKey(right.ids))); const duo = needs('duo-ga') ? combinationStats(players, matches, {}, 'duo').filter(row => !teamIds.length || teamIds.includes(row.teamId)).map(row => ({ ids: row.playerIds, value: row.combinedGA })) : []; const cb = needs('cb-suppression') ? combinationStats(players, matches, {}, 'cb').filter(row => (!teamIds.length || teamIds.includes(row.teamId)) && row.togetherMinutes >= 180).map(row => ({ ids: row.playerIds, value: row.weightedOpponentSot / (row.togetherMinutes / 90), minutes: row.togetherMinutes })) : []
   const group = (id: string, title: string, rows: { ids: string[]; value: number; minutes?: number }[], cbGroup = false, ascending = false): RecordsLeaderboardGroup => ({ id, title, kind: 'combination', applicableFilters: { position: false, team: true }, rows: entries(rows, ascending).map((row, index) => { const combinationPair = combinationPairPresentation(id, row.ids); return { id: `${id}:${combinationPair.directional ? row.ids.join(':') : combinationKey(row.ids)}`, playerIds: row.ids, combinationPair, name: name(combinationPair), numeric: row.value, value: cbGroup ? `${row.value.toFixed(2)} SOT/90 · ${row.minutes}'` : String(row.value), detail: cbGroup ? `${row.minutes}' shared CB minutes` : 'Combination record', rank: index + 1 } }) })
-  const units = buildUnitRecords(players, matches, teamIds)
+  const requestedUnits = selectedIds && new Set(selectedIds.flatMap(id => {
+    const unit = /^(?:together|best-unit):(attack|midfield|defence):([234]):/.exec(id)
+    return unit ? [`${unit[1]}:${unit[2]}`] : id === 'cb-ga' ? ['cb:2'] : []
+  }))
+  const units = buildUnitRecords(players, matches, teamIds, requestedUnits)
   const teamNameById = new Map(teams.map(team => [team.id, team.shortName ?? team.name]))
   const unitGroup = (id: string, title: string, chosen: UnitRecord[], value: (row: UnitRecord) => number, suffix: string, ascending = false): RecordsLeaderboardGroup => ({
     id, title, kind: 'combination', applicableFilters: { position: false, team: true },

@@ -19,6 +19,7 @@ export function RecordsLeaderboardScreen({ screenState, onStateChange, onNavigat
     teams,
     matches,
     scope: { seasons: screenState.filterSeasonIds, teamIds: screenState.filterTeamIds, competition: screenState.competition, positionFilter: screenState.positionFilter },
+    ...(screenState.category === 'combination' ? { selectedIds: [screenState.leaderboardId] } : {}),
   }), [screenState, players, teams, matches])
   const group = groups.find(item => item.id === screenState.leaderboardId)
   const playerById = useMemo(() => new Map(players.map(player => [player.id, player])), [players])

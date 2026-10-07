@@ -38,7 +38,8 @@ function commonIntervals(segments: ReturnType<typeof creditedPositionSegments>[]
 }
 
 /** One scoped pass builds all 2/3/4-player unit facts from actual same-team appearances. */
-export function buildUnitRecords(players: Player[], matches: Match[], teamIds: string[]): UnitRecord[] {
+export function buildUnitRecords(players: Player[], matches: Match[], teamIds: string[], requested?: ReadonlySet<string>): UnitRecord[] {
+  if (requested?.size === 0) return []
   const families = scopedPositionFamilyByPlayer(players, matches, { teams: teamIds })
   const known = new Set(players.map(player => player.id))
   const totals = new Map<string, UnitRecord>()
@@ -53,8 +54,10 @@ export function buildUnitRecords(players: Player[], matches: Match[], teamIds: s
       const segments = new Map(appearances.map(appearance => [appearance.playerId, creditedPositionSegments(match, appearance)]))
       const candidate = (position: UnitPosition) => appearances.filter(appearance => segments.get(appearance.playerId)?.length && (position === 'cb' ? segments.get(appearance.playerId)!.some(segment => positionFamily(segment.position) === 'CB') : groupOf(families.get(appearance.playerId)) === position)).sort((a, b) => a.playerId.localeCompare(b.playerId))
       for (const position of ['attack', 'midfield', 'defence', 'cb'] as const) {
+        if (requested && ![2, 3, 4].some(size => requested.has(`${position}:${size}`))) continue
         const eligible = candidate(position)
         for (const size of position === 'cb' ? [2] : [2, 3, 4]) {
+          if (requested && !requested.has(`${position}:${size}`)) continue
           for (const members of combinations(eligible, size)) {
             const playerIds = members.map(member => member.playerId)
             const intervals = commonIntervals(members.map(member => position === 'cb' ? segments.get(member.playerId)!.filter(segment => positionFamily(segment.position) === 'CB') : segments.get(member.playerId)!))

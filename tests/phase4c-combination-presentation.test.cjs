@@ -4,7 +4,7 @@ const { test } = require('node:test')
 const ts = require('typescript')
 for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename)
 
-const { combinationPairPresentation, recordsLeaderboardGroups } = require('../src/screens/recordsLeaderboards.ts')
+const { combinationBestUnitOptions, combinationPairPresentation, recordsLeaderboardGroups } = require('../src/screens/recordsLeaderboards.ts')
 
 const player = (id, position = 'ST') => ({ id, name: id, displayName: id, fullName: id, teamId: 'A', position, number: 9 })
 const appearance = (entry) => ({ playerId: entry.id, teamId: 'A', role: 'starter', position: entry.position, matchPosition: entry.position })
@@ -36,6 +36,20 @@ test('Most Goal Combinations preserves assist-to-scorer direction rather than al
   assert.deepEqual(direct.map(row => row.combinationPair.playerIds), [[assist.id, scorer.id], [scorer.id, assist.id]])
   assert.equal(direct[0].combinationPair.connector, '→')
   assert.notEqual(direct[0].id, direct[1].id)
+})
+
+test('a selected Combination leaderboard matches its full projection and reuses an unchanged scope', () => {
+  const matches = [match('selected', [{ id: 'selected-goal', type: 'goal', minute: 20, teamId: 'A', playerId: scorer.id, assistPlayerId: assist.id }])]
+  const input = { category: 'combination', players, teams: [], matches, scope }
+  const all = recordsLeaderboardGroups(input)
+  assert.strictEqual(recordsLeaderboardGroups(input), all)
+  assert.deepEqual(combinationBestUnitOptions, all.filter(group => group.id.startsWith('best-unit:')).map(group => ({ id: group.id, title: group.title })))
+  for (const id of all.map(group => group.id)) {
+    assert.deepEqual(recordsLeaderboardGroups({ ...input, selectedIds: [id] }), all.filter(group => group.id === id))
+  }
+  const changed = { ...input, matches: [{ ...matches[0], events: [] }] }
+  assert.notStrictEqual(recordsLeaderboardGroups(changed), all)
+  assert.equal(recordsLeaderboardGroups(changed).find(group => group.id === 'goal-combinations').rows.length, 0)
 })
 
 test('preview and View All use the same structured pair renderer with independent player actions', () => {

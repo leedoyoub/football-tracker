@@ -85,6 +85,7 @@ test('a substituted defender is charged only for the shared interval', () => {
   ], { halftimeOpponentSot: 1, fulltimeOpponentSot: 3 })
   const rows = buildUnitRecords(players, [match], [])
   const four = rows.find(row => row.position === 'defence' && row.size === 4)
+  assert.deepEqual(buildUnitRecords(players, [match], [], new Set(['defence:4'])), rows.filter(row => row.position === 'defence' && row.size === 4))
   assert.equal(four.minutes, 60)
   assert.equal(four.intervalGA, 0)
   assert.equal(four.intervalSOT, 1 + 2 * 15 / 45)
@@ -224,12 +225,12 @@ test('personal rolling five uses raw ratings in chronological appearances and sk
   assert.equal(playerPersonalRecords(p, [p], games.slice().reverse()).bestFiveAverage, expected)
 })
 
-test('v2.4.8 version, unchanged rating revision and Champions entity navigation', () => {
+test('v2.4.9 version, unchanged rating revision and Champions entity navigation', () => {
   const source = file => fs.readFileSync(require.resolve(`../${file}`), 'utf8')
-  assert.equal(require('../src/config.ts').APP_VERSION, '2.4.8')
+  assert.equal(require('../src/config.ts').APP_VERSION, '2.4.9')
   assert.equal(require('../src/engine/ratingRevision.ts').RATING_ENGINE_REVISION, 12)
-  assert.equal(require('../package.json').version, '2.4.8')
-  assert.equal(require('../package-lock.json').version, '2.4.8')
+  assert.equal(require('../package.json').version, '2.4.9')
+  assert.equal(require('../package-lock.json').version, '2.4.9')
   const champions = source('src/screens/CompetitionScreen.tsx')
   assert.match(champions, /<ChampionsBracket[^>]*onNavigate=\{onNavigate\}/)
   assert.match(champions, /TeamIdentityAction team=\{teams\[id\]\}/)

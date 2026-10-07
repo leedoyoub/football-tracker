@@ -16,7 +16,7 @@ import { useStore } from '../store'
 import type { CompetitionState, CompetitionType, Match, Player, RecordsCategory, ScreenStateByView, Team, View } from '../types'
 import { RecordsHistory } from './RecordsHistory'
 import { emptyFilters, type RankingFilters } from './RankingFilters'
-import { recordsLeaderboardGroups, type RecordsLeaderboardGroup, type RecordsLeaderboardKind, type RecordsLeaderboardRow } from './recordsLeaderboards'
+import { combinationBestUnitOptions, recordsLeaderboardGroups, type RecordsLeaderboardGroup, type RecordsLeaderboardKind, type RecordsLeaderboardRow } from './recordsLeaderboards'
 
 type Category = RecordsCategory
 const tabs: [Category, string, string][] = [['player', 'Player', '⚽'], ['combination', 'Combination', '🤝'], ['team', 'Team', '🛡️'], ['history', 'History', '🏆'], ['insights', 'Insights', '📈'], ['integrity', 'Data Integrity', '✓']]
@@ -37,19 +37,18 @@ export function RecordsScreen({ season, screenState, onStateChange, onNavigate }
 }
 
 function RecordsRankingPreviews({ category, players, teams, matches, filters, competition, positionFilter, screenState, onSelectionChange, onNavigate }: { category: RecordsLeaderboardKind; players: Player[]; teams: Team[]; matches: Match[]; filters: RankingFilters; competition: CompetitionType | 'all'; positionFilter: ScreenStateByView['records']['positionFilter']; screenState: ScreenStateByView['records']; onSelectionChange: (patch: Partial<ScreenStateByView['records']>) => void; onNavigate: (view: View) => void }) {
-  const groups = useMemo(() => recordsLeaderboardGroups({ category, players, teams, matches, scope: { seasons: filters.seasons, teamIds: filters.teams, competition, positionFilter } }), [category, players, teams, matches, filters.seasons, filters.teams, competition, positionFilter])
+  const selectedTogether = `together:${screenState.combinationPosition ?? 'attack'}:${screenState.combinationPlayers ?? 2}:${screenState.combinationMetric ?? 'starts'}`
+  const selectedBest = screenState.bestUnitId ?? 'best-unit:attack:2:goals'
+  const groups = useMemo(() => recordsLeaderboardGroups({ category, players, teams, matches, scope: { seasons: filters.seasons, teamIds: filters.teams, competition, positionFilter }, ...(category === 'combination' ? { selectedIds: ['goal-combinations', 'mutual-goal-combinations', 'both-scored', 'both-ga', 'duo-ga', selectedTogether, selectedBest, 'cb-suppression', 'cb-ga'] } : {}) }), [category, players, teams, matches, filters.seasons, filters.teams, competition, positionFilter, selectedTogether, selectedBest])
   const playerById = useMemo(() => new Map(players.map(player => [player.id, player])), [players])
   const teamById = useMemo(() => new Map(teams.map(team => [team.id, team])), [teams])
   const card = (group: RecordsLeaderboardGroup) => <section key={group.id} className="mb-5"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-semibold">{group.title}</h2>{group.rows.length > 3 && <button type="button" onClick={() => onNavigate({ name: 'records-leaderboard', category, leaderboardId: group.id, competition, positionFilter, seasonIds: filters.seasons, teamIds: filters.teams })} className="secondary-view-all">View All</button>}</div><div className="overflow-hidden rounded-xl bg-zinc-900">{group.rows.slice(0, 3).map(row => <div key={row.id} className="grid min-h-11 grid-cols-[28px_1fr_auto] items-center gap-2 border-b border-white/5 px-3 text-xs last:border-0"><b className="text-zinc-500">#{row.rank}</b><RecordIdentity row={row} playerById={playerById} teamById={teamById} onNavigate={onNavigate} /><b className="text-emerald-300">{row.value}</b></div>)}</div></section>
   if (category !== 'combination') return <section aria-label="Records leaderboard previews">{groups.map(card)}</section>
-  const selectedTogether = `together:${screenState.combinationPosition ?? 'attack'}:${screenState.combinationPlayers ?? 2}:${screenState.combinationMetric ?? 'starts'}`
-  const bestGroups = groups.filter(group => group.id.startsWith('best-unit:'))
-  const selectedBest = screenState.bestUnitId ?? 'best-unit:attack:2:goals'
   const choose = (label: string, value: string | number, options: { value: string | number; label: string }[], onChange: (value: string) => void) => <CompactFilterMenu value={String(value)} options={options.map(option => ({ value: String(option.value), label: option.label }))} onChange={onChange} label={`Combination ${label.toLowerCase()}`} menuClassName="max-h-64 overflow-y-auto overscroll-contain" popupAlign="start" />
   return <section aria-label="Records leaderboard previews">
     <h2 className="mb-3 text-base font-semibold">Goal Partnerships</h2>{groups.slice(0, 5).map(card)}
     <h2 className="mb-3 text-base font-semibold">Together</h2><div className="mb-3 flex flex-wrap gap-2">{choose('Position', screenState.combinationPosition ?? 'attack', [{ value: 'attack', label: 'Attack' }, { value: 'midfield', label: 'Midfield' }, { value: 'defence', label: 'Defence' }], value => onSelectionChange({ combinationPosition: value as 'attack' | 'midfield' | 'defence' }))}{choose('Players', screenState.combinationPlayers ?? 2, [2, 3, 4].map(value => ({ value, label: `${value} Players` })), value => onSelectionChange({ combinationPlayers: Number(value) as 2 | 3 | 4 }))}{choose('Metric', screenState.combinationMetric ?? 'starts', [{ value: 'starts', label: 'Starts' }, { value: 'minutes', label: 'Minutes' }, { value: 'ppg', label: 'PPG' }], value => onSelectionChange({ combinationMetric: value as 'starts' | 'minutes' | 'ppg' }))}</div>{groups.filter(group => group.id === selectedTogether).map(card)}
-    <h2 className="mb-3 text-base font-semibold">Best Units</h2><div className="mb-3">{choose('Best unit', selectedBest, bestGroups.map(group => ({ value: group.id, label: group.title })), value => onSelectionChange({ bestUnitId: value }))}</div>{bestGroups.filter(group => group.id === selectedBest).map(card)}
+    <h2 className="mb-3 text-base font-semibold">Best Units</h2><div className="mb-3">{choose('Best unit', selectedBest, combinationBestUnitOptions.map(group => ({ value: group.id, label: group.title })), value => onSelectionChange({ bestUnitId: value }))}</div>{groups.filter(group => group.id === selectedBest).map(card)}
     <h2 className="mb-3 text-base font-semibold">Defensive Partnerships</h2>{groups.filter(group => group.id === 'cb-suppression' || group.id === 'cb-ga').map(card)}
   </section>
 }
