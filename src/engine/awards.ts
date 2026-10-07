@@ -20,6 +20,8 @@ export type CanonicalAwardResult = {
   bestXI: Best11Slot[]
   statsByPlayer: Record<string, { goals: number; assists: number; avgRating?: number }>
   anchorMatch: Match
+  complete?: boolean
+  candidates?: AwardCandidate[]
 }
 
 /** One competition-aware source for Team/Best XI wording. */
@@ -44,7 +46,7 @@ export function competitionAwardResult(type: CompetitionType, season: string, te
   const playerLabel = type === 'league' ? 'Player of the Season' : type === 'cup' ? 'Player of the Cup' : 'Player of the Tournament'
   const selected = official.bestXI.flatMap(slot => slot.playerId ? [official.candidates?.find(candidate => candidate.playerId === slot.playerId && candidate.teamId === slot.teamId)] : [])
   const statsByPlayer = Object.fromEntries(selected.flatMap(candidate => candidate ? [[candidate.playerId, { goals: candidate.goals, assists: candidate.assists, avgRating: candidate.average }]] : []))
-  return { scopeLabel: season, playerLabel, teamLabel: competitionAwardLabel(type), bestPlayerId: official.mvp.playerId, bestXI: official.bestXI, statsByPlayer, anchorMatch }
+  return { scopeLabel: season, playerLabel, teamLabel: competitionAwardLabel(type), bestPlayerId: official.mvp.playerId, bestXI: official.bestXI, statsByPlayer, anchorMatch, complete: official.complete, candidates: official.candidates }
 }
 
 const rawAverage = (row: GlobalLeaderboardRow) => row.ratings.length ? row.ratings.reduce((sum, rating) => sum + rating.raw, 0) / row.ratings.length : 0
