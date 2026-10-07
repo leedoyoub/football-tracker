@@ -7,7 +7,6 @@ import { creditedPositionSegments, isOnPitchAtEvent, scoringTeamId } from './tim
 import { newestMatches, oldestMatches } from './matchChronology'
 import { matchCompetitionType } from './competitionContext'
 import { isPlayerAssistEvent, isPlayerGoalEvent, playerGoalkeeperFacts } from './playerMatchFacts'
-import { seasonsFromMatches } from './stats'
 
 export type PlayerScope = { season?: string; competition?: CompetitionType | 'all'; teamIds?: string[] }
 export type DerivedAppearance = { match: Match; appearance: Appearance; rating: RatingBreakdown }
@@ -114,12 +113,14 @@ export function derivePlayerScope(player: Player, players: Player[], matches: Ma
 }
 
 export function playerCareerTimeline(player: Player, players: Player[], matches: Match[]): CareerEntry[] {
-  const groups = new Map<string, { season: string; teamId: string; matches: Match[] }>()
-  for (const match of matches) for (const appearance of match.appearances) if (appearance.playerId === player.id) {
-    const key = `${match.season}:${appearance.teamId}`; const group = groups.get(key) ?? { season: match.season, teamId: appearance.teamId, matches: [] }; if (!group.matches.includes(match)) group.matches.push(match); groups.set(key, group)
+  const groups: { season: string; teamId: string; matches: Match[] }[] = []
+  for (const match of oldestMatches(matches)) for (const appearance of match.appearances) if (appearance.playerId === player.id) {
+    const last = groups[groups.length - 1]
+    const group = last?.season === match.season && last.teamId === appearance.teamId ? last : { season: match.season, teamId: appearance.teamId, matches: [] }
+    if (group !== last) groups.push(group)
+    if (!group.matches.includes(match)) group.matches.push(match)
   }
-  const seasonOrder = seasonsFromMatches(matches)
-  return [...groups.values()].map(group => { const data = derivePlayerScope(player, players, group.matches, { teamIds: [group.teamId] }); return { season: group.season, teamId: group.teamId, apps: data.apps, goals: data.goals, assists: data.assists, averageRating: data.averageRating } }).filter(row => row.apps > 0).sort((left, right) => seasonOrder.indexOf(left.season) - seasonOrder.indexOf(right.season) || right.teamId.localeCompare(left.teamId))
+  return groups.map(group => { const data = derivePlayerScope(player, players, group.matches, { teamIds: [group.teamId] }); return { season: group.season, teamId: group.teamId, apps: data.apps, goals: data.goals, assists: data.assists, averageRating: data.averageRating } }).filter(row => row.apps > 0)
 }
 
 export function playerPersonalRecords(player: Player, _players: Player[], matches: Match[]): PersonalRecords {

@@ -4,15 +4,17 @@ import { PlayerIcon } from '../components/PlayerIcon'
 import { seasonsFromMatches } from '../engine/stats'
 import { positionFamily, scopedPositionFamilyByPlayer } from '../engine/positionScope'
 import { useStore } from '../store'
-import { emptyFilters, matchesForPlayer, playerHasNoCurrentTeam, RankingFilterButton } from './RankingFilters'
+import { matchesForPlayer, playerHasNoCurrentTeam, RankingFilterButton } from './RankingFilters'
 import type { ScreenStateByView, View } from '../types'
 import type { RankingFilters } from './RankingFilters'
 
-export function PlayersScreen({ screenState, onStateChange, onNavigate, appliedFilters = emptyFilters, onFiltersChange = () => {} }: { screenState: ScreenStateByView['players']; onStateChange: (state: ScreenStateByView['players']) => void; onNavigate: (view: View) => void; appliedFilters: RankingFilters; onFiltersChange: (filters: RankingFilters) => void }) {
+export function PlayersScreen({ screenState, onStateChange, onNavigate }: { screenState: ScreenStateByView['players']; onStateChange: (state: ScreenStateByView['players']) => void; onNavigate: (view: View) => void }) {
   const { players, teams, matches } = useStore()
   const seasons = useMemo(() => seasonsFromMatches(matches), [matches])
   const representative = useMemo(() => scopedPositionFamilyByPlayer(players, matches, {}), [players, matches])
   const search = screenState.search
+  const appliedFilters = screenState.filters
+  const onFiltersChange = (filters: RankingFilters) => onStateChange({ ...screenState, filters })
   const setSearch = (value: string) => onStateChange({ ...screenState, search: value })
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()

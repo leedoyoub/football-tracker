@@ -10,14 +10,15 @@ import type {
   TeamSeasonStats,
   PartnershipStats,
 } from '../types'
-import { hasPitchAppearance, ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, pitchWindow, matchPositionSegments } from './rating'
+import { hasPitchAppearance, ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, pitchWindow, matchPositionSegments, creditedPositionSegments } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import { kickoffLineupForMatch } from './kickoffLineup'
 import { newestMatches, oldestMatches } from './matchChronology'
 import { positionFamily, scopedAwardFamilyByPlayer, scopedPositionFamilyByPlayer, type PositionFamily } from './positionScope'
 import { matchCompetitionType } from './competitionContext'
 import { GOOD_RATING_THRESHOLD } from './constants'
-import { opponentSot } from './opponentSot'
+import { opponentSotExposureForPositionSegment } from './opponentSot'
+import { isRecordedForTeam, teamsCreditedWithResult, teamPerspectiveScore } from './matchPerspective'
 import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts, playerSaveCount } from './playerMatchFacts'
 import { isAwardEligible, rankAwardCandidates, selectAwardBestXI, type AwardCandidate } from './awardRules'
 
@@ -126,9 +127,7 @@ export function teamSeasonStats(
   matches: Match[],
   season: string,
 ): TeamSeasonStats {
-  const teamMatches = oldestMatches(matches.filter((m) =>
-    m.season === season && (m.teamId === teamId || (!m.teamId && (m.homeTeamId === teamId || m.awayTeamId === teamId))),
-  ))
+  const teamMatches = oldestMatches(matches.filter(match => match.season === season && teamsCreditedWithResult(match).includes(teamId)))
   
   let wins = 0
   let draws = 0
@@ -139,10 +138,9 @@ export function teamSeasonStats(
   const recentForm: ('W' | 'D' | 'L')[] = []
   
   for (const match of teamMatches) {
-    const score = matchScore(match)
-    const isHome = match.homeTeamId === teamId
-    const ours = isHome ? score.home : score.away
-    const theirs = isHome ? score.away : score.home
+    const perspective = teamPerspectiveScore(match, teamId)!
+    const ours = perspective.goalsFor
+    const theirs = perspective.goalsAgainst
     
     goalsFor += ours
     goalsAgainst += theirs
@@ -250,17 +248,20 @@ export type GlobalLeaderboardRow = PlayerSeasonStats & {
   sotAllowedAppearances?: number
   sotAllowedTotal?: number
   concededOnPitch?: number
+  qualifyingConceded?: number
+  qualifyingGoalkeeperMinutes?: number
   qualifyingGoalkeeperAppearances?: number
   qualifyingSaves?: number
   cleanSheets?: number
   goalkeeperRatings?: RatingBreakdown[]
   goalkeeperMinutes?: number
+  allGoalkeeperMinutes?: number
   goalkeeperAppearances?: number
   goalkeeperConceded?: number
   scopedPositionFamily?: PositionFamily
 }
 
-const defenderRankingPosition = (position: Position) => ['CB', 'LB', 'RB'].includes(position)
+const defenderRankingPosition = (position: Position) => ['CB', 'LB', 'RB'].includes(positionFamily(position) ?? '')
 const goalkeeperPosition = (position: Position) => position === 'GK'
 
 /** Derived-only cache. A new store match/player array naturally invalidates
@@ -335,7 +336,7 @@ export function buildGlobalRankingData(
     const ratingRows: RatingBreakdown[] = []
     let starts = 0; let subs = 0; let saves = 0; let cleanSheets = 0; let goalkeeperMinutes = 0; let goalkeeperAppearances = 0; let goalkeeperConceded = 0; let wins = 0; let draws = 0; let losses = 0
     const goalkeeperRatings: RatingBreakdown[] = []
-    let sotAllowedTotal = 0; let sotAllowedAppearances = 0; let concededOnPitch = 0; let qualifyingGoalkeeperAppearances = 0; let qualifyingSaves = 0
+    let sotAllowedTotal = 0; let sotAllowedAppearances = 0; let concededOnPitch = 0; let qualifyingGoalkeeperMinutes = 0; let qualifyingGoalkeeperAppearances = 0; let qualifyingSaves = 0
     const recentForm: ('W' | 'D' | 'L')[] = []
     for (const match of playerMatches) {
       const appearance = match.appearances.find(item => item.playerId === player.id)
@@ -354,13 +355,15 @@ export function buildGlobalRankingData(
       // Ranking eligibility follows the historical match role, just like the
       // rating engine; a later transfer or role change cannot rewrite it.
       const playedPositions = matchPositionSegments(match, appearance).map(segment => segment.position)
-      const isDefender = playedPositions.some(defenderRankingPosition)
+      const defenderSegments = creditedPositionSegments(match, appearance).filter(segment => defenderRankingPosition(segment.position))
+      const defenderMinutes = defenderSegments.reduce((total, segment) => total + segment.exit - segment.enter, 0)
       const isGoalkeeper = playedPositions.some(goalkeeperPosition)
-      if (window && isDefender && rating.minutes >= 60) {
-        sotAllowedTotal += opponentSot(match, appearance.teamId)
+      if (window && defenderMinutes >= 60) {
+        sotAllowedTotal += defenderSegments.reduce((total, segment) => total + opponentSotExposureForPositionSegment(match, appearance, segment.position, segment.enter, segment.exit), 0)
         sotAllowedAppearances++
       }
       if (window && isGoalkeeper && goalkeeper.minutes >= 60) {
+        qualifyingGoalkeeperMinutes += goalkeeper.minutes
         qualifyingGoalkeeperAppearances++
         qualifyingSaves += matchSaves
         concededOnPitch += goalkeeper.conceded
@@ -378,7 +381,7 @@ export function buildGlobalRankingData(
     const playedGoalkeeper = goalkeeperAppearances > 0
     const per90 = (value: number) => stats.minutes ? value / stats.minutes * 90 : 0
     const value = _metric === 'goals' ? stats.goals : _metric === 'assists' ? stats.assists : _metric === 'g+a' ? stats.goals + stats.assists : _metric === 'minutes' ? stats.minutes : _metric === 'mom' ? stats.mom : _metric === 'goodMatches' ? stats.goodMatches : _metric === 'goals/90' ? per90(stats.goals) : _metric === 'assists/90' ? per90(stats.assists) : _metric === 'g+a/90' ? per90(stats.goals + stats.assists) : stats.avgRating
-    return [{ ...stats, value, historicalTeamId: latest?.appearances.find(item => item.playerId === player.id)?.teamId, playedGoalkeeper, sotAllowedAppearances, sotAllowedTotal, concededOnPitch, qualifyingGoalkeeperAppearances, qualifyingSaves, cleanSheets, goalkeeperRatings, goalkeeperMinutes, goalkeeperAppearances, goalkeeperConceded, scopedPositionFamily: historicalPositionFamilies.get(player.id) }]
+    return [{ ...stats, value, historicalTeamId: latest?.appearances.find(item => item.playerId === player.id)?.teamId, playedGoalkeeper, sotAllowedAppearances, sotAllowedTotal, concededOnPitch, qualifyingConceded: concededOnPitch, qualifyingGoalkeeperMinutes, qualifyingGoalkeeperAppearances, qualifyingSaves, cleanSheets, goalkeeperRatings, goalkeeperMinutes, allGoalkeeperMinutes: goalkeeperMinutes, goalkeeperAppearances, goalkeeperConceded, scopedPositionFamily: historicalPositionFamilies.get(player.id) }]
   })
   const presented = presentMetric(rows, _metric)
   byFilter.set(cacheKey, { rows, presented: new Map([[_metric, presented]]) })
@@ -414,8 +417,8 @@ export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Pla
       case 'sotAllowed': return row.sotAllowedAppearances ? (row.sotAllowedTotal ?? 0) / row.sotAllowedAppearances : Number.NaN
       case 'cleanSheets': return row.cleanSheets ?? 0
       case 'saves': return row.saves
-      case 'goalsConceded': return row.qualifyingGoalkeeperAppearances ? (row.concededOnPitch ?? 0) / row.qualifyingGoalkeeperAppearances : Number.NaN
-      case 'savePercentage': { const saves = row.qualifyingSaves ?? 0; const denominator = saves + (row.concededOnPitch ?? 0); return denominator ? saves / denominator * 100 : Number.NaN }
+      case 'goalsConceded': return row.qualifyingGoalkeeperAppearances ? (row.qualifyingConceded ?? 0) / row.qualifyingGoalkeeperAppearances : Number.NaN
+      case 'savePercentage': { const saves = row.qualifyingSaves ?? 0; const denominator = saves + (row.qualifyingConceded ?? 0); return denominator ? saves / denominator * 100 : Number.NaN }
     }
   }
   const ranked = rows.flatMap(row => {
@@ -552,8 +555,7 @@ type SeasonParticipation = {
 }
 
 function matchRecordedForTeam(match: Match, teamId: string): boolean {
-  return match.teamId === teamId ||
-    (!match.teamId && (match.homeTeamId === teamId || match.awayTeamId === teamId))
+  return isRecordedForTeam(match, teamId)
 }
 
 /** A bench listing is not an appearance until the player has a recorded sub-on. */
@@ -670,7 +672,7 @@ export function bestEleven(
 }
 
 export function teamMatches(matches: Match[], teamId: string): Match[] {
-  return newestMatches(matches.filter((m) => m.homeTeamId === teamId || m.awayTeamId === teamId))
+  return newestMatches(matches.filter((match) => isRecordedForTeam(match, teamId)))
 }
 
 export function latestTeamMatch(matches: Match[], teamId: string, season: string): Match | undefined {

@@ -29,15 +29,15 @@ import { seasonsFromMatches } from './engine/stats'
 import { useAuth } from './lib/auth'
 import { isSupabaseConfigured } from './lib/supabase'
 import { AuthEntryScreen } from './screens/AuthEntryScreen'
-import { loadLastRoute, saveLastRoute } from './lib/lastRoute'
+import { loadLastNavigationEntry, saveLastRoute } from './lib/lastRoute'
 import { canUseApp, shouldRestoreLastRoute, startupScreen } from './lib/startup'
 import { BootstrapShell, StartupRecovery } from './components/StartupBoundary'
-import { emptyFilters, type RankingFilters } from './screens/RankingFilters'
 import { appContentOverflowClass } from './lib/routeLayout'
 import { loadLocalModePreference, saveLocalModePreference } from './lib/localMode'
 import { backFromTeamDetailEntries, closeTransientWorkflow, completeTransientWorkflowToBrowse, createNavigationEntry, enterTransientWorkflow, navigateBrowseEntry, popNavigationEntry, replaceNavigationEntry, resetNavigationEntries, updateCurrentScreenState } from './lib/navigation'
 import { restoreScrollWhenReachable } from './lib/scrollRestoration'
 import { resetCompetitionTypeScroll } from './lib/competitionTypeScroll'
+import { resolvePlayerDestination } from './lib/playerNavigation'
 
 export default function App() {
   const { user, loading, startupError, signInWithGoogle, retryStartup } = useAuth()
@@ -47,7 +47,6 @@ export default function App() {
   const seasons = [...new Set([...seasonsFromMatches(matches), ...competitionStates.map(state => state.season), ...completedNextSeasons])].sort((a, b) => Number(b.match(/\d+/)?.[0] ?? 0) - Number(a.match(/\d+/)?.[0] ?? 0))
   const [season, setSeason] = useState(seasons[0] ?? 'Season 1')
   const [history, setHistory] = useState<NavigationEntry[]>([createNavigationEntry({ name: 'home' })])
-  const [playerFilters, setPlayerFilters] = useState<RankingFilters>(emptyFilters)
   const [localOnly, setLocalOnly] = useState(loadLocalModePreference)
   const [routeRestored, setRouteRestored] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -64,14 +63,14 @@ export default function App() {
   useEffect(() => {
     if (!shouldRestoreLastRoute(startup)) return
     restoreScroll.current = true
-    setHistory([createNavigationEntry(loadLastRoute(store))])
+    setHistory([loadLastNavigationEntry(store)])
     setRouteRestored(true)
   }, [startup, store])
 
   useEffect(() => {
     if (!routeRestored || loading || !canUseApp(startup)) return
-    saveLastRoute(view, store.draftMatch)
-  }, [routeRestored, loading, startup, view, store.draftMatch])
+    saveLastRoute(view, store.draftMatch, undefined, entry.screenState)
+  }, [routeRestored, loading, startup, view, entry.screenState, store.draftMatch])
 
   // Logging out must not leave a previously authenticated in-memory route ready
   // to reappear after the next sign-in. Persistent route state is cleared by
@@ -120,9 +119,16 @@ export default function App() {
 
   function onNavigate(next: View) {
     restoreScroll.current = true
-    setHistory((prev) => next.name === 'new-match' || next.name === 'edit-match'
-      ? enterTransientWorkflow(prev, next, scrollRef.current?.scrollTop ?? 0)
-      : navigateBrowseEntry(prev, next, scrollRef.current?.scrollTop ?? 0))
+    setHistory((prev) => {
+      const scrollTop = scrollRef.current?.scrollTop ?? 0
+      if (next.name === 'new-match' || next.name === 'edit-match') return enterTransientWorkflow(prev, next, scrollTop)
+      if (next.name === 'player') {
+        const current = prev[prev.length - 1]
+        const destination = resolvePlayerDestination(next, current.view, current.screenState, season, matches)
+        return navigateBrowseEntry(prev, destination.view, scrollTop, destination.screenState)
+      }
+      return navigateBrowseEntry(prev, next, scrollTop)
+    })
   }
 
   function onBack() {
@@ -206,12 +212,12 @@ export default function App() {
           {view.name === 'season-recap' && <SeasonRecapScreen season={view.season} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'season-highlight' && <SeasonHighlightScreen season={view.season} kind={view.kind} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'chemistry' && <ChemistryScreen season={season} onNavigate={onNavigate} onBack={onBack} />}
-          {view.name === 'comparison' && <ComparisonScreen season={view.season ?? season} screenState={entry.screenState as ScreenStateByView['comparison']} onStateChange={onStateChange} onNavigate={onNavigate} />}
+          {view.name === 'comparison' && <ComparisonScreen season={(entry.screenState as ScreenStateByView['comparison']).season ?? view.season ?? season} screenState={entry.screenState as ScreenStateByView['comparison']} onStateChange={onStateChange} onNavigate={onNavigate} />}
 
           {view.name === 'teams' && <TeamsScreen season={season} onNavigate={onNavigate} />}
           {view.name === 'team' && <TeamDetailScreen teamId={view.id} season={season} screenState={entry.screenState as ScreenStateByView['team']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onTeamDetailBack} />}
           {view.name === 'import-squad' && <SquadImportScreen teamId={view.teamId} onBack={onBack} />}
-          {view.name === 'players' && <PlayersScreen screenState={entry.screenState as ScreenStateByView['players']} onStateChange={onStateChange} onNavigate={onNavigate} appliedFilters={playerFilters} onFiltersChange={setPlayerFilters} />}
+          {view.name === 'players' && <PlayersScreen screenState={entry.screenState as ScreenStateByView['players']} onStateChange={onStateChange} onNavigate={onNavigate} />}
 
           {view.name === 'player' && (
             <PlayerDetailScreen playerId={view.id} season={view.season ?? season} screenState={entry.screenState as ScreenStateByView['player']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} />

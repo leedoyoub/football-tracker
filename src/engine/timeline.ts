@@ -57,6 +57,15 @@ export function positionChangeOrder(change: PositionChange, appearance: Appearan
   return (sameMinute.length ? order.get(sameMinute[0].event)! : 0) - .5
 }
 
+/** Preserve every saved move, including multiple moves in one minute. */
+export function orderedPositionChanges(appearance: Pick<Appearance, 'playerId' | 'teamId' | 'positionHistory'>, events: MatchEvent[]): PositionChange[] {
+  const rows = orderRawEvents({ events } as Match)
+  const order = new Map(rows.map((row, index) => [row.event, index]))
+  return (appearance.positionHistory ?? []).map((change, index) => ({ change, index, order: positionChangeOrder(change, appearance as Appearance, rows, order) }))
+    .sort((a, b) => a.change.minute - b.change.minute || a.order - b.order || (a.change.sequence ?? Infinity) - (b.change.sequence ?? Infinity) || a.index - b.index)
+    .map(row => row.change)
+}
+
 function positionFor(interval: PitchInterval, changes: Change[], minute: number, order = Infinity): Position {
   let position = interval.position
   for (const change of changes) {
@@ -82,7 +91,7 @@ export function normalizeMatchTimeline(match: Match, revision = RATING_ENGINE_RE
     const changes = (appearance.positionHistory ?? []).flatMap((change, index): Change[] => {
       const position = normalizeMatchPosition(change.position)
       return position && Number.isFinite(change.minute) && change.minute >= 0 && change.minute <= end ? [{ minute: change.minute, position, index, order: positionChangeOrder(change, appearance, events, order) }] : []
-    }).sort((a, b) => a.minute - b.minute || a.order - b.order || a.index - b.index)
+    }).sort((a, b) => a.minute - b.minute || a.order - b.order || (appearance.positionHistory?.[a.index].sequence ?? Infinity) - (appearance.positionHistory?.[b.index].sequence ?? Infinity) || a.index - b.index)
     const intervals: PitchInterval[] = []
     let active: PitchInterval | undefined = appearance.role === 'starter' ? { enter: 0, exit: end, position: initial } : undefined
     for (const { event } of events) {
@@ -108,6 +117,7 @@ export function normalizeMatchTimeline(match: Match, revision = RATING_ENGINE_RE
   return value
 }
 export function orderedEvents(match: Match): OrderedEvent[] { return normalizeMatchTimeline(match).events }
+export function orderedEventList(events: MatchEvent[]): MatchEvent[] { return orderRawEvents({ events } as Match).map(row => row.event) }
 export function eventIndex(match: Match, event: MatchEvent): number { const index = match.events.indexOf(event); return index >= 0 ? index : match.events.findIndex(row => row.id === event.id) }
 export function compareEvents(match: Match, left: MatchEvent, right: MatchEvent): number {
   const timeline = normalizeMatchTimeline(match)

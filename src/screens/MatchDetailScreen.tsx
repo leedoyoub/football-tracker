@@ -1,7 +1,9 @@
 import { Pitch } from '../components/Pitch'
 import { MatchTimeline } from '../components/MatchTimeline'
 import { formatDate, SubstitutePlayerCard } from '../components/ui'
-import { getMatchManOfTheMatch, matchScore, rateMatch } from '../engine/rating'
+import { getMatchManOfTheMatch, rateMatch } from '../engine/rating'
+import { recordedOpponentId, recordedTeamId, teamPerspectiveScore } from '../engine/matchPerspective'
+import { orderedEvents } from '../engine/timeline'
 import { assignmentSnapshotForMatch, formatCompetitionContext } from '../engine/competitionContext'
 import { matchStory } from '../engine/matchStory'
 import { matchChangesForMatch } from '../engine/matchChanges'
@@ -64,17 +66,17 @@ export function MatchDetailScreen({ matchId, screenState, onStateChange, onNavig
   const match = matches.find(item => item.id === matchId)
   const derived = useMemo(() => measureInDevelopment('Match Detail base read model', () => {
     if (!match) return null
-    const teamId = match.teamId ?? (teams.some(team => team.id === match.homeTeamId) ? match.homeTeamId : match.awayTeamId)
+    const teamId = recordedTeamId(match)
     const team = teams.find(item => item.id === teamId)
-    const opponent = match.opponentName ?? teams.find(item => item.id === (match.homeTeamId === teamId ? match.awayTeamId : match.homeTeamId))?.shortName ?? 'OPP'
-    const score = matchScore(match); const isHome = match.homeTeamId === teamId
+    const opponent = match.opponentName ?? teams.find(item => item.id === recordedOpponentId(match))?.shortName ?? 'OPP'
+    const perspective = teamPerspectiveScore(match, teamId)
     const byId = Object.fromEntries(players.map(player => [player.id, player])) as Record<string, Player>
     const ratings = Object.fromEntries(rateMatch(match, players).map(rating => [rating.playerId, rating]))
     const starters = match.appearances.filter(appearance => appearance.teamId === teamId && appearance.role === 'starter')
     const bench = match.appearances.filter(appearance => appearance.teamId === teamId && appearance.role === 'bench').sort((a, b) => (positionOrder[a.position] ?? 99) - (positionOrder[b.position] ?? 99))
-    const substitutions = match.events.filter((event): event is Extract<MatchEvent, { type: 'sub' }> => event.type === 'sub' && event.teamId === teamId)
+    const substitutions = orderedEvents(match).map(row => row.event).filter((event): event is Extract<MatchEvent, { type: 'sub' }> => event.type === 'sub' && event.teamId === teamId)
     const kickoff = kickoffLineupForMatch(match, teamId)
-    return { teamId, team, opponent, ours: isHome ? score.home : score.away, theirs: isHome ? score.away : score.home, byId, ratings, sortedRatings: Object.values(ratings).sort((a, b) => b.raw - a.raw || a.playerId.localeCompare(b.playerId)), momId: getMatchManOfTheMatch(match, players), story: matchStory(match, players), starters, bench, substitutions, orderedRatingAppearances: orderMatchDetailAppearances([...starters, ...bench], ratings), outMinutesByPlayer: Object.fromEntries(substitutions.map(event => [event.playerOutId, event.minute])), slots: kickoff.map((slot): Best11Slot => ({ slot: slot.id, position: slot.ratingPosition ?? slot.matchPosition, matchPosition: slot.ratingPosition ?? slot.matchPosition, displayPosition: slot.displayPosition, playerId: slot.playerId, teamId, avgRating: ratings[slot.playerId ?? '']?.rating ?? 0, matches: ratings[slot.playerId ?? ''] ? 1 : 0, x: slot.x, y: slot.y })) }
+    return { teamId, team, opponent, ours: perspective?.goalsFor ?? 0, theirs: perspective?.goalsAgainst ?? 0, byId, ratings, sortedRatings: Object.values(ratings).sort((a, b) => b.raw - a.raw || a.playerId.localeCompare(b.playerId)), momId: getMatchManOfTheMatch(match, players), story: matchStory(match, players), starters, bench, substitutions, orderedRatingAppearances: orderMatchDetailAppearances([...starters, ...bench], ratings), outMinutesByPlayer: Object.fromEntries(substitutions.map(event => [event.playerOutId, event.minute])), slots: kickoff.map((slot): Best11Slot => ({ slot: slot.id, position: slot.ratingPosition ?? slot.matchPosition, matchPosition: slot.ratingPosition ?? slot.matchPosition, displayPosition: slot.displayPosition, playerId: slot.playerId, teamId, avgRating: ratings[slot.playerId ?? '']?.rating ?? 0, matches: ratings[slot.playerId ?? ''] ? 1 : 0, x: slot.x, y: slot.y })) }
   }), [match, players, teams])
   if (!match || !derived) return <div className="p-6 text-sm text-zinc-400">Match not found.</div>
   const { teamId, team, opponent, ours, theirs, byId, ratings, sortedRatings, momId, story, starters, bench, substitutions, orderedRatingAppearances, outMinutesByPlayer, slots } = derived

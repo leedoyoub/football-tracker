@@ -2,9 +2,11 @@ import type { CompetitionType, Match } from '../types'
 import { LEAGUE_MATCHES_PER_TEAM } from './leagueFormat'
 import { competitionIdentityForMatch } from './competitionContext'
 import { oldestMatches } from './matchChronology'
+import { firstMissingLeagueSlot, leagueSlotCounts } from './leagueSlots'
+import { isRecordedForTeam } from './matchPerspective'
 
 export function getTeamMatches(matches: Match[], teamId: string): Match[] {
-  return oldestMatches(matches.filter((m) => m.teamId === teamId || (!m.teamId && (m.homeTeamId === teamId || m.awayTeamId === teamId))))
+  return oldestMatches(matches.filter((match) => isRecordedForTeam(match, teamId)))
 }
 
 /** MatchDay is a competition-scoped schedule number, never actual chronology. */
@@ -12,7 +14,7 @@ export function getNextMatchDayForTeam(teamId: string, matches: Match[], complet
   const teamMatches = getTeamMatches(matches, teamId)
   if (targetSeason) {
     const scopedDays = teamMatches.filter(match => match.season === targetSeason && competitionIdentityForMatch(match).competitionType === competitionType).map(match => competitionIdentityForMatch(match).matchDay).filter(Number.isInteger)
-    const next = Math.max(0, ...scopedDays) + 1
+    const next = competitionType === 'league' ? firstMissingLeagueSlot(leagueSlotCounts(teamMatches, targetSeason).get(teamId)) : Math.max(0, ...scopedDays) + 1
     return { season: targetSeason, matchDay: competitionType === 'league' ? Math.min(next, LEAGUE_MATCHES_PER_TEAM) : next }
   }
   if (teamMatches.length === 0) {
@@ -31,6 +33,6 @@ export function getNextMatchDayForTeam(teamId: string, matches: Match[], complet
     .filter(match => match.season === lastMatch.season && competitionIdentityForMatch(match).competitionType === competitionType)
     .map(match => competitionIdentityForMatch(match).matchDay)
     .filter(Number.isInteger)
-  const next = Math.max(0, ...competitionMatchDays) + 1
+  const next = competitionType === 'league' ? firstMissingLeagueSlot(leagueSlotCounts(teamMatches, lastMatch.season).get(teamId)) : Math.max(0, ...competitionMatchDays) + 1
   return { season: `Season ${lastSeasonNum}`, matchDay: competitionType === 'league' ? Math.min(next, LEAGUE_MATCHES_PER_TEAM) : next }
 }

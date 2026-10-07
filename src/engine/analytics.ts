@@ -1,5 +1,5 @@
 import { creditedPositionSegments, hasPitchAppearance, isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchScore, ratePlayerMatch } from './rating'
-import { opponentSot } from './opponentSot'
+import { opponentSot, opponentSotExposure } from './opponentSot'
 import { isPlayerAssistEvent, isPlayerGoalEvent, playerAssistEvents, playerGoalEvents } from './playerMatchFacts'
 import type { Match, Player, Position } from '../types'
 
@@ -94,7 +94,7 @@ function buildCombination(match: Match, playerIds: string[], teamId: string, rol
     startingGoalInvolvements += Number(contribution.goals + contribution.assists > 0)
   }
   const onPitchGoalDifference = goalsFor - goalsAgainst
-  const weightedOpponentSot = opponentSot(match, teamId) * togetherMinutes / 90
+  const weightedOpponentSot = overlap.reduce((total, interval) => total + opponentSotExposure(match, teamId, interval.start, interval.end), 0)
   return { togetherMinutes, matches: 1, startsTogether, goalsFor, goalsAgainst, weightedOpponentSot, onPitchGoalsFor: goalsFor, onPitchGoalsAgainst: goalsAgainst, onPitchGoalDifference, onPitchGoalsForPer90: goalsFor / togetherMinutes * 90, onPitchGoalsAgainstPer90: goalsAgainst / togetherMinutes * 90, onPitchGoalDifferencePer90: onPitchGoalDifference / togetherMinutes * 90, startingGoalsFor: startsTogether ? ours : 0, startingGoalsAgainst: startsTogether ? theirs : 0, startingCombinedGA, startingGoalInvolvements, startingOpponentSot: startsTogether ? opponentSot(match, teamId) : 0, startingWins: startsTogether && ours > theirs ? 1 : 0, startingDraws: startsTogether && ours === theirs ? 1 : 0, startingLosses: startsTogether && ours < theirs ? 1 : 0, startingCleanSheets: startsTogether && theirs === 0 ? 1 : 0, goalDifference: onPitchGoalDifference, combinedGoals, combinedAssists, combinedGA: combinedGoals + combinedAssists, averageRating: ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 0, wins: ours > theirs ? 1 : 0, draws: ours === theirs ? 1 : 0, losses: ours < theirs ? 1 : 0, cleanSheets: goalsAgainst === 0 ? 1 : 0 }
 }
 
@@ -166,6 +166,10 @@ export type PlayerChemistry = {
   results?: CombinationStats
 }
 
+export function startingPPG(row: Pick<CombinationStats, 'startingWins' | 'startingDraws' | 'startsTogether'>): number {
+  return row.startsTogether ? (row.startingWins * 3 + row.startingDraws) / row.startsTogether : 0
+}
+
 /** Evidence-first chemistry: direct links, relevant positional overlap, then
  * team outcomes when starting together. There is deliberately no opaque score. */
 export function playerChemistry(player: Player, players: Player[], matches: Match[], filter: AnalyticsFilter, scopedPosition: string = player.position): PlayerChemistry {
@@ -188,7 +192,7 @@ export function playerChemistry(player: Player, players: Player[], matches: Matc
     return (positionalKind === 'cb' || positionalKind === 'fullback' ? leftValue - rightValue : rightValue - leftValue) || right.startsTogether - left.startsTogether || left.key.localeCompare(right.key)
   })[0]
   const results = duoRows.slice().sort((left, right) => {
-    const leftPpg = (left.wins * 3 + left.draws) / Math.max(left.startsTogether, 1); const rightPpg = (right.wins * 3 + right.draws) / Math.max(right.startsTogether, 1)
+    const leftPpg = startingPPG(left); const rightPpg = startingPPG(right)
     return rightPpg - leftPpg || right.startsTogether - left.startsTogether || right.goalDifference - left.goalDifference || left.key.localeCompare(right.key)
   })[0]
   return { direct: bestDirect, positional, results }

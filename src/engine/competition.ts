@@ -1,9 +1,11 @@
-import { matchScore, rateMatch } from './rating'
+import { rateMatch } from './rating'
 import { opponentSot } from './opponentSot'
 import { compareStandings, sameStandingMetrics, seasonStandings, type Standing, type StandingTieMetrics } from './standings'
 import { LEAGUE_MATCHES_PER_TEAM } from './leagueFormat'
+import { firstMissingLeagueSlot, hasCompleteLeagueSlots, leagueSlotCounts } from './leagueSlots'
 import type { ChampionsStage, CompetitionStage, CompetitionState, CompetitionType, CupStage, Match, Player, Team } from '../types'
 import { competitionIdentityForMatch, matchCompetitionStage, matchCompetitionType, normalizeMatchCompetitionIdentity } from './competitionContext'
+import { teamsCreditedWithResult, teamPerspectiveScore } from './matchPerspective'
 
 export const CUP_STAGES: CupStage[] = ['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'stage6', 'stage7']
 export const CHAMPIONS_ROUNDS: Exclude<ChampionsStage, 'finalReplay'>[] = ['roundOf16', 'quarterFinal', 'semiFinal', 'final']
@@ -28,7 +30,7 @@ export function competitionStageMatches(matches: Match[], season: string, type: 
 }
 
 function hasPlayed(match: Match, teamId: string): boolean {
-  return match.homeTeamId === teamId || match.awayTeamId === teamId || match.teamId === teamId
+  return teamsCreditedWithResult(match).includes(teamId)
 }
 
 function sameStanding(a?: Standing, b?: Standing): boolean {
@@ -60,9 +62,9 @@ export function reconcileChampionsPairingIds(matches: Match[], states: Competiti
 export function leagueCompetition(teams: Team[], matches: Match[], season: string, players: Player[] = []) {
   const games = competitionMatches(matches, season, 'league')
   const standings = stageRanking(teams.map(team => team.id), games, season, players, `${season}:league`)
-  const minimumTeamMatches = standings.length ? Math.min(...standings.map(row => row.played)) : 0
-  const matchdayProgress = Math.min(minimumTeamMatches + 1, LEAGUE_MATCHES_PER_TEAM)
-  const complete = standings.length > 0 && minimumTeamMatches >= LEAGUE_MATCHES_PER_TEAM
+  const slots = leagueSlotCounts(games, season)
+  const matchdayProgress = teams.length ? Math.min(...teams.map(team => firstMissingLeagueSlot(slots.get(team.id)))) : 1
+  const complete = teams.length > 0 && teams.every(team => hasCompleteLeagueSlots(slots.get(team.id)))
   return { standings, matches: games, matchdayProgress, complete, championId: complete ? standings[0]?.teamId : undefined }
 }
 
@@ -249,16 +251,17 @@ function comparePair(teamIds: [string, string], games: Match[], players: Player[
 }
 
 function scoreForTeam(match: Match, teamId: string) {
-  const score = matchScore(match)
-  const home = match.homeTeamId === teamId || (match.teamId === teamId && match.homeTeamId !== teamId)
-  const goalsFor = home ? score.home : score.away
-  const goalsAgainst = home ? score.away : score.home
+  const perspective = teamPerspectiveScore(match, teamId)
+  if (!perspective) return undefined
+  const goalsFor = perspective.goalsFor
+  const goalsAgainst = perspective.goalsAgainst
   return { goalsFor, goalsAgainst, result: goalsFor > goalsAgainst ? 2 : goalsFor === goalsAgainst ? 1 : 0 }
 }
 
 /** Canonical per-row Champions comparison. Pairings compare independent team matches, never a direct fixture. */
-export function compareChampionsSeriesRow(firstId: string, first: Match, secondId: string, second: Match, players: Player[]): string {
+export function compareChampionsSeriesRow(firstId: string, first: Match, secondId: string, second: Match, players: Player[]): string | undefined {
   const left = scoreForTeam(first, firstId), right = scoreForTeam(second, secondId)
+  if (!left || !right) return undefined
   const rating = (match: Match, teamId: string) => averageTeamRating(teamId, [match], players)
   const order = [
     left.result - right.result,
@@ -358,7 +361,7 @@ function makeRound(stage: Exclude<ChampionsStage, 'finalReplay'>, teamIds: strin
       const pairing = pairById.get(id)!
       const repaired = repairChampionsPairing(match, stage, pairing.pair, id, draw)
       if (repaired) gamesByPairing.get(id)!.push(repaired)
-      else if (hasPlayed(match, pairing.pair[0]) || hasPlayed(match, pairing.pair[1])) ambiguousPairings.add(id)
+      else if ([match.teamId, match.homeTeamId, match.awayTeamId].some(teamId => pairing.pair.includes(teamId ?? ''))) ambiguousPairings.add(id)
     }
   }
 
@@ -419,8 +422,8 @@ function championsStageLabel(stage: ChampionsStage): string {
 
 export function competitionAssignment(type: CompetitionType, season: string, teamId: string, teams: Team[], matches: Match[], draw?: CompetitionState, players: Player[] = []): CompetitionAssignment {
   if (type === 'league') {
-    const played = competitionMatches(matches, season, 'league').filter(match => hasPlayed(match, teamId)).length
-    return played >= LEAGUE_MATCHES_PER_TEAM ? { available: false, stage: 'regular' as const, message: 'This team has completed its 30-match League schedule.' } : { available: true, stage: 'regular' as const }
+    const complete = hasCompleteLeagueSlots(leagueSlotCounts(matches, season).get(teamId))
+    return complete ? { available: false, stage: 'regular' as const, message: 'This team has completed its 30-match League schedule.' } : { available: true, stage: 'regular' as const }
   }
   if (type === 'cup') {
     const cup = cupCompetition(teams, matches, season, players)
@@ -609,10 +612,9 @@ const cupStageLabel = (stage: CupStage) => stage === 'final' ? 'Final' : stage =
  * Champions comparison opponents are never used as a score source. */
 export function teamCompetitionGoals(teamId: string, matches: Match[], season: string, type: CompetitionType) {
   return competitionMatches(matches, season, type).reduce((total, match) => {
-    if (!hasPlayed(match, teamId)) return total
-    const score = matchScore(match)
-    const home = match.homeTeamId === teamId || (match.teamId === teamId && match.homeTeamId !== teamId)
-    return { goalsFor: total.goalsFor + (home ? score.home : score.away), goalsAgainst: total.goalsAgainst + (home ? score.away : score.home) }
+    const perspective = teamPerspectiveScore(match, teamId)
+    if (!perspective) return total
+    return { goalsFor: total.goalsFor + perspective.goalsFor, goalsAgainst: total.goalsAgainst + perspective.goalsAgainst }
   }, { goalsFor: 0, goalsAgainst: 0 })
 }
 

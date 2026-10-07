@@ -11,7 +11,7 @@ const { STORAGE_KEY } = require('../src/lib/repository.ts')
 
 const expectedIds = ['real-madrid', 'barcelona', 'atletico-madrid', 'inter-miami', 'manchester-united', 'manchester-city', 'liverpool', 'arsenal', 'chelsea', 'tottenham-hotspur', 'bayern-munich', 'borussia-dortmund', 'ac-milan', 'inter-milan', 'juventus', 'paris-saint-germain']
 
-test('v2.4.7 exposes exactly the approved catalog order and retains catalog identities', () => {
+test('v2.4.8 exposes exactly the approved catalog order and retains catalog identities', () => {
   assert.deepEqual(STATIC_TEAMS.map(team => team.id), expectedIds)
   const interMiami = STATIC_TEAMS[3]
   assert.deepEqual([interMiami.id, interMiami.externalTeamId, interMiami.name, interMiami.abbreviation], ['inter-miami', 9568, 'Inter Miami CF', 'MIA'])
@@ -19,9 +19,9 @@ test('v2.4.7 exposes exactly the approved catalog order and retains catalog iden
   assert.strictEqual(currentStaticTeams([saved])[0], saved)
 })
 
-test('v2.4.7 aligns version sources with rating revision 12 and unchanged storage key', () => {
-  assert.equal(APP_VERSION, '2.4.7')
-  assert.equal(require('../package.json').version, '2.4.7')
+test('v2.4.8 aligns version sources with rating revision 12 and unchanged storage key', () => {
+  assert.equal(APP_VERSION, '2.4.8')
+  assert.equal(require('../package.json').version, '2.4.8')
   assert.equal(RATING_ENGINE_REVISION, 12)
   assert.equal(STORAGE_KEY, 'football-tracker-v1')
 })

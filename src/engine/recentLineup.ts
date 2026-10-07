@@ -2,10 +2,11 @@
 import type { Match } from '../types.ts'
 import { kickoffLineupForMatch, validateKickoffLineup } from './kickoffLineup.ts'
 import { newestMatches } from './matchChronology.ts'
+import { isRecordedForTeam } from './matchPerspective.ts'
 
 export function getMostRecentStartingLineup(matches: Match[], teamId: string): Record<string, string> | null {
   const teamMatches = newestMatches(matches
-    .filter((m) => m.teamId === teamId || (!m.teamId && (m.homeTeamId === teamId || m.awayTeamId === teamId))))
+    .filter((match) => isRecordedForTeam(match, teamId)))
 
   for (const match of teamMatches) {
     const kickoff = kickoffLineupForMatch(match, teamId)

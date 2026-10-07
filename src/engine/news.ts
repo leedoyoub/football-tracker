@@ -4,10 +4,12 @@ import { currentStaticTeams } from '../data/teams'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import type { CompetitionState, CompetitionType, EventSurface, Match, MatchChangePayload, Player, Team } from '../types'
-import { oldestMatches } from './matchChronology'
+import { newestMatches, oldestMatches } from './matchChronology'
 import { buildSeasonAnalytics, rankingMovement } from './seasonAnalytics'
 import { hasPitchAppearance, isOnPitchAtEvent } from './timeline'
 import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts } from './playerMatchFacts'
+import { teamsCreditedWithResult, teamPerspectiveScore } from './matchPerspective'
+import { positionFamily } from './positionScope'
 
 export type NewsKind = 'player' | 'match' | 'team'
 export type NewsImportance = 'major' | 'medium' | 'minor'
@@ -263,7 +265,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
       const contributions = performance.goals + performance.assists
       const matchRating = ratePlayerMatch(match, player)?.rating ?? 0
       const isSubstitute = appearance.role === 'bench' && match.events.some(event => event.type === 'sub' && event.playerInId === player.id)
-      const isDefender = ['CB', 'LCB', 'RCB', 'LB', 'LWB', 'RB', 'RWB'].includes(appearance.position)
+      const isDefender = ['CB', 'LB', 'RB'].includes(positionFamily(appearance.matchPosition ?? appearance.position) ?? '')
       let rare: { key: string; title: string } | undefined
       if (performance.goals >= 4) rare = { key: `goals-${performance.goals}`, title: `${playerName(players, player.id)} scores ${performance.goals} in one match` }
       else if (contributions >= 4) rare = { key: `contributions-${contributions}`, title: `${playerName(players, player.id)} delivers ${contributions} goal contributions` }
@@ -281,9 +283,10 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
       if (run.contribution === 5) add({ id: `streak:contribution:${match.id}:${player.id}:5`, kind: 'player', date: match.date, matchId: match.id, playerId: player.id, eyebrow: 'FORM STREAK', title: `${playerName(players, player.id)} contributes in 5 consecutive appearances`, detail: 'Goal or assist in each appearance.', context })
     }
 
-    for (const teamId of [match.homeTeamId, match.awayTeamId]) {
+    for (const teamId of teamsCreditedWithResult(match)) {
       if (!teams.some(team => team.id === teamId)) continue
-      const score = matchScore(match); const ours = teamId === match.homeTeamId ? score.home : score.away; const theirs = teamId === match.homeTeamId ? score.away : score.home
+      const perspective = teamPerspectiveScore(match, teamId)!
+      const ours = perspective.goalsFor; const theirs = perspective.goalsAgainst
       const key = `${match.season}:${teamId}`; const run = teamRuns.get(key) ?? { wins: 0, unbeaten: 0, cleanSheets: 0, seasonGoals: 0, seasonCleanSheets: 0 }
       const priorGoals = run.seasonGoals; const priorCleanSheets = run.seasonCleanSheets
       run.wins = ours > theirs ? run.wins + 1 : 0; run.unbeaten = ours >= theirs ? run.unbeaten + 1 : 0; run.cleanSheets = theirs === 0 ? run.cleanSheets + 1 : 0; run.seasonGoals += ours; run.seasonCleanSheets += Number(theirs === 0); teamRuns.set(key, run)
@@ -323,7 +326,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
       }
     }
     for (const award of analytics.monthlyAwards.values()) {
-      const finalMatch = analytics.leagueSnapshots.get(award.block.endMatchDay)?.matches.slice(-1)[0]
+      const finalMatch = newestMatches(analytics.leagueSnapshots.get(award.block.endMatchDay)?.matches ?? [])[0]
       const bestPlayerId = award.bestPlayerId
       if (!finalMatch || !bestPlayerId) continue
       for (const article of awardNewsFromResult(monthlyCanonicalAwardResult({ ...award, bestPlayerId }, finalMatch), id => playerName(players, id))) add(article)

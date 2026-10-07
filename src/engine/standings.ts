@@ -1,5 +1,5 @@
-import { matchScore } from './rating'
 import type { Match, Team } from '../types'
+import { teamPerspectiveScore, teamsCreditedWithResult } from './matchPerspective'
 
 export type Standing = {
   rank: number
@@ -54,7 +54,6 @@ export function seasonStandings(teams: Team[], matches: Match[], season: string)
 
   for (const match of matches) {
     if (match.season !== season) continue
-    const score = matchScore(match)
     const apply = (teamId: string, scored: number, conceded: number) => {
       const row = rows.get(teamId)
       if (!row) return
@@ -63,8 +62,10 @@ export function seasonStandings(teams: Team[], matches: Match[], season: string)
       else if (scored === conceded) { row.draws += 1; row.points += 1 }
       else row.losses += 1
     }
-    apply(match.homeTeamId, score.home, score.away)
-    apply(match.awayTeamId, score.away, score.home)
+    for (const teamId of teamsCreditedWithResult(match)) {
+      const perspective = teamPerspectiveScore(match, teamId)!
+      apply(teamId, perspective.goalsFor, perspective.goalsAgainst)
+    }
   }
 
   const ordered = [...rows.values()].map((row) => ({ ...row, goalDifference: row.goalsFor - row.goalsAgainst }))

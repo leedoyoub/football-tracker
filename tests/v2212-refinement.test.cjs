@@ -121,14 +121,14 @@ test('Match Changes keeps canonical labels atomic and prioritizes rare event ide
   assert.equal(presented[0].category, 'rare')
 })
 
-test('v2.4.7 keeps package, lockfile, app version, rating revision, and storage namespace aligned', () => {
+test('v2.4.8 keeps package, lockfile, app version, rating revision, and storage namespace aligned', () => {
   const { APP_VERSION } = require('../src/config.ts')
   const { RATING_ENGINE_REVISION } = require('../src/engine/ratingRevision.ts')
   const repository = fs.readFileSync(require.resolve('../src/lib/repository.ts'), 'utf8')
-  assert.equal(APP_VERSION, '2.4.7')
-  assert.equal(require('../package.json').version, '2.4.7')
-  assert.equal(require('../package-lock.json').version, '2.4.7')
-  assert.equal(require('../package-lock.json').packages[''].version, '2.4.7')
+  assert.equal(APP_VERSION, '2.4.8')
+  assert.equal(require('../package.json').version, '2.4.8')
+  assert.equal(require('../package-lock.json').version, '2.4.8')
+  assert.equal(require('../package-lock.json').packages[''].version, '2.4.8')
   assert.equal(RATING_ENGINE_REVISION, 12)
   assert(repository.includes("STORAGE_KEY = 'football-tracker-v1'"))
 })

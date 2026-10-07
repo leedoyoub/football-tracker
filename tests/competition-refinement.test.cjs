@@ -167,9 +167,9 @@ test('Records owns History, Trophy Cabinet and cached form Insights', () => {
 
 test('League completion does not roll the season; an explicit completion marker can', () => {
   const match = game('38', { stage: 'regular' })
-  assert.deepEqual(getNextMatchDayForTeam('T1', [match]), { season: 'Season 1', matchDay: 30 })
+  assert.deepEqual(getNextMatchDayForTeam('T1', [match]), { season: 'Season 1', matchDay: 1 })
   assert.deepEqual(getNextMatchDayForTeam('T1', [match], ['Season 1']), { season: 'Season 2', matchDay: 1 })
-  assert.deepEqual(getNextMatchDayForTeam('T1', [match, { ...match, id: 'cup-99', competitionType: 'cup', matchDay: 99 }]), { season: 'Season 1', matchDay: 30 })
+  assert.deepEqual(getNextMatchDayForTeam('T1', [match, { ...match, id: 'cup-99', competitionType: 'cup', matchDay: 99 }]), { season: 'Season 1', matchDay: 1 })
   const status = competition.competitionSeasonStatus(teams, [match], 'Season 1', [], undefined)
   assert.equal(status.complete, false)
 })
@@ -183,9 +183,9 @@ test('season completion is synchronized as backward-compatible CompetitionState 
   assert(validation.includes("'season-complete'"))
 })
 
-test('visible and package metadata version are exactly v2.4.7 / 2.4.7', () => {
-  assert.equal(APP_VERSION, '2.4.7')
-  assert.equal(require('../package.json').version, '2.4.7')
+test('visible and package metadata version are exactly v2.4.8 / 2.4.8', () => {
+  assert.equal(APP_VERSION, '2.4.8')
+  assert.equal(require('../package.json').version, '2.4.8')
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('v{APP_VERSION}'))
 })

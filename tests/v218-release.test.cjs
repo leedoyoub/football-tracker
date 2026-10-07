@@ -81,6 +81,6 @@ test('League and Cup standings share the complete deterministic tie-break order'
 test('v2.1.8 UI uses full score cells and full Best Player names', () => {
   const bracket = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
   const detail = fs.readFileSync(require.resolve('../src/screens/TeamDetailScreen.tsx'), 'utf8')
-  assert(bracket.includes('pairing.requiredMatches') && bracket.includes('`${home ? value.home : value.away}-${home ? value.away : value.home}`'))
+  assert(bracket.includes('pairing.requiredMatches') && bracket.includes('`${perspective.goalsFor}-${perspective.goalsAgainst}`'))
   assert(detail.includes('<RankingRow') && detail.includes("from '../components/RankingRow'"))
 })

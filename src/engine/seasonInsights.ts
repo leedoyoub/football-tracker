@@ -8,6 +8,7 @@ import type { CompetitionState, Match, MatchEvent, Player, Team } from '../types
 import { oldestMatches } from './matchChronology'
 import { matchCompetitionType } from './competitionContext'
 import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts } from './playerMatchFacts'
+import { orderedEvents } from './timeline'
 
 /** All season insight calculations live here so none of them require extra match input. */
 export const STARTING_XI_MIN_SAMPLE = 3
@@ -25,8 +26,7 @@ function scoredBy(event: GoalEvent, match: Match) {
 
 function goalsInOrder(match: Match): OrderedGoal[] {
   let home = 0; let away = 0
-  return match.events.map((event, index) => ({ event, index })).filter((item): item is { event: GoalEvent; index: number } => item.event.type === 'goal')
-    .sort((a, b) => a.event.minute - b.event.minute || a.index - b.index)
+  return orderedEvents(match).filter((item): item is { event: GoalEvent; index: number } => item.event.type === 'goal')
     .map(({ event, index }) => {
       const homeBefore = home; const awayBefore = away
       const scoringTeamId = scoredBy(event, match)

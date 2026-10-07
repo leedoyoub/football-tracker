@@ -3,12 +3,15 @@ import { GOOD_RATING_THRESHOLD } from './constants'
 import { playerAssistEvents, playerGoalEvents } from './playerMatchFacts'
 import { competitionMatches, leagueCompetition, matchCompetitionType } from './competition'
 import { LEAGUE_MATCHES_PER_TEAM } from './leagueFormat'
+import { leagueSlotTeamIds } from './leagueSlots'
 import { newestMatches } from './matchChronology'
-import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
+import { getMatchManOfTheMatch, ratePlayerMatch } from './rating'
+import { recordedTeamId, teamPerspectiveScore, teamsCreditedWithResult } from './matchPerspective'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { compareStandings, type Standing } from './standings'
 import type { LeaderboardMetric } from './stats'
 import { performanceAwardResult } from './awards'
+import { competitionIdentityForMatch } from './competitionContext'
 
 export type RankMovement = number | null
 export type RankedStanding = Standing & { movement: RankMovement }
@@ -77,9 +80,10 @@ export function canonicalBlockLabel(season: string, block: number): string {
   return `${season}-${block}`
 }
 
+const leagueDay = (match: Match) => competitionIdentityForMatch(match).matchDay
+
 function recordedTeams(match: Match, registered: Set<string>): string[] {
-  if (match.teamId && registered.has(match.teamId)) return [match.teamId]
-  return [match.homeTeamId, match.awayTeamId].filter(id => registered.has(id))
+  return leagueSlotTeamIds(match).filter(id => registered.has(id))
 }
 
 /** The sole League Matchday-completion rule. A Matchday is complete only when
@@ -87,12 +91,17 @@ function recordedTeams(match: Match, registered: Set<string>): string[] {
 export function isLeagueMatchdayComplete(teams: Team[], matches: Match[], season: string, matchDay: number): boolean {
   if (!teams.length || matchDay < 1 || matchDay > LEAGUE_MATCHES_PER_TEAM) return false
   const registered = new Set(teams.map(team => team.id))
-  const completed = new Set<string>()
+  const completed = new Map<string, number>()
   for (const match of matches) {
-    if (match.season !== season || matchCompetitionType(match) !== 'league' || match.matchDay !== matchDay) continue
-    for (const id of recordedTeams(match, registered)) completed.add(id)
+    if (match.season !== season || matchCompetitionType(match) !== 'league' || leagueDay(match) !== matchDay) continue
+    for (const id of recordedTeams(match, registered)) completed.set(id, (completed.get(id) ?? 0) + 1)
   }
-  return teams.every(team => completed.has(team.id))
+  return teams.every(team => completed.get(team.id) === 1)
+}
+
+function isMonthlyBlockComplete(teams: Team[], matches: Match[], season: string, block: MonthlyBlock): boolean {
+  for (let day = block.startMatchDay; day <= block.endMatchDay; day++) if (!isLeagueMatchdayComplete(teams, matches, season, day)) return false
+  return true
 }
 
 export function positionFamily(position: Position): 'GK' | 'CB' | 'LB' | 'RB' | 'CDM' | 'CM' | 'CAM' | 'WIDE' | 'ATT' {
@@ -122,13 +131,12 @@ function emptyStanding(teamId: string): Standing {
 
 function formTable(teams: Team[], leagueMatches: Match[]): Standing[] {
   const rows = teams.map(team => {
-    const recent = newestMatches(leagueMatches.filter(match => recordedTeams(match, new Set([team.id])).includes(team.id))).slice(0, 3)
+    const recent = newestMatches(leagueMatches.filter(match => teamsCreditedWithResult(match).includes(team.id))).slice(0, 3)
     const row = emptyStanding(team.id)
     for (const match of recent) {
-      const score = matchScore(match)
-      const home = match.homeTeamId === team.id
-      const scored = home ? score.home : score.away
-      const conceded = home ? score.away : score.home
+      const perspective = teamPerspectiveScore(match, team.id)!
+      const scored = perspective.goalsFor
+      const conceded = perspective.goalsAgainst
       row.played++; row.goalsFor += scored; row.goalsAgainst += conceded
       if (scored > conceded) { row.wins++; row.points += 3 } else if (scored === conceded) { row.draws++; row.points++ } else row.losses++
     }
@@ -153,7 +161,7 @@ function buildPlayerSnapshots(players: Player[], games: Match[]): Map<number, Pl
   const byPlayer = new Map(players.map(player => [player.id, player]))
   const result = new Map<number, PlayerRankingSnapshot>()
   for (let day = 1; day <= LEAGUE_MATCHES_PER_TEAM; day++) {
-    for (const match of games.filter(item => item.matchDay === day)) {
+    for (const match of games.filter(item => leagueDay(item) === day)) {
       const mom = getMatchManOfTheMatch(match, players)
       for (const appearance of match.appearances) {
         const player = byPlayer.get(appearance.playerId)
@@ -168,13 +176,13 @@ function buildPlayerSnapshots(players: Player[], games: Match[]): Map<number, Pl
         rows.set(player.id, row)
       }
     }
-    if (games.some(match => match.matchDay === day)) result.set(day, { matchDay: day, rows: clonePlayerRows(rows) })
+    if (games.some(match => leagueDay(match) === day)) result.set(day, { matchDay: day, rows: clonePlayerRows(rows) })
   }
   return result
 }
 
 function monthlyAwardsFor(block: MonthlyBlock, _teams: Team[], players: Player[], games: Match[], finalized: boolean): MonthlyAwards {
-  const selected = games.filter(match => match.matchDay >= block.startMatchDay && match.matchDay <= block.endMatchDay)
+  const selected = games.filter(match => leagueDay(match) >= block.startMatchDay && leagueDay(match) <= block.endMatchDay)
   const result = performanceAwardResult(players, selected, 'monthly')
   const candidates = result.candidates
   const ordered = candidates.map(candidate => ({ playerId: candidate.playerId, teamId: candidate.teamId, appearances: candidate.appearances, minutes: candidate.minutes, goals: candidate.goals, assists: candidate.assists, mom: candidate.mom, goodMatches: 0, ratingTotal: candidate.average * candidate.appearances, avgRating: candidate.average }))
@@ -194,7 +202,7 @@ export function monthlyAwardForBlock(teams: Team[], players: Player[], matches: 
   const block = monthlyBlockRange(blockId)
   if (!block) return undefined
   const leagueMatches = competitionMatches(matches, season, 'league')
-  if (!isLeagueMatchdayComplete(teams, leagueMatches, season, block.endMatchDay)) return undefined
+  if (!isMonthlyBlockComplete(teams, leagueMatches, season, block)) return undefined
   return monthlyAwardsFor(block, teams, players, leagueMatches, true)
 }
 
@@ -203,8 +211,8 @@ export function monthlyAwardForStartedBlock(teams: Team[], players: Player[], ma
   const block = monthlyBlockRange(blockId)
   if (!block) return undefined
   const leagueMatches = competitionMatches(matches, season, 'league')
-  if (!leagueMatches.some(match => match.matchDay >= block.startMatchDay && match.matchDay <= block.endMatchDay)) return undefined
-  return monthlyAwardsFor(block, teams, players, leagueMatches, isLeagueMatchdayComplete(teams, leagueMatches, season, block.endMatchDay))
+  if (!leagueMatches.some(match => leagueDay(match) >= block.startMatchDay && leagueDay(match) <= block.endMatchDay)) return undefined
+  return monthlyAwardsFor(block, teams, players, leagueMatches, isMonthlyBlockComplete(teams, leagueMatches, season, block))
 }
 
 function buildReview(day: number, snapshots: Map<number, LeagueSnapshot>, playerSnapshots: Map<number, PlayerRankingSnapshot>): MatchdayReview {
@@ -213,7 +221,7 @@ function buildReview(day: number, snapshots: Map<number, LeagueSnapshot>, player
   const previousRatings = playerSnapshots.get(day - 1)?.rows.get('rating') ?? []
   const previousValues = new Map(previousRatings.map(row => [row.playerId, row.ratingTotal]))
   const daily = ratings.map(row => ({ playerId: row.playerId, rating: row.ratingTotal - (previousValues.get(row.playerId) ?? 0) })).sort((a, b) => b.rating - a.rating || a.playerId.localeCompare(b.playerId))[0]
-  const biggestWin = snapshot?.matches.map(match => { const score = matchScore(match); return { matchId: match.id, margin: Math.abs(score.home - score.away) } }).sort((a, b) => b.margin - a.margin || a.matchId.localeCompare(b.matchId))[0]
+  const biggestWin = snapshot?.matches.flatMap(match => { const perspective = teamPerspectiveScore(match, recordedTeamId(match)); return perspective?.outcome === 'W' ? [{ matchId: match.id, margin: perspective.goalsFor - perspective.goalsAgainst }] : [] }).sort((a, b) => b.margin - a.margin || a.matchId.localeCompare(b.matchId))[0]
   const biggestMover = snapshot?.standings.filter(row => (row.movement ?? 0) > 0).sort((a, b) => (b.movement ?? 0) - (a.movement ?? 0) || a.teamId.localeCompare(b.teamId))[0]
   return { matchDay: day, highestRated: daily, biggestWin, biggestMover: biggestMover ? { teamId: biggestMover.teamId, movement: biggestMover.movement! } : undefined }
 }
@@ -225,14 +233,14 @@ export function buildSeasonAnalytics(teams: Team[], players: Player[], matches: 
   const key = `${RATING_ENGINE_REVISION}:${season}`
   const existing = bySeason.get(key); if (existing) return existing
   const leagueMatches = competitionMatches(matches, season, 'league')
-  const currentMatchDay = Math.max(0, ...leagueMatches.map(match => match.matchDay))
+  const currentMatchDay = Math.max(0, ...leagueMatches.map(leagueDay).filter(day => Number.isInteger(day) && day >= 1 && day <= LEAGUE_MATCHES_PER_TEAM))
   const leagueSnapshots = new Map<number, LeagueSnapshot>()
   let previous: Standing[] | undefined
   for (let day = 1; day <= currentMatchDay; day++) {
-    const through = leagueMatches.filter(match => match.matchDay <= day)
+    const through = leagueMatches.filter(match => leagueDay(match) <= day)
     const standings = leagueCompetition(teams, through, season, players).standings
     const ranked = standingsWithMovement(standings, previous)
-    leagueSnapshots.set(day, { matchDay: day, complete: isLeagueMatchdayComplete(teams, leagueMatches, season, day), matches: leagueMatches.filter(match => match.matchDay === day), standings: ranked })
+    leagueSnapshots.set(day, { matchDay: day, complete: isLeagueMatchdayComplete(teams, leagueMatches, season, day), matches: leagueMatches.filter(match => leagueDay(match) === day), standings: ranked })
     previous = standings
   }
   const completedSnapshots = [...leagueSnapshots.values()].filter(snapshot => snapshot.complete)
@@ -241,13 +249,13 @@ export function buildSeasonAnalytics(teams: Team[], players: Player[], matches: 
   const monthlyAwards = new Map<number, MonthlyAwards>()
   for (let blockId = 1; blockId <= 10; blockId++) {
     const block = monthlyBlockRange(blockId)!
-    const finalized = isLeagueMatchdayComplete(teams, leagueMatches, season, block.endMatchDay)
+    const finalized = isMonthlyBlockComplete(teams, leagueMatches, season, block)
     if (finalized) monthlyAwards.set(blockId, monthlyAwardsFor(block, teams, players, leagueMatches, true))
   }
   const monthlyResults = [...monthlyAwards.values()]
   const latestMonthlyAwards = monthlyResults[monthlyResults.length - 1]
   const activeBlock = monthlyBlockRange(monthlyBlockForMatchday(currentMatchDay) ?? 0)
-  const activeMonthlyAwards = activeBlock && leagueMatches.some(match => match.matchDay >= activeBlock.startMatchDay && match.matchDay <= activeBlock.endMatchDay)
+  const activeMonthlyAwards = activeBlock && leagueMatches.some(match => leagueDay(match) >= activeBlock.startMatchDay && leagueDay(match) <= activeBlock.endMatchDay)
     ? monthlyAwards.get(activeBlock.id) ?? monthlyAwardsFor(activeBlock, teams, players, leagueMatches, false)
     : undefined
   const result: SeasonAnalytics = {

@@ -15,7 +15,7 @@ export function defaultScreenState<V extends View>(view: V): ScreenStateByView[V
     case 'records-leaderboard': state = { name: 'records-leaderboard', category: view.category, leaderboardId: view.leaderboardId, competition: view.competition ?? 'all', positionFilter: view.positionFilter ?? 'all', filterSeasonIds: view.seasonIds ?? [], filterTeamIds: view.teamIds ?? [] }; break
     case 'comparison': state = { name: 'comparison', leftId: view.leftId ?? null, rightId: view.rightId ?? null, season: view.season ?? null, competition: view.competitionType ?? 'all', teamId: null }; break
     case 'team': state = { name: 'team', tab: 'overview', bestPlayersSeason: null, bestPlayersCompetition: 'all', bestPlayersMetric: 'rating', matchesCompetition: 'all' }; break
-    case 'players': state = { name: 'players', search: '' }; break
+    case 'players': state = { name: 'players', search: '', filters: { seasons: [], teams: [], positions: [] } }; break
     case 'player': state = { name: 'player', season: view.season ?? null, competition: view.competitionType ?? 'all', teamId: view.teamId ?? null }; break
     case 'match': state = { name: 'match', tab: 'facts' }; break
     default: state = { name: view.name } as ScreenStateByView[keyof ScreenStateByView]
@@ -52,21 +52,28 @@ export function resetNavigationEntries<V extends View>(view: V, screenState?: Sc
 type DetailView = Extract<View, { name: 'team' | 'player' | 'match' }>
 const isDetailView = (view: View): view is DetailView => view.name === 'team' || view.name === 'player' || view.name === 'match'
 const isTransientWorkflow = (view: View) => view.name === 'new-match' || view.name === 'edit-match'
-const sameDetailDestination = (left: View, right: View) => isDetailView(left) && isDetailView(right) && left.name === right.name && left.id === right.id && (left.name !== 'player' || right.name !== 'player' || (left.season ?? null) === (right.season ?? null) && (left.competitionType ?? 'all') === (right.competitionType ?? 'all') && (left.teamId ?? null) === (right.teamId ?? null))
+const sameDetailDestination = (entry: NavigationEntry, right: View, desiredState?: ScreenStateByView['player']) => {
+  const left = entry.view
+  if (!isDetailView(left) || !isDetailView(right) || left.name !== right.name || left.id !== right.id) return false
+  if (left.name !== 'player' || right.name !== 'player') return true
+  const desired = desiredState ?? defaultScreenState(right) as ScreenStateByView['player']
+  const current = entry.screenState as ScreenStateByView['player']
+  return current.season === desired.season && current.competition === desired.competition
+}
 
 /** Returns the nearest prior instance of an exact Team, Player, or Match detail. */
-export function popToExistingNavigationEntry(entries: NavigationEntry[], view: View, currentScrollTop: number): NavigationEntry[] | undefined {
+export function popToExistingNavigationEntry(entries: NavigationEntry[], view: View, currentScrollTop: number, screenState?: ScreenStateByView['player']): NavigationEntry[] | undefined {
   if (!isDetailView(view)) return undefined
   for (let index = entries.length - 1; index >= 0; index--) {
-    if (!sameDetailDestination(entries[index].view, view)) continue
+    if (!sameDetailDestination(entries[index], view, screenState)) continue
     return index === entries.length - 1 ? snapshotScroll(entries, index, currentScrollTop) : entries.slice(0, index + 1)
   }
   return undefined
 }
 
 /** Browse navigation preserves an existing exact detail entry instead of pushing a duplicate. */
-export function navigateBrowseEntry<V extends View>(entries: NavigationEntry[], view: V, currentScrollTop: number): NavigationEntry[] {
-  return popToExistingNavigationEntry(entries, view, currentScrollTop) ?? pushNavigationEntry(entries, view, currentScrollTop)
+export function navigateBrowseEntry<V extends View>(entries: NavigationEntry[], view: V, currentScrollTop: number, screenState?: ScreenStateByView[V['name']]): NavigationEntry[] {
+  return popToExistingNavigationEntry(entries, view, currentScrollTop, screenState?.name === 'player' ? screenState as ScreenStateByView['player'] : undefined) ?? pushNavigationEntry(entries, view, currentScrollTop, screenState)
 }
 
 /** Editors live above their browse parent only while the workflow is active. */

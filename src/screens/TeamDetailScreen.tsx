@@ -9,6 +9,7 @@ import { matchScore } from '../engine/rating'
 import { buildGlobalRankingData, rankGlobalRankingRows, playerSeasonStats, seasonsFromMatches, teamBestEleven, type LeaderboardMetric } from '../engine/stats'
 import { matchCompetitionType, teamCompetitionOverview } from '../engine/competition'
 import { assignmentSnapshotForMatch, formatCompactCompetitionContext } from '../engine/competitionContext'
+import { teamsCreditedWithResult } from '../engine/matchPerspective'
 import { buildSeasonAnalytics } from '../engine/seasonAnalytics'
 import { RankDelta, SegmentedControl } from '../components/SeasonUI'
 import { CompetitionScopeSelector } from '../components/CompetitionScopeSelector'
@@ -47,7 +48,7 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
     })
     return { best: { ...canonicalBest, slots }, statsByPlayer, starterIds: new Set(slots.flatMap(slot => slot.playerId ? [slot.playerId] : [])), allTeamPlayers: sortPlayersByPosition(players.filter(player => (player.teamIds ?? [player.teamId]).includes(teamId)), [], representative) }
   }, [tab, players, matches, teamId, activeSeason, representative])
-  const matchData = useMemo(() => tab === 'matches' ? recentMatches(matches.filter(match => match.season === activeSeason && (matchesCompetition === 'all' || matchCompetitionType(match) === matchesCompetition) && (match.homeTeamId === teamId || match.awayTeamId === teamId))) : [], [tab, matches, activeSeason, matchesCompetition, teamId])
+  const matchData = useMemo(() => tab === 'matches' ? recentMatches(matches.filter(match => match.season === activeSeason && (matchesCompetition === 'all' || matchCompetitionType(match) === matchesCompetition) && teamsCreditedWithResult(match).includes(teamId))) : [], [tab, matches, activeSeason, matchesCompetition, teamId])
   if (!team) return <div className="p-6 text-sm text-zinc-400">Team not found.</div>
 
   const best = playerData?.best

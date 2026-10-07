@@ -1,11 +1,11 @@
 import { combinationStats } from '../engine/analytics'
-import { matchCompetitionType } from '../engine/competition'
 import { oldestMatches } from '../engine/matchChronology'
 import { buildPlayerRecordLeaderboards } from '../engine/playerRecords'
 import { isPlayerAssistEvent, isPlayerGoalEvent } from '../engine/playerMatchFacts'
-import { matchScore } from '../engine/rating'
 import { orderedEvents, scoringTeamId } from '../engine/timeline'
 import { teamMetrics } from '../engine/teamMetrics'
+import { recordsScopedMatches } from '../engine/recordsScope'
+import { teamPerspectiveScore } from '../engine/matchPerspective'
 import { buildUnitRecords, type UnitRecord } from '../engine/unitRecords'
 import { playerFullName } from '../components/ui'
 import { formatSignedTwoDecimals } from '../lib/signedNumber'
@@ -19,7 +19,6 @@ export type RecordsLeaderboardGroup = { id: string; title: string; kind: Records
 export type RecordsScope = { seasons: string[]; teamIds: string[]; competition: CompetitionType | 'all'; positionFilter: PositionFilterKey }
 
 const rank = (rows: Omit<RecordsLeaderboardRow, 'rank'>[], ascending = false) => { let prior: number | undefined; let priorRank = 0; return rows.slice().sort((a, b) => (ascending ? a.numeric - b.numeric : b.numeric - a.numeric) || a.name.localeCompare(b.name)).map((row, index) => { const next = prior === row.numeric ? priorRank : index + 1; prior = row.numeric; priorRank = next; return { ...row, rank: next } }) }
-const scopedMatches = (matches: Match[], scope: RecordsScope) => matches.filter(match => (!scope.seasons.length || scope.seasons.includes(match.season)) && (!scope.teamIds.length || scope.teamIds.includes(match.homeTeamId) || scope.teamIds.includes(match.awayTeamId)) && (scope.competition === 'all' || matchCompetitionType(match) === scope.competition))
 const combinationKey = (ids: string[]) => ids.slice().sort().join(':')
 const combinationPresentationRules: Record<string, Pick<CombinationPairPresentation, 'connector' | 'directional'>> = {
   'goal-combinations': { connector: '→', directional: true },
@@ -40,7 +39,7 @@ export function combinationPairPresentation(leaderboardId: string, playerIds: st
 
 export function recordsLeaderboardGroups({ category, players, teams, matches, scope }: { category: RecordsLeaderboardKind; players: Player[]; teams: Team[]; matches: Match[]; scope: RecordsScope }): RecordsLeaderboardGroup[] {
   if (category === 'player') { const byId = new Map(players.map(player => [player.id, player])); return buildPlayerRecordLeaderboards(players, matches, { seasons: scope.seasons, teamIds: scope.teamIds, competition: scope.competition, positionFilter: scope.positionFilter }).map(group => ({ id: group.id, title: group.title, kind: 'player' as const, applicableFilters: { position: true, team: true }, rows: group.rows.map(row => ({ id: row.playerId, name: playerFullName(byId.get(row.playerId)), numeric: row.numeric, value: row.value, detail: row.detail, rank: row.rank })) })) }
-  const scoped = scopedMatches(matches, scope)
+  const scoped = recordsScopedMatches(matches, scope, category)
   return category === 'team' ? teamGroups(teams.filter(team => !scope.teamIds.length || scope.teamIds.includes(team.id)), scoped) : combinationGroups(players, teams, scoped, scope.teamIds)
 }
 
@@ -48,9 +47,9 @@ function teamGroups(teams: Team[], matches: Match[]): RecordsLeaderboardGroup[] 
   const rows = teams.map(team => {
     const summary = teamMetrics(team, matches)
     const results = oldestMatches(summary.games).map(match => {
-      const score = matchScore(match)
-      const ours = match.homeTeamId === team.id ? score.home : score.away
-      const against = match.homeTeamId === team.id ? score.away : score.home
+      const perspective = teamPerspectiveScore(match, team.id)!
+      const ours = perspective.goalsFor
+      const against = perspective.goalsAgainst
       const goals = orderedEvents(match).map(row => row.event).filter((event): event is Extract<Match['events'][number], { type: 'goal' }> => event.type === 'goal')
       let lead = 0; let trailed = false
       for (const event of goals) { lead += scoringTeamId(match, event) === team.id ? 1 : -1; if (lead < 0) trailed = true }

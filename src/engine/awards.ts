@@ -4,6 +4,8 @@ import { buildGlobalRankingData, type GlobalLeaderboardRow } from './stats'
 import { AWARD_433, isAwardEligible, rankAwardCandidates, seasonChampionsProgressBonus, seasonCupProgressBonus, seasonLeaguePositionBonus, selectAwardBestXI, type AwardCandidate, type AwardCandidateMode } from './awardRules'
 import { scopedAwardFamilyByPlayer } from './positionScope'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
+import { isRecordedForTeam } from './matchPerspective'
+import { newestMatches } from './matchChronology'
 
 export { AWARD_433, awardPositionFamily, isAwardEligible } from './awardRules'
 
@@ -37,7 +39,7 @@ export function monthlyCanonicalAwardResult(award: Pick<CanonicalAwardResult, 's
 export function competitionAwardResult(type: CompetitionType, season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], models?: CompetitionAwardModels): CanonicalAwardResult | undefined {
   const official = awardsForCompetition(type, season, teams, players, matches, states, models)
   const scope = competitionMatches(matches, season, type)
-  const anchorMatch = scope.slice().sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0]
+  const anchorMatch = newestMatches(scope)[0]
   if (!official.mvp || !official.bestXI || !anchorMatch) return undefined
   const playerLabel = type === 'league' ? 'Player of the Season' : type === 'cup' ? 'Player of the Cup' : 'Player of the Tournament'
   const selected = official.bestXI.flatMap(slot => slot.playerId ? [official.candidates?.find(candidate => candidate.playerId === slot.playerId && candidate.teamId === slot.teamId)] : [])
@@ -94,8 +96,7 @@ function scoredCandidatesForScope(players: Player[], games: Match[], bonusFor: (
   const teamIds = [...new Set(games.flatMap(match => match.appearances.map(appearance => appearance.teamId)))]
   const gamesByTeam = new Map(teamIds.map(teamId => [teamId, [] as Match[]]))
   for (const match of games) {
-    const playedTeams = new Set([match.teamId, match.homeTeamId, match.awayTeamId])
-    for (const teamId of playedTeams) if (teamId && gamesByTeam.has(teamId)) gamesByTeam.get(teamId)!.push(match)
+    for (const teamId of teamIds) if (isRecordedForTeam(match, teamId)) gamesByTeam.get(teamId)!.push(match)
   }
   const candidates = teamIds.flatMap(teamId => {
     const teamGames = gamesByTeam.get(teamId) ?? []
@@ -136,6 +137,7 @@ export function performanceAwardResult(players: Player[], games: Match[], mode: 
 
 const goalkeeperRatings = (row: GlobalLeaderboardRow) => row.goalkeeperRatings ?? []
 const goalkeeperMinutes = (row: GlobalLeaderboardRow) => row.goalkeeperMinutes ?? 0
+const qualifyingGoalkeeperMinutes = (row: GlobalLeaderboardRow) => row.qualifyingGoalkeeperMinutes ?? 0
 const goalkeeperAverage = (row: GlobalLeaderboardRow) => {
   const ratings = goalkeeperRatings(row)
   return ratings.length ? ratings.reduce((total, rating) => total + rating.raw, 0) / ratings.length : 0
@@ -143,16 +145,16 @@ const goalkeeperAverage = (row: GlobalLeaderboardRow) => {
 const goalkeeperCleanSheets = (row: GlobalLeaderboardRow) => row.cleanSheets ?? 0
 const goalkeeperSavePercentage = (row: GlobalLeaderboardRow) => {
   const saves = row.qualifyingSaves ?? 0
-  const faced = saves + (row.concededOnPitch ?? 0)
+  const faced = saves + (row.qualifyingConceded ?? 0)
   return faced ? saves / faced : 0
 }
 const goalkeeperSavesPer90 = (row: GlobalLeaderboardRow) => {
-  const minutes = goalkeeperMinutes(row)
+  const minutes = qualifyingGoalkeeperMinutes(row)
   return minutes ? (row.qualifyingSaves ?? 0) / minutes * 90 : 0
 }
 const goalkeeperGoalsAgainstPer90 = (row: GlobalLeaderboardRow) => {
-  const minutes = goalkeeperMinutes(row)
-  return minutes ? (row.concededOnPitch ?? 0) / minutes * 90 : Number.POSITIVE_INFINITY
+  const minutes = qualifyingGoalkeeperMinutes(row)
+  return minutes ? (row.qualifyingConceded ?? 0) / minutes * 90 : Number.POSITIVE_INFINITY
 }
 
 function goalkeeperWinner(rows: { row: GlobalLeaderboardRow; score: number }[], label: string): AwardWinner | undefined {
@@ -204,7 +206,7 @@ export function awardsForCompetition(type: CompetitionType, season: string, team
   const best = eligible[0]
   const mvp = best ? { playerId: best.row.playerId, value: rawAverage(best.row), awardScore: best.score, label: 'Avg Rating' } : undefined
   const goalkeeperLabel = type === 'league' ? 'Goalkeeper of the Season' : type === 'cup' ? 'Goalkeeper of the Cup' : 'Goalkeeper of the Tournament'
-  const goalkeeperEligible = eligible.map(candidate => ({ ...candidate, score: ratingAwardScore(goalkeeperAverage(candidate.row), bonusFor(teamIdFor(candidate.row)), goalkeeperMinutes(candidate.row), games.filter(match => match.teamId ? match.teamId === teamIdFor(candidate.row) : match.homeTeamId === teamIdFor(candidate.row) || match.awayTeamId === teamIdFor(candidate.row)).length) }))
+  const goalkeeperEligible = eligible.map(candidate => ({ ...candidate, score: ratingAwardScore(goalkeeperAverage(candidate.row), bonusFor(teamIdFor(candidate.row)), goalkeeperMinutes(candidate.row), games.filter(match => isRecordedForTeam(match, teamIdFor(candidate.row))).length) }))
   const presentation = awardPresentationFromCandidates(scored.map(item => item.candidate))
   return { complete, championId, scorer: winner(stats, row => row.goals, 'Goals'), assists: winner(stats, row => row.assists, 'Assists'), mvp, goalkeeper: goalkeeperWinner(goalkeeperEligible, goalkeeperLabel), ...presentation, candidates: scored.map(item => item.candidate) }
 }

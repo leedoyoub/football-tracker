@@ -1,11 +1,12 @@
 import type { CompetitionState, Match, MatchChangePayload, Player, Team } from '../types'
 import { oldestMatches } from './matchChronology'
 import { matchCompetitionType } from './competitionContext'
-import { getMatchManOfTheMatch, matchScore } from './rating'
+import { getMatchManOfTheMatch } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { measureInDevelopment } from '../lib/developmentMeasurement'
 import { hasPitchAppearance } from './timeline'
 import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts } from './playerMatchFacts'
+import { teamsCreditedWithResult, teamPerspectiveScore } from './matchPerspective'
 
 export type GroupedMatchChangeItem = { id: string; label: string; kind: MatchChangePayload['kind'] }
 export type GroupedMatchChange = { id: string; playerId?: string; title: string; detail: string; eventIds: string[]; items: GroupedMatchChangeItem[] }
@@ -54,7 +55,22 @@ function uncached(players: Player[], matches: Match[]) {
       for (const value of crossed(s0.mom, s1.mom, multiples(10, s1.mom))) add(groups, match.id, players, player.id, `season-mom:${match.season}:${player.id}:${value}`, `Season ${value} MOM`, 'milestone'); for (const [field, step, label] of [['apps', 100, 'career appearances'], ['mom', 50, 'career MOM']] as const) for (const value of crossed(c0[field], c1[field], multiples(step, c1[field]))) add(groups, match.id, players, player.id, `career-${field}:${player.id}:${value}`, `${value} ${label}`, 'milestone'); if (keeper) { for (const value of crossed(s0.cleanSheets, s1.cleanSheets, [10, 20])) add(groups, match.id, players, player.id, `season-cs:${player.id}:${value}`, `Season ${value} clean sheets`, 'milestone'); for (const value of crossed(c0.cleanSheets, c1.cleanSheets, multiples(50, c1.cleanSheets))) add(groups, match.id, players, player.id, `career-cs:${player.id}:${value}`, `${value} career clean sheets`, 'milestone'); for (const value of crossed(c0.saves, c1.saves, [100, 250, 500, 750, 1000, ...multiples(250, c1.saves, 1250)])) add(groups, match.id, players, player.id, `career-saves:${player.id}:${value}`, `${value} career saves`, 'milestone') }
       const run = runs.get(player.id) ?? { scoring: 0, contribution: 0 }; run.scoring = p.goals ? run.scoring + 1 : 0; run.contribution = p.goals + p.assists ? run.contribution + 1 : 0; runs.set(player.id, run); if (run.scoring === 5) add(groups, match.id, players, player.id, `streak:scoring:${match.id}:${player.id}`, '5-match scoring streak', 'milestone'); if (run.contribution === 5) add(groups, match.id, players, player.id, `streak:contribution:${match.id}:${player.id}`, '5-match contribution streak', 'milestone')
     }
-    for (const teamId of [match.homeTeamId, match.awayTeamId]) { const score = matchScore(match); const ours = teamId === match.homeTeamId ? score.home : score.away; const against = teamId === match.homeTeamId ? score.away : score.home; const key = `${match.season}:${teamId}`; const run = teamRuns.get(key) ?? { wins: 0, unbeaten: 0, cleanSheets: 0, goals: 0, seasonSheets: 0 }; const goalsBefore = run.goals; const sheetsBefore = run.seasonSheets; run.wins = ours > against ? run.wins + 1 : 0; run.unbeaten = ours >= against ? run.unbeaten + 1 : 0; run.cleanSheets = against === 0 ? run.cleanSheets + 1 : 0; run.goals += ours; run.seasonSheets += Number(against === 0); teamRuns.set(key, run); for (const value of [5, 10]) if (run.wins === value) add(groups, match.id, players, undefined, `team-win-streak:${key}:${match.id}:${value}`, `${value}-match team winning streak`, 'milestone'); for (const value of [10, 15]) if (run.unbeaten === value) add(groups, match.id, players, undefined, `team-unbeaten:${key}:${match.id}:${value}`, `${value}-match team unbeaten run`, 'milestone'); if (run.cleanSheets === 5) add(groups, match.id, players, undefined, `team-clean-streak:${key}:${match.id}`, '5-match team clean-sheet streak', 'milestone'); for (const value of crossed(goalsBefore, run.goals, [50, 100, 150, ...multiples(50, run.goals, 200)])) add(groups, match.id, players, undefined, `team-season-goals:${key}:${value}`, `Team ${value} season goals`, 'milestone'); for (const value of crossed(sheetsBefore, run.seasonSheets, [10, 20])) add(groups, match.id, players, undefined, `team-season-sheets:${key}:${value}`, `Team ${value} season clean sheets`, 'milestone') }
+    for (const teamId of teamsCreditedWithResult(match)) {
+      const perspective = teamPerspectiveScore(match, teamId)!
+      const ours = perspective.goalsFor; const against = perspective.goalsAgainst
+      const key = `${match.season}:${teamId}`
+      const run = teamRuns.get(key) ?? { wins: 0, unbeaten: 0, cleanSheets: 0, goals: 0, seasonSheets: 0 }
+      const goalsBefore = run.goals; const sheetsBefore = run.seasonSheets
+      run.wins = ours > against ? run.wins + 1 : 0
+      run.unbeaten = ours >= against ? run.unbeaten + 1 : 0
+      run.cleanSheets = against === 0 ? run.cleanSheets + 1 : 0
+      run.goals += ours; run.seasonSheets += Number(against === 0); teamRuns.set(key, run)
+      for (const value of [5, 10]) if (run.wins === value) add(groups, match.id, players, undefined, `team-win-streak:${key}:${match.id}:${value}`, `${value}-match team winning streak`, 'milestone')
+      for (const value of [10, 15]) if (run.unbeaten === value) add(groups, match.id, players, undefined, `team-unbeaten:${key}:${match.id}:${value}`, `${value}-match team unbeaten run`, 'milestone')
+      if (run.cleanSheets === 5) add(groups, match.id, players, undefined, `team-clean-streak:${key}:${match.id}`, '5-match team clean-sheet streak', 'milestone')
+      for (const value of crossed(goalsBefore, run.goals, [50, 100, 150, ...multiples(50, run.goals, 200)])) add(groups, match.id, players, undefined, `team-season-goals:${key}:${value}`, `Team ${value} season goals`, 'milestone')
+      for (const value of crossed(sheetsBefore, run.seasonSheets, [10, 20])) add(groups, match.id, players, undefined, `team-season-sheets:${key}:${value}`, `Team ${value} season clean sheets`, 'milestone')
+    }
     output.set(match.id, [...groups.values()])
   }
   return output

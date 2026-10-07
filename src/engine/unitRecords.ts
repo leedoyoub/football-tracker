@@ -3,7 +3,7 @@ import { oldestMatches } from './matchChronology'
 import { opponentSotExposure } from './opponentSot'
 import { playerGoalEvents } from './playerMatchFacts'
 import { positionFamily, scopedPositionFamilyByPlayer, type PositionFamily } from './positionScope'
-import { matchScore } from './rating'
+import { teamPerspectiveScore } from './matchPerspective'
 import { creditedPositionSegments, isOnPitchAtEvent, matchPositionAtEvent, scoringTeamId } from './timeline'
 
 export type UnitPosition = 'attack' | 'midfield' | 'defence' | 'cb'
@@ -43,7 +43,6 @@ export function buildUnitRecords(players: Player[], matches: Match[], teamIds: s
   const known = new Set(players.map(player => player.id))
   const totals = new Map<string, UnitRecord>()
   for (const match of oldestMatches(matches)) {
-    const score = matchScore(match)
     const teamAppearances = new Map<string, Appearance[]>()
     for (const appearance of match.appearances) {
       if (!known.has(appearance.playerId) || (teamIds.length && !teamIds.includes(appearance.teamId))) continue
@@ -68,8 +67,9 @@ export function buildUnitRecords(players: Player[], matches: Match[], teamIds: s
             row.intervalGA += match.events.filter(event => event.type === 'goal' && event.minute <= 90 && scoringTeamId(match, event) !== teamId && members.every(member => isOnPitchAtEvent(match, member, event) && (position !== 'cb' || positionFamily(matchPositionAtEvent(match, member, event)) === 'CB'))).length
             if (members.every(member => member.role === 'starter' && segments.get(member.playerId)!.some(segment => segment.enter === 0 && (position !== 'cb' || positionFamily(segment.position) === 'CB')))) {
               row.starts++
-              const ours = match.homeTeamId === teamId ? score.home : score.away
-              const against = match.homeTeamId === teamId ? score.away : score.home
+              const perspective = teamPerspectiveScore(match, teamId)
+              const ours = perspective?.goalsFor ?? 0
+              const against = perspective?.goalsAgainst ?? 0
               row.wins += Number(ours > against); row.draws += Number(ours === against)
               row.teamGF += ours; row.teamGA += against
               row.memberGoals += members.reduce((total, member) => total + playerGoalEvents(match, member).length, 0)

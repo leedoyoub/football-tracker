@@ -2,7 +2,7 @@ import type { CompetitionState, CompetitionType, Match, Player, Team } from '../
 import { currentStaticTeams } from '../data/teams'
 import { competitionSeasonStatus } from './competition'
 import { awardsForCompetition, seasonAwards } from './awards'
-import { buildGlobalRankingData, rankGlobalRankingRows, unifiedBestEleven } from './stats'
+import { buildGlobalRankingData, rankGlobalRankingRows } from './stats'
 import { monthlyAwardForBlock, type MonthlyAwards } from './seasonAnalytics'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 
@@ -72,7 +72,7 @@ export function historyTimelineForSeason(teams: Team[], players: Player[], match
   const assister = rankGlobalRankingRows(rows, players, 'assists')[0]
   const mom = rankGlobalRankingRows(rows, players, 'mom')[0]
   const rating = rankGlobalRankingRows(rows, players, 'rating')[0]
-  const xi = unifiedBestEleven(players, matches, season).slots.flatMap(slot => slot.playerId ? [slot.playerId] : [])
+  const xi = seasonAwards(season, tournamentTeams, players, matches, states).bestXI.flatMap(slot => slot.playerId ? [slot.playerId] : [])
   const result: HistoryTimeline = { season, league: status.league.championId, cup: status.cup.championId, champions: status.champions.championId, scorer: scorer ? { playerId: scorer.playerId, goals: scorer.goals } : undefined, assists: assister ? { playerId: assister.playerId, assists: assister.assists } : undefined, rating: rating ? { playerId: rating.playerId, avgRating: rating.avgRating } : undefined, mom: mom ? { playerId: mom.playerId, mom: mom.mom } : undefined, bestXI: xi }
   cached.set(key, result)
   return result
@@ -95,7 +95,7 @@ export function historyAwardsForSeason(teams: Team[], players: Player[], matches
 }
 
 /** Historical team titles are derived from canonical champions plus recorded season membership. */
-export function playerTeamTitles(teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], playerId: string, season: string): string[] {
+export function playerTeamTitles(teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], playerId: string, season: string, scope: CompetitionType | 'all' = 'all'): string[] {
   const cached = stateMap(teamTitleCache, matches, players, teams, states)
   const key = `${RATING_ENGINE_REVISION}:${season}`
   let model = cached.get(key)
@@ -115,7 +115,7 @@ export function playerTeamTitles(teams: Team[], players: Player[], matches: Matc
     cached.set(key, model)
   }
   const label: Record<CompetitionType, string> = { league: 'League', cup: 'Cup', champions: 'Champions' }
-  return (['league', 'cup', 'champions'] as CompetitionType[]).flatMap(type => {
+  return (scope === 'all' ? ['league', 'cup', 'champions'] as CompetitionType[] : [scope]).flatMap(type => {
     const championId = model!.championIds[type]
     return championId && model!.memberIdsByTeam.get(championId)?.has(playerId) ? [`${season} ${label[type]}`] : []
   })

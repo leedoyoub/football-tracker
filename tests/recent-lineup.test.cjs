@@ -1,4 +1,6 @@
-const path = require('path');
+const fs = require('node:fs');
+const ts = require('typescript');
+for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename);
 const { getMostRecentStartingLineup } = require('../src/engine/recentLineup.ts');
 const assert = require('assert');
 const { test } = require('node:test');
@@ -34,4 +36,10 @@ test('recent lineup is correctly fetched', () => {
     assert.ok(result, 'Result should not be null');
     assert.strictEqual(result['GK'], 'p1');
     assert.strictEqual(result['ST'], 'p10');
+});
+
+test('a legacy Champions opponent record does not supply the opponent lineup', () => {
+    const match = { ...mockMatch1, competitionType: 'champions', appearances: mockMatch1.appearances.map(appearance => ({ ...appearance, teamId: 't2' })) };
+    delete match.teamId;
+    assert.strictEqual(getMostRecentStartingLineup([match], 't2'), null);
 });

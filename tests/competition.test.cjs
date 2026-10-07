@@ -25,20 +25,22 @@ test('legacy matches safely fall back to League and season/type filtering stays 
 test('League Matchday is one after the least-played team in the current season and competition', () => {
   const matches = [
     game('a1', 'Season 1', 'league', 'regular', 'T1', 'T2', 1, 0),
+    game('b1', 'Season 1', 'league', 'regular', 'T3', 'T4', 1, 0),
     game('a2', 'Season 1', 'league', 'regular', 'T1', 'T3', 1, 0),
-    game('b2', 'Season 1', 'league', 'regular', 'T2', 'T3', 1, 0),
+    game('b2', 'Season 1', 'league', 'regular', 'T2', 'T4', 1, 0),
     game('cup', 'Season 1', 'cup', 'stage1', 'T1', 'T2', 1, 0),
     game('other-season', 'Season 2', 'league', 'regular', 'T1', 'T2', 1, 0),
   ]
-  assert.equal(leagueCompetition(teams.slice(0, 3), matches, 'Season 1').matchdayProgress, 3)
+  for (const match of matches.slice(0, 4)) { delete match.teamId; match.matchDay = match.id.endsWith('2') ? 2 : 1 }
+  assert.equal(leagueCompetition(teams.slice(0, 4), matches, 'Season 1').matchdayProgress, 3)
 })
 
 test('League Matchday is 10 when league teams have played 10, 10, 9, and 9 matches', () => {
   const matches = [
-    ...Array.from({ length: 10 }, (_, index) => game(`t1-${index}`, 'Season 1', 'league', 'regular', 'T1', `OPP:T1:${index}`, 1, 0)),
-    ...Array.from({ length: 10 }, (_, index) => game(`t2-${index}`, 'Season 1', 'league', 'regular', 'T2', `OPP:T2:${index}`, 1, 0)),
-    ...Array.from({ length: 9 }, (_, index) => game(`t3-${index}`, 'Season 1', 'league', 'regular', 'T3', `OPP:T3:${index}`, 1, 0)),
-    ...Array.from({ length: 9 }, (_, index) => game(`t4-${index}`, 'Season 1', 'league', 'regular', 'T4', `OPP:T4:${index}`, 1, 0)),
+    ...Array.from({ length: 10 }, (_, index) => ({ ...game(`t1-${index}`, 'Season 1', 'league', 'regular', 'T1', `OPP:T1:${index}`, 1, 0), matchDay: index + 1 })),
+    ...Array.from({ length: 10 }, (_, index) => ({ ...game(`t2-${index}`, 'Season 1', 'league', 'regular', 'T2', `OPP:T2:${index}`, 1, 0), matchDay: index + 1 })),
+    ...Array.from({ length: 9 }, (_, index) => ({ ...game(`t3-${index}`, 'Season 1', 'league', 'regular', 'T3', `OPP:T3:${index}`, 1, 0), matchDay: index + 1 })),
+    ...Array.from({ length: 9 }, (_, index) => ({ ...game(`t4-${index}`, 'Season 1', 'league', 'regular', 'T4', `OPP:T4:${index}`, 1, 0), matchDay: index + 1 })),
     game('ignored-cup', 'Season 1', 'cup', 'stage1', 'T3', 'T4', 1, 0),
   ]
   assert.equal(leagueCompetition(teams.slice(0, 4), matches, 'Season 1').matchdayProgress, 10)
@@ -46,7 +48,7 @@ test('League Matchday is 10 when league teams have played 10, 10, 9, and 9 match
 
 test('League Matchday is capped at 30 after every team completes its schedule', () => {
   const leagueTeams = teams.slice(0, 2)
-  const matches = Array.from({ length: 30 }, (_, index) => game(`league-${index + 1}`, 'Season 1', 'league', 'regular', 'T1', 'T2', 1, 0))
+  const matches = Array.from({ length: 30 }, (_, index) => { const match = game(`league-${index + 1}`, 'Season 1', 'league', 'regular', 'T1', 'T2', 1, 0); delete match.teamId; match.matchDay = index + 1; return match })
   const league = leagueCompetition(leagueTeams, matches, 'Season 1')
   assert.equal(league.matchdayProgress, 30)
   assert.equal(league.complete, true)

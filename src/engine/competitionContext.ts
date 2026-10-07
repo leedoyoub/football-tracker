@@ -1,4 +1,5 @@
 import type { CompetitionAssignmentSnapshot, CompetitionStage, CompetitionType, Match } from '../types'
+import { recordedOpponentId } from './matchPerspective'
 
 export type CompetitionIdentity = CompetitionAssignmentSnapshot
 
@@ -57,7 +58,7 @@ function legacyIdentity(match: Match): CompetitionIdentity {
   // Pair and series fields are not generic Match metadata: carrying them
   // from a previous tournament into a League identity recreates split-brain
   // data after an otherwise safe normalization.
-  return freezeCompetitionAssignment({ competitionType, season: match.season, teamId: match.teamId ?? match.homeTeamId, stage, ...(competitionType === 'champions' ? { pairingId: match.competitionPairingId, seriesGame: match.competitionSeriesGame } : {}), opponentTeamId: match.awayTeamId, matchDay: derived ?? match.matchDay })
+  return freezeCompetitionAssignment({ competitionType, season: match.season, teamId: match.teamId ?? match.homeTeamId, stage, ...(competitionType === 'champions' ? { pairingId: match.competitionPairingId, seriesGame: match.competitionSeriesGame } : {}), opponentTeamId: recordedOpponentId(match), matchDay: derived ?? match.matchDay })
 }
 
 /** Prefer a snapshot only when it matches the fixed competition format. */
@@ -98,19 +99,19 @@ export function matchesCompetitionAssignmentExactly(match: Match, assignment: Co
     && match.matchDay === assignment.matchDay
     && match.competitionPairingId === assignment.pairingId
     && match.competitionSeriesGame === assignment.seriesGame
-    && (assignment.opponentTeamId === undefined || match.awayTeamId === assignment.opponentTeamId)
+    && (assignment.opponentTeamId === undefined || recordedOpponentId(match) === assignment.opponentTeamId)
 }
 
 /** Metadata-only, idempotent synchronization for unambiguous identities. */
 export function normalizeMatchCompetitionIdentity(match: Match): Match {
   const identity = competitionIdentityForMatch(match)
-  const sameTopLevel = match.competitionType === identity.competitionType && match.competitionStage === identity.stage && match.competitionPairingId === identity.pairingId && match.competitionSeriesGame === identity.seriesGame && match.matchDay === identity.matchDay && match.awayTeamId === (identity.opponentTeamId ?? match.awayTeamId)
+  const sameTopLevel = match.competitionType === identity.competitionType && match.competitionStage === identity.stage && match.competitionPairingId === identity.pairingId && match.competitionSeriesGame === identity.seriesGame && match.matchDay === identity.matchDay
   const sameSnapshot = match.competitionAssignment && JSON.stringify(match.competitionAssignment) === JSON.stringify(identity)
   if (sameTopLevel && sameSnapshot) return match
   // Omit stale optional tournament fields rather than allowing a previous
   // competition selection to survive beside the canonical identity.
   const { competitionPairingId: _pairing, competitionSeriesGame: _seriesGame, ...base } = match
-  return { ...base, competitionType: identity.competitionType, competitionStage: identity.stage, ...(identity.pairingId ? { competitionPairingId: identity.pairingId } : {}), ...(identity.seriesGame ? { competitionSeriesGame: identity.seriesGame } : {}), matchDay: identity.matchDay, ...(identity.opponentTeamId ? { awayTeamId: identity.opponentTeamId } : {}), competitionAssignment: identity }
+  return { ...base, competitionType: identity.competitionType, competitionStage: identity.stage, ...(identity.pairingId ? { competitionPairingId: identity.pairingId } : {}), ...(identity.seriesGame ? { competitionSeriesGame: identity.seriesGame } : {}), matchDay: identity.matchDay, competitionAssignment: identity }
 }
 
 /** Compatibility name for consumers that need the normalized read snapshot. */

@@ -113,11 +113,11 @@ test('position display uses match position, preserves tactical labels, and never
   assert.equal(recentMatchPositions(game('m'), { ...appearance, matchPosition: undefined }), '-')
 })
 
-test('position history is chronological, clips to playing time, and resolves same-minute corrections without mutation', () => {
+test('position history is chronological, clips to playing time, and preserves same-minute changes without mutation', () => {
   const appearance = { playerId: 'p', teamId: 'A', role: 'starter', position: 'ST', matchPosition: 'CM', positionHistory: [{ minute: 75, position: 'RW' }, { minute: 60, position: 'ST' }, { minute: 60, position: 'CAM' }, { minute: 85, position: 'GK' }] }
   const match = game('m', { events: [{ type: 'sub', teamId: 'A', playerOutId: 'p', playerInId: 'next', minute: 80, position: 'RW' }] })
   const before = JSON.stringify(appearance)
-  assert.equal(recentMatchPositions(match, appearance), 'CM → CAM → RW')
+  assert.equal(recentMatchPositions(match, appearance), 'CM → ST → CAM → RW')
   assert.equal(JSON.stringify(appearance), before)
   const bench = { ...appearance, role: 'bench', positionHistory: [{ minute: 70, position: 'CAM' }] }
   match.events.push({ type: 'sub', teamId: 'A', playerOutId: 'first', playerInId: 'p', minute: 60, position: 'CM' })

@@ -306,7 +306,7 @@ export interface ScreenStateByView {
     matchesCompetition: CompetitionType | 'all'
   }
   'import-squad': { name: 'import-squad' }
-  players: { name: 'players'; search: string }
+  players: { name: 'players'; search: string; filters: { seasons: string[]; teams: string[]; positions: Position[] } }
   player: { name: 'player'; season: string | null; competition: CompetitionType | 'all'; teamId: string | null }
   match: { name: 'match'; tab: 'facts' | 'lineup' | 'ratings' }
   'edit-match': { name: 'edit-match' }
