@@ -34,6 +34,10 @@ function dominant<T extends string>(minutes: Map<T, number>, order: readonly T[]
   return [...minutes].sort((left, right) => right[1] - left[1] || order.indexOf(left[0]) - order.indexOf(right[0]) || left[0].localeCompare(right[0]))[0]?.[0]
 }
 
+export function dominantPositionFamily(minutes: Map<PositionFamily, number>): PositionFamily | undefined {
+  return dominant(minutes, FAMILY_ORDER)
+}
+
 function positionMinutesByPlayer(players: Player[], matches: Match[], scope: PositionScope) {
   const known = new Set(players.map(player => player.id))
   const rows = new Map<string, Map<Position, number>>()
@@ -57,7 +61,7 @@ export function scopedPositionFamilyByPlayer(players: Player[], matches: Match[]
       const family = positionFamily(position)
       if (family) minutes.set(family, (minutes.get(family) ?? 0) + value)
     }
-    const family = dominant(minutes, FAMILY_ORDER)
+    const family = dominantPositionFamily(minutes)
     if (family) result.set(playerId, family)
   }
   const hasScope = Boolean(scope.seasons?.length || scope.teams?.length)

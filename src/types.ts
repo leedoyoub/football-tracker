@@ -212,6 +212,7 @@ export type View =
   | { name: 'latest-changes'; season?: string }
   | { name: 'competition'; season?: string; competitionType?: CompetitionType; rankingMetric?: 'rating' | 'goals' | 'assists' | 'mom' }
   | { name: 'global-ranking'; season?: string; competitionType?: CompetitionType | 'all'; rankingMetric?: RankSort; teamId?: string }
+  | { name: 'award-race'; season?: string; competitionType?: CompetitionType | 'all' }
   | { name: 'results' }
   | { name: 'records' }
   | { name: 'records-leaderboard'; category: Extract<RecordsCategory, 'player' | 'team' | 'combination'>; leaderboardId: string; competition?: CompetitionType | 'all'; positionFilter?: PositionFilterKey; seasonIds?: string[]; teamIds?: string[] }
@@ -261,6 +262,7 @@ export interface ScreenStateByView {
     historyComparedTeamIds: string[]
   }
   'global-ranking': { name: 'global-ranking'; metric: RankSort; scope: CompetitionType | 'all'; positionFilter: PositionFilterKey; teamId: string | null }
+  'award-race': { name: 'award-race'; season: string | null; scope: CompetitionType | 'all'; positionFilter: PositionFilterKey; teamId: string | null }
   results: { name: 'results' }
   records: {
     name: 'records'
@@ -302,7 +304,7 @@ export interface ScreenStateByView {
   }
   'import-squad': { name: 'import-squad' }
   players: { name: 'players'; search: string; filters: { seasons: string[]; teams: string[]; positions: Position[] } }
-  player: { name: 'player'; season: string | null; competition: CompetitionType | 'all' }
+  player: { name: 'player'; season: string | null; competition: CompetitionType | 'all'; rankTrendMetric: 'rating' | 'goals' | 'assists' | 'g+a' | 'sotAllowed' | 'defenderGaPer90' | 'cleanSheets' | 'saves' | 'goalkeeperGaPer90' }
   match: { name: 'match'; tab: 'facts' | 'lineup' | 'ratings' }
   'edit-match': { name: 'edit-match' }
   'new-match': { name: 'new-match' }
@@ -322,7 +324,7 @@ export type NavigationEntry<V extends View = View> = {
 
 export type RankSort =
   | 'rating' | 'goals' | 'assists' | 'g+a' | 'minutes' | 'mom' | 'goodMatches'
-  | 'goals/90' | 'assists/90' | 'g+a/90' | 'sotAllowed' | 'cleanSheets' | 'saves'
+  | 'goals/90' | 'assists/90' | 'g+a/90' | 'sotAllowed' | 'defenderGaPer90' | 'cleanSheets' | 'saves' | 'goalkeeperGaPer90'
   | 'goalsConceded' | 'savePercentage'
 
 export interface Best11Slot {

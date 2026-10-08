@@ -1,12 +1,15 @@
 import { POSITIONS, type AppState, type NavigationEntry, type ScreenState, type ScreenStateByView, type View } from '../types'
 import { draftContext, isResumableDraft } from './draftLifecycle'
 import { createNavigationEntry, defaultScreenState } from './navigation'
+import { rankTrendMetricOptions } from '../engine/playerRankTrend'
+import { scopedPositionFamilyByPlayer } from '../engine/positionScope'
+import { matchCompetitionType } from '../engine/competitionContext'
 
 /** Device-only UI state. It is deliberately never part of the sync queue. */
 export const LAST_ROUTE_STORAGE_KEY = 'football-tracker-last-route'
 
 const competitionTypes = ['league', 'cup', 'champions'] as const
-const rankingMetrics = new Set(['rating', 'goals', 'assists', 'g+a', 'minutes', 'mom', 'goodMatches', 'goals/90', 'assists/90', 'g+a/90', 'sotAllowed', 'cleanSheets', 'saves', 'goalsConceded', 'savePercentage'])
+const rankingMetrics = new Set(['rating', 'goals', 'assists', 'g+a', 'minutes', 'mom', 'goodMatches', 'goals/90', 'assists/90', 'g+a/90', 'sotAllowed', 'defenderGaPer90', 'cleanSheets', 'saves', 'goalkeeperGaPer90', 'goalsConceded', 'savePercentage'])
 const positionFilters = new Set(['all', 'st-ss', 'lw-rw', 'cam', 'lm-rm', 'cm', 'cdm', 'lb-rb', 'fb', 'cb', 'gk'])
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
@@ -60,6 +63,8 @@ export function validRestoredView(value: unknown, state: AppState): View | null 
       return { name: 'competition', ...(season(view.season) ? { season: season(view.season) } : {}), ...(competitionTypes.includes(view.competitionType as typeof competitionTypes[number]) ? { competitionType: view.competitionType } : {}) }
     case 'global-ranking':
       return { name: 'global-ranking', ...(season(view.season) ? { season: season(view.season) } : {}), ...(scope(view.competitionType) ? { competitionType: view.competitionType } : {}), ...(rankingMetrics.has(view.rankingMetric ?? '') ? { rankingMetric: view.rankingMetric } : {}), ...(hasTeam(view.teamId) ? { teamId: view.teamId } : {}) }
+    case 'award-race':
+      return { name: 'award-race', ...(season(view.season) ? { season: season(view.season) } : {}), ...(scope(view.competitionType) ? { competitionType: view.competitionType } : {}) }
     case 'comparison':
       return { name: 'comparison', ...(hasPlayer(view.leftId) ? { leftId: view.leftId } : {}), ...(hasPlayer(view.rightId) ? { rightId: view.rightId } : {}), ...(season(view.season) ? { season: season(view.season) } : {}), ...(scope(view.competitionType) ? { competitionType: view.competitionType } : {}) }
     case 'records-leaderboard':
@@ -98,7 +103,12 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
   const saved = value as Record<string, unknown>
   if (view.name === 'player') {
     const validSeason = typeof saved.season === 'string' && state.matches.some(match => match.season === saved.season)
-    return { name: 'player', season: validSeason ? saved.season as string : null, competition: competitionTypes.includes(saved.competition as typeof competitionTypes[number]) ? saved.competition as typeof competitionTypes[number] : 'all' }
+    const season = validSeason ? saved.season as string : null
+    const competition = competitionTypes.includes(saved.competition as typeof competitionTypes[number]) ? saved.competition as typeof competitionTypes[number] : 'all'
+    const scoped = state.matches.filter(match => (!season || match.season === season) && (competition === 'all' || matchCompetitionType(match) === competition))
+    const family = (scoped.every(match => Array.isArray(match.appearances)) ? scopedPositionFamilyByPlayer(state.players, scoped, {}).get(view.id) : undefined) ?? state.players.find(player => player.id === view.id)?.position
+    const rankTrendMetric = rankTrendMetricOptions(family).find(option => option.value === saved.rankTrendMetric)?.value ?? 'rating'
+    return { name: 'player', season, competition, rankTrendMetric }
   }
   const validScope = (scope: unknown) => scope === 'all' || competitionTypes.includes(scope as typeof competitionTypes[number])
   const validMetric = (metric: unknown) => typeof metric === 'string' && rankingMetrics.has(metric)
@@ -128,6 +138,10 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
   if (view.name === 'global-ranking') {
     const base = fallback as ScreenStateByView['global-ranking']
     return { ...base, metric: validMetric(saved.metric) ? saved.metric as typeof base.metric : base.metric, scope: validScope(saved.scope) ? saved.scope as typeof base.scope : base.scope, positionFilter: validPosition(saved.positionFilter) ? saved.positionFilter as typeof base.positionFilter : base.positionFilter, teamId: typeof saved.teamId === 'string' && state.teams.some(team => team.id === saved.teamId) ? saved.teamId : null }
+  }
+  if (view.name === 'award-race') {
+    const base = fallback as ScreenStateByView['award-race']
+    return { ...base, season: validSeason(saved.season) ? saved.season as string : base.season, scope: validScope(saved.scope) ? saved.scope as typeof base.scope : base.scope, positionFilter: validPosition(saved.positionFilter) ? saved.positionFilter as typeof base.positionFilter : base.positionFilter, teamId: typeof saved.teamId === 'string' && state.teams.some(team => team.id === saved.teamId) ? saved.teamId : null }
   }
   if (view.name === 'comparison') {
     const base = fallback as ScreenStateByView['comparison']

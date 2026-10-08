@@ -14,6 +14,7 @@ export function resolvePlayerDestination(target: Extract<View, { name: 'player' 
   let competition: ScreenStateByView['player']['competition'] = 'all'
   if (source.name === 'competition' && sourceState.name === 'competition') competition = sourceState.competitionType
   if (source.name === 'global-ranking' && sourceState.name === 'global-ranking') competition = sourceState.scope
+  if (source.name === 'award-race' && sourceState.name === 'award-race') competition = sourceState.scope
   if (source.name === 'records' && sourceState.name === 'records') competition = sourceState.competition
   if (source.name === 'records-leaderboard' && sourceState.name === 'records-leaderboard') competition = sourceState.competition
   if (source.name === 'team' && sourceState.name === 'team' && sourceState.tab === 'overview') competition = sourceState.bestPlayersCompetition
@@ -25,7 +26,7 @@ export function resolvePlayerDestination(target: Extract<View, { name: 'player' 
   }
   if (source.name === 'season-highlight' && source.kind === 'monthly') competition = 'league'
   const season = target.season ?? (source.name === 'match' ? matches.find(item => item.id === source.id)?.season : undefined) ?? (source.name === 'player' && sourceState.name === 'player' ? sourceState.season : undefined) ?? sourceSeason
-  return { view: { name: 'player', id: target.id }, screenState: { name: 'player', season, competition: target.competitionType ?? competition } }
+  return { view: { name: 'player', id: target.id }, screenState: { name: 'player', season, competition: target.competitionType ?? competition, rankTrendMetric: 'rating' } }
 }
 
 /** Removes Edit Player when returning to its existing detail route. */

@@ -17,10 +17,11 @@ import { scopedPositionFamilyByPlayer } from '../engine/positionScope'
 import { positionFamily } from '../engine/positionScope'
 import { latestAppearanceTeamId } from '../engine/playerDetailScope'
 import { playerForm } from '../engine/playerForm'
-import { playerRankTrend } from '../engine/playerRankTrend'
+import { playerRankTrend, rankTrendMetricOptions, type RankTrendMetric } from '../engine/playerRankTrend'
 import { careerNextMilestones } from '../engine/nextMilestones'
 import { recordedTeamId } from '../engine/matchPerspective'
 import { CompactFilterMenu } from '../components/CompactFilterMenu'
+import { RankingMetricTabs } from '../components/RankingRow'
 import { useStore } from '../store'
 import { currentMembershipPresentation } from '../lib/currentMembershipPresentation'
 import { recentFormLabelColor, scrollTrendToLatest, TREND_POINT_SPACING, trendPlotWidth } from '../lib/trendPlot'
@@ -38,8 +39,8 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
   const seasons = useMemo(() => seasonsFromMatches(matches), [matches])
   const selectedSeason = screenState.season && seasons.includes(screenState.season) ? screenState.season : seasons.includes(season) ? season : seasons[0] ?? season
   const competition = screenState.competition
-  const setSelectedSeason = (value: string) => onStateChange({ ...screenState, season: value })
-  const setCompetition = (value: CompetitionType | 'all') => onStateChange({ ...screenState, competition: value })
+  const setSelectedSeason = (value: string) => onStateChange({ ...screenState, season: value, rankTrendMetric: 'rating' })
+  const setCompetition = (value: CompetitionType | 'all') => onStateChange({ ...screenState, competition: value, rankTrendMetric: 'rating' })
   const scopedMatches = useMemo(() => matches.filter(match => match.season === selectedSeason && (competition === 'all' || matchCompetitionType(match) === competition)), [matches, selectedSeason, competition])
   const playerScopedMatches = useMemo(() => scopedMatches.filter(match => match.appearances.some(appearance => appearance.playerId === playerId)), [scopedMatches, playerId])
   const scopedFamilies = useMemo(() => scopedPositionFamilyByPlayer(players, scopedMatches, {}), [players, scopedMatches])
@@ -71,7 +72,7 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
     <div className="mb-4 grid grid-cols-2 gap-2"><CompactFilterMenu value={selectedSeason} options={seasons.map(item => ({ value: item, label: item }))} onChange={setSelectedSeason} label="Player detail season" popupAlign="start" /><CompactFilterMenu value={competition} options={competitions} onChange={setCompetition} label="Player detail competition" allValue="all" allLabel="All competitions" allAccessibilityLabel="All competitions" /></div>
     <Overview data={data} ranks={ranks} />
     <RecentForm form={form} playerId={playerId} players={players} teams={teams} onNavigate={onNavigate} />
-    <DeferredRankTrend playerId={playerId} players={players} matches={matches} season={selectedSeason} competition={competition} />
+    <DeferredRankTrend playerId={playerId} players={players} matches={matches} season={selectedSeason} competition={competition} position={dominantPosition} metric={screenState.rankTrendMetric} onMetric={rankTrendMetric => onStateChange({ ...screenState, rankTrendMetric })} />
     <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Active Streaks</h2>{activeStreaks.length ? <div className="mt-2 flex flex-wrap gap-2">{activeStreaks.map(row => <span key={row.key} className="rounded-full bg-emerald-500/10 px-2.5 py-1.5 text-[10px] font-bold text-emerald-300">{row.current} straight · {row.label}</span>)}</div> : <p className="mt-2 text-xs text-zinc-500">No active streak.</p>}</section>
     <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><div><h2 className="text-sm font-semibold">Awards {awards.length}</h2><p className="text-[10px] text-zinc-500">Season awards and titles in {selectedSeason}</p></div>{awards.length ? <div className="mt-2 space-y-1">{awards.slice().reverse().map((award, index) => <p key={`${award}:${index}`} className="rounded-lg bg-black/20 px-2 py-1.5 text-xs">{award}</p>)}</div> : <p className="mt-2 text-xs text-zinc-500">No completed awards or team titles yet.</p>}</section>
     {milestones.length > 0 && <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Recent Milestones</h2><div className="mt-2 space-y-1">{milestones.map(item => <button key={item.id} type="button" onClick={() => item.matchId && onNavigate({ name: 'match', id: item.matchId })} className="block w-full rounded-lg bg-black/20 px-2 py-1.5 text-left text-xs">{item.title.replace(/^.*? · /, '')}</button>)}</div></section>}
@@ -112,29 +113,35 @@ function RecentForm({ form, playerId, players, teams, onNavigate }: { form: Retu
   </section>
 }
 
-function DeferredRankTrend({ playerId, players, matches, season, competition }: { playerId: string; players: Player[]; matches: Match[]; season: string; competition: CompetitionType | 'all' }) {
+function DeferredRankTrend({ playerId, players, matches, season, competition, position, metric, onMetric }: { playerId: string; players: Player[]; matches: Match[]; season: string; competition: CompetitionType | 'all'; position?: string; metric: RankTrendMetric; onMetric: (metric: RankTrendMetric) => void }) {
   const [ready, setReady] = useState(() => typeof window === 'undefined')
   useEffect(() => { if (typeof window === 'undefined') return; const timer = window.setTimeout(() => setReady(true), 80); return () => window.clearTimeout(timer) }, [playerId, players, matches, season, competition])
-  return ready ? <RankTrend key={`${playerId}:${season}:${competition}`} playerId={playerId} players={players} matches={matches} season={season} competition={competition} /> : <div className="mb-4 h-44 rounded-2xl bg-zinc-900/60" aria-label="Loading rank trend" />
+  return ready ? <RankTrend key={`${playerId}:${season}:${competition}`} playerId={playerId} players={players} matches={matches} season={season} competition={competition} position={position} metric={metric} onMetric={onMetric} /> : <div className="mb-4 h-44 rounded-2xl bg-zinc-900/60" aria-label="Loading rank trend" />
 }
 
-export function RankTrend({ playerId, players, matches, season, competition }: { playerId: string; players: Player[]; matches: Match[]; season: string; competition: CompetitionType | 'all' }) {
+export function RankTrend({ playerId, players, matches, season, competition, position, metric = 'rating', onMetric }: { playerId: string; players: Player[]; matches: Match[]; season: string; competition: CompetitionType | 'all'; position?: string; metric?: RankTrendMetric; onMetric?: (metric: RankTrendMetric) => void }) {
   const [selected, setSelected] = useState<'overall' | 'position' | 'team'>('position')
   const scrollRef = useRef<HTMLDivElement>(null)
-  const points = useMemo(() => playerRankTrend(playerId, players, matches, season, competition), [playerId, players, matches, season, competition])
+  const scopedMatches = useMemo(() => matches.filter(match => match.season === season && (competition === 'all' || matchCompetitionType(match) === competition)), [matches, season, competition])
+  const family = position ?? scopedPositionFamilyByPlayer(players, scopedMatches, {}).get(playerId) ?? players.find(player => player.id === playerId)?.position
+  const options = rankTrendMetricOptions(family)
+  const chosen = options.some(option => option.value === metric) ? metric : 'rating'
+  const points = useMemo(() => playerRankTrend(playerId, players, matches, season, competition, chosen), [playerId, players, matches, season, competition, chosen])
   const valid = points.filter(row => row[selected] !== null)
   const highest = Math.max(2, ...valid.map(row => row[selected] ?? 0))
-  const width = trendPlotWidth(valid.length)
+  const width = trendPlotWidth(points.length)
   const x = (index: number) => 18 + index * TREND_POINT_SPACING
   const y = (rank: number) => 26 + (rank - 1) * 62 / Math.max(1, highest - 1)
-  useEffect(() => scrollTrendToLatest(scrollRef.current), [selected, valid.length, valid[valid.length - 1]?.match.id])
+  const latestMatchId = points[points.length - 1]?.match.id
+  useEffect(() => scrollTrendToLatest(scrollRef.current), [selected, chosen, points.length, latestMatchId])
   return <section className="mb-4 rounded-2xl bg-zinc-900 p-3">
     <div className="flex items-center justify-between gap-2"><div><h2 className="text-sm font-semibold">Rank Trend</h2><p className="text-[10px] text-zinc-500">Rank after each appearance</p></div><div className="flex gap-1" aria-label="Rank trend type">{(['overall', 'position', 'team'] as const).map(item => <button key={item} type="button" aria-pressed={selected === item} onClick={() => setSelected(item)} className={'rounded-full px-2 py-1 text-[10px] ' + (selected === item ? 'bg-emerald-400 text-black' : 'bg-black/30 text-zinc-400')}>{item[0].toUpperCase() + item.slice(1)}</button>)}</div></div>
-    {valid.length > 0 ? <>
-      <div ref={scrollRef} className="no-scrollbar mt-3 overflow-x-auto overscroll-x-contain" aria-label="Rank Trend horizontal plot"><svg width={width} height={104} role="img" aria-label={selected + ' rank history: ' + valid.map(row => '#' + row[selected]).join(', ')} className="block">
-        {valid.length > 1 && <polyline fill="none" stroke="#34d399" strokeWidth="2" points={valid.map((row, index) => x(index) + ',' + y(row[selected]!)).join(' ')} />}
-        {valid.map((row, index) => <g key={row.match.id}><circle cx={x(index)} cy={y(row[selected]!)} r="3" fill="#34d399" /><text x={x(index)} y={y(row[selected]!) - 7} textAnchor="middle" fontSize="9" fill="#e4e4e7">{'#' + row[selected]}</text><title>{row.match.date + ' · #' + row[selected] + ' · ' + matchCompetitionType(row.match)}</title></g>)}
-      </svg></div><p className="text-right text-xs text-zinc-400">Current <b className="text-emerald-300">{'#' + valid[valid.length - 1][selected]}</b></p>
+    <div className="mt-3"><RankingMetricTabs label="Rank Trend metric" value={chosen} onChange={value => onMetric?.(value)} options={options} /></div>
+    {points.length > 0 ? <>
+      <div ref={scrollRef} className="no-scrollbar mt-3 overflow-x-auto overscroll-x-contain" aria-label="Rank Trend horizontal plot"><svg width={width} height={104} role="img" aria-label={selected + ' ' + chosen + ' rank history: ' + points.map(row => row[selected] === null ? '—' : '#' + row[selected]).join(', ')} className="block">
+        {points.slice(1).map((row, index) => row[selected] !== null && points[index][selected] !== null ? <line key={row.match.id} x1={x(index)} y1={y(points[index][selected]!)} x2={x(index + 1)} y2={y(row[selected]!)} stroke="#34d399" strokeWidth="2" /> : null)}
+        {points.map((row, index) => <g key={row.match.id}>{row[selected] !== null && <circle cx={x(index)} cy={y(row[selected]!)} r="3" fill="#34d399" />}<text x={x(index)} y={row[selected] === null ? 96 : y(row[selected]!) - 7} textAnchor="middle" fontSize="9" fill="#e4e4e7">{row[selected] === null ? '—' : '#' + row[selected]}</text><title>{row.match.date + ' · ' + (row[selected] === null ? '—' : '#' + row[selected]) + ' · ' + matchCompetitionType(row.match)}</title></g>)}
+      </svg></div><p className="text-right text-xs text-zinc-400">Current <b className="text-emerald-300">{points[points.length - 1][selected] === null ? '—' : '#' + points[points.length - 1][selected]}</b></p>
     </> : <p className="mt-3 text-xs text-zinc-500">Not enough matches to show rank trend.</p>}
   </section>
 }

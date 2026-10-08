@@ -10,16 +10,16 @@ import type {
   TeamSeasonStats,
   PartnershipStats,
 } from '../types'
-import { hasPitchAppearance, ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, pitchWindow, matchPositionSegments, creditedPositionSegments } from './rating'
+import { hasPitchAppearance, ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, pitchWindow, matchPositionSegments } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import { kickoffLineupForMatch } from './kickoffLineup'
 import { newestMatches, oldestMatches } from './matchChronology'
 import { positionFamily, scopedAwardFamilyByPlayer, scopedPositionFamilyByPlayer, type PositionFamily } from './positionScope'
 import { matchCompetitionType } from './competitionContext'
 import { GOOD_RATING_THRESHOLD } from './constants'
-import { opponentSotExposureForPositionSegment } from './opponentSot'
 import { isRecordedForTeam, teamsCreditedWithResult, teamPerspectiveScore } from './matchPerspective'
 import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts, playerSaveCount } from './playerMatchFacts'
+import { addDefensiveRankingFacts, appendRecordedTeamOpportunities, defensiveMatchFacts, defensiveRankingValue, emptyDefensiveRankingFacts, emptyTeamOpportunityIndex, teamAppearanceHistory, teamOpportunityMinutesFromIndex, type DefensiveRankingFacts } from './defensiveRanking'
 import { isAwardEligible, rankAwardCandidates, selectAwardBestXI, type AwardCandidate } from './awardRules'
 
 
@@ -259,7 +259,7 @@ export type GlobalLeaderboardRow = PlayerSeasonStats & {
   goalkeeperAppearances?: number
   goalkeeperConceded?: number
   scopedPositionFamily?: PositionFamily
-}
+} & DefensiveRankingFacts
 
 const defenderRankingPosition = (position: Position) => ['CB', 'LB', 'RB'].includes(positionFamily(position) ?? '')
 const goalkeeperPosition = (position: Position) => position === 'GK'
@@ -303,6 +303,10 @@ export function buildGlobalRankingData(
     return rows
   }
   const selected = matches.filter(match => (!filters.seasons.length || filters.seasons.includes(match.season)))
+  const orderedSelected = oldestMatches(selected)
+  const opportunityIndex = emptyTeamOpportunityIndex()
+  orderedSelected.forEach((match, matchIndex) => appendRecordedTeamOpportunities(opportunityIndex, match, matchIndex))
+  const appearancesByPlayer = teamAppearanceHistory(orderedSelected)
   const historicalPositionFamilies = scopedPositionFamilyByPlayer(players, selected, { teams: filters.teams })
   const allowedPositionFamilies = new Set(filters.positions.map(positionFamily).filter((family): family is NonNullable<typeof family> => Boolean(family)))
   const playerById = new Map(players.map(player => [player.id, player]))
@@ -336,7 +340,9 @@ export function buildGlobalRankingData(
     const ratingRows: RatingBreakdown[] = []
     let starts = 0; let subs = 0; let saves = 0; let cleanSheets = 0; let goalkeeperMinutes = 0; let goalkeeperAppearances = 0; let goalkeeperConceded = 0; let wins = 0; let draws = 0; let losses = 0
     const goalkeeperRatings: RatingBreakdown[] = []
-    let sotAllowedTotal = 0; let sotAllowedAppearances = 0; let concededOnPitch = 0; let qualifyingGoalkeeperMinutes = 0; let qualifyingGoalkeeperAppearances = 0; let qualifyingSaves = 0
+    let concededOnPitch = 0; let qualifyingGoalkeeperMinutes = 0; let qualifyingGoalkeeperAppearances = 0; let qualifyingSaves = 0
+    const defensive = emptyDefensiveRankingFacts()
+    const representedTeamIds = new Set<string>()
     const recentForm: ('W' | 'D' | 'L')[] = []
     for (const match of playerMatches) {
       const appearance = match.appearances.find(item => item.playerId === player.id)
@@ -344,24 +350,17 @@ export function buildGlobalRankingData(
       const rating = ratingFor(match, player)
       if (!rating) continue
       ratingRows.push(rating)
+      representedTeamIds.add(appearance.teamId)
       if (appearance.role === 'starter') starts++; else subs++
       const goalkeeper = playerGoalkeeperFacts(match, appearance)
+      addDefensiveRankingFacts(defensive, defensiveMatchFacts(match, appearance, goalkeeper))
       const matchSaves = goalkeeper.saves
       saves += matchSaves
       cleanSheets += Number(goalkeeper.cleanSheet)
       goalkeeperMinutes += goalkeeper.minutes; goalkeeperAppearances += goalkeeper.appearances; goalkeeperConceded += goalkeeper.conceded
       if (goalkeeper.appearances) goalkeeperRatings.push(rating)
       const window = pitchWindow(match, appearance)
-      // Ranking eligibility follows the historical match role, just like the
-      // rating engine; a later transfer or role change cannot rewrite it.
-      const playedPositions = matchPositionSegments(match, appearance).map(segment => segment.position)
-      const defenderSegments = creditedPositionSegments(match, appearance).filter(segment => defenderRankingPosition(segment.position))
-      const defenderMinutes = defenderSegments.reduce((total, segment) => total + segment.exit - segment.enter, 0)
-      const isGoalkeeper = playedPositions.some(goalkeeperPosition)
-      if (window && defenderMinutes >= 60) {
-        sotAllowedTotal += defenderSegments.reduce((total, segment) => total + opponentSotExposureForPositionSegment(match, appearance, segment.position, segment.enter, segment.exit), 0)
-        sotAllowedAppearances++
-      }
+      const isGoalkeeper = matchPositionSegments(match, appearance).some(segment => goalkeeperPosition(segment.position))
       if (window && isGoalkeeper && goalkeeper.minutes >= 60) {
         qualifyingGoalkeeperMinutes += goalkeeper.minutes
         qualifyingGoalkeeperAppearances++
@@ -381,7 +380,8 @@ export function buildGlobalRankingData(
     const playedGoalkeeper = goalkeeperAppearances > 0
     const per90 = (value: number) => stats.minutes ? value / stats.minutes * 90 : 0
     const value = _metric === 'goals' ? stats.goals : _metric === 'assists' ? stats.assists : _metric === 'g+a' ? stats.goals + stats.assists : _metric === 'minutes' ? stats.minutes : _metric === 'mom' ? stats.mom : _metric === 'goodMatches' ? stats.goodMatches : _metric === 'goals/90' ? per90(stats.goals) : _metric === 'assists/90' ? per90(stats.assists) : _metric === 'g+a/90' ? per90(stats.goals + stats.assists) : stats.avgRating
-    return [{ ...stats, value, historicalTeamId: latest?.appearances.find(item => item.playerId === player.id)?.teamId, playedGoalkeeper, sotAllowedAppearances, sotAllowedTotal, concededOnPitch, qualifyingConceded: concededOnPitch, qualifyingGoalkeeperMinutes, qualifyingGoalkeeperAppearances, qualifyingSaves, cleanSheets, goalkeeperRatings, goalkeeperMinutes, allGoalkeeperMinutes: goalkeeperMinutes, goalkeeperAppearances, goalkeeperConceded, scopedPositionFamily: historicalPositionFamilies.get(player.id) }]
+    defensive.availableTeamMinutes = teamOpportunityMinutesFromIndex(opportunityIndex, representedTeamIds, appearancesByPlayer.get(player.id) ?? [])
+    return [{ ...stats, ...defensive, value, historicalTeamId: latest?.appearances.find(item => item.playerId === player.id)?.teamId, playedGoalkeeper, concededOnPitch, qualifyingConceded: concededOnPitch, qualifyingGoalkeeperMinutes, qualifyingGoalkeeperAppearances, qualifyingSaves, cleanSheets, goalkeeperRatings, goalkeeperMinutes, allGoalkeeperMinutes: goalkeeperMinutes, goalkeeperAppearances, goalkeeperConceded, scopedPositionFamily: historicalPositionFamilies.get(player.id) }]
   })
   const presented = presentMetric(rows, _metric)
   byFilter.set(cacheKey, { rows, presented: new Map([[_metric, presented]]) })
@@ -414,7 +414,7 @@ export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Pla
       case 'goals/90': return row.minutes ? row.goals / row.minutes * 90 : 0
       case 'assists/90': return row.minutes ? row.assists / row.minutes * 90 : 0
       case 'g+a/90': return row.minutes ? (row.goals + row.assists) / row.minutes * 90 : 0
-      case 'sotAllowed': return row.sotAllowedAppearances ? (row.sotAllowedTotal ?? 0) / row.sotAllowedAppearances : Number.NaN
+      case 'sotAllowed': case 'defenderGaPer90': case 'goalkeeperGaPer90': return defensiveRankingValue(metric, row) ?? Number.NaN
       case 'cleanSheets': return row.cleanSheets ?? 0
       case 'saves': return row.saves
       case 'goalsConceded': return row.qualifyingGoalkeeperAppearances ? (row.qualifyingConceded ?? 0) / row.qualifyingGoalkeeperAppearances : Number.NaN
@@ -423,12 +423,12 @@ export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Pla
   }
   const ranked = rows.flatMap(row => {
     const player = playerById.get(row.playerId)
-    const requiresDefensiveSample = metric === 'sotAllowed' && !row.sotAllowedAppearances
+    const requiresDefensiveSample = (metric === 'sotAllowed' || metric === 'defenderGaPer90' || metric === 'goalkeeperGaPer90') && defensiveRankingValue(metric, row) === null
     const requiresGoalkeeperSample = (metric === 'saves' || metric === 'goalsConceded' || metric === 'savePercentage' || metric === 'cleanSheets') && !row.playedGoalkeeper
     if (!player || requiresDefensiveSample || requiresGoalkeeperSample) return []
     const value = valueFor(row)
     return Number.isFinite(value) ? [{ ...row, value }] : []
-  }).sort((a, b) => CORE_LEADERBOARD_METRICS.has(metric) ? compareCoreLeaderboardRows(a, b, metric as Extract<LeaderboardMetric, 'rating' | 'goals' | 'assists' | 'g+a' | 'mom'>) : (metric === 'sotAllowed' || metric === 'goalsConceded' ? a.value - b.value : b.value - a.value) || b.avgRating - a.avgRating || a.playerId.localeCompare(b.playerId))
+  }).sort((a, b) => CORE_LEADERBOARD_METRICS.has(metric) ? compareCoreLeaderboardRows(a, b, metric as Extract<LeaderboardMetric, 'rating' | 'goals' | 'assists' | 'g+a' | 'mom'>) : (metric === 'sotAllowed' || metric === 'defenderGaPer90' || metric === 'goalkeeperGaPer90' || metric === 'goalsConceded' ? a.value - b.value : b.value - a.value) || b.avgRating - a.avgRating || a.playerId.localeCompare(b.playerId))
   byMetric.set(metric, ranked)
   return ranked
 }

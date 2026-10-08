@@ -8,11 +8,13 @@ import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { playerStreaks } from './seasonInsights'
 import { goalTypeTotals } from './goalTypes'
 import { playerGoalkeeperFacts, playerGoalEvents, playerAssistEvents } from './playerMatchFacts'
+import { buildGlobalRankingData, rankGlobalRankingRows } from './stats'
+import type { DefensiveRankingMetric } from './defensiveRanking'
 
 export type PlayerRecordLeaderboardId =
   | 'goals' | 'assists' | 'ga' | 'matches-scored-in' | 'matches-ga' | 'braces' | 'hat-tricks'
   | 'four-goals' | 'three-assists' | 'four-ga' | 'mom'
-  | 'good' | 'eight' | 'nine' | 'ten' | 'clean-sheets' | 'saves'
+  | 'good' | 'eight' | 'nine' | 'ten' | 'lowest-sot-90' | 'lowest-defender-ga-90' | 'clean-sheets' | 'saves' | 'lowest-gk-ga-90'
   | 'good-streak' | 'scoring-streak' | 'ga-streak'
   | 'game-winning-goals' | 'comeback-goals' | 'equalizers' | 'opening-goals' | 'stoppage-time-goals'
   | 'highest-rating' | 'highest-goals' | 'highest-assists' | 'highest-ga'
@@ -91,6 +93,21 @@ export function buildPlayerRecordLeaderboards(players: Player[], matches: Match[
   const key = scopeKey(scope)
   const cached = byScope.get(key); if (cached) return cached
   const facts = buildFacts(players, matches, scope)
+  const selected = selectedMatches(matches, scope)
+  const rankingIndex = buildGlobalRankingData(players, selected, { seasons: [], teams: scope.teamIds ?? [], positions: positionFilterFamilies(scope.positionFilter ?? 'all') }, 'rating')
+  const defensiveGroup = (id: PlayerRecordLeaderboardId, title: string, metric: DefensiveRankingMetric): PlayerRecordGroup => {
+    let previous: number | undefined
+    let previousRank = 0
+    const rows = rankGlobalRankingRows(rankingIndex, players, metric).map((row, index): PlayerRecordRow => {
+      const numeric = row.value
+      const rank = previous === numeric ? previousRank : index + 1
+      previous = numeric; previousRank = rank
+      const minutes = metric === 'sotAllowed' ? row.qualifyingDefenderMinutes : metric === 'defenderGaPer90' ? row.defenderMinutes : row.goalkeeperMinutes
+      const detail = metric === 'sotAllowed' ? `${minutes}' qualifying defender minutes · ${row.sotAllowedAppearances} qualifying apps` : `${minutes}' ${metric === 'defenderGaPer90' ? 'defender' : 'GK'} minutes · ${metric === 'defenderGaPer90' ? row.defenderConceded : row.goalkeeperConceded} conceded`
+      return { playerId: row.playerId, numeric, value: `${numeric.toFixed(2)} ${metric === 'sotAllowed' ? 'SOT/90' : 'GA/90'}`, detail, rank }
+    })
+    return { id, title, rows }
+  }
   const group = (id: PlayerRecordLeaderboardId, title: string, metric: (row: PlayerRecordFacts) => number, suffix = '', detail?: (row: PlayerRecordFacts) => string): PlayerRecordGroup => ({
     id, title, rows: rank(facts.map(row => {
       const numeric = metric(row)
@@ -102,7 +119,7 @@ export function buildPlayerRecordLeaderboards(players: Player[], matches: Match[
     group('matches-scored-in', 'Most Matches Scored In', row => row.matchesScoredIn), group('matches-ga', 'Most Matches with G+A', row => row.matchesGA), group('braces', 'Most Braces', row => row.braces), group('hat-tricks', 'Most Hat-tricks', row => row.hatTricks),
     group('four-goals', 'Most 4+ Goal Games', row => row.fourGoalGames), group('three-assists', 'Most 3+ Assist Games', row => row.threeAssistGames), group('four-ga', 'Most 4+ G+A Games', row => row.fourGAGames),
     group('mom', 'Most MOM Awards', row => row.mom, ' MOM'), group('good', 'Most 7.2+ Matches', row => row.goodRatings), group('eight', 'Most 8.0+ Ratings', row => row.eightRatings), group('nine', 'Most 9.0+ Ratings', row => row.nineRatings),
-    group('ten', 'Most 10.0 Ratings', row => row.tenRatings, '', () => 'final canonical 10.0 ratings'), group('clean-sheets', 'Most Clean Sheets', row => row.cleanSheets, ' CS'), group('saves', 'Most Career Saves', row => row.saves, ' saves'),
+    group('ten', 'Most 10.0 Ratings', row => row.tenRatings, '', () => 'final canonical 10.0 ratings'), defensiveGroup('lowest-sot-90', 'Lowest Opponent SOT/90', 'sotAllowed'), defensiveGroup('lowest-defender-ga-90', 'Lowest Defender GA/90', 'defenderGaPer90'), group('clean-sheets', 'Most Clean Sheets', row => row.cleanSheets, ' CS'), group('saves', 'Most Career Saves', row => row.saves, ' saves'), defensiveGroup('lowest-gk-ga-90', 'Lowest GK GA/90', 'goalkeeperGaPer90'),
     group('good-streak', 'Longest 7.2+ Streak', row => row.goodStreak, ' matches'), group('scoring-streak', 'Longest Scoring Streak', row => row.scoringStreak, ' matches'), group('ga-streak', 'Longest G+A Streak', row => row.gaStreak, ' matches'),
     group('game-winning-goals', 'Most Game-Winning Goals', row => row.gameWinningGoals, ' goals'), group('comeback-goals', 'Most Comeback Goals', row => row.comebackGoals, ' goals'), group('equalizers', 'Most Equalizers', row => row.equalizers, ' goals'), group('opening-goals', 'Most Opening Goals', row => row.openingGoals, ' goals'), group('stoppage-time-goals', 'Most Stoppage-Time Goals', row => row.stoppageTimeGoals, ' goals'),
     group('highest-rating', 'Highest Match Rating', row => row.highestRating, '', row => `${row.highestRating.toFixed(2)} canonical raw rating`), group('highest-goals', 'Most Goals in a Match', row => row.highestGoals, ' goals'),

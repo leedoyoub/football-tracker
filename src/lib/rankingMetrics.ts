@@ -14,8 +14,11 @@ export const RANKING_METRICS = [
   { value: 'goals/90', label: 'Goals/90' },
   { value: 'assists/90', label: 'Assists/90' },
   { value: 'g+a/90', label: 'G+A/90' },
+  { value: 'sotAllowed', label: 'SOT Allowed/90' },
+  { value: 'defenderGaPer90', label: 'Defender GA/90' },
   { value: 'cleanSheets', label: 'Clean Sheets' },
   { value: 'saves', label: 'Saves' },
+  { value: 'goalkeeperGaPer90', label: 'GK GA/90' },
   { value: 'savePercentage', label: 'Qualifying GK Save %' },
 ] as const satisfies readonly { value: LeaderboardMetric; label: string }[]
 
@@ -30,5 +33,6 @@ export function rankingTitle(scope: RankingTitleScope, teamScoped = false) {
 }
 
 export function formatRankingMetricValue(metric: LeaderboardMetric, value: number) {
-  return `${value.toFixed(metric === 'rating' || metric.includes('/') ? 2 : 0)}${metric === 'savePercentage' ? '%' : ''}`
+  const decimals = metric === 'rating' || metric.includes('/') || metric === 'sotAllowed' || metric === 'defenderGaPer90' || metric === 'goalkeeperGaPer90' ? 2 : 0
+  return `${value.toFixed(decimals)}${metric === 'savePercentage' ? '%' : ''}`
 }
