@@ -9,7 +9,7 @@ const { RATING_ENGINE_REVISION } = require('../src/engine/ratingRevision.ts')
 const { APP_VERSION } = require('../src/config.ts')
 const {
   buildSeasonAnalytics, isLeagueMatchdayComplete, monthlyBlockForMatchday,
-  monthlyBlockRange, raceHistory, rankMovement, rankingMovement,
+  monthlyBlockRange, rankMovement, rankingMovement,
 } = require('../src/engine/seasonAnalytics.ts')
 const {
   buildAwardBestXI, championsProgressBonus, cupProgressBonus, isAwardEligible,
@@ -32,8 +32,8 @@ function game(day, options = {}) {
   }
 }
 
-test('v2.5.0 metadata and the revision-12 position table are exact', () => {
-  assert.equal(APP_VERSION, '2.5.0'); assert.equal(require('../package.json').version, '2.5.0'); assert.equal(RATING_ENGINE_REVISION, 12)
+test('v2.5.1 metadata and the revision-12 position table are exact', () => {
+  assert.equal(APP_VERSION, '2.5.1'); assert.equal(require('../package.json').version, '2.5.1'); assert.equal(RATING_ENGINE_REVISION, 12)
   const expected = {
     LB: [.04, 1], LWB: [.04, 1], RB: [.04, 1], RWB: [.04, 1],
     CDM: [.06, .80], LDM: [.06, .80], RDM: [.06, .80],
@@ -106,7 +106,7 @@ test('rank movement is snapshot-to-snapshot and neutral without a prior rank', (
   assert.deepEqual([...rankingMovement(current, undefined, 'goals')], [['A', null], ['B', null]])
 })
 
-test('historical standings, form and race snapshots exclude future or wrong-competition data and invalidate on edit', () => {
+test('historical standings, form and player snapshots exclude future or wrong-competition data and invalidate on edit', () => {
   const p = player('p')
   const league = [1, 2, 3, 4, 5, 6].map(day => game(day, { appearances: [appearance(p)], events: day === 1 ? [goal('b1', 'B')] : [goal(`a${day}`, 'A', p.id)] }))
   const cup = game(7, { id: 'cup', competitionType: 'cup', competitionStage: 'stage1', appearances: [appearance(p)], events: [goal('cup-b', 'B')] })
@@ -114,15 +114,14 @@ test('historical standings, form and race snapshots exclude future or wrong-comp
   assert.equal(analytics.leagueSnapshots.get(1).standings.find(row => row.teamId === 'A').points, 0)
   assert.equal(analytics.leagueSnapshots.get(2).standings.find(row => row.teamId === 'A').points, 3)
   assert.deepEqual([analytics.formTable.find(row => row.teamId === 'A').played, analytics.formTable.find(row => row.teamId === 'A').points], [3, 9])
-  const goals = raceHistory(analytics, 'goals', [p.id])[0].points
-  assert.deepEqual(goals.map(point => point.value), [0, 1, 2, 3, 4, 5])
-  const averages = raceHistory(analytics, 'rating', [p.id])[0].points
-  assert(averages.every(point => point.value >= 3 && point.value <= 10))
+  const snapshots = [...analytics.playerSnapshots.values()]
+  assert.deepEqual(snapshots.map(snapshot => snapshot.rows.get('goals').find(row => row.playerId === p.id)?.goals), [0, 1, 2, 3, 4, 5])
+  assert(snapshots.every(snapshot => { const average = snapshot.rows.get('rating').find(row => row.playerId === p.id)?.avgRating; return average >= 3 && average <= 10 }))
   assert.strictEqual(buildSeasonAnalytics(teams, [p], [...league, cup], 'S1') === analytics, false)
   const edited = league.map(match => match.matchDay === 1 ? { ...match, events: [goal('a1-edited', 'A', p.id)] } : match)
   const rebuilt = buildSeasonAnalytics(teams, [p], edited, 'S1')
   assert.equal(rebuilt.leagueSnapshots.get(1).standings.find(row => row.teamId === 'A').points, 3)
-  assert.equal(raceHistory(rebuilt, 'goals', [p.id])[0].points.at(-1).value, 6)
+  assert.equal([...rebuilt.playerSnapshots.values()].at(-1).rows.get('goals').find(row => row.playerId === p.id).goals, 6)
 })
 
 test('single-match performance News uses stable one-article thresholds', () => {
@@ -146,7 +145,7 @@ test('mobile screen hierarchy, compare mode, cached snapshots and navigation mem
   const playerDetail = fs.readFileSync(require.resolve('../src/screens/PlayerDetailScreen.tsx'), 'utf8')
   const matchDetail = fs.readFileSync(require.resolve('../src/screens/MatchDetailScreen.tsx'), 'utf8')
   for (const token of ['screenState.leaderMetric', 'Global Ranking', 'Latest Changes', 'slice(0, 10)', 'slice(0, 4)', 'seasonMatches']) assert(home.includes(token), token)
-  for (const token of ['screenState.competitionType', 'screenState.rankingMetric', "label: 'Players'", "label: 'Table'", "label: 'Form'", "label: 'History'", 'Team of the Month', 'Race History']) assert(competition.includes(token), token)
+  for (const token of ['screenState.competitionType', 'screenState.rankingMetric', "label: 'Players'", "label: 'Table'", "label: 'Form'", "label: 'History'", 'Team of the Month', 'Best XI view']) assert(competition.includes(token), token)
   for (const token of ['screenState.bestPlayersMetric', "label: 'Overview'", "label: 'Matches'", "label: 'Players'", 'Roster management', 'Latest XI', 'Bench', 'RANKING_METRICS']) assert(team.includes(token), token)
   for (const token of ['RankedMetric', 'Overall rank', 'Position-family rank', 'Team rank', 'Season avg', 'Last 5 avg', 'Active Streaks', 'Awards']) assert(playerDetail.includes(token), token)
   for (const token of ['Match Facts', 'Lineup', 'Ratings', 'What Changed', 'Top 3 Ratings']) assert(matchDetail.includes(token), token)

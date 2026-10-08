@@ -6,7 +6,7 @@ import { GOOD_RATING_THRESHOLD } from './constants'
 import { classifyGoalTypes } from './goalTypes'
 import type { CompetitionState, Match, MatchEvent, Player, Team } from '../types'
 import { oldestMatches } from './matchChronology'
-import { matchCompetitionType } from './competitionContext'
+import { competitionIdentityForMatch, matchCompetitionType } from './competitionContext'
 import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts } from './playerMatchFacts'
 import { orderedEvents } from './timeline'
 
@@ -64,7 +64,7 @@ export function playerForm(player: Player, matches: Match[]): PlayerForm {
     const appearance = match.appearances.find(item => item.playerId === player.id)
     const rating = appearance ? ratePlayerMatch(match, player) : null
     // ratePlayerMatch deliberately returns null for a bench player who never entered.
-    return rating ? [{ matchId: match.id, matchDay: match.matchDay, rating: rating.rating }] : []
+    return rating ? [{ matchId: match.id, matchDay: competitionIdentityForMatch(match).matchDay, rating: rating.rating }] : []
   })
   const average = (rows: typeof ratings) => rows.length ? rows.reduce((sum, row) => sum + row.rating, 0) / rows.length : 0
   return { seasonAverage: average(ratings), last5Average: average(ratings.slice(-5)), last3Average: average(ratings.slice(-3)), ratings }
@@ -165,7 +165,7 @@ export function seasonRecap(players: Player[], matches: Match[], season: string,
     awardFor('substitute', 'Best Substitute', bestSub, row => `${starterSubstituteSplits(row.player, matches, filter).substitute.averageRating.toFixed(2)} as a substitute`),
     xi && { id: 'most-used-xi', title: 'Most Used XI', playerIds: xi.playerIds, detail: `${xi.matches} matches · ${(xi.winRate * 100).toFixed(0)}% wins` },
   ].filter((award): award is SeasonAward => Boolean(award))
-  return { season, complete: isSeasonComplete(matches, season, states), matchDays: new Set(matches.filter(match => match.season === season && matchCompetitionType(match) === 'league').map(match => match.matchDay)).size, awards, bestXI }
+  return { season, complete: isSeasonComplete(matches, season, states), matchDays: new Set(matches.filter(match => match.season === season && matchCompetitionType(match) === 'league').map(match => competitionIdentityForMatch(match).matchDay)).size, awards, bestXI }
 }
 
 export type DataStory = { id: string; eyebrow: string; title: string; detail: string; playerIds: string[] }

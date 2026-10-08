@@ -159,12 +159,12 @@ test('save validation uses the event-time goalkeeper role and rejects malformed 
 
 test('navigation preserves a ranking player scope and distinguishes another scope', () => {
   const source = createNavigationEntry({ name: 'global-ranking', season: 'Season 2', competitionType: 'cup', teamId: 'A' })
-  const cup = { name: 'player', id: 'P', season: 'Season 2', competitionType: 'cup', teamId: 'A' }
+  const cup = { name: 'player', id: 'P', season: 'Season 2', competitionType: 'cup' }
   const league = { name: 'player', id: 'P', season: 'Season 2', competitionType: 'league' }
   const opened = navigateBrowseEntry([source], cup, 0)
   assert.equal(opened[1].screenState.season, 'Season 2')
   assert.equal(opened[1].screenState.competition, 'cup')
-  assert.equal(opened[1].screenState.teamId, 'A')
+  assert.equal(Object.hasOwn(opened[1].screenState, 'teamId'), false)
   assert.equal(navigateBrowseEntry(opened, league, 0).length, 3)
   assert.equal(navigateBrowseEntry(opened, cup, 0).length, 2)
 })
@@ -282,7 +282,7 @@ test('Comparison Last 5 follows match dates instead of storage order', () => {
   }
 })
 
-test('League Rating Race History uses the current ranking population', () => {
+test('League Rating player snapshots use the current ranking population', () => {
   const striker = player('P', 'ST')
   const teams = [{ id: 'A', name: 'A' }, { id: 'B', name: 'B' }]
   const games = [match('first', '2026-01-01', [appearance('P', 'A', 'ST')]), match('second', '2026-01-02', []), match('third', '2026-01-03', [])]

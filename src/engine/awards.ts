@@ -208,7 +208,7 @@ export function awardsForCompetition(type: CompetitionType, season: string, team
   const best = eligible[0]
   const mvp = best ? { playerId: best.row.playerId, value: rawAverage(best.row), awardScore: best.score, label: 'Avg Rating' } : undefined
   const goalkeeperLabel = type === 'league' ? 'Goalkeeper of the Season' : type === 'cup' ? 'Goalkeeper of the Cup' : 'Goalkeeper of the Tournament'
-  const goalkeeperEligible = eligible.map(candidate => ({ ...candidate, score: ratingAwardScore(goalkeeperAverage(candidate.row), bonusFor(teamIdFor(candidate.row)), goalkeeperMinutes(candidate.row), games.filter(match => isRecordedForTeam(match, teamIdFor(candidate.row))).length) }))
+  const goalkeeperEligible = eligible.filter(candidate => isAwardEligible(candidate.row.goalkeeperAppearances ?? 0, games.filter(match => isRecordedForTeam(match, teamIdFor(candidate.row))).length)).map(candidate => ({ ...candidate, score: ratingAwardScore(goalkeeperAverage(candidate.row), bonusFor(teamIdFor(candidate.row)), goalkeeperMinutes(candidate.row), games.filter(match => isRecordedForTeam(match, teamIdFor(candidate.row))).length) }))
   const presentation = awardPresentationFromCandidates(scored.map(item => item.candidate))
   return { complete, championId, scorer: winner(stats, row => row.goals, 'Goals'), assists: winner(stats, row => row.assists, 'Assists'), mvp, goalkeeper: goalkeeperWinner(goalkeeperEligible, goalkeeperLabel), ...presentation, candidates: scored.map(item => item.candidate) }
 }

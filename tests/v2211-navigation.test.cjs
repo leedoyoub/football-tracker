@@ -52,14 +52,14 @@ test('defaults retain every approved state-bearing screen field', () => {
   assert.deepEqual(defaultScreenState({ name: 'home' }), { name: 'home', leaderMetric: 'rating', positionFilter: 'all' })
   assert.deepEqual(defaultScreenState({ name: 'match', id: 'm1' }), { name: 'match', tab: 'facts' })
   assert.deepEqual(defaultScreenState({ name: 'global-ranking', season: 'Season 3', competitionType: 'cup', rankingMetric: 'assists' }), {
-    name: 'global-ranking', metric: 'assists', scope: 'cup', positionFilter: 'all', teamId: null, viewAll: false,
+    name: 'global-ranking', metric: 'assists', scope: 'cup', positionFilter: 'all', teamId: null,
   })
   assert.deepEqual(defaultScreenState({ name: 'team', id: 'A' }), {
     name: 'team', tab: 'overview', bestPlayersSeason: null, bestPlayersCompetition: 'all', bestPlayersMetric: 'rating', matchesCompetition: 'all',
   })
   assert.deepEqual(defaultScreenState({ name: 'competition', competitionType: 'champions', rankingMetric: 'mom' }), {
-    name: 'competition', competitionType: 'champions', tab: 'players', rankingMetric: 'mom', positionFilter: 'all',
-    bestXiMode: 'season', monthlyAwardBlock: null, cupAwardStage: null, championsAwardRound: null, viewAllMetric: null, cupViewAll: false, compareMode: false, comparedPlayerIds: [], rankingTeamIds: [],
+    name: 'competition', competitionType: 'champions', tab: 'players', rankingMetric: 'mom',
+    bestXiMode: 'period', monthlyAwardBlock: null, cupAwardStage: null, championsAwardRound: null, cupViewAll: false,
     historyMatchday: null, historyComparedTeamIds: [],
   })
   assert.deepEqual(defaultScreenState({ name: 'records' }), {

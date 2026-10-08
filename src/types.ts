@@ -224,7 +224,7 @@ export type View =
   | { name: 'team'; id: string }
   | { name: 'import-squad'; teamId: string }
   | { name: 'players' }
-  | { name: 'player'; id: string; season?: string; competitionType?: CompetitionType | 'all'; teamId?: string }
+  | { name: 'player'; id: string; season?: string; competitionType?: CompetitionType | 'all' }
   | { name: 'match'; id: string }
   | { name: 'edit-match'; id: string }
   | { name: 'new-match'; teamId?: string; season?: string; competitionType?: CompetitionType; resumeDraft?: boolean }
@@ -252,20 +252,15 @@ export interface ScreenStateByView {
     competitionType: CompetitionType
     tab: 'players' | 'table' | 'form' | 'history'
     rankingMetric: RankSort
-    positionFilter: PositionFilterKey
-    bestXiMode: 'season' | 'monthly'
+    bestXiMode: 'period' | 'competition'
     monthlyAwardBlock: number | null
     cupAwardStage: CupStage | null
     championsAwardRound: Exclude<ChampionsStage, 'finalReplay'> | null
-    viewAllMetric: RankSort | null
     cupViewAll: boolean
-    compareMode: boolean
-    comparedPlayerIds: string[]
-    rankingTeamIds: string[]
     historyMatchday: number | null
     historyComparedTeamIds: string[]
   }
-  'global-ranking': { name: 'global-ranking'; metric: RankSort; scope: CompetitionType | 'all'; positionFilter: PositionFilterKey; teamId: string | null; viewAll: boolean }
+  'global-ranking': { name: 'global-ranking'; metric: RankSort; scope: CompetitionType | 'all'; positionFilter: PositionFilterKey; teamId: string | null }
   results: { name: 'results' }
   records: {
     name: 'records'
@@ -307,7 +302,7 @@ export interface ScreenStateByView {
   }
   'import-squad': { name: 'import-squad' }
   players: { name: 'players'; search: string; filters: { seasons: string[]; teams: string[]; positions: Position[] } }
-  player: { name: 'player'; season: string | null; competition: CompetitionType | 'all'; teamId: string | null }
+  player: { name: 'player'; season: string | null; competition: CompetitionType | 'all' }
   match: { name: 'match'; tab: 'facts' | 'lineup' | 'ratings' }
   'edit-match': { name: 'edit-match' }
   'new-match': { name: 'new-match' }

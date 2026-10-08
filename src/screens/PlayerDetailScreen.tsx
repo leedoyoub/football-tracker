@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { PlayerAvatar } from '../components/PlayerAvatar'
 import { TeamIdentityAction } from '../components/EntityActions'
 import { formatDate, playerFullName, ratingTone } from '../components/ui'
@@ -7,7 +7,7 @@ import { playerChemistry, startingPPG } from '../engine/analytics'
 import { substituteImpact } from '../engine/substituteImpact'
 import { derivePlayerScope, playerAppearanceMatches, playerCareerTimeline, playerPersonalRecords, type PlayerDerived } from '../engine/playerDerived'
 import { matchCompetitionType, assignmentSnapshotForMatch, formatCompactCompetitionContext } from '../engine/competitionContext'
-import { matchScore, ratePlayerMatch, tracePlayerMatchRating } from '../engine/rating'
+import { getMatchManOfTheMatch, matchScore, ratePlayerMatch, tracePlayerMatchRating } from '../engine/rating'
 import { buildGlobalRankingData, rankGlobalRankingRows, seasonsFromMatches } from '../engine/stats'
 import { buildSeasonAnalytics, scopedMetricRanks } from '../engine/seasonAnalytics'
 import { playerStreaks } from '../engine/seasonInsights'
@@ -22,6 +22,8 @@ import { careerNextMilestones } from '../engine/nextMilestones'
 import { recordedTeamId } from '../engine/matchPerspective'
 import { CompactFilterMenu } from '../components/CompactFilterMenu'
 import { useStore } from '../store'
+import { currentMembershipPresentation } from '../lib/currentMembershipPresentation'
+import { recentFormLabelColor, scrollTrendToLatest, TREND_POINT_SPACING, trendPlotWidth } from '../lib/trendPlot'
 import type { CompetitionType, Match, Player, RatingBreakdown, ScreenStateByView, View } from '../types'
 
 const competitions: { value: CompetitionType | 'all'; label: string }[] = [{ value: 'all', label: 'All competitions' }, { value: 'league', label: 'League' }, { value: 'cup', label: 'Cup' }, { value: 'champions', label: 'Champions' }]
@@ -45,7 +47,7 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
   const rankingIndex = useMemo(() => buildGlobalRankingData(players, scopedMatches, { seasons: [selectedSeason], teams: [], positions: [] }, 'rating'), [players, scopedMatches, selectedSeason])
   const rankingRows = useMemo(() => ({ rating: rankGlobalRankingRows(rankingIndex, players, 'rating'), goals: rankGlobalRankingRows(rankingIndex, players, 'goals'), assists: rankGlobalRankingRows(rankingIndex, players, 'assists') }), [rankingIndex, players])
   const activeStreaks = useMemo(() => player ? playerStreaks(player, playerScopedMatches).filter(row => row.current > 1).sort((a, b) => b.current - a.current).slice(0, 3) : [], [player, playerScopedMatches])
-  const leagueAnalytics = useMemo(() => buildSeasonAnalytics(teams, players, matches, selectedSeason), [teams, players, matches, selectedSeason])
+  const leagueAnalytics = useMemo(() => competition === 'all' || competition === 'league' ? buildSeasonAnalytics(teams, players, matches, selectedSeason) : undefined, [competition, teams, players, matches, selectedSeason])
   let playerDerivedCacheHit = false
   const data = player ? derivePlayerScope(player, players, matches, { season: selectedSeason, competition }, diagnostic => { playerDerivedCacheHit = diagnostic.cacheHit }) : null
   const dominantPosition = (data?.minutes ? scopedFamilies.get(playerId) : careerFamilies.get(playerId)) ?? player?.position
@@ -53,21 +55,22 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
   const teamRankingIndex = historicalTeamId ? buildGlobalRankingData(players, scopedMatches, { seasons: [selectedSeason], teams: [historicalTeamId], positions: [] }, 'rating') : []
   const teamRankingRows = { rating: rankGlobalRankingRows(teamRankingIndex, players, 'rating'), goals: rankGlobalRankingRows(teamRankingIndex, players, 'goals'), assists: rankGlobalRankingRows(teamRankingIndex, players, 'assists') }
   if (!player || !data) return <div className="p-6 text-sm text-zinc-400">Player not found.</div>
-  const currentTeam = teams.find(team => team.id === player.teamId)
+  const membership = currentMembershipPresentation(player, [], teams)
+  const currentTeam = teams.find(team => team.id === membership.teamId)
   const form = playerForm(data.appearances)
   const rankIn = (metric: 'rating' | 'goals' | 'assists') => ({ ...scopedMetricRanks(rankingRows[metric], players, player.id, scopedFamilies), team: scopedMetricRanks(teamRankingRows[metric], players, player.id).team })
   const ranks = { rating: rankIn('rating'), goals: rankIn('goals'), assists: rankIn('assists') }
-  const monthlyAwards = competition === 'all' || competition === 'league' ? [...leagueAnalytics.monthlyAwards.values()].flatMap(award => [award.playerOfMonth?.playerId === player.id ? 'Player of the Month' : null, award.bestXI.some(slot => slot.playerId === player.id) ? 'Monthly Best XI' : null].filter((item): item is string => Boolean(item))) : []
+  const monthlyAwards = leagueAnalytics ? [...leagueAnalytics.monthlyAwards.values()].flatMap(award => [award.playerOfMonth?.playerId === player.id ? 'Player of the Month' : null, award.bestXI.some(slot => slot.playerId === player.id) ? 'Monthly Best XI' : null].filter((item): item is string => Boolean(item))) : []
   const awards = [...monthlyAwards, ...playerTeamTitles(teams, players, matches, competitionStates, player.id, selectedSeason, competition)]
   const scopedMatchIds = new Set(playerScopedMatches.map(match => match.id))
   const milestones = deriveNews(players, teams, matches).filter(item => item.playerId === player.id && item.milestone && item.matchId && scopedMatchIds.has(item.matchId)).slice(0, 3)
   const positions = [...data.positionMinutes.entries()].map(([position, minutes]) => ({ position, minutes, share: data.minutes ? minutes / data.minutes * 100 : 0 })).filter(row => row.share >= 10).sort((left, right) => right.share - left.share || right.minutes - left.minutes)
   return <div className="px-4 pb-8 pt-6">
     <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">Back</button>
-    <header className="mb-4 flex items-start gap-3"><PlayerAvatar photoUrl={player.photoUrl || player.image} number={player.number} className="h-14 w-14 text-sm" /><div className="min-w-0 flex-1"><p className="text-xs text-zinc-400"><TeamIdentityAction team={currentTeam} onNavigate={id => onNavigate({ name: 'team', id })} className="inline-flex items-center gap-1">{currentTeam?.name ?? 'No Team'}</TeamIdentityAction> · #{player.number} · {dominantPosition}</p><h1 className="break-words text-2xl font-semibold">{playerFullName(player)}</h1><div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => onNavigate({ name: 'edit-player', id: player.id })} className="rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-bold">Edit player</button><button type="button" onClick={() => onNavigate({ name: 'comparison', leftId: player.id, season: selectedSeason, competitionType: competition })} className="rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-bold">Compare</button></div></div></header>
+    <header className="mb-4 flex items-start gap-3"><PlayerAvatar photoUrl={player.photoUrl || player.image} number={player.number} className="h-14 w-14 text-sm" /><div className="min-w-0 flex-1"><p className="text-xs text-zinc-400"><TeamIdentityAction team={currentTeam} onNavigate={id => onNavigate({ name: 'team', id })} className="inline-flex items-center gap-1">{membership.label}</TeamIdentityAction> · #{player.number} · {dominantPosition}</p><h1 className="break-words text-2xl font-semibold">{playerFullName(player)}</h1><div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => onNavigate({ name: 'edit-player', id: player.id })} className="rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-bold">Edit player</button><button type="button" onClick={() => onNavigate({ name: 'comparison', leftId: player.id, season: selectedSeason, competitionType: competition })} className="rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-bold">Compare</button></div></div></header>
     <div className="mb-4 grid grid-cols-2 gap-2"><CompactFilterMenu value={selectedSeason} options={seasons.map(item => ({ value: item, label: item }))} onChange={setSelectedSeason} label="Player detail season" popupAlign="start" /><CompactFilterMenu value={competition} options={competitions} onChange={setCompetition} label="Player detail competition" allValue="all" allLabel="All competitions" allAccessibilityLabel="All competitions" /></div>
     <Overview data={data} ranks={ranks} />
-    <RecentForm form={form} playerId={playerId} teams={teams} onNavigate={onNavigate} />
+    <RecentForm form={form} playerId={playerId} players={players} teams={teams} onNavigate={onNavigate} />
     <DeferredRankTrend playerId={playerId} players={players} matches={matches} season={selectedSeason} competition={competition} />
     <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Active Streaks</h2>{activeStreaks.length ? <div className="mt-2 flex flex-wrap gap-2">{activeStreaks.map(row => <span key={row.key} className="rounded-full bg-emerald-500/10 px-2.5 py-1.5 text-[10px] font-bold text-emerald-300">{row.current} straight · {row.label}</span>)}</div> : <p className="mt-2 text-xs text-zinc-500">No active streak.</p>}</section>
     <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><div><h2 className="text-sm font-semibold">Awards {awards.length}</h2><p className="text-[10px] text-zinc-500">Season awards and titles in {selectedSeason}</p></div>{awards.length ? <div className="mt-2 space-y-1">{awards.slice().reverse().map((award, index) => <p key={`${award}:${index}`} className="rounded-lg bg-black/20 px-2 py-1.5 text-xs">{award}</p>)}</div> : <p className="mt-2 text-xs text-zinc-500">No completed awards or team titles yet.</p>}</section>
@@ -75,25 +78,38 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
     <PositionStats data={data} position={dominantPosition ?? player.position} />
     <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Positions Played</h2><p className="mt-1 text-[10px] text-zinc-500">Match-position timeline minutes · positions under 10% are hidden.</p>{positions.length ? <div className="mt-3 space-y-2">{positions.map(row => <div key={row.position} className="grid grid-cols-[34px_1fr_auto] items-center gap-2 text-xs"><b>{row.position}</b><span className="h-2 overflow-hidden rounded-full bg-black/30"><span className="block h-full rounded-full bg-emerald-400" style={{ width: `${row.share}%` }} /></span><span className="tabular-nums">{pct(row.share)} · {row.minutes}'</span></div>)}</div> : <p className="mt-2 text-xs text-zinc-500">No position minutes yet.</p>}</section>
     <StartingPerformance rows={data.startingPerformance} teams={teams} />
-    <DeferredMount player={player} players={players} teams={teams} matches={matches} scopedMatches={playerScopedMatches} data={data} displayCacheHit={playerDerivedCacheHit} teamId={null} dominantPosition={dominantPosition ?? player.position} onNavigate={onNavigate} />
+    <DeferredMount player={player} players={players} teams={teams} matches={matches} scopedMatches={playerScopedMatches} data={data} displayCacheHit={playerDerivedCacheHit} dominantPosition={dominantPosition ?? player.position} onNavigate={onNavigate} />
   </div>
 }
 
 function Overview({ data, ranks }: { data: PlayerDerived; ranks: Record<'rating' | 'goals' | 'assists', { overall: number | null; position: number | null; team: number | null }> }) { return <section className="mb-4 rounded-2xl border border-white/5 bg-zinc-900 p-3"><div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-semibold">Overview</h2><p className="text-[10px] text-zinc-500">Core stats in the selected scope</p></div><b className={`rounded-full px-2 py-1 text-sm ${ratingTone(data.averageRating || 6)}`}>{data.apps ? value(data.averageRating) : '—'}</b></div><div className="grid grid-cols-3 gap-1.5"><RankedMetric label="Avg Rating" value={data.apps ? value(data.averageRating) : '—'} ranks={ranks.rating} /><RankedMetric label="Goals" value={data.goals} ranks={ranks.goals} /><RankedMetric label="Assists" value={data.assists} ranks={ranks.assists} /></div><div className="mt-2 grid grid-cols-3 gap-1.5"><AppsMetric apps={data.apps} starts={data.starts} subs={data.subs} />{metric('Minutes', data.minutes)}{metric('MOM', data.mom)}</div><p className="mt-2 text-[10px] text-zinc-500">Ranks: overall · position family · team.</p></section> }
 function AppsMetric({ apps, starts, subs }: { apps: number; starts: number; subs: number }) { return <div aria-label={`${apps} appearances: ${starts} starts and ${subs} substitute appearances`} className="rounded-xl bg-black/20 px-2 py-2 text-center"><b className="block text-sm tabular-nums">{apps}</b><span className="mt-0.5 block text-[8px] tabular-nums text-zinc-400"><span>{starts}</span><span className="ml-2">{subs}</span></span><small className="block text-[9px] uppercase text-zinc-500">Apps</small></div> }
 function RankedMetric({ label, value: content, ranks }: { label: string; value: string | number; ranks: { overall: number | null; position: number | null; team: number | null } }) { const rank = (item: number | null) => item ? `#${item}` : '—'; return <div className="rounded-xl bg-black/20 px-2 py-2 text-center"><b className="block text-sm tabular-nums">{content}</b><small className="block text-[9px] uppercase text-zinc-500">{label}</small><div className="mt-1 grid grid-cols-3 gap-0.5 text-[8px] text-zinc-400"><span aria-label={`Overall rank ${rank(ranks.overall)}`}>{rank(ranks.overall)}</span><span aria-label={`Position-family rank ${rank(ranks.position)}`}>{rank(ranks.position)}</span><span aria-label={`Team rank ${rank(ranks.team)}`}>{rank(ranks.team)}</span></div></div> }
-function RecentForm({ form, playerId, teams, onNavigate }: { form: ReturnType<typeof playerForm>; playerId: string; teams: { id: string; name: string; shortName: string }[]; onNavigate: (view: View) => void }) {
-  const width = 300; const height = 62
+function RecentForm({ form, playerId, players, teams, onNavigate }: { form: ReturnType<typeof playerForm>; playerId: string; players: Player[]; teams: { id: string; name: string; shortName: string }[]; onNavigate: (view: View) => void }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const width = trendPlotWidth(form.points.length)
   const values = form.points.map(row => row.rating.raw)
   const min = Math.min(5, ...values); const max = Math.max(9, ...values)
-  const x = (index: number) => 10 + index * 280 / Math.max(1, values.length - 1)
-  const y = (rating: number) => 54 - (rating - min) / Math.max(1, max - min) * 46
+  const x = (index: number) => 18 + index * TREND_POINT_SPACING
+  const y = (rating: number) => 60 - (rating - min) / Math.max(1, max - min) * 44
+  useEffect(() => scrollTrendToLatest(scrollRef.current), [form.points.length, form.points[form.points.length - 1]?.match.id])
   const opponent = (match: Match) => {
     const playedFor = match.appearances.find(appearance => appearance.playerId === playerId)?.teamId
     const opponentId = playedFor === match.homeTeamId ? match.awayTeamId : match.homeTeamId
     return (playedFor === recordedTeamId(match) ? match.opponentName : undefined) || teams.find(team => team.id === opponentId)?.shortName || opponentId
   }
-  return <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><div className="flex items-end justify-between"><div><h2 className="text-sm font-semibold">Recent Form</h2><p className="text-[10px] text-zinc-500">Player Form · Latest {form.count} actual appearances</p></div><span className="text-[10px] text-zinc-500">Good {GOOD_RATING_THRESHOLD}+</span></div><div className="mt-3 grid grid-cols-3 gap-1.5">{metric(form.count === 5 ? 'Last 5 avg' : `Last ${form.count || 5} avg`, value(form.recentAverage))}{metric('Season avg', value(form.average))}{metric('Trend', form.delta === null ? '—' : `${form.delta > 0 ? '↑ +' : form.delta < 0 ? '↓ ' : '→ '}${value(form.delta)}`)}</div>{form.points.length > 1 && <svg role="img" aria-label={`Last ${form.points.length} raw match ratings in chronological order`} viewBox={`0 0 ${width} ${height}`} className="mt-3 h-16 w-full overflow-visible"><line x1="10" x2="290" y1={form.average === null ? 54 : y(form.average)} y2={form.average === null ? 54 : y(form.average)} stroke="#52525b" strokeDasharray="3 3" /><polyline fill="none" stroke="#34d399" strokeWidth="2" points={values.map((rating, index) => `${x(index)},${y(rating)}`).join(' ')} />{form.points.map((row, index) => <circle key={row.match.id} cx={x(index)} cy={y(row.rating.raw)} r="3" fill="#34d399"><title>{`${opponent(row.match)} · ${row.rating.raw.toFixed(2)} · ${matchCompetitionType(row.match)}`}</title></circle>)}</svg>}<div className="mt-3 flex gap-1.5">{form.recent.map(row => <button type="button" aria-label={`Open match with rating ${row.rating.rating.toFixed(1)}`} onClick={() => onNavigate({ name: 'match', id: row.match.id })} key={row.match.id} className={`grid min-h-11 flex-1 place-items-center rounded-lg text-xs font-black ${ratingTone(row.rating.rating)}`}>{row.rating.rating.toFixed(1)}</button>)}{!form.count && <span className="text-xs text-zinc-500">No actual appearances in this scope.</span>}</div></section>
+  return <section className="mb-4 rounded-2xl bg-zinc-900 p-3">
+    <div className="flex items-end justify-between"><div><h2 className="text-sm font-semibold">Recent Form</h2><p className="text-[10px] text-zinc-500">Player Form · {form.points.length} actual appearances</p></div><span className="text-[10px] text-zinc-500">Good {GOOD_RATING_THRESHOLD}+</span></div>
+    <div className="mt-3 grid grid-cols-3 gap-1.5">{metric(form.count === 5 ? 'Last 5 avg' : 'Last ' + (form.count || 5) + ' avg', value(form.recentAverage))}{metric('Season avg', value(form.average))}{metric('Trend', form.delta === null ? '—' : (form.delta > 0 ? '↑ +' : form.delta < 0 ? '↓ ' : '→ ') + value(form.delta))}</div>
+    {form.points.length > 0 && <div ref={scrollRef} className="no-scrollbar mt-3 overflow-x-auto overscroll-x-contain" aria-label="Recent Form horizontal plot">
+      <svg width={width} height={82} role="img" aria-label={'All ' + form.points.length + ' raw match ratings, older to newer'} className="block">
+        <line x1={18} x2={width - 18} y1={form.average === null ? 60 : y(form.average)} y2={form.average === null ? 60 : y(form.average)} stroke="#52525b" strokeDasharray="3 3" />
+        {form.points.length > 1 && <polyline fill="none" stroke="#34d399" strokeWidth="2" points={values.map((rating, index) => x(index) + ',' + y(rating)).join(' ')} />}
+        {form.points.map((row, index) => <g key={row.match.id}><circle cx={x(index)} cy={y(row.rating.raw)} r="3" fill="#34d399" /><text x={x(index)} y={y(row.rating.raw) - 7} textAnchor="middle" fontSize="9" fontWeight="700" fill={recentFormLabelColor(row.rating.rating, getMatchManOfTheMatch(row.match, players) === playerId)}>{row.rating.rating.toFixed(1)}</text><title>{opponent(row.match) + ' · ' + row.rating.raw.toFixed(2) + ' · ' + matchCompetitionType(row.match)}</title></g>)}
+      </svg>
+    </div>}
+    <div className="mt-3 flex gap-1.5">{form.recent.slice().reverse().map(row => <button type="button" aria-label={'Open match with rating ' + row.rating.rating.toFixed(1)} onClick={() => onNavigate({ name: 'match', id: row.match.id })} key={row.match.id} className={'grid min-h-11 flex-1 place-items-center rounded-lg text-xs font-black ' + ratingTone(row.rating.rating)}>{row.rating.rating.toFixed(1)}</button>)}{!form.count && <span className="text-xs text-zinc-500">No actual appearances in this scope.</span>}</div>
+  </section>
 }
 
 function DeferredRankTrend({ playerId, players, matches, season, competition }: { playerId: string; players: Player[]; matches: Match[]; season: string; competition: CompetitionType | 'all' }) {
@@ -102,14 +118,25 @@ function DeferredRankTrend({ playerId, players, matches, season, competition }: 
   return ready ? <RankTrend key={`${playerId}:${season}:${competition}`} playerId={playerId} players={players} matches={matches} season={season} competition={competition} /> : <div className="mb-4 h-44 rounded-2xl bg-zinc-900/60" aria-label="Loading rank trend" />
 }
 
-function RankTrend({ playerId, players, matches, season, competition }: { playerId: string; players: Player[]; matches: Match[]; season: string; competition: CompetitionType | 'all' }) {
+export function RankTrend({ playerId, players, matches, season, competition }: { playerId: string; players: Player[]; matches: Match[]; season: string; competition: CompetitionType | 'all' }) {
   const [selected, setSelected] = useState<'overall' | 'position' | 'team'>('position')
+  const scrollRef = useRef<HTMLDivElement>(null)
   const points = useMemo(() => playerRankTrend(playerId, players, matches, season, competition), [playerId, players, matches, season, competition])
   const valid = points.filter(row => row[selected] !== null)
   const highest = Math.max(2, ...valid.map(row => row[selected] ?? 0))
-  const x = (index: number) => 18 + index * 264 / Math.max(1, valid.length - 1)
-  const y = (rank: number) => 10 + (rank - 1) * 72 / Math.max(1, highest - 1)
-  return <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><div className="flex items-center justify-between gap-2"><div><h2 className="text-sm font-semibold">Rank Trend</h2><p className="text-[10px] text-zinc-500">Rank after each appearance</p></div><div className="flex gap-1" aria-label="Rank trend type">{(['overall', 'position', 'team'] as const).map(item => <button key={item} type="button" aria-pressed={selected === item} onClick={() => setSelected(item)} className={`rounded-full px-2 py-1 text-[10px] ${selected === item ? 'bg-emerald-400 text-black' : 'bg-black/30 text-zinc-400'}`}>{item[0].toUpperCase() + item.slice(1)}</button>)}</div></div>{valid.length > 1 ? <><svg role="img" aria-label={`${selected} rank history: ${valid.map(row => `#${row[selected]}`).join(', ')}`} viewBox="0 0 300 98" className="mt-3 h-24 w-full"><polyline fill="none" stroke="#34d399" strokeWidth="2" points={valid.map((row, index) => `${x(index)},${y(row[selected]!)}`).join(' ')} />{valid.map((row, index) => <circle key={row.match.id} cx={x(index)} cy={y(row[selected]!)} r="3" fill="#34d399"><title>{`${row.match.date} · #${row[selected]} · ${matchCompetitionType(row.match)}`}</title></circle>)}</svg><p className="text-right text-xs text-zinc-400">Current <b className="text-emerald-300">#{valid[valid.length - 1][selected]}</b></p></> : <p className="mt-3 text-xs text-zinc-500">Not enough matches to show rank trend.</p>}</section>
+  const width = trendPlotWidth(valid.length)
+  const x = (index: number) => 18 + index * TREND_POINT_SPACING
+  const y = (rank: number) => 26 + (rank - 1) * 62 / Math.max(1, highest - 1)
+  useEffect(() => scrollTrendToLatest(scrollRef.current), [selected, valid.length, valid[valid.length - 1]?.match.id])
+  return <section className="mb-4 rounded-2xl bg-zinc-900 p-3">
+    <div className="flex items-center justify-between gap-2"><div><h2 className="text-sm font-semibold">Rank Trend</h2><p className="text-[10px] text-zinc-500">Rank after each appearance</p></div><div className="flex gap-1" aria-label="Rank trend type">{(['overall', 'position', 'team'] as const).map(item => <button key={item} type="button" aria-pressed={selected === item} onClick={() => setSelected(item)} className={'rounded-full px-2 py-1 text-[10px] ' + (selected === item ? 'bg-emerald-400 text-black' : 'bg-black/30 text-zinc-400')}>{item[0].toUpperCase() + item.slice(1)}</button>)}</div></div>
+    {valid.length > 0 ? <>
+      <div ref={scrollRef} className="no-scrollbar mt-3 overflow-x-auto overscroll-x-contain" aria-label="Rank Trend horizontal plot"><svg width={width} height={104} role="img" aria-label={selected + ' rank history: ' + valid.map(row => '#' + row[selected]).join(', ')} className="block">
+        {valid.length > 1 && <polyline fill="none" stroke="#34d399" strokeWidth="2" points={valid.map((row, index) => x(index) + ',' + y(row[selected]!)).join(' ')} />}
+        {valid.map((row, index) => <g key={row.match.id}><circle cx={x(index)} cy={y(row[selected]!)} r="3" fill="#34d399" /><text x={x(index)} y={y(row[selected]!) - 7} textAnchor="middle" fontSize="9" fill="#e4e4e7">{'#' + row[selected]}</text><title>{row.match.date + ' · #' + row[selected] + ' · ' + matchCompetitionType(row.match)}</title></g>)}
+      </svg></div><p className="text-right text-xs text-zinc-400">Current <b className="text-emerald-300">{'#' + valid[valid.length - 1][selected]}</b></p>
+    </> : <p className="mt-3 text-xs text-zinc-500">Not enough matches to show rank trend.</p>}
+  </section>
 }
 function PositionStats({ data, position }: { data: PlayerDerived; position: string }) {
   const contents: [string, string | number][] = position === 'GK'
@@ -121,10 +148,10 @@ function PositionStats({ data, position }: { data: PlayerDerived; position: stri
 }
 function StartingPerformance({ rows, teams }: { rows: PlayerDerived['startingPerformance']; teams: { id: string; name: string }[] }) { return <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Team Performance When Starting</h2><p className="mt-1 text-[10px] text-zinc-500">Match outcomes, not individual causation. Separate by team stint.</p>{rows.length ? <div className="mt-3 space-y-2">{rows.map(row => <div key={row.teamId} className="rounded-xl bg-black/20 p-2.5 text-xs"><div className="mb-2 flex justify-between"><b>{teams.find(team => team.id === row.teamId)?.name ?? row.teamId}</b><span>{row.wins}-{row.draws}-{row.losses}</span></div><div className="grid grid-cols-2 gap-1.5">{metric('Starter PPG', value(row.starterPpg))}{metric('Team overall PPG', value(row.teamPpg))}{metric('Starter GD / match', value(row.starterGdPerMatch))}{metric('Team overall GD / match', value(row.teamGdPerMatch))}</div></div>)}</div> : <p className="mt-2 text-xs text-zinc-500">No starts in this scope.</p>}</section> }
 
-function DeferredMount(props: { player: Player; players: Player[]; teams: { id: string; name: string; shortName: string }[]; matches: Match[]; scopedMatches: Match[]; data: PlayerDerived; displayCacheHit: boolean; teamId: string | null; dominantPosition: string; onNavigate: (view: View) => void }) { const [ready, setReady] = useState(() => typeof window === 'undefined'); useEffect(() => { if (typeof window === 'undefined') return; const timer = window.setTimeout(() => setReady(true), 80); return () => window.clearTimeout(timer) }, [props.player.id, props.scopedMatches]); return ready ? <DeferredPlayerSections {...props} /> : <div className="mb-4 h-12 rounded-2xl bg-zinc-900/60" aria-label="Loading secondary player statistics" /> }
-function DeferredPlayerSections({ player, players, teams, matches, scopedMatches, data, displayCacheHit, teamId, dominantPosition, onNavigate }: { player: Player; players: Player[]; teams: { id: string; name: string; shortName: string }[]; matches: Match[]; scopedMatches: Match[]; data: PlayerDerived; displayCacheHit: boolean; teamId: string | null; dominantPosition: string; onNavigate: (view: View) => void }) {
+function DeferredMount(props: { player: Player; players: Player[]; teams: { id: string; name: string; shortName: string }[]; matches: Match[]; scopedMatches: Match[]; data: PlayerDerived; displayCacheHit: boolean; dominantPosition: string; onNavigate: (view: View) => void }) { const [ready, setReady] = useState(() => typeof window === 'undefined'); useEffect(() => { if (typeof window === 'undefined') return; const timer = window.setTimeout(() => setReady(true), 80); return () => window.clearTimeout(timer) }, [props.player.id, props.scopedMatches]); return ready ? <DeferredPlayerSections {...props} /> : <div className="mb-4 h-12 rounded-2xl bg-zinc-900/60" aria-label="Loading secondary player statistics" /> }
+function DeferredPlayerSections({ player, players, teams, matches, scopedMatches, data, displayCacheHit, dominantPosition, onNavigate }: { player: Player; players: Player[]; teams: { id: string; name: string; shortName: string }[]; matches: Match[]; scopedMatches: Match[]; data: PlayerDerived; displayCacheHit: boolean; dominantPosition: string; onNavigate: (view: View) => void }) {
   const impact = useMemo(() => substituteImpact(player, data.appearances.map(row => row.match)), [player, data])
-  const chemistry = useMemo(() => playerChemistry(player, players, scopedMatches, { teamId: teamId ?? undefined }, dominantPosition), [player, players, scopedMatches, teamId, dominantPosition])
+  const chemistry = useMemo(() => playerChemistry(player, players, scopedMatches, {}, dominantPosition), [player, players, scopedMatches, dominantPosition])
   const career = useMemo(() => playerCareerTimeline(player, players, matches), [player, players, matches])
   const records = useMemo(() => playerPersonalRecords(player, players, matches), [player, players, matches])
   const history = useMemo(() => playerAppearanceMatches(player, scopedMatches), [player, scopedMatches])

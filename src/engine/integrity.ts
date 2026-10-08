@@ -24,6 +24,19 @@ export function auditDataIntegrity(matches: Match[], players: Player[], teams: T
       seen.add(row.id)
     }
   }
+  for (const player of players) {
+    if (player.teamIds === undefined) {
+      if (player.teamId && !teamIds.has(player.teamId)) add(issues, 'error', undefined, `Player ${player.id} has an unknown current team.`)
+      continue
+    }
+    if (!Array.isArray(player.teamIds) || player.teamIds.some(id => typeof id !== 'string' || !id)) {
+      add(issues, 'error', undefined, `Player ${player.id} has malformed current teamIds.`)
+      continue
+    }
+    if (new Set(player.teamIds).size !== player.teamIds.length) add(issues, 'error', undefined, `Duplicate current team membership for player ${player.id}.`)
+    if (player.teamId !== (player.teamIds[0] ?? '')) add(issues, 'error', undefined, `Player ${player.id} has inconsistent teamId and teamIds.`)
+    if (player.teamIds.some(id => !teamIds.has(id))) add(issues, 'error', undefined, `Player ${player.id} has an unknown current team.`)
+  }
   const leagueSlots = new Map<string, Map<number, Match[]>>()
   const knockoutSlots = new Map<string, Match>()
   for (const match of matches) {

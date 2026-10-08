@@ -10,7 +10,7 @@ import { RATING_ENGINE_REVISION } from './ratingRevision'
 export type PlayerRankPoint = { match: Match; teamId: string; overall: number | null; position: number | null; team: number | null }
 const cache = new WeakMap<Match[], WeakMap<Player[], Map<string, PlayerRankPoint[]>>>()
 
-/** Rank at each of the player's latest ten actual appearances, using canonical ranking rows. */
+/** Rank at each actual appearance in the selected scope, using canonical ranking rows. */
 export function playerRankTrend(playerId: string, players: Player[], matches: Match[], season: string, competition: CompetitionType | 'all'): PlayerRankPoint[] {
   let byPlayers = cache.get(matches)
   if (!byPlayers) { byPlayers = new WeakMap(); cache.set(matches, byPlayers) }
@@ -22,8 +22,8 @@ export function playerRankTrend(playerId: string, players: Player[], matches: Ma
   const player = players.find(row => row.id === playerId)
   if (!player) return []
   const ordered = oldestMatches(matches.filter(match => match.season === season && (competition === 'all' || matchCompetitionType(match) === competition)))
-  const appearances = newestMatches(ordered.filter(match => match.appearances.some(appearance => appearance.playerId === playerId) && ratePlayerMatch(match, player))).slice(0, 10).reverse()
-  if (appearances.length < 2) return []
+  const appearances = newestMatches(ordered.filter(match => match.appearances.some(appearance => appearance.playerId === playerId) && ratePlayerMatch(match, player))).reverse()
+  if (!appearances.length) return []
   type Running = { playerId: string; teamId: string; sum: number; apps: number }
   const playerById = new Map(players.map(item => [item.id, item]))
   const totals = new Map<string, Running>()

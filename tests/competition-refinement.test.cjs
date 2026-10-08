@@ -131,7 +131,7 @@ test('Home keeps its compact dashboard and adds the canonical Season Best XI', (
 
 test('Competition Best XI uses canonical started historical scope selectors', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
-  for (const token of ['startedMonthlyAwardBlocks', 'startedCupAwardStages', 'startedChampionsAwardRounds', 'League Best XI', 'Cup Team of', 'Champions']) assert(source.includes(token), token)
+  for (const token of ['startedMonthlyAwardBlocks', 'startedCupAwardStages', 'startedChampionsAwardRounds', 'League Best XI', 'Team of the Stage', 'Champions']) assert(source.includes(token), token)
   assert(source.includes('AwardScopeSelector'))
   assert(!source.includes('Team of the Year'))
 })
@@ -183,9 +183,9 @@ test('season completion is synchronized as backward-compatible CompetitionState 
   assert(validation.includes("'season-complete'"))
 })
 
-test('visible and package metadata version are exactly v2.5.0 / 2.5.0', () => {
-  assert.equal(APP_VERSION, '2.5.0')
-  assert.equal(require('../package.json').version, '2.5.0')
+test('visible and package metadata version are exactly v2.5.1 / 2.5.1', () => {
+  assert.equal(APP_VERSION, '2.5.1')
+  assert.equal(require('../package.json').version, '2.5.1')
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('v{APP_VERSION}'))
 })

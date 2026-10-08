@@ -171,7 +171,7 @@ export default function App() {
       const current = prev[prev.length - 1]
       if (!current || current.view.name !== 'competition') return prev
       const screenState = current.screenState as ScreenStateByView['competition']
-      return updateCurrentScreenState(prev, { ...screenState, competitionType: next, viewAllMetric: null, cupViewAll: false, compareMode: false, comparedPlayerIds: [] })
+      return updateCurrentScreenState(prev, { ...screenState, competitionType: next, cupViewAll: false })
     })
   }
 

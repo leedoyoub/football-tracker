@@ -98,7 +98,7 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
   const saved = value as Record<string, unknown>
   if (view.name === 'player') {
     const validSeason = typeof saved.season === 'string' && state.matches.some(match => match.season === saved.season)
-    return { name: 'player', season: validSeason ? saved.season as string : null, competition: competitionTypes.includes(saved.competition as typeof competitionTypes[number]) ? saved.competition as typeof competitionTypes[number] : 'all', teamId: null }
+    return { name: 'player', season: validSeason ? saved.season as string : null, competition: competitionTypes.includes(saved.competition as typeof competitionTypes[number]) ? saved.competition as typeof competitionTypes[number] : 'all' }
   }
   const validScope = (scope: unknown) => scope === 'all' || competitionTypes.includes(scope as typeof competitionTypes[number])
   const validMetric = (metric: unknown) => typeof metric === 'string' && rankingMetrics.has(metric)
@@ -106,7 +106,6 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
   const validSeason = (season: unknown) => typeof season === 'string' && state.matches.some(match => match.season === season)
   const seasonIds = (ids: unknown) => Array.isArray(ids) ? [...new Set(ids.filter(validSeason))] as string[] : []
   const teamIds = (ids: unknown) => Array.isArray(ids) ? [...new Set(ids.filter(id => typeof id === 'string' && state.teams.some(team => team.id === id)))] as string[] : []
-  const playerIds = (ids: unknown) => Array.isArray(ids) ? [...new Set(ids.filter(id => typeof id === 'string' && state.players.some(player => player.id === id)))] as string[] : []
   const leagueDay = (day: unknown) => Number.isInteger(day) && (day as number) >= 1 && (day as number) <= 30 ? day as number : null
   if (view.name === 'home') {
     const base = fallback as ScreenStateByView['home']
@@ -118,20 +117,17 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
       competitionType: competitionTypes.includes(saved.competitionType as typeof competitionTypes[number]) ? saved.competitionType as typeof competitionTypes[number] : base.competitionType,
       tab: ['players', 'table', 'form', 'history'].includes(saved.tab as string) ? saved.tab as typeof base.tab : base.tab,
       rankingMetric: validMetric(saved.rankingMetric) ? saved.rankingMetric as typeof base.rankingMetric : base.rankingMetric,
-      positionFilter: validPosition(saved.positionFilter) ? saved.positionFilter as typeof base.positionFilter : base.positionFilter,
-      bestXiMode: saved.bestXiMode === 'monthly' ? 'monthly' : 'season',
+      bestXiMode: saved.bestXiMode === 'season' || saved.bestXiMode === 'competition' ? 'competition' : 'period',
       monthlyAwardBlock: Number.isInteger(saved.monthlyAwardBlock) && (saved.monthlyAwardBlock as number) >= 1 && (saved.monthlyAwardBlock as number) <= 10 ? saved.monthlyAwardBlock as number : null,
       cupAwardStage: ['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'stage6', 'stage7', 'final', 'finalReplay'].includes(saved.cupAwardStage as string) ? saved.cupAwardStage as typeof base.cupAwardStage : null,
       championsAwardRound: ['roundOf16', 'quarterFinal', 'semiFinal', 'final'].includes(saved.championsAwardRound as string) ? saved.championsAwardRound as typeof base.championsAwardRound : null,
-      viewAllMetric: validMetric(saved.viewAllMetric) ? saved.viewAllMetric as typeof base.viewAllMetric : null,
-      cupViewAll: saved.cupViewAll === true, compareMode: saved.compareMode === true,
-      comparedPlayerIds: playerIds(saved.comparedPlayerIds), rankingTeamIds: teamIds(saved.rankingTeamIds),
+      cupViewAll: saved.cupViewAll === true,
       historyMatchday: leagueDay(saved.historyMatchday), historyComparedTeamIds: teamIds(saved.historyComparedTeamIds),
     }
   }
   if (view.name === 'global-ranking') {
     const base = fallback as ScreenStateByView['global-ranking']
-    return { ...base, metric: validMetric(saved.metric) ? saved.metric as typeof base.metric : base.metric, scope: validScope(saved.scope) ? saved.scope as typeof base.scope : base.scope, positionFilter: validPosition(saved.positionFilter) ? saved.positionFilter as typeof base.positionFilter : base.positionFilter, teamId: typeof saved.teamId === 'string' && state.teams.some(team => team.id === saved.teamId) ? saved.teamId : null, viewAll: saved.viewAll === true }
+    return { ...base, metric: validMetric(saved.metric) ? saved.metric as typeof base.metric : base.metric, scope: validScope(saved.scope) ? saved.scope as typeof base.scope : base.scope, positionFilter: validPosition(saved.positionFilter) ? saved.positionFilter as typeof base.positionFilter : base.positionFilter, teamId: typeof saved.teamId === 'string' && state.teams.some(team => team.id === saved.teamId) ? saved.teamId : null }
   }
   if (view.name === 'comparison') {
     const base = fallback as ScreenStateByView['comparison']

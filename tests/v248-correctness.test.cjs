@@ -126,15 +126,15 @@ test('player destination keeps visible season and competition without the source
   const source = { name: 'global-ranking', season: 'Season 2', competitionType: 'cup', teamId: 'A' }
   const result = resolvePlayerDestination({ name: 'player', id: 'P', teamId: 'A' }, source, { name: 'global-ranking', scope: 'cup' }, 'Season 1', [])
   assert.deepEqual(result.view, { name: 'player', id: 'P' })
-  assert.deepEqual(result.screenState, { name: 'player', season: 'Season 2', competition: 'cup', teamId: null })
+  assert.deepEqual(result.screenState, { name: 'player', season: 'Season 2', competition: 'cup' })
   const comparison = resolvePlayerDestination({ name: 'player', id: 'P' }, { name: 'comparison', season: 'Season 1' }, { ...navigation.defaultScreenState({ name: 'comparison' }), season: 'Season 2', competition: 'champions' }, 'Season 1', [])
-  assert.deepEqual(comparison.screenState, { name: 'player', season: 'Season 2', competition: 'champions', teamId: null })
+  assert.deepEqual(comparison.screenState, { name: 'player', season: 'Season 2', competition: 'champions' })
   const hiddenTeamFilters = resolvePlayerDestination({ name: 'player', id: 'P' }, { name: 'team', id: 'A' }, { ...navigation.defaultScreenState({ name: 'team', id: 'A' }), tab: 'players', bestPlayersSeason: 'Season 2', bestPlayersCompetition: 'cup' }, 'Season 1', [])
-  assert.deepEqual(hiddenTeamFilters.screenState, { name: 'player', season: 'Season 1', competition: 'all', teamId: null })
+  assert.deepEqual(hiddenTeamFilters.screenState, { name: 'player', season: 'Season 1', competition: 'all' })
   const players = resolvePlayerDestination({ name: 'player', id: 'P' }, { name: 'players' }, { ...navigation.defaultScreenState({ name: 'players' }), filters: { seasons: ['Season 2'], teams: ['A'], positions: [] } }, 'Season 1', [])
-  assert.deepEqual(players.screenState, { name: 'player', season: 'Season 2', competition: 'all', teamId: null })
+  assert.deepEqual(players.screenState, { name: 'player', season: 'Season 2', competition: 'all' })
   const history = resolvePlayerDestination({ name: 'player', id: 'P' }, { name: 'records' }, { ...navigation.defaultScreenState({ name: 'records' }), category: 'history', historySeason: 'Season 2', filterSeasonIds: ['Season 3'], competition: 'cup' }, 'Season 1', [])
-  assert.deepEqual(history.screenState, { name: 'player', season: 'Season 2', competition: 'cup', teamId: null })
+  assert.deepEqual(history.screenState, { name: 'player', season: 'Season 2', competition: 'cup' })
 })
 
 test('same player navigation compares current screen scope rather than stale view values', () => {
@@ -198,9 +198,9 @@ test('last route restores validated player scope and keeps a valid route when on
   const state = { teams: [{ id: 'A' }], players: [{ id: 'P' }], matches: [{ id: 'm', season: 'Season 2' }] }
   saveLastRoute({ name: 'player', id: 'P', season: 'Season 1', teamId: 'A' }, undefined, storage, { name: 'player', season: 'Season 2', competition: 'cup', teamId: 'A' })
   assert.equal(JSON.parse(values.get(LAST_ROUTE_STORAGE_KEY)).version, 2)
-  assert.deepEqual(loadLastNavigationEntry(state, storage), navigation.createNavigationEntry({ name: 'player', id: 'P' }, { name: 'player', season: 'Season 2', competition: 'cup', teamId: null }))
+  assert.deepEqual(loadLastNavigationEntry(state, storage), navigation.createNavigationEntry({ name: 'player', id: 'P' }, { name: 'player', season: 'Season 2', competition: 'cup' }))
   values.set(LAST_ROUTE_STORAGE_KEY, JSON.stringify({ version: 2, view: { name: 'player', id: 'P' }, screenState: { name: 'player', season: 'missing', competition: 'cup', teamId: 'A' } }))
-  assert.deepEqual(loadLastNavigationEntry(state, storage).screenState, { name: 'player', season: null, competition: 'cup', teamId: null })
+  assert.deepEqual(loadLastNavigationEntry(state, storage).screenState, { name: 'player', season: null, competition: 'cup' })
 })
 
 test('last route preserves supported analytical destinations and their current filters', () => {
@@ -246,7 +246,7 @@ test('last route keeps valid Competition panel selections and drops stale entity
   const screenState = { ...navigation.defaultScreenState(view), tab: 'history', bestXiMode: 'monthly', monthlyAwardBlock: 2, historyMatchday: 3, historyComparedTeamIds: ['A', 'missing'], comparedPlayerIds: ['P', 'missing'] }
   saveLastRoute(view, undefined, storage, screenState)
   const restored = loadLastNavigationEntry(state, storage).screenState
-  assert.deepEqual([restored.tab, restored.bestXiMode, restored.monthlyAwardBlock, restored.historyMatchday, restored.historyComparedTeamIds, restored.comparedPlayerIds], ['history', 'monthly', 2, 3, ['A'], ['P']])
+  assert.deepEqual([restored.tab, restored.bestXiMode, restored.monthlyAwardBlock, restored.historyMatchday, restored.historyComparedTeamIds, restored.comparedPlayerIds], ['history', 'period', 2, 3, ['A'], undefined])
 })
 
 test('Records Insights ignores hidden season and team filters, and team records use recorded identity', () => {

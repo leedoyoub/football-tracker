@@ -109,6 +109,25 @@ test('integration: same ID newer cloud updated_at replaces synchronized local ro
   try { await h.SyncManager.syncNow(); assert.equal(JSON.parse(h.entries['football-tracker-v1']).teams[0].name, 'Cloud new'); assert.equal(h.stores.sync_metadata.get('meta').entityCloudUpdatedAt['team:X'], '2026-02-01T00:00:00.000Z') } finally { h.restore() }
 })
 
+test('invalid cloud merge cannot save, enqueue, upload, or delete; a later valid sync recovers', async () => {
+  const local = state([]); local.teams = [{ id: 'A', name: 'Local' }]
+  const cloudTeams = [{ id: 'B', name: 42 }]
+  const h = syncHarness({ initial: local, cloudTeams, queue: [{ id: 'queued', entityType: 'team', entityId: 'A', operation: 'upsert', payload: local.teams[0], timestamp: Date.now(), status: 'pending' }] })
+  const before = h.entries['football-tracker-v1']; const oldSetTimeout = global.setTimeout
+  global.setTimeout = () => 1
+  try {
+    const invalid = await h.SyncManager.syncNow()
+    assert.equal(invalid.status, 'pending')
+    assert.equal(h.entries['football-tracker-v1'], before)
+    assert.deepEqual([...h.stores.sync_queue.keys()], ['queued'])
+    assert.equal(h.uploaded.length, 0)
+    cloudTeams[0] = { id: 'B', name: 'Recovered' }
+    const recovered = await h.SyncManager.syncNow()
+    assert.equal(recovered.status, 'synced')
+    assert.equal(JSON.parse(h.entries['football-tracker-v1']).teams.find(team => team.id === 'B').name, 'Recovered')
+  } finally { global.setTimeout = oldSetTimeout; h.restore() }
+})
+
 test('integration: durable save failure does not block the next serialized save', async () => {
   const previousStorage = global.localStorage; const previousIndexedDB = global.indexedDB; let writes = 0; const entries = {}
   global.localStorage = { getItem: key => entries[key] ?? null, setItem: (key, value) => { if (key === 'football-tracker-v1' && ++writes === 1) throw new Error('quota'); entries[key] = value }, removeItem: key => delete entries[key] }; delete global.indexedDB

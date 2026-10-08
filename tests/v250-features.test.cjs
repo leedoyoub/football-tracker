@@ -50,6 +50,17 @@ test('Player Form excludes unused bench and other season or competition records'
   assert.equal(form.average, ratePlayerMatch(games[0], striker).raw)
 })
 
+test('Player Form plots every selected-scope appearance from oldest to newest while Last 5 stays recent', () => {
+  const striker = player('a')
+  const league = Array.from({ length: 13 }, (_, index) => match(`league-${index + 1}`, index + 1, [appearance('a')]))
+  const games = [...league, match('cup', 14, [appearance('a')], { competition: 'cup' }), match('old-season', 15, [appearance('a')], { season: 'S0' })]
+  const scoped = derivePlayerScope(striker, [striker], games.slice().reverse(), { season: 'S1', competition: 'league' })
+  const form = playerForm(scoped.appearances)
+  assert.deepEqual(form.points.map(row => row.match.id), league.map(row => row.id))
+  assert.deepEqual(form.recent.map(row => row.match.id), league.slice(-5).reverse().map(row => row.id))
+  assert.equal(form.recentAverage, form.recent.reduce((sum, row) => sum + row.rating.raw, 0) / 5)
+})
+
 test('Career milestone targets advance past exact achievements and prioritize progress ratio', () => {
   const rows = nextMilestones({ apps: 96, goals: 50, assists: 8, mom: 0, cleanSheets: 0, saves: 0 }, false)
   assert.equal(rows[0].label, '100 Apps')
@@ -113,7 +124,7 @@ test('Rank Trend follows existing ranking and historical team after transfer', (
   assert.deepEqual(trend.map(row => row.teamId), ['A', 'B'])
   assert.equal(trend[0].team, 1)
   assert.equal(trend.at(-1).team, 1)
-  assert.equal(playerRankTrend('target', players, games.slice(0, 1), 'S1', 'league').length, 0)
+  assert.equal(playerRankTrend('target', players, games.slice(0, 1), 'S1', 'league').length, 1)
 })
 
 test('Rank Trend gives a sole qualifying player the official first rank', () => {
@@ -133,7 +144,7 @@ test('Rank Trend uses canonical same-date order, position aliases, and selected 
   const league = playerRankTrend('target', players, games, 'S1', 'league')
   assert.deepEqual(league.map(row => row.match.id), ['earlier', 'later'])
   assert.equal(league.at(-1).position, 1)
-  assert.equal(playerRankTrend('target', players, games, 'S1', 'cup').length, 0)
+  assert.equal(playerRankTrend('target', players, games, 'S1', 'cup').length, 1)
   assert.equal(playerRankTrend('target', players, games, 'S1', 'all').length, 3)
 })
 
@@ -150,6 +161,17 @@ test('Rank Trend final point matches the official rating and scoped team ranking
   const teamRanked = rankGlobalRankingRows(buildGlobalRankingData(players, games, { seasons: ['S1'], teams: ['B'], positions: [] }, 'rating'), players, 'rating')
   const officialTeam = scopedMetricRanks(teamRanked, players, 'target').team
   assert.deepEqual([last.overall, last.position, last.team], [official.overall, official.position, officialTeam])
+})
+
+test('Rank Trend extends the existing final-ten results to every actual appearance', () => {
+  const target = player('target')
+  const rival = player('rival')
+  const league = Array.from({ length: 13 }, (_, index) => match(`league-${index + 1}`, index + 1, [appearance('target'), appearance('rival')], { events: index % 2 ? [goal(`g-${index}`, 'A', 'target')] : [] }))
+  const games = [...league, match('other-cup', 14, [appearance('target')], { competition: 'cup' }), match('old-season', 15, [appearance('target')], { season: 'S0' })]
+  const full = playerRankTrend('target', [target, rival], games.slice().reverse(), 'S1', 'league')
+  const historicalPrefix = playerRankTrend('target', [target, rival], league.slice(0, 10), 'S1', 'league')
+  assert.deepEqual(full.map(row => row.match.id), league.map(row => row.id))
+  assert.deepEqual(full.slice(0, 10).map(row => [row.overall, row.position, row.team]), historicalPrefix.map(row => [row.overall, row.position, row.team]))
 })
 
 test('Award Race uses official provisional candidates and leaves final awards unchanged', () => {

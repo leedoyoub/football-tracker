@@ -84,7 +84,8 @@ export const SyncManager = {
       }
       const mergedDraftSafe = sanitizeDraftLifecycle({ teams: merge('team', local.teams, cloud.teams), players: merge('player', local.players, cloud.players), matches: merge('match', local.matches, cloud.matches), competitionStates: merge('competition', local.competitionStates ?? [], cloud.competitionStates ?? []), draftMatch: local.draftMatch })
       const merged: AppState = { ...mergedDraftSafe, matches: reconcileChampionsPairingIds(mergedDraftSafe.matches, mergedDraftSafe.competitionStates) }
-      if (validateState(merged)) await LocalRepository.saveAppState(merged)
+      if (!validateState(merged)) throw new Error('Merged cloud data failed validation; sync stopped before local save or upload.')
+      await LocalRepository.saveAppState(merged)
       // First sign-in / remote-empty safety: every local-only entity gets an upload.
       for (const type of ['team', 'player', 'match', 'competition'] as const) {
         const remoteRows = type === 'team' ? cloud.teams : type === 'player' ? cloud.players : type === 'match' ? cloud.matches : cloud.competitionStates

@@ -4,7 +4,7 @@ const fs = require('node:fs')
 
 test('Cup and Champions previews are compact Top 10 routes to their canonical Global Ranking scope', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
-  const preview = source.slice(source.indexOf('function CompetitionRankings'), source.indexOf('function RaceHistoryPanel'))
+  const preview = source.slice(source.indexOf('function CompetitionRankings'), source.indexOf('function CompetitionBestElevens'))
   assert(preview.includes("competitionType: type"))
   assert(preview.includes('rows.slice(0, 10)'))
   for (const removed of ['RankingFilterButton', 'compareMode', 'viewAllMetric', 'rankingTeamIds', 'Show Top 10']) assert.equal(preview.includes(removed), false, `${removed} must not remain in compact previews`)

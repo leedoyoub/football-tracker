@@ -29,8 +29,6 @@ export type PlayerSnapshotRow = {
   avgRating: number
 }
 export type PlayerRankingSnapshot = { matchDay: number; rows: Map<LeaderboardMetric, PlayerSnapshotRow[]> }
-export type RacePoint = { matchDay: number; value: number }
-export type RaceSeries = { playerId: string; points: RacePoint[] }
 export type MonthlyBlock = { id: number; startMatchDay: number; endMatchDay: number }
 export type MonthlyAwards = {
   block: MonthlyBlock
@@ -271,18 +269,6 @@ export function rankingMovement(snapshot: PlayerRankingSnapshot | undefined, pre
   const current = snapshot?.rows.get(metric) ?? []
   const prior = new Map((previous?.rows.get(metric) ?? []).map((row, index) => [row.playerId, index + 1]))
   return new Map(current.map((row, index) => [row.playerId, rankMovement(index + 1, prior.get(row.playerId))]))
-}
-
-export function raceHistory(analytics: SeasonAnalytics, metric: 'goals' | 'assists' | 'mom' | 'rating', playerIds?: string[]): RaceSeries[] {
-  const snapshots = [...analytics.playerSnapshots.values()]
-  const latest = snapshots[snapshots.length - 1]?.rows.get(metric) ?? []
-  const selected = playerIds?.length ? playerIds.slice(0, 4) : latest.slice(0, 3).map(row => row.playerId)
-  return selected.map(playerId => ({ playerId, points: snapshots.flatMap(snapshot => {
-    const row = snapshot.rows.get(metric)?.find(item => item.playerId === playerId)
-    if (!row) return []
-    const value = metric === 'rating' ? row.avgRating : row[metric]
-    return [{ matchDay: snapshot.matchDay, value }]
-  }) }))
 }
 
 export function scopedPlayerRanks(rows: PlayerSnapshotRow[], players: Player[], playerId: string) {

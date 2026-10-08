@@ -12,6 +12,7 @@ import { playerStreaks } from '../engine/seasonInsights'
 import { GOOD_RATING_THRESHOLD } from '../engine/constants'
 import { playerFullName } from '../components/ui'
 import { useStore } from '../store'
+import { currentMembershipPresentation } from '../lib/currentMembershipPresentation'
 import type { CompetitionType, Match, Player, ScreenStateByView, View } from '../types'
 
 type Direction = 'higher' | 'lower' | 'neutral'
@@ -50,7 +51,7 @@ function PlayerSelect({ label, value, players, teams, representative, excludedId
   const normalize = (text: string) => text.toLocaleLowerCase().replace(/\s+/g, '')
   const needle = normalize(query)
   const candidates = useMemo(() => players.filter(player => player.id !== excludedId && (!needle || normalize(`${playerFullName(player)} ${player.displayName ?? ''}`).includes(needle))), [players, excludedId, needle])
-  const teamName = (player: Player) => teams.find(team => team.id === player.teamId)?.name ?? 'No Team'
+  const teamName = (player: Player) => currentMembershipPresentation(player, [], teams).label
   return <section aria-label={label} className="rounded-xl bg-zinc-900 p-2"><label className="block text-[10px] text-zinc-400">{label}<input aria-label={`${label} search`} value={query} onChange={event => setQuery(event.target.value)} placeholder="Search player" className="mt-1 w-full rounded-lg bg-black/30 px-2 py-1.5 text-xs text-white" /></label><div className="mt-1 max-h-32 overflow-y-auto">{value && <button type="button" onClick={() => onChange('')} className="w-full rounded-lg px-1 py-1 text-left text-[10px] text-zinc-400">Clear selection</button>}{candidates.map(player => <button key={player.id} type="button" onClick={() => onChange(player.id)} className={`block w-full rounded-lg px-1 py-1.5 text-left ${player.id === value ? 'bg-emerald-500/15' : ''}`}><b className="block truncate text-xs">{playerFullName(player)}</b><span className="block truncate text-[10px] text-zinc-400">{teamName(player)} · {representative.get(player.id) ?? player.position}</span></button>)}{!candidates.length && <p className="px-1 py-2 text-[10px] text-zinc-500">No matching player.</p>}</div></section>
 }
 function summary(player: Player, allPlayers: Player[], matches: Match[], filter: { season: string; competition: CompetitionType | 'all'; teamId?: string }, ranking: ReturnType<typeof rankGlobalRankingRows>): Summary {

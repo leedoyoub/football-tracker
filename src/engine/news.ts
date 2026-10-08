@@ -6,7 +6,7 @@ import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import type { CompetitionState, CompetitionType, EventSurface, Match, MatchChangePayload, Player, Team } from '../types'
 import { newestMatches, oldestMatches } from './matchChronology'
 import { buildSeasonAnalytics, rankingMovement } from './seasonAnalytics'
-import { hasPitchAppearance, isOnPitchAtEvent } from './timeline'
+import { hasPitchAppearance, isOnPitchAtEvent, matchPositionSegments } from './timeline'
 import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts } from './playerMatchFacts'
 import { teamsCreditedWithResult, teamPerspectiveScore } from './matchPerspective'
 import { positionFamily } from './positionScope'
@@ -114,6 +114,15 @@ function addAttackingMilestones(add: (item: NewsDraft) => void, player: Player, 
  * rerenders, hydration, sync and reopening an old match naturally idempotent.
  */
 function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[]): NewsItem[] {
+  const playerById = new Map<string, Player>()
+  const teamById = new Map<string, Team>()
+  const drawsBySeason = new Map<string, CompetitionState>()
+  for (const player of players) if (!playerById.has(player.id)) playerById.set(player.id, player)
+  for (const team of teams) if (!teamById.has(team.id)) teamById.set(team.id, team)
+  for (const state of states) if (state.kind === 'champions-draw' && !drawsBySeason.has(state.season)) drawsBySeason.set(state.season, state)
+  const playerName = (_players: Player[], id?: string) => { const player = playerById.get(id ?? ''); return player?.displayName ?? player?.name ?? 'Player' }
+  const teamName = (_teams: Team[], id?: string) => teamById.get(id ?? '')?.name ?? 'Team'
+  const scoreText = (match: Match, _teams: Team[]) => { const score = matchScore(match); return `${teamName(teams, match.homeTeamId)} ${score.home}-${score.away} ${teamName(teams, match.awayTeamId)} · ${competitionName(matchCompetitionType(match))}` }
   const items = new Map<string, NewsItem>()
   const add = (item: NewsDraft) => { if (!items.has(item.id)) items.set(item.id, { ...item, emoji: newsEmoji(item) }) }
   const career = new Map<string, Totals>()
@@ -124,26 +133,21 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
   const teamRuns = new Map<string, TeamRun>()
   const chronological = ordered(matches)
   const analyticsBySeason = new Map([...new Set(matches.map(match => match.season))].map(seasonName => [seasonName, buildSeasonAnalytics(teams, players, matches, seasonName)]))
-  const matchesThroughDate = new Map<string, Match[]>()
-  const matchesUpTo = (season: string, date: string) => {
-    const key = `${season}\u0000${date}`
-    const cached = matchesThroughDate.get(key)
-    if (cached) return cached
-    const selected = matches.filter(item => item.season === season && item.date <= date)
-    matchesThroughDate.set(key, selected)
-    return selected
-  }
+  const chronologicalPrefixBySeason = new Map<string, Match[]>()
   // Track canonical snapshot and knockout transitions for News.
   const teamLeads = new Map<string, boolean>()
   const cupStatus = new Map<string, string[]>()
 
   for (const match of chronological) {
+    const seasonPrefix = chronologicalPrefixBySeason.get(match.season) ?? []
+    seasonPrefix.push(match)
+    chronologicalPrefixBySeason.set(match.season, seasonPrefix)
     const type = matchCompetitionType(match)
     const context = scoreText(match, teams)
     
     // Team News: Knockout Stages (Cup / Champions)
     if (type === 'cup' || type === 'champions') {
-        const matchesUpToDate = matchesUpTo(match.season, match.date)
+        const matchesUpToDate = seasonPrefix
         if (type === 'cup') {
             const cup = cupCompetition(teams, matchesUpToDate, match.season, players)
             const prevActive = cupStatus.get(match.season) || teams.map(t => t.id)
@@ -170,7 +174,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
         }
         // Champions League news
         if (type === 'champions') {
-            const draw = states.find(s => s.season === match.season && s.kind === 'champions-draw')
+            const draw = drawsBySeason.get(match.season)
             if (draw) {
                 const champions = championsCompetition(draw, matchesUpToDate, match.season, players)
                 const prevActive = cupStatus.get(match.season + 'champions') || draw.teamIds
@@ -265,7 +269,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
       const contributions = performance.goals + performance.assists
       const matchRating = ratePlayerMatch(match, player)?.rating ?? 0
       const isSubstitute = appearance.role === 'bench' && match.events.some(event => event.type === 'sub' && event.playerInId === player.id)
-      const isDefender = ['CB', 'LB', 'RB'].includes(positionFamily(appearance.matchPosition ?? appearance.position) ?? '')
+      const isDefender = matchPositionSegments(match, appearance).some(segment => ['CB', 'LB', 'RB'].includes(positionFamily(segment.position) ?? ''))
       let rare: { key: string; title: string } | undefined
       if (performance.goals >= 4) rare = { key: `goals-${performance.goals}`, title: `${playerName(players, player.id)} scores ${performance.goals} in one match` }
       else if (contributions >= 4) rare = { key: `contributions-${contributions}`, title: `${playerName(players, player.id)} delivers ${contributions} goal contributions` }
@@ -284,7 +288,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
     }
 
     for (const teamId of teamsCreditedWithResult(match)) {
-      if (!teams.some(team => team.id === teamId)) continue
+      if (!teamById.has(teamId)) continue
       const perspective = teamPerspectiveScore(match, teamId)!
       const ours = perspective.goalsFor; const theirs = perspective.goalsAgainst
       const key = `${match.season}:${teamId}`; const run = teamRuns.get(key) ?? { wins: 0, unbeaten: 0, cleanSheets: 0, seasonGoals: 0, seasonCleanSheets: 0 }

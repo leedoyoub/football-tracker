@@ -25,7 +25,7 @@ export function resolvePlayerDestination(target: Extract<View, { name: 'player' 
   }
   if (source.name === 'season-highlight' && source.kind === 'monthly') competition = 'league'
   const season = target.season ?? (source.name === 'match' ? matches.find(item => item.id === source.id)?.season : undefined) ?? (source.name === 'player' && sourceState.name === 'player' ? sourceState.season : undefined) ?? sourceSeason
-  return { view: { name: 'player', id: target.id }, screenState: { name: 'player', season, competition: target.competitionType ?? competition, teamId: null } }
+  return { view: { name: 'player', id: target.id }, screenState: { name: 'player', season, competition: target.competitionType ?? competition } }
 }
 
 /** Removes Edit Player when returning to its existing detail route. */

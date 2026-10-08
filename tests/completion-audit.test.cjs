@@ -43,7 +43,7 @@ test('squad-first cache, No Team filtering, and No Team display remain real UI b
   assert(helper.includes('const squadCache = new Map'))
   assert(filters.includes("NO_TEAM_FILTER = '__no-team__'") && filters.includes('>No Team</label>'))
   assert(players.includes("appliedFilters.teams.includes('__no-team__') && playerHasNoCurrentTeam(player)"))
-  assert(players.includes("playerHasNoCurrentTeam(player) ? 'No Team'"))
+  assert(players.includes('membershipLabel'))
   assert(!players.includes('aggregatePlayerStats'))
   assert(!players.includes('ratingTone('))
   assert(!players.includes('avgRating.toFixed'))

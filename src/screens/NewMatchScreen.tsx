@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { FORMATION_SLOTS, Pitch, UNIVERSAL_TACTICAL_SLOTS } from '../components/Pitch'
 import { calculateFormation, kickoffFormation } from '../engine/formation'
 import { playerSeasonStats } from '../engine/stats'
+import { liveGoalAssistCounts } from './liveEventStats'
 import { scopedPositionFamilyByPlayer } from '../engine/positionScope'
 import { fillFormationSlots } from '../engine/lineupSuggestion'
 import { matchScore } from '../engine/rating'
@@ -175,14 +176,14 @@ function MatchEditor({
     setDraftReady(true)
   }, [selectedTeamId, players, recentAssignments, representative])
 
-  const homeSquad = players.filter((p) => (p.teamIds ?? [p.teamId]).includes(selectedTeamId))
+  const homeSquad = useMemo(() => players.filter((p) => (p.teamIds ?? [p.teamId]).includes(selectedTeamId)), [players, selectedTeamId])
   const draftPlayers = homeSquad
   const usedIds = new Set([...startingIds, ...matchDraft.homeBench.filter(Boolean)])
   const squadPlayers = draftPlayers.filter((player) => !usedIds.has(player.id))
-  const seasonStats = Object.fromEntries(draftPlayers.map((player) => {
+  const seasonStats = useMemo(() => Object.fromEntries(draftPlayers.map((player) => {
     const stats = playerSeasonStats(player, players, matches, season, selectedTeamId, competitionType)
     return [player.id, { goals: stats.goals, assists: stats.assists }]
-  }))
+  })), [draftPlayers, players, matches, season, selectedTeamId, competitionType])
   const activeDraft = substitutionDraft ?? matchDraft
   // Visual feedback comes only from the current selection and unconfirmed draft.
   const substitutionSelection: Record<string, 'in' | 'out'> = {}
@@ -204,13 +205,8 @@ function MatchEditor({
   }
   const liveSlots = UNIVERSAL_TACTICAL_SLOTS
     .map((slot) => ({ ...slot, playerId: activeDraft.slotAssignments[slot.slot] ?? null, teamId: selectedTeamId, avgRating: 0, matches: 0 }))
-  const liveStats = Object.fromEntries(draftPlayers.map((player) => {
-    const committed = editingEventId ? matchDraft.events.filter((e) => e.id !== editingEventId) : matchDraft.events
-    return [player.id, {
-      goals: committed.filter((e) => e.type === 'goal' && e.playerId === player.id).length + (liveEvent === 'goal' && liveScorerId === player.id ? 1 : 0),
-      assists: committed.filter((e) => e.type === 'goal' && e.assistPlayerId === player.id).length + (liveEvent === 'goal' && liveAssistId === player.id ? 1 : 0),
-    }]
-  }))
+  const liveCounts = liveGoalAssistCounts(matchDraft.events, editingEventId, liveEvent === 'goal' ? liveScorerId : undefined, liveEvent === 'goal' ? liveAssistId : undefined)
+  const liveStats = Object.fromEntries(draftPlayers.map(player => [player.id, liveCounts.get(player.id) ?? { goals: 0, assists: 0 }]))
   const minuteIsValid = /^\d{1,2}$/.test(draftMinute) && liveMinute >= 0 && liveMinute <= 99
 
   function openLiveEvent(type: NonNullable<typeof liveEvent>) {
