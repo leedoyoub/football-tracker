@@ -1,3 +1,5 @@
+import { isGoodRating } from '../engine/constants'
+
 /** Plot geometry is shared by player trends and League position history. */
 export const TREND_POINT_SPACING = 30
 
@@ -15,7 +17,7 @@ export function positionHistoryLabelVisible(teamCount: number, focusedTeamId: st
 
 export function recentFormLabelColor(rating: number, isMom: boolean): string {
   if (isMom) return '#60a5fa'
-  if (rating >= 7.2) return '#34d399'
+  if (isGoodRating(rating)) return '#34d399'
   if (rating >= 6) return '#fb923c'
   return '#f87171'
 }

@@ -2,7 +2,7 @@ import { matchScore, ratePlayerMatch } from './rating'
 import { playerSeasonStats } from './stats'
 import { seasonAwards } from './awards'
 import { combinationStats, goalPartnerships, starterSubstituteSplits } from './analytics'
-import { GOOD_RATING_THRESHOLD } from './constants'
+import { GOOD_RATING_THRESHOLD, isGoodRating } from './constants'
 import { classifyGoalTypes } from './goalTypes'
 import type { CompetitionState, Match, MatchEvent, Player, Team } from '../types'
 import { oldestMatches } from './matchChronology'
@@ -87,7 +87,7 @@ export function playerStreaks(player: Player, matches: Match[]): PlayerStreak[] 
     { key: 'goals', label: 'Goals', passes: entry => entry.goals > 0 },
     { key: 'assists', label: 'Assists', passes: entry => entry.assists > 0 },
     { key: 'goalContributions', label: 'G+A', passes: entry => entry.goals + entry.assists > 0 },
-    { key: 'goodRating', label: `${GOOD_RATING_THRESHOLD.toFixed(1)}+ rating`, passes: entry => entry.rating >= GOOD_RATING_THRESHOLD },
+    { key: 'goodRating', label: `${GOOD_RATING_THRESHOLD.toFixed(1)}+ rating`, passes: entry => isGoodRating(entry.rating) },
     { key: 'starts', label: 'Starts', passes: entry => entry.started },
     { key: 'cleanSheets', label: 'Clean sheets', passes: entry => entry.cleanSheet },
   ]

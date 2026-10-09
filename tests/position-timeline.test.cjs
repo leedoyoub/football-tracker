@@ -29,7 +29,7 @@ test('uninvolved team goals exclude scorer and assister and use event-time posit
 
 test('SOT curve and minute-prorated suppression use the finalized values', () => {
   assert.deepEqual([0, 1, 2, 3, 5, 10].map(sotMultiplier), [1, .86, .73, .62, .45, .20])
-  for (const [minutes, expected] of [[30, 1.3 / 3], [45, .65], [60, 1.3 * 2 / 3], [90, 1.3]]) {
+  for (const [minutes, expected] of [[30, 1.4 / 3], [45, .70], [60, 1.4 * 2 / 3], [90, 1.4]]) {
     const cb = player(`cb${minutes}`, 'CB'); const match = game(cb); match.appearances[0].role = 'bench'; match.events = [{ id: 'on', type: 'sub', minute: 90 - minutes, teamId: 'A', playerOutId: 'out', playerInId: cb.id, position: 'CB' }]
     near(ratePlayerMatch(match, cb).noConceded, expected)
   }
@@ -41,12 +41,12 @@ test('conceded penalties honor on-pitch event-time position and individual cause
   const sub = player('sub', 'CB'); const after = game(sub); after.appearances[0].role = 'bench'; after.events = [goal(20, { teamId: 'B' }), { id: 'on', type: 'sub', minute: 30, teamId: 'A', playerOutId: 'x', playerInId: 'sub', position: 'CB' }]
   near(ratePlayerMatch(after, sub).conceded, 0)
   const changed = player('changed', 'CB'); const match = game(changed); match.appearances[0].positionHistory = [{ minute: 50, position: 'CDM' }]; match.events = [goal(20, { teamId: 'B' }), goal(60, { teamId: 'B', concededGoalCausePlayerId: 'changed' })]
-  near(ratePlayerMatch(match, changed).conceded, -.37); near(ratePlayerMatch(match, changed).concededCause, -.3)
-  for (const [position, penalty] of [['LB', -.2], ['LWB', -.2], ['RB', -.2], ['RWB', -.2], ['CB', -.25], ['LCB', -.25], ['RCB', -.25], ['CDM', -.12], ['CM', -.10], ['LM', -.10], ['ST', 0]]) { const p = player(position, position); const m = game(p); m.events = [goal(30, { teamId: 'B' })]; near(ratePlayerMatch(m, p).conceded, penalty) }
+  near(ratePlayerMatch(match, changed).conceded, -.47); near(ratePlayerMatch(match, changed).concededCause, -.3)
+  for (const [position, penalty] of [['LB', -.25], ['LWB', -.25], ['RB', -.25], ['RWB', -.25], ['CB', -.35], ['LCB', -.35], ['RCB', -.35], ['CDM', -.12], ['CM', -.10], ['LM', -.10], ['ST', 0]]) { const p = player(position, position); const m = game(p); m.events = [goal(30, { teamId: 'B' })]; near(ratePlayerMatch(m, p).conceded, penalty) }
 })
 
-test('v2.1.2 per-goal conceded coefficients scale for fullbacks, centre-backs, and goalkeepers', () => {
-  for (const [position, oneGoal, twoGoals] of [['LB', -.20, -.40], ['CB', -.25, -.50], ['GK', -.25, -.50]]) {
+test('REV13 per-goal conceded coefficients scale for fullbacks, centre-backs, and goalkeepers', () => {
+  for (const [position, oneGoal, twoGoals] of [['LB', -.25, -.50], ['CB', -.35, -.70], ['GK', -.30, -.60]]) {
     const p = player(position, position)
     const once = game(p); once.events = [goal(30, { teamId: 'B' })]
     const twice = game(p); twice.events = [goal(30, { teamId: 'B' }), goal(60, { teamId: 'B' })]
@@ -60,7 +60,7 @@ test('GK base and save-rate bands are derived safely from saves and conceded goa
   assert.equal(ratePlayerMatch(empty, gk).base, GOALKEEPER_BASE_RATING); near(ratePlayerMatch(empty, gk).saves, 0)
   assert.deepEqual([.8, .6, .4, .2, 0].map(saveBonusPerSave), [.30, .27, .25, .21, .17])
   const match = game(gk); match.events = [{ id: 's', type: 'save', teamId: 'A', playerId: 'gk', minute: 20, count: 4 }, goal(30, { teamId: 'B' })]
-  near(ratePlayerMatch(match, gk).base, 7.0); near(ratePlayerMatch(match, gk).saves, 1.2); near(ratePlayerMatch(match, gk).conceded, -.25)
+  near(ratePlayerMatch(match, gk).base, 7.1); near(ratePlayerMatch(match, gk).saves, 1.2); near(ratePlayerMatch(match, gk).conceded, -.30)
 })
 
 test('historical rating derivation is raw-data-safe, clamped, and drives averages and MOM', () => {

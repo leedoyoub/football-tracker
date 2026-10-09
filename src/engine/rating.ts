@@ -18,7 +18,7 @@ import { playerSaveCount } from './playerMatchFacts.ts'
 export { creditedMinutesPlayed, creditedPitchIntervals, creditedPositionSegments, hasPitchAppearance, isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchPositionSegments, normalizeMatchPosition, normalizePositionFamily, pitchWindow, scoringTeamId } from './timeline.ts'
 
 export const BASE_RATING = 6.5
-export const GOALKEEPER_BASE_RATING = 7.0
+export const GOALKEEPER_BASE_RATING = 7.1
 export const MIN_RATING = 3.0
 export const MAX_RATING = 10.0
 
@@ -32,9 +32,9 @@ export const POSITION_RULES: Record<Position, PositionRules> = {
   LM: RULE(1.05, .65, .05, .25, -.10), RM: RULE(1.05, .65, .05, .25, -.10),
   CM: RULE(1.05, .65, .07, .30, -.10), LCM: RULE(1.05, .65, .07, .30, -.10), RCM: RULE(1.05, .65, .07, .30, -.10),
   CDM: RULE(1.15, .70, .06, .80, -.12), LDM: RULE(1.15, .70, .06, .80, -.12), RDM: RULE(1.15, .70, .06, .80, -.12),
-  LB: RULE(1.25, .70, .04, 1, -.20), LWB: RULE(1.25, .70, .04, 1, -.20), RB: RULE(1.25, .70, .04, 1, -.20), RWB: RULE(1.25, .70, .04, 1, -.20),
-  CB: RULE(1.35, .75, 0, 1.30, -.25), LCB: RULE(1.35, .75, 0, 1.30, -.25), RCB: RULE(1.35, .75, 0, 1.30, -.25),
-  GK: RULE(1.50, 1, 0, 0, -.25),
+  LB: RULE(1.25, .70, .04, 1, -.25), LWB: RULE(1.25, .70, .04, 1, -.25), RB: RULE(1.25, .70, .04, 1, -.25), RWB: RULE(1.25, .70, .04, 1, -.25),
+  CB: RULE(1.35, .75, 0, 1.40, -.35), LCB: RULE(1.35, .75, 0, 1.40, -.35), RCB: RULE(1.35, .75, 0, 1.40, -.35),
+  GK: RULE(1.50, 1, 0, 0, -.30),
 }
 
 export const SOT_MULTIPLIERS = [1, .86, .73, .62, .53, .45, .38, .32, .27, .23] as const

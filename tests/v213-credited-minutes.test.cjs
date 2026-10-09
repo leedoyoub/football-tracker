@@ -83,8 +83,8 @@ test('stoppage saves and concessions remain real events, but SOT shares cap at 9
     goal('against', 94, { teamId: 'B' }),
   ])
   const keeperRating = rating.ratePlayerMatch(match, keeper), cbRating = rating.ratePlayerMatch(match, cb)
-  assert.equal(keeperRating.minutes, 90); assert.equal(keeperRating.saves, .25); assert.equal(keeperRating.conceded, -.25)
-  assert.equal(cbRating.minutes, 90); assert.equal(cbRating.conceded, -.25)
+  assert.equal(keeperRating.minutes, 90); assert.equal(keeperRating.saves, .25); assert.equal(keeperRating.conceded, -.30)
+  assert.equal(cbRating.minutes, 90); assert.equal(cbRating.conceded, -.35)
   const normalPlayer = player('normal'), extendedPlayer = player('extended')
   const normal = game('normal', [appearance(normalPlayer)], [], 90)
   const extended = game('extended', [appearance(extendedPlayer)], [], 95)

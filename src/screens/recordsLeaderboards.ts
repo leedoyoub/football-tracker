@@ -1,6 +1,7 @@
 import { combinationStats } from '../engine/analytics'
 import { oldestMatches } from '../engine/matchChronology'
 import { buildPlayerRecordLeaderboards } from '../engine/playerRecords'
+import { RATING_ENGINE_REVISION } from '../engine/ratingRevision'
 import { isPlayerAssistEvent, isPlayerGoalEvent } from '../engine/playerMatchFacts'
 import { orderedEvents, scoringTeamId } from '../engine/timeline'
 import { teamMetrics } from '../engine/teamMetrics'
@@ -29,7 +30,7 @@ export const combinationBestUnitOptions = [
 ]
 
 const recordsCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], Map<string, RecordsLeaderboardGroup[]>>>>()
-const scopeKey = ({ category, scope, selectedIds }: RecordsInput) => JSON.stringify([category, scope.competition, scope.positionFilter, scope.seasons.slice().sort(), scope.teamIds.slice().sort(), selectedIds ?? null])
+const scopeKey = ({ category, scope, selectedIds }: RecordsInput) => JSON.stringify([RATING_ENGINE_REVISION, category, scope.competition, scope.positionFilter, scope.seasons.slice().sort(), scope.teamIds.slice().sort(), selectedIds ?? null])
 
 const rank = (rows: Omit<RecordsLeaderboardRow, 'rank'>[], ascending = false) => { let prior: number | undefined; let priorRank = 0; return rows.slice().sort((a, b) => (ascending ? a.numeric - b.numeric : b.numeric - a.numeric) || a.name.localeCompare(b.name)).map((row, index) => { const next = prior === row.numeric ? priorRank : index + 1; prior = row.numeric; priorRank = next; return { ...row, rank: next } }) }
 const combinationKey = (ids: string[]) => ids.slice().sort().join(':')

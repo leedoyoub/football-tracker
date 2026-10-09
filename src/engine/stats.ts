@@ -16,7 +16,7 @@ import { kickoffLineupForMatch } from './kickoffLineup'
 import { newestMatches, oldestMatches } from './matchChronology'
 import { positionFamily, scopedAwardFamilyByPlayer, scopedPositionFamilyByPlayer, type PositionFamily } from './positionScope'
 import { matchCompetitionType } from './competitionContext'
-import { GOOD_RATING_THRESHOLD } from './constants'
+import { isGoodRating } from './constants'
 import { isRecordedForTeam, teamsCreditedWithResult, teamPerspectiveScore } from './matchPerspective'
 import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts, playerSaveCount } from './playerMatchFacts'
 import { addDefensiveRankingFacts, appendRecordedTeamOpportunities, defensiveMatchFacts, defensiveRankingValue, emptyDefensiveRankingFacts, emptyTeamOpportunityIndex, teamAppearanceHistory, teamOpportunityMinutesFromIndex, type DefensiveRankingFacts } from './defensiveRanking'
@@ -97,7 +97,7 @@ export function aggregatePlayerStats(
     avgRating,
     saves,
     mom,
-    goodMatches: ratings.filter(rating => rating.raw >= GOOD_RATING_THRESHOLD).length,
+    goodMatches: ratings.filter(rating => isGoodRating(rating.raw)).length,
     wins,
     draws,
     losses,
@@ -376,7 +376,7 @@ export function buildGlobalRankingData(
     const minutes = ratingRows.reduce((sum, rating) => sum + rating.minutes, 0)
     const avgRating = ratingRows.reduce((sum, rating) => sum + rating.raw, 0) / ratingRows.length
     const latest = newestMatches(playerMatches)[0]
-    const stats: PlayerSeasonStats = { playerId: player.id, teamId: player.teamId, season: 'All', matches: ratingRows.length, starts, subs, minutes, goals, assists, avgRating, mom: playerMatches.filter(match => momFor(match) === player.id).length, goodMatches: ratingRows.filter(rating => rating.raw >= GOOD_RATING_THRESHOLD).length, saves, wins, draws, losses, recentForm: recentForm.slice(-5).reverse(), ratings: ratingRows }
+    const stats: PlayerSeasonStats = { playerId: player.id, teamId: player.teamId, season: 'All', matches: ratingRows.length, starts, subs, minutes, goals, assists, avgRating, mom: playerMatches.filter(match => momFor(match) === player.id).length, goodMatches: ratingRows.filter(rating => isGoodRating(rating.raw)).length, saves, wins, draws, losses, recentForm: recentForm.slice(-5).reverse(), ratings: ratingRows }
     const playedGoalkeeper = goalkeeperAppearances > 0
     const per90 = (value: number) => stats.minutes ? value / stats.minutes * 90 : 0
     const value = _metric === 'goals' ? stats.goals : _metric === 'assists' ? stats.assists : _metric === 'g+a' ? stats.goals + stats.assists : _metric === 'minutes' ? stats.minutes : _metric === 'mom' ? stats.mom : _metric === 'goodMatches' ? stats.goodMatches : _metric === 'goals/90' ? per90(stats.goals) : _metric === 'assists/90' ? per90(stats.assists) : _metric === 'g+a/90' ? per90(stats.goals + stats.assists) : stats.avgRating

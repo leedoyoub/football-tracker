@@ -23,14 +23,14 @@ function game(id, day = 1, subjects = players, sot = 4) {
     appearances: subjects.map(p => ({ playerId: p.id, teamId: 'A', role: 'starter', position: p.position, matchPosition: p.position, rating: 10 })),
     events: [{ id: `${id}:g1`, type: 'goal', minute: 20, teamId: 'A', assistPlayerId: 'cam' }, { id: `${id}:g2`, type: 'goal', minute: 30, teamId: 'A' }] }
 }
-// Recreate REV11 solely inside the fixture, then reuse the same object identities
-// under REV12. This detects caches that forget their formula revision dependency.
-function withRevision11(run) {
+// Recreate REV12 solely inside the fixture, then reuse the same object identities
+// under REV13. This detects caches that forget their formula revision dependency.
+function withRevision12(run) {
   const original = revision.RATING_ENGINE_REVISION
   const values = ['CB', 'LCB', 'RCB'].map(p => rating.POSITION_RULES[p].suppressionMax)
   try {
-    revision.RATING_ENGINE_REVISION = 11
-    for (const p of ['CB', 'LCB', 'RCB']) rating.POSITION_RULES[p].suppressionMax = 1.4
+    revision.RATING_ENGINE_REVISION = 12
+    for (const p of ['CB', 'LCB', 'RCB']) rating.POSITION_RULES[p].suppressionMax = 1.3
     return run()
   } finally {
     revision.RATING_ENGINE_REVISION = original
@@ -38,8 +38,8 @@ function withRevision11(run) {
   }
 }
 
-test('REV12 CB/LCB/RCB suppression is exactly 1.30 at zero SOT and .689 at four SOT', () => {
-  for (const position of ['CB', 'LCB', 'RCB']) for (const [sot, expected] of [[0, 1.30], [4, .689]]) {
+test('REV13 CB/LCB/RCB suppression is exactly 1.40 at zero SOT and .742 at four SOT', () => {
+  for (const position of ['CB', 'LCB', 'RCB']) for (const [sot, expected] of [[0, 1.40], [4, .742]]) {
     const p = player(position, position), match = game(`exact-${position}-${sot}`, 1, [p], sot)
     const result = rating.ratePlayerMatch(match, p)
     near(result.noConceded, expected); assert.equal(result.cleanSheet, 0)
@@ -55,52 +55,52 @@ test('non-CB suppression and all other CB contributions retain their contract', 
   const match = game('contributions', 1, [cb], 4)
   match.events = [{ id: 'goal', type: 'goal', minute: 10, teamId: 'A', playerId: 'cb' }, { id: 'assist', type: 'goal', minute: 20, teamId: 'A', assistPlayerId: 'cb' }, { id: 'neutral', type: 'goal', minute: 30, teamId: 'A' }, { id: 'fault', type: 'goal', minute: 40, teamId: 'B', concededGoalCausePlayerId: 'cb' }]
   const r = rating.ratePlayerMatch(match, cb)
-  assert.deepEqual([r.goals, r.assists, r.teamGoals, r.conceded, r.concededCause, r.cleanSheet], [1.35, .75, 0, -.25, -.3, 0])
+  assert.deepEqual([r.goals, r.assists, r.teamGoals, r.conceded, r.concededCause, r.cleanSheet], [1.35, .75, 0, -.35, -.3, 0])
 })
 
-test('canonical MOM changes from CB to CAM using raw precision even when both display 7.3', () => {
+test('canonical MOM changes from CAM to CB using raw precision even when both display 7.3', () => {
   const match = game('mom')
-  withRevision11(() => { near(rating.ratePlayerMatch(match, cb).raw, 7.342); assert.equal(rating.getMatchManOfTheMatch(match, players), 'cb') })
-  near(rating.ratePlayerMatch(match, cb).raw, 7.289)
+  withRevision12(() => { near(rating.ratePlayerMatch(match, cb).raw, 7.289); assert.equal(rating.getMatchManOfTheMatch(match, players), 'cam') })
+  near(rating.ratePlayerMatch(match, cb).raw, 7.342)
   near(rating.ratePlayerMatch(match, cam).raw, 7.29)
   assert.equal(rating.ratePlayerMatch(match, cb).raw.toFixed(1), rating.ratePlayerMatch(match, cam).raw.toFixed(1))
-  assert.equal(rating.getMatchManOfTheMatch(match, players), 'cam')
+  assert.equal(rating.getMatchManOfTheMatch(match, players), 'cb')
 })
 
-test('REV11 warm caches are invalidated for MOM counts, global/team/league ranks, Player Detail and Records', () => {
+test('REV12 warm caches are invalidated for MOM counts, global/team/league ranks, Player Detail and Records', () => {
   const matches = [1, 2, 3].map(day => game(`rank-${day}`, day))
   const before = JSON.stringify(matches)
-  withRevision11(() => {
-    assert.equal(derivePlayerScope(cb, players, matches, { season: 'S1' }).mom, 3)
-    assert.equal(rankGlobalRankingRows(buildGlobalRankingData(players, matches, filters, 'mom'), players, 'mom')[0].playerId, 'cb')
+  withRevision12(() => {
+    assert.equal(derivePlayerScope(cam, players, matches, { season: 'S1' }).mom, 3)
+    assert.equal(rankGlobalRankingRows(buildGlobalRankingData(players, matches, filters, 'mom'), players, 'mom')[0].playerId, 'cam')
     buildPlayerRecordLeaderboards(players, matches)
     buildSeasonAnalytics(teams, players, matches, 'S1')
     historyTimelineForSeason(teams, players, matches, [], 'S1')
   })
   for (const p of players) {
-    const expected = p === cb ? 7.289 : 7.29, mom = p === cb ? 0 : 3
+    const expected = p === cb ? 7.342 : 7.29, mom = p === cb ? 3 : 0
     const detail = derivePlayerScope(p, players, matches, { season: 'S1', competition: 'league', teamIds: ['A'] })
     near(detail.averageRating, expected); assert.equal(detail.mom, mom); assert.equal(detail.goodMatches, 3)
     const stats = aggregatePlayerStats(p, players, matches)
     near(stats.avgRating, expected); assert.equal(stats.mom, mom)
   }
-  assert.equal(derivePlayerScope(cb, players, matches, { season: 'S1' }).mom, 0)
+  assert.equal(derivePlayerScope(cb, players, matches, { season: 'S1' }).mom, 3)
   for (const scope of [filters, { ...filters, teams: ['A'] }]) for (const metric of ['mom', 'rating']) {
     const rows = buildGlobalRankingData(players, matches, scope, metric)
-    near(rows.find(r => r.playerId === 'cb').avgRating, 7.289)
-    assert.equal(rankGlobalRankingRows(rows, players, metric)[0].playerId, 'cam')
+    near(rows.find(r => r.playerId === 'cb').avgRating, 7.342)
+    assert.equal(rankGlobalRankingRows(rows, players, metric)[0].playerId, 'cb')
   }
   const records = buildPlayerRecordLeaderboards(players, matches)
-  assert.equal(records.find(g => g.id === 'mom').rows[0].playerId, 'cam')
-  assert.equal(records.find(g => g.id === 'highest-rating').rows[0].playerId, 'cam')
+  assert.equal(records.find(g => g.id === 'mom').rows[0].playerId, 'cb')
+  assert.equal(records.find(g => g.id === 'highest-rating').rows[0].playerId, 'cb')
   const snapshots = buildSeasonAnalytics(teams, players, matches, 'S1').playerSnapshots
-  assert.equal(snapshots.get(3).rows.get('mom')[0].playerId, 'cam')
-  assert.equal(snapshots.get(3).rows.get('rating')[0].playerId, 'cam')
-  assert.equal(historyTimelineForSeason(teams, players, matches, [], 'S1').rating.playerId, 'cam')
+  assert.equal(snapshots.get(3).rows.get('mom')[0].playerId, 'cb')
+  assert.equal(snapshots.get(3).rows.get('rating')[0].playerId, 'cb')
+  assert.equal(historyTimelineForSeason(teams, players, matches, [], 'S1').rating.playerId, 'cb')
   assert.equal(JSON.stringify(matches), before, 'historical facts and ignored stored ratings must remain untouched')
 })
 
-test('Best XI and recent Team of the Week reorder close CB candidates in league/champions/cup scopes using REV12', () => {
+test('Best XI and recent Team of the Week reorder close CB candidates in league/champions/cup scopes using REV13', () => {
   const a = player('zero-sot-cb', 'CB'), b = player('assist-cb', 'CB'), subjects = [a, b]
   for (const competitionType of ['league', 'champions', 'cup']) {
     const matches = [1, 2, 3].flatMap(day => {
@@ -108,14 +108,14 @@ test('Best XI and recent Team of the Week reorder close CB candidates in league/
       const second = { ...game(`${competitionType}-b-${day}`, day, [b], 6), competitionType, events: [{ id: `assist-${day}`, type: 'goal', minute: 20, teamId: 'A', assistPlayerId: b.id }] }
       return [first, second]
     })
-    withRevision11(() => {
-      near(rating.ratePlayerMatch(matches[0], a).raw, 7.9); near(rating.ratePlayerMatch(matches[1], b).raw, 7.882)
-      for (const recent of [false, true]) assert.equal(unifiedBestEleven(subjects, matches, 'S1', recent).slots.find(s => s.slot === 'LCB').playerId, a.id)
+    withRevision12(() => {
+      near(rating.ratePlayerMatch(matches[0], a).raw, 7.8); near(rating.ratePlayerMatch(matches[1], b).raw, 7.844)
+      for (const recent of [false, true]) assert.equal(unifiedBestEleven(subjects, matches, 'S1', recent).slots.find(s => s.slot === 'LCB').playerId, b.id)
     })
-    near(rating.ratePlayerMatch(matches[0], a).raw, 7.8); near(rating.ratePlayerMatch(matches[1], b).raw, 7.844)
-    for (const recent of [false, true]) assert.equal(unifiedBestEleven(subjects, matches, 'S1', recent).slots.find(s => s.slot === 'LCB').playerId, b.id)
-    assert.equal(performanceAwardResult(subjects, matches).bestXI.find(s => s.slot === 'LCB').playerId, b.id)
-    assert.equal(awardsForCompetition(competitionType, 'S1', teams, subjects, matches, []).bestXI.find(s => s.slot === 'LCB').playerId, b.id)
+    near(rating.ratePlayerMatch(matches[0], a).raw, 7.9); near(rating.ratePlayerMatch(matches[1], b).raw, 7.882)
+    for (const recent of [false, true]) assert.equal(unifiedBestEleven(subjects, matches, 'S1', recent).slots.find(s => s.slot === 'LCB').playerId, a.id)
+    assert.equal(performanceAwardResult(subjects, matches).bestXI.find(s => s.slot === 'LCB').playerId, a.id)
+    assert.equal(awardsForCompetition(competitionType, 'S1', teams, subjects, matches, []).bestXI.find(s => s.slot === 'LCB').playerId, a.id)
   }
 })
 
@@ -125,25 +125,25 @@ test('monthly, stage, competition, season and historical awards consume the new 
   // Only completion is supplied; rating, eligibility, bonuses and selectors run unchanged.
   competition.competitionSeasonStatus = () => ({ league: { complete: true, championId: 'A', standings: [{ teamId: 'A', rank: 1 }] }, cup: { championId: 'A' }, champions: { championId: 'A' }, complete: true })
   try {
-    withRevision11(() => {
-      assert.equal(seasonAwards('S1', teams, players, matches, states).ballon.playerId, 'cb')
-      assert.equal(seasonRecap(players, matches, 'S1', states, teams).awards.find(award => award.id === 'player').playerIds[0], 'cb')
+    withRevision12(() => {
+      assert.equal(seasonAwards('S1', teams, players, matches, states).ballon.playerId, 'cam')
+      assert.equal(seasonRecap(players, matches, 'S1', states, teams).awards.find(award => award.id === 'player').playerIds[0], 'cam')
       historyAwardsForSeason(teams, players, matches, states, 'S1', 'all')
       historyMonthlyAward(teams, players, matches, 'S1', 1)
     })
-    assert.equal(monthlyAwardForBlock(teams, players, matches, 'S1', 1).bestPlayerId, 'cam')
-    assert.equal(performanceAwardResult(players, matches).bestPlayerId, 'cam')
+    assert.equal(monthlyAwardForBlock(teams, players, matches, 'S1', 1).bestPlayerId, 'cb')
+    assert.equal(performanceAwardResult(players, matches).bestPlayerId, 'cb')
     for (const type of ['league', 'cup', 'champions']) {
       const scoped = matches.map(m => ({ ...m, competitionType: type }))
       const award = awardsForCompetition(type, 'S1', teams, players, scoped, states)
-      assert.equal(award.mvp.playerId, 'cam')
-      near(award.candidates.find(c => c.playerId === 'cb').average, 7.289)
+      assert.equal(award.mvp.playerId, 'cb')
+      near(award.candidates.find(c => c.playerId === 'cb').average, 7.342)
     }
-    assert.equal(seasonAwards('S1', teams, players, matches, states).ballon.playerId, 'cam')
+    assert.equal(seasonAwards('S1', teams, players, matches, states).ballon.playerId, 'cb')
     const recap = seasonRecap(players, matches, 'S1', states, teams)
-    assert.equal(recap.awards.find(award => award.id === 'player').playerIds[0], 'cam')
-    assert.equal(recap.awards.find(award => award.id === 'mom').playerIds[0], 'cam')
-    assert.equal(historyAwardsForSeason(teams, players, matches, states, 'S1', 'all').find(a => a.competition === 'league').player.playerId, 'cam')
-    assert.equal(historyMonthlyAward(teams, players, matches, 'S1', 1).bestPlayerId, 'cam')
+    assert.equal(recap.awards.find(award => award.id === 'player').playerIds[0], 'cb')
+    assert.equal(recap.awards.find(award => award.id === 'mom').playerIds[0], 'cb')
+    assert.equal(historyAwardsForSeason(teams, players, matches, states, 'S1', 'all').find(a => a.competition === 'league').player.playerId, 'cb')
+    assert.equal(historyMonthlyAward(teams, players, matches, 'S1', 1).bestPlayerId, 'cb')
   } finally { competition.competitionSeasonStatus = original }
 })

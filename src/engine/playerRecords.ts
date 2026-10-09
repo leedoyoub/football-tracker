@@ -1,6 +1,6 @@
 import type { CompetitionType, Match, Player, PositionFilterKey } from '../types'
 import { matchCompetitionType } from './competition'
-import { GOOD_RATING_THRESHOLD } from './constants'
+import { isGoodRating } from './constants'
 import { newestMatches } from './matchChronology'
 import { positionFilterFamilies, scopedPositionFamilyByPlayer } from './positionScope'
 import { getMatchManOfTheMatch, ratePlayerMatch } from './rating'
@@ -78,7 +78,7 @@ function buildFacts(players: Player[], matches: Match[], scope: PlayerRecordScop
       playerId: player.id, appearances: rated.length,
       goals: sum(row => row.goals), assists: sum(row => row.assists), matchesScoredIn: count(row => row.goals >= 1), matchesGA: count(row => row.goals + row.assists >= 1), braces: count(row => row.goals >= 2), hatTricks: count(row => row.goals >= 3),
       fourGoalGames: count(row => row.goals >= 4), threeAssistGames: count(row => row.assists >= 3), fourGAGames: count(row => row.goals + row.assists >= 4), mom: count(row => momByMatch.get(row.match.id) === player.id),
-      goodRatings: count(row => row.rating.raw >= GOOD_RATING_THRESHOLD), eightRatings: count(row => row.rating.raw >= 8), nineRatings: count(row => row.rating.raw >= 9), tenRatings: count(row => row.rating.raw === 10),
+      goodRatings: count(row => isGoodRating(row.rating.raw)), eightRatings: count(row => row.rating.raw >= 8), nineRatings: count(row => row.rating.raw >= 9), tenRatings: count(row => row.rating.raw === 10),
       cleanSheets: count(row => row.cleanSheet), saves: sum(row => row.saves), goodStreak: streak('goodRating'), scoringStreak: streak('goals'), gaStreak: streak('goalContributions'),
       highestRating: Math.max(...rated.map(row => row.rating.raw)), highestGoals: Math.max(...rated.map(row => row.goals)), highestAssists: Math.max(...rated.map(row => row.assists)), highestGA: Math.max(...rated.map(row => row.goals + row.assists)),
       gameWinningGoals: goalTypes('gameWinning'), comebackGoals: goalTypes('comeback'), equalizers: goalTypes('equalizer'), openingGoals: goalTypes('opening'), stoppageTimeGoals: goalTypes('stoppageTime'),

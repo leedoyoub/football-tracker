@@ -1,6 +1,6 @@
 import type { Player, Team } from '../types'
 import { PlayerIcon } from './PlayerIcon'
-import { GOOD_RATING_THRESHOLD } from '../engine/constants'
+import { isGoodRating } from '../engine/constants'
 
 export function Badge({ children, className = '', colorClass, size = 'default' }: { children: React.ReactNode, className?: string, colorClass: string, size?: 'default' | 'large' }) {
   const sizeClasses = size === 'large' ? 'h-[18px] min-w-[25px] px-0.5 text-[8px]' : 'h-[15px] min-w-[23px] px-0.5 text-[7px]'
@@ -17,7 +17,7 @@ export function SubstitutionSelection({ direction }: { direction: 'in' | 'out' }
 
 /** Rating colour is presentation-only and must follow the one-decimal rating shown to users. */
 export function displayedRating(rating: number): number { return Number(rating.toFixed(1)) }
-export const ratingBadgeColor = (rating: number) => displayedRating(rating) >= GOOD_RATING_THRESHOLD ? 'bg-emerald-500 text-white' : displayedRating(rating) >= 6 ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'
+export const ratingBadgeColor = (rating: number) => isGoodRating(displayedRating(rating)) ? 'bg-emerald-500 text-white' : displayedRating(rating) >= 6 ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'
 
 export function SubstitutePlayerCard({ player, team, rating, stats, position, inMinute, outMinute, showRating = true, selection, isMotm = false, onClick }: { player: Player, team?: Team, rating?: number, stats?: { goals: number, assists: number }, position?: string, inMinute?: number, outMinute?: number, showRating?: boolean, selection?: 'in' | 'out', isMotm?: boolean, onClick: () => void }) {
   return (
@@ -69,7 +69,7 @@ export function StatIcons({ goals, assists, className = '' }: { goals: number; a
 }
 
 export function ratingTone(rating: number) {
-  if (displayedRating(rating) >= GOOD_RATING_THRESHOLD) return 'text-emerald-400'
+  if (isGoodRating(displayedRating(rating))) return 'text-emerald-400'
   if (displayedRating(rating) >= 6) return 'text-orange-400'
   return 'text-red-400'
 }

@@ -1,5 +1,5 @@
 import type { Best11Slot, CompetitionType, Match, Player, Position, Team } from '../types'
-import { GOOD_RATING_THRESHOLD } from './constants'
+import { isGoodRating } from './constants'
 import { playerAssistEvents, playerGoalEvents } from './playerMatchFacts'
 import { competitionMatches, leagueCompetition, matchCompetitionType } from './competition'
 import { LEAGUE_MATCHES_PER_TEAM } from './leagueFormat'
@@ -170,7 +170,7 @@ function buildPlayerSnapshots(players: Player[], games: Match[]): Map<number, Pl
         row.teamId = appearance.teamId; row.appearances++; row.minutes += rating.minutes; row.ratingTotal += rating.raw; row.avgRating = row.ratingTotal / row.appearances
         row.goals += playerGoalEvents(match, appearance).length
         row.assists += playerAssistEvents(match, appearance).length
-        row.mom += Number(mom === player.id); row.goodMatches += Number(rating.raw >= GOOD_RATING_THRESHOLD)
+        row.mom += Number(mom === player.id); row.goodMatches += Number(isGoodRating(rating.raw))
         rows.set(player.id, row)
       }
     }

@@ -254,7 +254,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
       career.set(player.id, careerAfter); season.set(seasonKey, seasonAfter); competition.set(competitionKey, competitionAfter)
 
       addAttackingMilestones(add, player, match, 'season', seasonBefore, seasonAfter, context)
-      for (const value of crossed(seasonBefore.mom, seasonAfter.mom, multiples(10, seasonAfter.mom))) add({ id: `season-mom:${match.season}:${player.id}:${value}`, kind: 'player', date: match.date, matchId: match.id, playerId: player.id, eyebrow: 'MOM MILESTONE', title: `${playerName(players, player.id)} records a ${value}th MOM this season`, detail: 'Calculated from saved match ratings.', context })
+      for (const value of crossed(seasonBefore.mom, seasonAfter.mom, multiples(10, seasonAfter.mom))) add({ id: `season-mom:${match.season}:${player.id}:${value}`, kind: 'player', date: match.date, matchId: match.id, playerId: player.id, eyebrow: 'MOM MILESTONE', title: `${playerName(players, player.id)} records a ${value}th MOM this season`, detail: 'Calculated from match events and current ratings.', context })
 
       addAttackingMilestones(add, player, match, type, competitionBefore, competitionAfter, context, type)
       addAttackingMilestones(add, player, match, 'career', careerBefore, careerAfter, context)
