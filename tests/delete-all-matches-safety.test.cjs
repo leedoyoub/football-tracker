@@ -10,6 +10,6 @@ test('Data management exposes no bulk-delete control', () => {
 
 test('Store deleteAllMatches clears stale draft and competition state', () => {
   const source = fs.readFileSync(require.resolve('../src/store.tsx'), 'utf8')
-  const deleteAllMatch = source.match(/deleteAllMatches: \(\) => \{\s+update\(\(prev\) => \(\{ \.\.\.prev, matches: \[\], draftMatch: undefined, competitionStates: \[\] \}\),/s)
+  const deleteAllMatch = source.match(/deleteAllMatches: \(\) => \{\s+return update\(\(prev\) => \(\{ \.\.\.prev, matches: \[\], draftMatch: undefined, competitionStates: \[\] \}\),/s)
   assert(deleteAllMatch, 'deleteAllMatches should clear stale dependent state')
 })

@@ -100,14 +100,14 @@ export function reconstructLegacyKickoffLineup(match: Match, teamId: string): Fo
 
 /** Modern matches render their immutable snapshot directly; old matches have one
  * deterministic compatibility route rather than per-screen reconstruction. */
-export function kickoffLineupForMatch(match: Match, teamId: string): FormationSlot[] {
+export function kickoffLineupForMatch(match: Match, teamId: string, exact = true): FormationSlot[] {
   // Presence of a snapshot marks a modern match. Corruption must fail closed;
   // falling back to legacy guessing would silently change a known kickoff XI.
   const snapshot = match.kickoffLineup ?? []
   const isModernSnapshot = snapshot.some(slot => slot.ratingPosition !== undefined || slot.displayPosition !== undefined)
   if (isModernSnapshot) {
     const modern = snapshot.filter(slot => Boolean(slot.playerId))
-    if (!validateKickoffLineup(modern).valid) return []
+    if (!validateKickoffLineup(modern, exact).valid) return []
     return modern.map(slot => {
     const definition = tacticalSlotById[slot.id]
     return { ...slot, matchPosition: slot.ratingPosition ?? slot.matchPosition ?? definition?.ratingPosition ?? 'CM', ratingPosition: slot.ratingPosition ?? slot.matchPosition ?? definition?.ratingPosition, displayPosition: slot.displayPosition ?? definition?.displayPosition, x: slot.x ?? definition?.x ?? 50, y: slot.y ?? definition?.y ?? 50 }

@@ -121,7 +121,7 @@ export function MatchDetailScreen({ matchId, screenState, onStateChange, onNavig
           <input type="text" placeholder="Enter 1001" value={deleteConfirmationInput} onChange={e => setDeleteConfirmationInput(e.target.value)} className="mt-4 w-full rounded-xl bg-black p-3 text-center text-lg font-black tracking-widest text-white outline-none ring-1 ring-zinc-700 focus:ring-red-500" />
           <div className="mt-6 flex gap-2">
             <button className="flex-1 rounded-xl bg-zinc-800 p-3 text-sm font-bold" onClick={() => { setDeleteConfirmationStep(0); setDeleteConfirmationInput(''); }}>Cancel</button>
-            <button disabled={deleteConfirmationInput !== '1001'} className="flex-1 rounded-xl bg-red-900 p-3 text-sm font-bold text-red-100 disabled:opacity-50" onClick={() => { try { deleteMatch(match.id); onReplace({ name: 'home' }) } catch (error) { setDeleteError(error instanceof Error ? error.message : 'This match cannot be deleted safely.'); setDeleteConfirmationStep(0); setDeleteConfirmationInput('') } }}>Delete Match</button>
+            <button disabled={deleteConfirmationInput !== '1001'} className="flex-1 rounded-xl bg-red-900 p-3 text-sm font-bold text-red-100 disabled:opacity-50" onClick={() => { void Promise.resolve().then(() => deleteMatch(match.id)).then(() => onReplace({ name: 'home' })).catch(error => { setDeleteError(error instanceof Error ? error.message : 'This match could not be safely deleted.'); setDeleteConfirmationStep(0); setDeleteConfirmationInput('') }) }}>Delete Match</button>
           </div>
         </div>
       </div>

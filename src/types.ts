@@ -193,6 +193,8 @@ export interface Match {
   fulltimeOpponentSot?: number
   /** Draft-checkpoint workflow state only. Finalized records omit this flag. */
   fulltimeOpponentSotAutoLinked?: boolean
+  /** Draft-only boundary: lineup was explicitly confirmed for kickoff. */
+  kickoffConfirmed?: boolean
   appearances: Appearance[]
   events: MatchEvent[]
   /** Optional saved kickoff layout; used only when historical data already has it. */

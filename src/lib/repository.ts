@@ -20,7 +20,7 @@ export type DurableSaveResult = { primarySaved: true; mirrorSaved: boolean; mirr
 /** Parse and normalize without changing durable storage or the live Store. */
 export function prepareImportData(jsonString: string): AppState {
   const parsed = JSON.parse(jsonString)
-  if (!validateState(parsed)) throw new Error('Invalid JSON structure')
+  if (!validateState(parsed, { allowMissingHistoricalPlayers: true })) throw new Error('Invalid JSON structure')
   const migrated = sanitizeDraftLifecycle({ ...parsed, matches: parsed.matches.map(normalizeMatchCompetitionIdentity) })
   return { ...migrated, matches: reconcileChampionsPairingIds(migrated.matches, migrated.competitionStates) }
 }
@@ -47,16 +47,7 @@ export function preservePreImportBackup() {
   if (!current) return
   try { localStorage.setItem(BACKUP_KEY, current) } catch { throw new Error('Unable to preserve the current data before import.') }
 }
-export function compactLegacyRecoveryStorage() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw || !validateState(JSON.parse(raw))) return false
-    localStorage.removeItem(BACKUP_KEY)
-    for (let i = 1; i <= MAX_SNAPSHOTS; i++) localStorage.removeItem(`${EMERGENCY_PREFIX}${i}`)
-    return true
-  } catch { return false }
-}
-function isQuotaError(error: unknown) { return error instanceof Error && /quota|capacity|storage/i.test(error.name + error.message) }
+function isQuotaError(error: unknown) { return error instanceof Error && /quota|capacity/i.test(error.name + error.message) }
 export const LocalRepository = {
   async getAppState(): Promise<AppState | null> {
     // localStorage is written synchronously before IndexedDB. Prefer it on a
@@ -75,7 +66,7 @@ export const LocalRepository = {
         const raw = await getSource();
         if (!raw) continue;
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        if (validateState(parsed)) {
+        if (validateState(parsed, { allowMissingHistoricalPlayers: true })) {
           // Migration: Ensure player position is valid
           const migrated = sanitizeDraftLifecycle({
             ...parsed,
@@ -105,7 +96,7 @@ export const LocalRepository = {
     return measureInDevelopment('LocalRepository.saveAppState', async () => {
     // Serialize and validate before touching any durable source. This makes a
     // reported successful match save mean primary browser storage was proven.
-    if (!measureInDevelopment('validation', () => validateState(state))) throw new Error('Invalid state structure, saving aborted.');
+    if (!measureInDevelopment('validation', () => validateState(state, { allowMissingHistoricalPlayers: true }))) throw new Error('Invalid state structure, saving aborted.');
     let serialized: string
     try { serialized = measureInDevelopment('JSON.stringify', () => JSON.stringify(state)) } catch { throw new Error('Primary storage serialization failed.') }
 
@@ -118,19 +109,15 @@ export const LocalRepository = {
     try {
       writePrimary()
     } catch (error) {
-      if (isQuotaError(error) && compactLegacyRecoveryStorage()) {
-        try { writePrimary() } catch (retry) { throw new Error(`Primary storage save failed: ${retry instanceof Error ? retry.message : 'storage full'}`) }
-      } else {
-        preserveRecoveryCopies(current)
+      if (!isQuotaError(error)) preserveRecoveryCopies(current)
       throw new Error(error instanceof Error ? `Primary storage save failed: ${error.message}` : 'Primary storage save failed.')
-      }
     }
 
     // Recovery is deliberately after the verified primary write. Safari
     // localStorage quota is shared with unrelated auth keys; recovery copies
     // are expendable and must never consume the room required by a Match save.
-    // Legacy snapshots are recovery-only. Do not recreate a full-state ring in
-    // localStorage after successful saves; it can starve iOS auth storage.
+    // Keep legacy snapshots as recovery material. If quota prevents this write,
+    // surface the failure and let the user export/review data before retrying.
 
     // IndexedDB is a mirror only. A blocked transaction must not turn an
     // already verified localStorage save into a user-visible failed save.

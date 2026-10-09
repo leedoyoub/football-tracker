@@ -23,6 +23,30 @@ test('verified primary save survives a fresh repository launch even when Indexed
   } finally { global.localStorage = previousStorage; global.indexedDB = previousIndexedDB }
 })
 
+test('local save, fresh launch, and Export preserve historical match references to a missing player entity', async () => {
+  const previousStorage = global.localStorage; const previousIndexedDB = global.indexedDB
+  const legacy = state([])
+  legacy.teams = [{ id: 'home', name: 'Home' }, { id: 'away', name: 'Away' }]
+  legacy.matches = [{ id: 'historic', season: 'S1', matchDay: 1, date: '2026-01-01', duration: 90, teamId: 'home', homeTeamId: 'home', awayTeamId: 'away', appearances: [{ playerId: 'departed-player', teamId: 'home', position: 'ST', matchPosition: 'ST', role: 'starter' }], events: [] }]
+  const entries = {}
+  global.localStorage = memoryStorage(entries); delete global.indexedDB
+  delete require.cache[require.resolve('../src/lib/repository.ts')]
+  const { LocalRepository, STORAGE_KEY } = require('../src/lib/repository.ts')
+  const { validateState } = require('../src/lib/validation.ts')
+  try {
+    assert.equal(validateState(legacy), false)
+    const result = await LocalRepository.saveAppState(legacy)
+    assert.equal(result.primarySaved, true)
+    delete require.cache[require.resolve('../src/lib/repository.ts')]
+    const { LocalRepository: RelaunchedRepository } = require('../src/lib/repository.ts')
+    const relaunched = await RelaunchedRepository.getAppState()
+    assert.equal(relaunched.matches[0].appearances[0].playerId, 'departed-player')
+    assert.equal(JSON.parse(entries[STORAGE_KEY]).matches[0].appearances[0].position, 'ST')
+    const exported = JSON.parse(await RelaunchedRepository.exportData())
+    assert.equal(exported.matches[0].appearances[0].playerId, 'departed-player')
+  } finally { global.localStorage = previousStorage; global.indexedDB = previousIndexedDB }
+})
+
 test('a primary read-back mismatch rejects and leaves the last verified payload recoverable', async () => {
   const previousStorage = global.localStorage; const previousIndexedDB = global.indexedDB
   const entries = { 'football-tracker-v1': JSON.stringify(state(['A'])) }
@@ -55,19 +79,21 @@ test('a primary write failure rejects before a caller can report a saved match',
   try { await assert.rejects(() => LocalRepository.saveAppState(state(['D'])), /Primary storage save failed/) } finally { global.localStorage = previousStorage; global.indexedDB = previousIndexedDB }
 })
 
-test('sync reconciliation uses server timestamps, preserves pending local rows, and keeps legacy rows conservative', () => {
-  const sync = fs.readFileSync(require.resolve('../src/lib/sync.ts'), 'utf8')
-  assert(sync.includes('await LocalRepository.getAppState()'))
-  assert(!sync.includes('getFromIndexedDB(DATA_KEY)'))
-  assert(sync.includes('entityCloudUpdatedAt'))
-  assert(sync.includes('isNewer(remote.updatedAt, meta.entityCloudUpdatedAt[entityKey])'))
-  assert(sync.includes('!pendingKeys.has(entityKey)'))
+test('server revision wins over local state based on an older accepted revision', () => {
+  const { resolveCloudMerge } = require('../src/lib/cloudSyncProtocol.ts')
+  const local = { teams: [{ id: 'X', name: 'Local old' }], players: [], matches: [], competitionStates: [] }
+  const remote = { entityType: 'team', entityId: 'X', revision: 8, deleted: false, payload: { id: 'X', name: 'Cloud new' } }
+  const merged = resolveCloudMerge(local, [remote], [], { 'team:X': 7 })
+  assert.equal(merged.state.teams[0].name, 'Cloud new')
+  assert.deepEqual(merged.mutations, [])
 })
 
-test('store serializes durable saves and restores the queue after a rejected write', () => {
+test('store coordinates latest snapshots and exposes an explicit persistence retry', () => {
   const store = fs.readFileSync(require.resolve('../src/store.tsx'), 'utf8')
-  assert(store.includes('createPersistenceQueue(LocalRepository.saveAppState)'))
-  assert(store.includes('persistenceQueue.current.enqueue(next, () => epoch === persistenceEpoch.current && (!valid || valid()))'))
+  assert(store.includes('createStoreTransactions<StoreSnapshot, DurableSaveResult>'))
+  assert(store.includes('transactions.retryLatest()'))
+  assert(store.includes('transactions.commit(current =>'))
+  assert(!store.includes('setSnapshot(current =>'))
 })
 
 test('match editor waits for durable save, preserves a failed form, and exposes explicit feedback', () => {
@@ -79,7 +105,7 @@ test('match editor waits for durable save, preserves a failed form, and exposes 
 })
 
 const tick = callback => queueMicrotask(callback)
-const syncHarness = ({ initial, cloudTeams, meta = {}, queue = [] }) => {
+const syncHarness = ({ initial, cloudTeams = [], initialRecords, initialRevision = 0, meta = {}, queue = [] }) => {
   const Module = require('node:module'); const originalLoad = Module._load
   const stores = { data: new Map(), sync_queue: new Map(queue.map(row => [row.id, row])), sync_metadata: new Map([['meta', { lastSyncedUserId: null, lastSyncAt: 0, retryAt: 0, entityUpdatedAt: {}, entityCloudUpdatedAt: {}, ...meta }]]) }
   const db = { transaction(name) { const tx = { error: null, oncomplete: null, onerror: null }; const store = stores[name]; return { objectStore() { return {
@@ -88,44 +114,55 @@ const syncHarness = ({ initial, cloudTeams, meta = {}, queue = [] }) => {
     put(value, key) { store.set(key ?? value.id, value); tick(() => tx.oncomplete?.()) },
     delete(key) { store.delete(key); tick(() => tx.oncomplete?.()) },
   } }, get oncomplete() { return tx.oncomplete }, set oncomplete(fn) { tx.oncomplete = fn }, get onerror() { return tx.onerror }, set onerror(fn) { tx.onerror = fn }, get error() { return tx.error } } } }
-  const uploaded = []; const supabase = { auth: { getUser: async () => ({ data: { user: { id: 'u1' } } }) }, from: table => ({ select: async () => ({ data: table === 'teams' ? cloudTeams : [], error: null }), upsert: async row => { uploaded.push(row); return { error: null } }, delete: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) }) }) }
+  const uploaded = []; const remote = { initialized: Boolean(initialRecords), revision: initialRevision, records: initialRecords ?? [] }
+  const supabase = {
+    auth: { getUser: async () => ({ data: { user: { id: 'u1' } }, error: null }) },
+    from: table => { let start = 0; let end = Number.MAX_SAFE_INTEGER; const query = { select() { return this }, eq() { return this }, order() { return this }, range(from, to) { start = from; end = to; return this }, maybeSingle: async () => ({ data: remote.initialized ? { revision: remote.revision } : null, error: null }), then(resolve, reject) { const rows = table === 'cloud_sync_entities' ? remote.records.map(row => ({ entity_type: row.entityType, entity_id: row.entityId, revision: row.revision, deleted: row.deleted, payload: row.payload })) : table === 'teams' ? cloudTeams : []; return Promise.resolve({ data: rows.slice(start, end + 1), error: null }).then(resolve, reject) } }; return query },
+    rpc: async (name, args) => {
+      if (name === 'initialize_cloud_sync') { if (!remote.initialized) { remote.initialized = true; remote.revision = 0; remote.records = args.p_entities.map(item => ({ ...item, revision: 0, deleted: false })) }; return { data: { revision: remote.revision }, error: null } }
+      if (name === 'commit_cloud_sync') { uploaded.push(...args.p_mutations); if (args.p_expected_revision !== remote.revision) return { data: { applied: false, revision: remote.revision }, error: null }; if (args.p_mutations.length) { remote.revision++; for (const mutation of args.p_mutations) { const row = { entityType: mutation.entityType, entityId: mutation.entityId, revision: remote.revision, deleted: mutation.operation === 'delete', payload: mutation.operation === 'delete' ? null : mutation.payload }; const index = remote.records.findIndex(item => item.entityType === row.entityType && item.entityId === row.entityId); if (index < 0) remote.records.push(row); else remote.records[index] = row } }; return { data: { applied: true, revision: remote.revision }, error: null } }
+      return { data: null, error: new Error('unexpected rpc') }
+    },
+  }
   const priorStorage = global.localStorage; const priorNavigator = Object.getOwnPropertyDescriptor(global, 'navigator')
   const entries = { 'football-tracker-v1': JSON.stringify(initial) }; global.localStorage = memoryStorage(entries); Object.defineProperty(global, 'navigator', { value: { onLine: true }, configurable: true })
-  Module._load = function(request, parent, isMain) { if (request === './db') return { openDB: async () => db, saveToIndexedDB: async () => {}, getFromIndexedDB: async () => null }; if (request === './supabase') return { getSupabase: () => supabase }; return originalLoad.call(this, request, parent, isMain) }
+  Module._load = function(request, parent, isMain) { if (request === './db') return { openDB: async () => db, saveToIndexedDB: async () => {}, getFromIndexedDB: async () => null }; if (request === './supabase') return { isCloudSyncEnabled: true, getSupabase: () => supabase }; return originalLoad.call(this, request, parent, isMain) }
   for (const file of ['../src/lib/sync.ts', '../src/lib/repository.ts', '../src/lib/db.ts']) delete require.cache[require.resolve(file)]
   const { SyncManager } = require('../src/lib/sync.ts')
-  return { SyncManager, entries, stores, uploaded, restore: () => { Module._load = originalLoad; global.localStorage = priorStorage; if (priorNavigator) Object.defineProperty(global, 'navigator', priorNavigator); else delete global.navigator } }
+  return { SyncManager, entries, stores, uploaded, remote, restore: () => { Module._load = originalLoad; global.localStorage = priorStorage; if (priorNavigator) Object.defineProperty(global, 'navigator', priorNavigator); else delete global.navigator } }
 }
 
 test('integration: same ID pending local mutation wins over older cloud row', async () => {
   const local = state([]); local.teams = [{ id: 'X', name: 'Local' }]
-  const h = syncHarness({ initial: local, cloudTeams: [{ id: 'X', name: 'Cloud old', updated_at: '2026-01-01T00:00:00.000Z' }], queue: [{ id: 'q1', entityType: 'team', entityId: 'X', operation: 'upsert', payload: local.teams[0], timestamp: Date.now(), status: 'pending' }] })
-  try { await h.SyncManager.syncNow(); assert.equal(JSON.parse(h.entries['football-tracker-v1']).teams[0].name, 'Local'); assert.equal(h.uploaded[0].name, 'Local') } finally { h.restore() }
+  const h = syncHarness({ initial: local, cloudTeams: [{ id: 'X', name: 'Cloud old' }], queue: [{ id: 'q1', entityType: 'team', entityId: 'X', operation: 'upsert', baseRevision: 0, payload: local.teams[0], timestamp: Date.now(), status: 'pending' }] })
+  try { await h.SyncManager.syncNow(); assert.equal(JSON.parse(h.entries['football-tracker-v1']).teams[0].name, 'Local'); assert.equal(h.uploaded[0].payload.name, 'Local') } finally { h.restore() }
 })
 
-test('integration: same ID newer cloud updated_at replaces synchronized local row', async () => {
+test('integration: a newer cloud entity revision replaces synchronized local state', async () => {
   const local = state([]); local.teams = [{ id: 'X', name: 'Local old' }]
-  const h = syncHarness({ initial: local, cloudTeams: [{ id: 'X', name: 'Cloud new', updated_at: '2026-02-01T00:00:00.000Z' }], meta: { entityCloudUpdatedAt: { 'team:X': '2026-01-01T00:00:00.000Z' } } })
-  try { await h.SyncManager.syncNow(); assert.equal(JSON.parse(h.entries['football-tracker-v1']).teams[0].name, 'Cloud new'); assert.equal(h.stores.sync_metadata.get('meta').entityCloudUpdatedAt['team:X'], '2026-02-01T00:00:00.000Z') } finally { h.restore() }
+  const h = syncHarness({ initial: local, initialRevision: 8, initialRecords: [{ entityType: 'team', entityId: 'X', revision: 8, deleted: false, payload: { id: 'X', name: 'Cloud new' } }], meta: { entityCloudRevision: { 'team:X': 7 } } })
+  try { await h.SyncManager.syncNow(); assert.equal(JSON.parse(h.entries['football-tracker-v1']).teams[0].name, 'Cloud new'); assert.equal(h.stores.sync_metadata.get('meta').entityCloudRevision['team:X'], 8) } finally { h.restore() }
 })
 
 test('invalid cloud merge cannot save, enqueue, upload, or delete; a later valid sync recovers', async () => {
   const local = state([]); local.teams = [{ id: 'A', name: 'Local' }]
   const cloudTeams = [{ id: 'B', name: 42 }]
-  const h = syncHarness({ initial: local, cloudTeams, queue: [{ id: 'queued', entityType: 'team', entityId: 'A', operation: 'upsert', payload: local.teams[0], timestamp: Date.now(), status: 'pending' }] })
+  const h = syncHarness({ initial: local, initialRevision: 1, initialRecords: [{ entityType: 'team', entityId: 'B', revision: 1, deleted: false, payload: cloudTeams[0] }], queue: [{ id: 'queued', entityType: 'team', entityId: 'A', operation: 'upsert', baseRevision: 0, payload: local.teams[0], timestamp: Date.now(), status: 'pending' }] })
   const before = h.entries['football-tracker-v1']; const oldSetTimeout = global.setTimeout
+  const oldConsoleError = console.error
   global.setTimeout = () => 1
+  console.error = () => {}
   try {
     const invalid = await h.SyncManager.syncNow()
     assert.equal(invalid.status, 'pending')
     assert.equal(h.entries['football-tracker-v1'], before)
     assert.deepEqual([...h.stores.sync_queue.keys()], ['queued'])
     assert.equal(h.uploaded.length, 0)
-    cloudTeams[0] = { id: 'B', name: 'Recovered' }
+    h.remote.records[0].payload = { id: 'B', name: 'Recovered' }
     const recovered = await h.SyncManager.syncNow()
     assert.equal(recovered.status, 'synced')
     assert.equal(JSON.parse(h.entries['football-tracker-v1']).teams.find(team => team.id === 'B').name, 'Recovered')
-  } finally { global.setTimeout = oldSetTimeout; h.restore() }
+  } finally { global.setTimeout = oldSetTimeout; console.error = oldConsoleError; h.restore() }
 })
 
 test('integration: durable save failure does not block the next serialized save', async () => {
@@ -145,26 +182,27 @@ test('quota recovery prioritizes a fitting primary save and preserves unrelated 
   try { await LocalRepository.saveAppState(state(['A', 'B', 'C', 'D'])); assert.deepEqual(JSON.parse(entries['football-tracker-v1']).matches.map(row => row.id), ['A', 'B', 'C', 'D']); assert.equal(entries['sb-auth-token'], 'session') } finally { global.localStorage = previousStorage; global.indexedDB = previousIndexedDB }
 })
 
-test('legacy full recovery footprint is compacted before one quota retry and canonical save succeeds', async () => {
+test('quota failure preserves the canonical save and every existing recovery snapshot', async () => {
   const previousStorage = global.localStorage; const previousIndexedDB = global.indexedDB; const old = JSON.stringify(state(['A', 'B', 'C'])); const fresh = JSON.stringify(state(['A', 'B', 'C', 'D']))
   const entries = { 'football-tracker-v1': old, 'football-tracker-v1-backup': old, 'football-tracker-emergency-1': old, 'football-tracker-emergency-2': old, 'football-tracker-emergency-3': old, 'football-tracker-emergency-4': old, 'football-tracker-emergency-5': old, 'sb-test-project-auth-token': 'session', unrelated: 'keep' }; const quota = fresh.length + 32
   const used = () => Object.values(entries).reduce((sum, value) => sum + String(value).length, 0)
   global.localStorage = { getItem: key => entries[key] ?? null, setItem: (key, value) => { const prior = entries[key] ?? ''; if (used() - prior.length + value.length > quota) { const error = new Error('QuotaExceededError'); error.name = 'QuotaExceededError'; throw error } entries[key] = value }, removeItem: key => delete entries[key] }; delete global.indexedDB
   delete require.cache[require.resolve('../src/lib/repository.ts')]; const { LocalRepository } = require('../src/lib/repository.ts')
-  try { await LocalRepository.saveAppState(state(['A', 'B', 'C', 'D'])); assert.equal(entries['football-tracker-v1'], fresh); assert.equal(entries['sb-test-project-auth-token'], 'session'); assert.equal(entries.unrelated, 'keep'); for (const key of ['football-tracker-v1-backup', ...Array.from({ length: 5 }, (_, index) => `football-tracker-emergency-${index + 1}`)]) assert.equal(entries[key], undefined) } finally { global.localStorage = previousStorage; global.indexedDB = previousIndexedDB }
+  try {
+    await assert.rejects(() => LocalRepository.saveAppState(state(['A', 'B', 'C', 'D'])), /Primary storage save failed/)
+    assert.equal(entries['football-tracker-v1'], old)
+    assert.equal(entries['sb-test-project-auth-token'], 'session')
+    assert.equal(entries.unrelated, 'keep')
+    for (const key of ['football-tracker-v1-backup', ...Array.from({ length: 5 }, (_, index) => `football-tracker-emergency-${index + 1}`)]) assert.equal(entries[key], old)
+  } finally { global.localStorage = previousStorage; global.indexedDB = previousIndexedDB }
 })
 
-test('legacy recovery compaction preserves snapshots when canonical primary is missing or invalid', () => {
-  const previousStorage = global.localStorage; const valid = JSON.stringify(state(['A'])); const entries = { 'football-tracker-v1-backup': valid, 'football-tracker-emergency-1': valid, 'football-tracker-emergency-2': valid, 'sb-test-project-auth-token': 'session', unrelated: 'keep' }
-  global.localStorage = memoryStorage(entries); delete require.cache[require.resolve('../src/lib/repository.ts')]; const { compactLegacyRecoveryStorage } = require('../src/lib/repository.ts')
-  try { assert.equal(compactLegacyRecoveryStorage(), false); entries['football-tracker-v1'] = '{bad'; assert.equal(compactLegacyRecoveryStorage(), false); for (const key of ['football-tracker-v1-backup', 'football-tracker-emergency-1', 'football-tracker-emergency-2', 'sb-test-project-auth-token', 'unrelated']) assert.notEqual(entries[key], undefined) } finally { global.localStorage = previousStorage }
-})
-
-test('startup compaction frees headroom for a growing auth token without changing canonical football data', () => {
-  const previousStorage = global.localStorage; const valid = JSON.stringify(state(['A', 'B'])); const entries = { 'football-tracker-v1': valid, 'football-tracker-v1-backup': valid, 'football-tracker-emergency-1': valid, 'football-tracker-emergency-2': valid, 'football-tracker-emergency-3': valid, 'football-tracker-emergency-4': valid, 'football-tracker-emergency-5': valid, 'sb-test-project-auth-token': 'old', unrelated: 'keep' }; const quota = valid.length + 100
-  const used = () => Object.values(entries).reduce((n, value) => n + String(value).length, 0); global.localStorage = { getItem: key => entries[key] ?? null, setItem: (key, value) => { const old = entries[key] ?? ''; if (used() - old.length + value.length > quota) throw new Error('QuotaExceededError'); entries[key] = value }, removeItem: key => delete entries[key] }
-  delete require.cache[require.resolve('../src/lib/repository.ts')]; const { compactLegacyRecoveryStorage } = require('../src/lib/repository.ts')
-  try { assert.throws(() => localStorage.setItem('sb-test-project-auth-token', 'new-session-that-is-larger')); assert(compactLegacyRecoveryStorage()); localStorage.setItem('sb-test-project-auth-token', 'new-session-that-is-larger'); assert.equal(entries['football-tracker-v1'], valid); assert.equal(entries.unrelated, 'keep') } finally { global.localStorage = previousStorage }
+test('startup does not automatically remove local recovery snapshots', () => {
+  const main = fs.readFileSync(require.resolve('../src/main.tsx'), 'utf8')
+  assert.doesNotMatch(main, /compactLegacyRecoveryStorage/)
+  const repository = fs.readFileSync(require.resolve('../src/lib/repository.ts'), 'utf8')
+  assert.doesNotMatch(repository, /removeItem\(BACKUP_KEY\)/)
+  assert.doesNotMatch(repository, /removeItem\(`\$\{EMERGENCY_PREFIX\}/)
 })
 
 test('verified primary save resolves while the IndexedDB mirror never resolves', async () => {

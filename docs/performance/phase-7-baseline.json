@@ -1,0 +1,269 @@
+﻿{
+  "node": "v24.19.0",
+  "platform": "win32-x64",
+  "gcExposed": true,
+  "fixturesPerSeason": 240,
+  "benchmarks": [
+    {
+      "size": 100,
+      "seasonCount": 1,
+      "fixturesPerSeason": 240,
+      "maximumRecordedMatchesPerTeamSeason": 13,
+      "heapDeltaBytes": -5371008,
+      "combinationRows": 16,
+      "results": [
+        {
+          "label": "global-ranking-cold",
+          "medianMs": 18.97,
+          "minMs": 16.23,
+          "maxMs": 51.35,
+          "output": {
+            "length": 176,
+            "hash": "dc6d77ff1e20e6518fa0d6e32d53193e896d289ffda9582ff6133c1a34085c2c"
+          }
+        },
+        {
+          "label": "global-ranking-warm",
+          "medianMs": 0.05,
+          "minMs": 0.03,
+          "maxMs": 0.1,
+          "output": {
+            "length": 176,
+            "hash": "dc6d77ff1e20e6518fa0d6e32d53193e896d289ffda9582ff6133c1a34085c2c"
+          }
+        },
+        {
+          "label": "league-standings",
+          "medianMs": 19.45,
+          "minMs": 19.18,
+          "maxMs": 29.77,
+          "output": {
+            "length": 16,
+            "hash": "089869b9473f6b9f3bbdf73d12d26fce5008f72a85906953490be2032613b5a6"
+          }
+        },
+        {
+          "label": "season-analytics-cold",
+          "medianMs": 157.85,
+          "minMs": 157.85,
+          "maxMs": 157.85,
+          "output": {
+            "hash": "032d3de881d540655f4205b3d065b71186065ad1ac3ef18621523a6f3b185112"
+          }
+        },
+        {
+          "label": "season-analytics-warm",
+          "medianMs": 0.09,
+          "minMs": 0.02,
+          "maxMs": 0.23,
+          "output": {
+            "hash": "032d3de881d540655f4205b3d065b71186065ad1ac3ef18621523a6f3b185112"
+          }
+        },
+        {
+          "label": "player-season-stats-all",
+          "medianMs": 45.77,
+          "minMs": 43.77,
+          "maxMs": 48.47,
+          "output": {
+            "length": 176,
+            "hash": "871ba5c3b8dda58bd6c167fc3efbc3f365cded51b7abc75c321b833f5ec72b2e"
+          }
+        },
+        {
+          "label": "combination-stats-six-kinds",
+          "medianMs": 87.23,
+          "minMs": 87.23,
+          "maxMs": 87.23,
+          "output": {
+            "length": 6,
+            "hash": "1beb107ad10fde0f68c53fad16a2a04c318da58aebda84d1845fee519e41d0cd"
+          }
+        },
+        {
+          "label": "season-awards",
+          "medianMs": 66.65,
+          "minMs": 66.65,
+          "maxMs": 66.65,
+          "output": {
+            "hash": "a036fa37331b6f3863cfb1e0cebbe7ddb466dbef6e5a906cc8de1a2550f39517"
+          }
+        }
+      ]
+    },
+    {
+      "size": 500,
+      "seasonCount": 3,
+      "fixturesPerSeason": 240,
+      "maximumRecordedMatchesPerTeamSeason": 15,
+      "heapDeltaBytes": 14973304,
+      "combinationRows": 16,
+      "results": [
+        {
+          "label": "global-ranking-cold",
+          "medianMs": 6.69,
+          "minMs": 3.49,
+          "maxMs": 8.92,
+          "output": {
+            "length": 110,
+            "hash": "2eb9e655ac1c632cb649db57cc89d24bb766e53c56e461cce9f2505ae06b3d28"
+          }
+        },
+        {
+          "label": "global-ranking-warm",
+          "medianMs": 0.03,
+          "minMs": 0.03,
+          "maxMs": 0.04,
+          "output": {
+            "length": 110,
+            "hash": "2eb9e655ac1c632cb649db57cc89d24bb766e53c56e461cce9f2505ae06b3d28"
+          }
+        },
+        {
+          "label": "league-standings",
+          "medianMs": 4.98,
+          "minMs": 4.53,
+          "maxMs": 5.14,
+          "output": {
+            "length": 16,
+            "hash": "0fe5dcf4971d3f5f7acd39da322d1382b50bdf6e7d61619a40578154f5b9ead3"
+          }
+        },
+        {
+          "label": "season-analytics-cold",
+          "medianMs": 20.16,
+          "minMs": 20.16,
+          "maxMs": 20.16,
+          "output": {
+            "hash": "b631c951c77af35c8a01368217329c61e990af1f7b360afb434e27111da394da"
+          }
+        },
+        {
+          "label": "season-analytics-warm",
+          "medianMs": 0.01,
+          "minMs": 0.01,
+          "maxMs": 0.03,
+          "output": {
+            "hash": "b631c951c77af35c8a01368217329c61e990af1f7b360afb434e27111da394da"
+          }
+        },
+        {
+          "label": "player-season-stats-all",
+          "medianMs": 10.54,
+          "minMs": 9.82,
+          "maxMs": 11.84,
+          "output": {
+            "length": 176,
+            "hash": "94ec0a725b73d3a17c945534e87b9524cceb9412c98fe20549a85d7af96e3fab"
+          }
+        },
+        {
+          "label": "combination-stats-six-kinds",
+          "medianMs": 453.32,
+          "minMs": 453.32,
+          "maxMs": 453.32,
+          "output": {
+            "length": 6,
+            "hash": "6a4eafe8003d908bd1ee38d5cfe8c6dc3c1fad013a62836416fde06bfebdcc95"
+          }
+        },
+        {
+          "label": "season-awards",
+          "medianMs": 16.24,
+          "minMs": 16.24,
+          "maxMs": 16.24,
+          "output": {
+            "hash": "816804a9c60436701f64aa6d2b1eace8c9645e0ff9ba093453bb098dff5edf78"
+          }
+        }
+      ]
+    },
+    {
+      "size": 1000,
+      "seasonCount": 5,
+      "fixturesPerSeason": 240,
+      "maximumRecordedMatchesPerTeamSeason": 15,
+      "heapDeltaBytes": 11952792,
+      "combinationRows": 16,
+      "results": [
+        {
+          "label": "global-ranking-cold",
+          "medianMs": 6.75,
+          "minMs": 6.62,
+          "maxMs": 12.21,
+          "output": {
+            "length": 132,
+            "hash": "fe2927e40530206ad9437fde2e4974194ccc4e916f4e3d2cd1121317600647a3"
+          }
+        },
+        {
+          "label": "global-ranking-warm",
+          "medianMs": 0.02,
+          "minMs": 0.02,
+          "maxMs": 0.03,
+          "output": {
+            "length": 132,
+            "hash": "fe2927e40530206ad9437fde2e4974194ccc4e916f4e3d2cd1121317600647a3"
+          }
+        },
+        {
+          "label": "league-standings",
+          "medianMs": 7.68,
+          "minMs": 7.56,
+          "maxMs": 8.62,
+          "output": {
+            "length": 16,
+            "hash": "7ad6de81015920d430c676bc4af68729032507efefb8cf4f528b42650448760a"
+          }
+        },
+        {
+          "label": "season-analytics-cold",
+          "medianMs": 34.59,
+          "minMs": 34.59,
+          "maxMs": 34.59,
+          "output": {
+            "hash": "ca0dfbff720ce7a680e8d9850360aeeee40ee25eadb5a59e8a801d4570aa45ae"
+          }
+        },
+        {
+          "label": "season-analytics-warm",
+          "medianMs": 0.01,
+          "minMs": 0.01,
+          "maxMs": 0.02,
+          "output": {
+            "hash": "ca0dfbff720ce7a680e8d9850360aeeee40ee25eadb5a59e8a801d4570aa45ae"
+          }
+        },
+        {
+          "label": "player-season-stats-all",
+          "medianMs": 21.31,
+          "minMs": 20.36,
+          "maxMs": 25.09,
+          "output": {
+            "length": 176,
+            "hash": "09ef81130ec64c6335fd7d39b72634f929cf6ce5ff6ef38b0b432c5d5ba76b20"
+          }
+        },
+        {
+          "label": "combination-stats-six-kinds",
+          "medianMs": 1164.75,
+          "minMs": 1164.75,
+          "maxMs": 1164.75,
+          "output": {
+            "length": 6,
+            "hash": "f99976229de912334e32d860ede3047072d375defbe150431e3a50809b1805ca"
+          }
+        },
+        {
+          "label": "season-awards",
+          "medianMs": 47.69,
+          "minMs": 47.69,
+          "maxMs": 47.69,
+          "output": {
+            "hash": "4762bcfc05372672b0c3883c0e4bee988ba01b4904aaad6420fa6abf07a828e6"
+          }
+        }
+      ]
+    }
+  ]
+}

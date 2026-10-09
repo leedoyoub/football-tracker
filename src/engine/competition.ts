@@ -2,7 +2,7 @@ import { rateMatch } from './rating'
 import { opponentSot } from './opponentSot'
 import { compareStandings, sameStandingMetrics, seasonStandings, type Standing, type StandingTieMetrics } from './standings'
 import { LEAGUE_MATCHES_PER_TEAM } from './leagueFormat'
-import { firstMissingLeagueSlot, hasCompleteLeagueSlots, leagueSlotCounts } from './leagueSlots'
+import { firstMissingLeagueSlot, hasCompleteLeagueSlots, leagueSlotCounts, leagueSlotTeamIds } from './leagueSlots'
 import type { ChampionsStage, CompetitionStage, CompetitionState, CompetitionType, CupStage, Match, Player, Team } from '../types'
 import { competitionIdentityForMatch, matchCompetitionStage, matchCompetitionType, normalizeMatchCompetitionIdentity } from './competitionContext'
 import { teamsCreditedWithResult, teamPerspectiveScore } from './matchPerspective'
@@ -12,17 +12,22 @@ export const CHAMPIONS_ROUNDS: Exclude<ChampionsStage, 'finalReplay'>[] = ['roun
 
 export { matchCompetitionType } from './competitionContext'
 
-const scopedCompetitionMatches = new WeakMap<Match[], Map<string, { length: number; rows: Match[] }>>()
-/** The initial selection is indexed by source-array identity and scope. This
- * makes a return to an unchanged competition an O(1) lookup. */
+/** Return an existing record that occupies the candidate's canonical League team slot. */
+export function leagueSlotConflict(matches: Match[], candidate: Match, excludingMatchId?: string): Match | undefined {
+  if (matchCompetitionType(candidate) !== 'league') return undefined
+  const identity = competitionIdentityForMatch(candidate)
+  const candidateTeams = new Set(leagueSlotTeamIds(candidate))
+  return matches.find(match => {
+    if (match.id === excludingMatchId || match.season !== identity.season || matchCompetitionType(match) !== 'league') return false
+    if (competitionIdentityForMatch(match).matchDay !== identity.matchDay) return false
+    return leagueSlotTeamIds(match).some(teamId => candidateTeams.has(teamId))
+  })
+}
+
+/** Return a fresh projection so in-place legacy input changes and caller edits
+ * cannot leave a stale/shared competition scope result. */
 export function competitionMatches(matches: Match[], season: string, type: CompetitionType): Match[] {
-  let index = scopedCompetitionMatches.get(matches)
-  if (!index) { index = new Map(); scopedCompetitionMatches.set(matches, index) }
-  const key = `${season}:${type}`; const cached = index.get(key)
-  if (cached && cached.length === matches.length) return cached.rows
-  const selected = matches.filter(match => match.season === season && matchCompetitionType(match) === type)
-  index.set(key, { length: matches.length, rows: selected })
-  return selected
+  return matches.filter(match => match.season === season && matchCompetitionType(match) === type)
 }
 
 export function competitionStageMatches(matches: Match[], season: string, type: CompetitionType, stage: string): Match[] {

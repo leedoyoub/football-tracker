@@ -1,29 +1,29 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { BottomNav } from './components/BottomNav'
-import { HomeScreen } from './screens/HomeScreen'
-import { MatchDetailScreen } from './screens/MatchDetailScreen'
-import { NewMatchScreen } from './screens/NewMatchScreen'
-import { NewPlayerScreen } from './screens/NewPlayerScreen'
-import { EditPlayerScreen } from './screens/EditPlayerScreen'
-import { EditMatchScreen } from './screens/EditMatchScreen'
-import { PlayerDetailScreen } from './screens/PlayerDetailScreen'
-import { PlayersScreen } from './screens/PlayersScreen'
-import { StandingsScreen } from './screens/StandingsScreen'
-import { ChemistryScreen } from './screens/ChemistryScreen'
-import { ComparisonScreen } from './screens/ComparisonScreen'
-import { TeamDetailScreen } from './screens/TeamDetailScreen'
-import { TeamsScreen } from './screens/TeamsScreen'
-import { DataManagementScreen } from './screens/DataManagementScreen'
-import { SeasonRecapScreen } from './screens/SeasonRecapScreen'
-import { SeasonHighlightScreen } from './screens/SeasonHighlightScreen'
-import { CompetitionScreen } from './screens/CompetitionScreen'
-import { RecordsScreen } from './screens/RecordsScreen'
-import { RecordsLeaderboardScreen } from './screens/RecordsLeaderboardScreen'
-import { LatestChangesScreen } from './screens/LatestChangesScreen'
-import { ResultsScreen } from './screens/ResultsScreen'
-import { GlobalRankingScreen } from './screens/GlobalRankingScreen'
-import { AwardRaceScreen } from './screens/AwardRaceScreen'
-import { SquadImportScreen } from './screens/SquadImportScreen'
+const HomeScreen = lazy(() => import('./screens/HomeScreen').then(module => ({ default: module.HomeScreen })))
+const MatchDetailScreen = lazy(() => import('./screens/MatchDetailScreen').then(module => ({ default: module.MatchDetailScreen })))
+const NewMatchScreen = lazy(() => import('./screens/NewMatchScreen').then(module => ({ default: module.NewMatchScreen })))
+const NewPlayerScreen = lazy(() => import('./screens/NewPlayerScreen').then(module => ({ default: module.NewPlayerScreen })))
+const EditPlayerScreen = lazy(() => import('./screens/EditPlayerScreen').then(module => ({ default: module.EditPlayerScreen })))
+const EditMatchScreen = lazy(() => import('./screens/EditMatchScreen').then(module => ({ default: module.EditMatchScreen })))
+const PlayerDetailScreen = lazy(() => import('./screens/PlayerDetailScreen').then(module => ({ default: module.PlayerDetailScreen })))
+const PlayersScreen = lazy(() => import('./screens/PlayersScreen').then(module => ({ default: module.PlayersScreen })))
+const StandingsScreen = lazy(() => import('./screens/StandingsScreen').then(module => ({ default: module.StandingsScreen })))
+const ChemistryScreen = lazy(() => import('./screens/ChemistryScreen').then(module => ({ default: module.ChemistryScreen })))
+const ComparisonScreen = lazy(() => import('./screens/ComparisonScreen').then(module => ({ default: module.ComparisonScreen })))
+const TeamDetailScreen = lazy(() => import('./screens/TeamDetailScreen').then(module => ({ default: module.TeamDetailScreen })))
+const TeamsScreen = lazy(() => import('./screens/TeamsScreen').then(module => ({ default: module.TeamsScreen })))
+const DataManagementScreen = lazy(() => import('./screens/DataManagementScreen').then(module => ({ default: module.DataManagementScreen })))
+const SeasonRecapScreen = lazy(() => import('./screens/SeasonRecapScreen').then(module => ({ default: module.SeasonRecapScreen })))
+const SeasonHighlightScreen = lazy(() => import('./screens/SeasonHighlightScreen').then(module => ({ default: module.SeasonHighlightScreen })))
+const CompetitionScreen = lazy(() => import('./screens/CompetitionScreen').then(module => ({ default: module.CompetitionScreen })))
+const RecordsScreen = lazy(() => import('./screens/RecordsScreen').then(module => ({ default: module.RecordsScreen })))
+const RecordsLeaderboardScreen = lazy(() => import('./screens/RecordsLeaderboardScreen').then(module => ({ default: module.RecordsLeaderboardScreen })))
+const LatestChangesScreen = lazy(() => import('./screens/LatestChangesScreen').then(module => ({ default: module.LatestChangesScreen })))
+const ResultsScreen = lazy(() => import('./screens/ResultsScreen').then(module => ({ default: module.ResultsScreen })))
+const GlobalRankingScreen = lazy(() => import('./screens/GlobalRankingScreen').then(module => ({ default: module.GlobalRankingScreen })))
+const AwardRaceScreen = lazy(() => import('./screens/AwardRaceScreen').then(module => ({ default: module.AwardRaceScreen })))
+const SquadImportScreen = lazy(() => import('./screens/SquadImportScreen').then(module => ({ default: module.SquadImportScreen })))
 import { useStore } from './store'
 import type { CompetitionType, NavigationEntry, ScreenState, ScreenStateByView, Tab, View } from './types'
 import { seasonsFromMatches } from './engine/stats'
@@ -200,6 +200,7 @@ export default function App() {
     <div className="min-h-[100dvh] bg-zinc-950">
       <div className="relative mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-black text-white shadow-2xl">
         <div ref={scrollRef} className={`app-content no-scrollbar min-h-0 flex-1 ${appContentOverflowClass(view)}`}>
+          <Suspense fallback={<div className="flex min-h-48 items-center justify-center text-sm text-zinc-400">Loading screen…</div>}>
           {view.name === 'home' && (
             <HomeScreen season={season} screenState={entry.screenState as ScreenStateByView['home']} onStateChange={onStateChange} onSeason={setSeason} onNavigate={onNavigate} />
           )}
@@ -235,6 +236,7 @@ export default function App() {
           {view.name === 'edit-player' && <EditPlayerScreen playerId={view.id} onNavigate={onNavigate} onDone={dismissPlayerEdit} />}
           {view.name === 'data-management' && <DataManagementScreen onBack={onBack} />}
           {/* Removed Reset demo data button */}
+          </Suspense>
         </div>
         <BottomNav tab={tab} onChange={onTab} />
       </div>

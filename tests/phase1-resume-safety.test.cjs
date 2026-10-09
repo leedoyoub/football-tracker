@@ -41,13 +41,13 @@ test('a restoration failure prevents resume mounting and cannot activate a draft
   assert(source.includes("if ((mode === 'resume' || mode === 'edit') && !restored)"))
   assert(source.includes("if (!draftReady || !editorSourceCanMount(mode, sourceMatch, restored)"))
   assert(source.includes('initialOpponentSotDraft(sourceMatch, mode === \'fresh\')'))
-  assert(source.includes('fulltimeOpponentSotAutoLinked: fulltimeOpponentSotAutoLinked'))
+  assert(source.includes('...finalMatchData, fulltimeOpponentSotAutoLinked, kickoffConfirmed'))
   assert(source.includes('halftimeOpponentSot: parseOpponentSot(halftimeOpponentSot)'))
 })
 
 test('the production NewMatch boundary returns recovery UI before MatchEditor can initialize a failed resume', () => {
   const Module = require('node:module'); const React = require('react'); const originalLoad = Module._load
-  const failedDraft = { ...draft, id: 'failed-draft', kickoffLineup: [] }
+  const failedDraft = { ...draft, id: 'failed-draft', kickoffLineup: [...kickoff, { ...kickoff[0], playerId: 'duplicate-slot' }] }
   const calls = { autosave: 0, clear: 0 }
   Module._load = function(name, parent, main) {
     if (name === 'react') return { ...React, useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}] }

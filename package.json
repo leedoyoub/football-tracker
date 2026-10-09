@@ -1,13 +1,14 @@
 {
   "name": "football-tracker",
   "private": true,
-  "version": "2.5.3",
+  "version": "2.5.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "test": "node --test tests/*.test.cjs",
+    "benchmark:engine": "node --expose-gc scripts/benchmark-engine.cjs",
     "preview": "vite preview"
   },
   "dependencies": {

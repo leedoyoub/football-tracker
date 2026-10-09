@@ -26,7 +26,8 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_ENABLE_CLOUD_SYNC: 'false'
+          VITE_SUPABASE_URL: https://mztsniphpalgwdpvcqor.supabase.co
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

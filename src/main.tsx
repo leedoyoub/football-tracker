@@ -13,7 +13,6 @@ if ('serviceWorker' in navigator) {
 }
 
 import { AuthProvider } from './lib/auth'
-import { compactLegacyRecoveryStorage } from './lib/repository'
 
 // Safari's non-standard gesture events cover installed-PWA pinch gestures that
 // are not consistently governed by the viewport meta tag alone.
@@ -22,8 +21,6 @@ for (const eventName of ['gesturestart', 'gesturechange', 'gestureend']) {
 }
 
 try {
-  // Run before AuthProvider constructs/refreshes Supabase session storage.
-  compactLegacyRecoveryStorage()
   const root = document.getElementById('root')
   if (!root) throw new Error('Missing application root')
   createRoot(root).render(

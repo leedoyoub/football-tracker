@@ -5,6 +5,7 @@ import type { Match, Player, Position } from '../types'
 
 export type AnalyticsFilter = { season?: string; teamId?: string }
 export type CombinationKind = 'duo' | 'attack' | 'midfield' | 'cb' | 'fullback' | 'backFour'
+export type CombinationAwardKind = 'duo' | 'attack' | 'midfield' | 'cb' | 'backFour'
 export type CombinationStats = {
   key: string; kind: CombinationKind; playerIds: string[]; teamId: string
   togetherMinutes: number; matches: number; startsTogether: number; goalsFor: number; goalsAgainst: number; weightedOpponentSot: number
@@ -21,6 +22,7 @@ export type RoleSplit = { apps: number; minutes: number; averageRating: number; 
 
 type Interval = { start: number; end: number; position: Position }
 type RoleCheck = (position: Position) => boolean
+type TeamMatchIndex = { appearances: Map<string, Match['appearances'][number]>; intervals: Map<string, Interval[]> }
 const attackers = new Set<Position>(['ST', 'LST', 'RST', 'SS', 'LW', 'RW'])
 const midfielders = new Set<Position>(['CAM', 'LM', 'RM', 'CM', 'LCM', 'RCM', 'CDM', 'LDM', 'RDM'])
 const centreBacks = new Set<Position>(['CB', 'LCB', 'RCB'])
@@ -40,8 +42,8 @@ function teamIntervals(match: Match, playerId: string, teamId: string): Interval
   return appearance ? creditedPositionSegments(match, appearance).map(segment => ({ start: segment.enter, end: segment.exit, position: segment.position })) : []
 }
 
-function sharedIntervals(match: Match, playerIds: string[], teamId: string, roles: Record<string, RoleCheck> = {}): Interval[] {
-  const intervals = playerIds.map(id => teamIntervals(match, id, teamId))
+function sharedIntervals(match: Match, playerIds: string[], teamId: string, roles: Record<string, RoleCheck> = {}, index?: TeamMatchIndex): Interval[] {
+  const intervals = playerIds.map(id => index?.intervals.get(id) ?? teamIntervals(match, id, teamId))
   if (intervals.some(items => !items.length)) return []
   const boundaries = [...new Set(intervals.flatMap(items => items.flatMap(item => [item.start, item.end])))].sort((a, b) => a - b)
   const shared: Interval[] = []
@@ -61,24 +63,24 @@ function teamIds(match: Match) { return [...new Set(match.appearances.map(appear
 function combinations<T>(items: T[], count: number): T[][] { if (count === 0) return [[]]; return items.flatMap((item, index) => combinations(items.slice(index + 1), count - 1).map(rest => [item, ...rest])) }
 function eligible(matches: number, togetherMinutes: number) { return matches >= 3 || togetherMinutes >= 180 }
 
-function playersOnPitchForEvent(match: Match, playerIds: string[], teamId: string, roles: Record<string, RoleCheck>, event: Extract<Match['events'][number], { type: 'goal' }>): boolean {
+function playersOnPitchForEvent(match: Match, playerIds: string[], teamId: string, index: TeamMatchIndex | undefined, roles: Record<string, RoleCheck>, event: Extract<Match['events'][number], { type: 'goal' }>): boolean {
   return playerIds.every(playerId => {
-    const appearance = match.appearances.find(item => item.playerId === playerId && item.teamId === teamId)
+    const appearance = index?.appearances.get(playerId) ?? match.appearances.find(item => item.playerId === playerId && item.teamId === teamId)
     if (!appearance) return false
     const position = matchPositionAtEvent(match, appearance, event)
     return Boolean(position && (roles[playerId]?.(position) ?? true))
   })
 }
 
-function buildCombination(match: Match, playerIds: string[], teamId: string, roles: Record<string, RoleCheck>, playersById: Map<string, Player>): Omit<CombinationStats, 'key' | 'kind' | 'playerIds' | 'teamId' | 'eligible'> | null {
-  const overlap = sharedIntervals(match, playerIds, teamId, roles)
+function buildCombination(match: Match, playerIds: string[], teamId: string, roles: Record<string, RoleCheck>, playersById: Map<string, Player>, index?: TeamMatchIndex): Omit<CombinationStats, 'key' | 'kind' | 'playerIds' | 'teamId' | 'eligible'> | null {
+  const overlap = sharedIntervals(match, playerIds, teamId, roles, index)
   const togetherMinutes = minutes(overlap)
   if (!togetherMinutes) return null
-  const appearances = playerIds.flatMap(playerId => { const appearance = match.appearances.find(item => item.playerId === playerId && item.teamId === teamId); return appearance ? [appearance] : [] })
+  const appearances = playerIds.flatMap(playerId => { const appearance = index?.appearances.get(playerId) ?? match.appearances.find(item => item.playerId === playerId && item.teamId === teamId); return appearance ? [appearance] : [] })
   const credited = (event: Match['events'][number]) => ({ goals: appearances.filter(appearance => isPlayerGoalEvent(match, appearance, event)).length, assists: appearances.filter(appearance => isPlayerAssistEvent(match, appearance, event)).length })
   let goalsFor = 0; let goalsAgainst = 0; let combinedGoals = 0; let combinedAssists = 0
   for (const event of match.events) {
-    if (event.type !== 'goal' || !playersOnPitchForEvent(match, playerIds, teamId, roles, event)) continue
+    if (event.type !== 'goal' || !playersOnPitchForEvent(match, playerIds, teamId, index, roles, event)) continue
     if (scoringTeam(event, match) === teamId) goalsFor++; else goalsAgainst++
     const contribution = credited(event)
     combinedGoals += contribution.goals
@@ -86,7 +88,7 @@ function buildCombination(match: Match, playerIds: string[], teamId: string, rol
   }
   const score = matchScore(match); const ours = teamId === match.homeTeamId ? score.home : score.away; const theirs = teamId === match.homeTeamId ? score.away : score.home
   const ratings = playerIds.flatMap(playerId => { const player = playersById.get(playerId); const rating = player && ratePlayerMatch(match, player); return rating ? [rating.rating] : [] })
-  const startsTogether = playerIds.every(id => { const appearance = match.appearances.find(item => item.playerId === id && item.teamId === teamId); return appearance?.role === 'starter' && Boolean(appearance && roles[id]?.(matchPositionAt(match, appearance, 0) ?? appearance.position)) }) ? 1 : 0
+  const startsTogether = playerIds.every(id => { const appearance = index?.appearances.get(id) ?? match.appearances.find(item => item.playerId === id && item.teamId === teamId); return appearance?.role === 'starter' && Boolean(appearance && roles[id]?.(matchPositionAt(match, appearance, 0) ?? appearance.position)) }) ? 1 : 0
   let startingCombinedGA = 0; let startingGoalInvolvements = 0
   if (startsTogether) for (const event of match.events) if (event.type === 'goal' && !event.ownGoal && scoringTeam(event, match) === teamId) {
     const contribution = credited(event)
@@ -101,14 +103,25 @@ function buildCombination(match: Match, playerIds: string[], teamId: string, rol
 export function combinationStats(players: Player[], matches: Match[], filter: AnalyticsFilter, kind: CombinationKind): CombinationStats[] {
   const playersById = new Map(players.map(player => [player.id, player]))
   const totals = new Map<string, CombinationStats>()
-  for (const match of matches.filter(match => isScoped(match, filter))) for (const teamId of teamIds(match)) {
+  const scopedMatches = matches.filter(match => isScoped(match, filter))
+  const indexIntervals = scopedMatches.length >= 200
+  for (const match of scopedMatches) for (const teamId of teamIds(match)) {
     if (filter.teamId && teamId !== filter.teamId) continue
     const appearances = match.appearances.filter(appearance => appearance.teamId === teamId)
-    const available = (check: RoleCheck) => appearances.filter(appearance => teamIntervals(match, appearance.playerId, teamId).some(interval => check(interval.position))).map(appearance => appearance.playerId)
+    const matchIndex: TeamMatchIndex | undefined = indexIntervals ? { appearances: new Map(), intervals: new Map() } : undefined
+    if (matchIndex) {
+      for (const appearance of appearances) {
+        if (!matchIndex.appearances.has(appearance.playerId)) {
+          matchIndex.appearances.set(appearance.playerId, appearance)
+          matchIndex.intervals.set(appearance.playerId, creditedPositionSegments(match, appearance).map(segment => ({ start: segment.enter, end: segment.exit, position: segment.position })))
+        }
+      }
+    }
+    const available = (check: RoleCheck) => appearances.filter(appearance => (matchIndex?.intervals.get(appearance.playerId) ?? teamIntervals(match, appearance.playerId, teamId)).some(interval => check(interval.position))).map(appearance => appearance.playerId)
     const add = (ids: string[], roles: Record<string, RoleCheck>) => {
       const unique = [...new Set(ids)]
       if (unique.length !== ids.length) return
-      const entry = buildCombination(match, ids, teamId, roles, playersById)
+      const entry = buildCombination(match, ids, teamId, roles, playersById, matchIndex)
       if (!entry) return
       const key = `${teamId}:${ids.slice().sort().join(':')}`; const previous = totals.get(key)
       if (!previous) { totals.set(key, { key, kind, playerIds: ids.slice().sort(), teamId, ...entry, eligible: false }); return }
@@ -119,6 +132,28 @@ export function combinationStats(players: Player[], matches: Match[], filter: An
     else { const count = kind === 'duo' || kind === 'cb' ? 2 : 3; const role = roleFor(kind); for (const ids of combinations(available(role), count)) add(ids, Object.fromEntries(ids.map(id => [id, role]))) }
   }
   return [...totals.values()].map(row => ({ ...row, onPitchGoalsForPer90: row.togetherMinutes ? row.onPitchGoalsFor / row.togetherMinutes * 90 : 0, onPitchGoalsAgainstPer90: row.togetherMinutes ? row.onPitchGoalsAgainst / row.togetherMinutes * 90 : 0, onPitchGoalDifferencePer90: row.togetherMinutes ? row.onPitchGoalDifference / row.togetherMinutes * 90 : 0, eligible: eligible(row.matches, row.togetherMinutes) })).sort((a, b) => Number(b.eligible) - Number(a.eligible) || b.togetherMinutes - a.togetherMinutes || b.goalDifference - a.goalDifference)
+}
+
+/** Selects a season combination winner by the metric shown for that award.
+ * Equal award metrics preserve the existing combination list order. */
+export function selectBestCombinationForAward(rows: CombinationStats[], kind: CombinationAwardKind): CombinationStats | undefined {
+  const value = (row: CombinationStats) => {
+    switch (kind) {
+      case 'duo': return row.goalDifference
+      case 'attack': return row.combinedGA
+      case 'midfield': return row.averageRating
+      case 'cb': return row.togetherMinutes > 0 ? row.goalsAgainst / row.togetherMinutes * 90 : Number.POSITIVE_INFINITY
+      case 'backFour': return row.cleanSheets
+    }
+  }
+  let winner: CombinationStats | undefined
+  for (const row of rows) {
+    if (!row.eligible) continue
+    const candidateValue = value(row)
+    if (!Number.isFinite(candidateValue)) continue
+    if (!winner || (kind === 'cb' ? candidateValue < value(winner) : candidateValue > value(winner))) winner = row
+  }
+  return winner
 }
 
 export type CombinationOnPitchMetric = 'onPitchGF90' | 'onPitchGA90' | 'onPitchGD90'
