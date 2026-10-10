@@ -12,6 +12,41 @@ export type SubstitutionDraft = Lineup & {
 
 export type GoalkeeperMovePhase = 'pre-kickoff' | 'in-match'
 
+type RosterPlayer = { id: string; position: Position }
+
+/** Construct a new match once. Saved drafts and historical matches bypass this. */
+export function createFreshLineup(
+  squad: RosterPlayer[], recentAssignments: Record<string, string> | null,
+  recentBench: string[], defaultAssignments: Record<string, string>,
+): Lineup {
+  const byId = new Map(squad.map(player => [player.id, player]))
+  const preferred = recentAssignments ?? defaultAssignments
+  const slotAssignments: Record<string, string> = {}
+  const used = new Set<string>()
+  for (const [slot, id] of Object.entries(preferred).slice(0, 11)) {
+    const player = byId.get(id)
+    if (!player || used.has(id) || (slot === 'GK') !== (player.position === 'GK')) continue
+    slotAssignments[slot] = id
+    used.add(id)
+  }
+  const candidates = [...new Set([...recentBench, ...squad.map(player => player.id)])]
+  for (const slot of Object.keys(preferred).slice(0, 11)) {
+    if (slotAssignments[slot]) continue
+    const replacement = candidates.find(id => !used.has(id) && byId.has(id) && (slot === 'GK') === (byId.get(id)!.position === 'GK'))
+    if (replacement) { slotAssignments[slot] = replacement; used.add(replacement) }
+  }
+  return reconcileFreshBench({ slotAssignments, homeBench: recentBench }, squad)
+}
+
+/** The roster is the recoverable pool; the visible match-day bench is at most 12. */
+export function reconcileFreshBench(lineup: Lineup, squad: RosterPlayer[]): Lineup {
+  const rosterIds = new Set(squad.map(player => player.id))
+  const starters = new Set(Object.values(lineup.slotAssignments).filter(Boolean))
+  const homeBench = [...new Set([...lineup.homeBench, ...squad.map(player => player.id)])]
+    .filter(id => rosterIds.has(id) && !starters.has(id)).slice(0, 12)
+  return { slotAssignments: lineup.slotAssignments, homeBench }
+}
+
 /**
  * The starting goalkeeper can be selected before kickoff, but the committed
  * match has one immutable goalkeeper. Keeping this rule here makes both tap
@@ -36,11 +71,11 @@ export function allowsGoalkeeperLineupMove(
   if (!involvesGoalkeeper) return true
   if (phase === 'in-match') return false
 
-  // Before kickoff, the only legal keeper movement is exchanging the GK slot
-  // with another real goalkeeper from the match-day bench/candidates.
-  return sourceIsGK
-    && targetIsGK
-    && ((sourceGKSlot && target.group !== 'starting') || (targetGKSlot && source.group !== 'starting'))
+  // The goalkeeper may exchange with a keeper on the bench, or fill an empty
+  // GK slot. Both tap orders have the same rule.
+  if (sourceGKSlot && target.group !== 'starting') return targetIsGK && (!sourceId || sourceIsGK)
+  if (targetGKSlot && source.group !== 'starting') return sourceIsGK && (!targetId || targetIsGK)
+  return false
 }
 
 export function lineupTarget(id: string): LineupTarget | undefined {
@@ -51,12 +86,16 @@ export function lineupTarget(id: string): LineupTarget | undefined {
   return roster ? { group: roster[1] as 'substitute' | 'squad', id: roster[2] } : undefined
 }
 
-// Both lineup setup and live substitutions use this same swap/assign operation.
-export function moveLineup(lineup: Lineup, source: LineupTarget, target: LineupTarget): Lineup {
+// Live substitution staging may briefly park an OUT player beside a full bench;
+// only confirmed match-day lineups are limited to twelve bench players.
+export function moveLineup(lineup: Lineup, source: LineupTarget, target: LineupTarget, allowTemporaryBenchOverflow = false): Lineup {
   if (source.group === target.group && source.id === target.id) return lineup
-  if (source.group !== 'starting' && target.group === 'starting') return moveLineup(lineup, target, source)
+  if (source.group !== 'starting' && target.group === 'starting') return moveLineup(lineup, target, source, allowTemporaryBenchOverflow)
   const assignments = { ...lineup.slotAssignments }
   const bench = [...lineup.homeBench]
+  // An invalid saved lineup is never silently repaired by an unrelated move.
+  const existingIds = [...Object.values(assignments).filter(Boolean), ...bench.filter(Boolean)]
+  if (new Set(existingIds).size !== existingIds.length) return lineup
   if (source.group === 'starting') {
     const outgoing = assignments[source.id]
     if (target.group === 'starting') {
@@ -68,6 +107,8 @@ export function moveLineup(lineup: Lineup, source: LineupTarget, target: LineupT
       const incoming = target.id
       if (incoming && Object.values(assignments).includes(incoming)) return lineup
       if (target.group === 'substitute' && incoming && !bench.includes(incoming)) return lineup
+      if (incoming && !outgoing && Object.values(assignments).filter(Boolean).length >= 11) return lineup
+      if (!incoming && outgoing && target.group === 'substitute' && bench.length >= 12 && !allowTemporaryBenchOverflow) return lineup
       if (!outgoing && !incoming) return lineup
       if (incoming) assignments[source.id] = incoming
       else delete assignments[source.id]
@@ -85,6 +126,8 @@ export function moveLineup(lineup: Lineup, source: LineupTarget, target: LineupT
     if (index < 0 || !fromSquad || bench.includes(fromSquad) || Object.values(assignments).includes(fromSquad)) return lineup
     bench[index] = fromSquad
   }
+  const nextIds = [...Object.values(assignments).filter(Boolean), ...bench.filter(Boolean)]
+  if (Object.values(assignments).filter(Boolean).length > 11 || (!allowTemporaryBenchOverflow && bench.length > 12) || new Set(nextIds).size !== nextIds.length) return lineup
   return { slotAssignments: assignments, homeBench: bench }
 }
 
@@ -100,7 +143,7 @@ export function moveSubstitution(
   if ([source, target].some(item => item.group === 'starting' && positions[item.id] === 'GK')) return draft
   const subs = draft.events.filter((event): event is Extract<MatchEvent, { type: 'sub' }> => event.type === 'sub')
   if (subs.some(event => event.minute > minute) || Object.values(draft.positionHistories).some(history => history.some(change => change.minute > minute))) return draft
-  const next = moveLineup(draft, source, target)
+  const next = moveLineup(draft, source, target, true)
   if (next === draft) return draft
   const before = draft.checkpoint.slotAssignments
   const beforeIds = Object.values(before).filter(Boolean)

@@ -47,7 +47,7 @@ test('a restoration failure prevents resume mounting and cannot activate a draft
 
 test('the production NewMatch boundary returns recovery UI before MatchEditor can initialize a failed resume', () => {
   const Module = require('node:module'); const React = require('react'); const originalLoad = Module._load
-  const failedDraft = { ...draft, id: 'failed-draft', kickoffLineup: [] }
+  const failedDraft = { ...draft, id: 'failed-draft', kickoffLineup: [kickoff[0], { ...kickoff[1], id: kickoff[0].id }] }
   const calls = { autosave: 0, clear: 0 }
   Module._load = function(name, parent, main) {
     if (name === 'react') return { ...React, useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}] }
@@ -60,7 +60,8 @@ test('the production NewMatch boundary returns recovery UI before MatchEditor ca
     const rendered = NewMatchScreen({ teamId: 'A', requestedSeason: 'S1', competitionType: 'league', resumeDraft: true, onReplace() {}, onBack() {} })
     assert.equal(rendered.type, 'div')
     assert.equal(rendered.props.role, 'alert')
-    assert.match(rendered.props.children, /saved draft was not changed/)
+    assert.match(rendered.props.children.join(''), /saved draft was not changed/)
+    assert.match(rendered.props.children.join(''), /invalid/)
     assert.deepEqual(calls, { autosave: 0, clear: 0 })
   } finally {
     Module._load = originalLoad
