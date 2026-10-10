@@ -20,7 +20,7 @@ export type DurableSaveResult = { primarySaved: true; mirrorSaved: boolean; mirr
 /** Parse and normalize without changing durable storage or the live Store. */
 export function prepareImportData(jsonString: string): AppState {
   const parsed = JSON.parse(jsonString)
-  if (!validateState(parsed, { allowMissingHistoricalPlayers: true })) throw new Error('Invalid JSON structure')
+  if (!validateState(parsed)) throw new Error('Invalid JSON structure')
   const migrated = sanitizeDraftLifecycle({ ...parsed, matches: parsed.matches.map(normalizeMatchCompetitionIdentity) })
   return { ...migrated, matches: reconcileChampionsPairingIds(migrated.matches, migrated.competitionStates) }
 }
@@ -66,7 +66,7 @@ export const LocalRepository = {
         const raw = await getSource();
         if (!raw) continue;
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        if (validateState(parsed, { allowMissingHistoricalPlayers: true })) {
+        if (validateState(parsed)) {
           // Migration: Ensure player position is valid
           const migrated = sanitizeDraftLifecycle({
             ...parsed,
@@ -96,7 +96,7 @@ export const LocalRepository = {
     return measureInDevelopment('LocalRepository.saveAppState', async () => {
     // Serialize and validate before touching any durable source. This makes a
     // reported successful match save mean primary browser storage was proven.
-    if (!measureInDevelopment('validation', () => validateState(state, { allowMissingHistoricalPlayers: true }))) throw new Error('Invalid state structure, saving aborted.');
+    if (!measureInDevelopment('validation', () => validateState(state))) throw new Error('Invalid state structure, saving aborted.');
     let serialized: string
     try { serialized = measureInDevelopment('JSON.stringify', () => JSON.stringify(state)) } catch { throw new Error('Primary storage serialization failed.') }
 
@@ -109,6 +109,8 @@ export const LocalRepository = {
     try {
       writePrimary()
     } catch (error) {
+      // Do not free storage by deleting existing recovery copies. If quota is
+      // exhausted, keep the last verified primary and report the failed save.
       if (!isQuotaError(error)) preserveRecoveryCopies(current)
       throw new Error(error instanceof Error ? `Primary storage save failed: ${error.message}` : 'Primary storage save failed.')
     }
@@ -116,8 +118,8 @@ export const LocalRepository = {
     // Recovery is deliberately after the verified primary write. Safari
     // localStorage quota is shared with unrelated auth keys; recovery copies
     // are expendable and must never consume the room required by a Match save.
-    // Keep legacy snapshots as recovery material. If quota prevents this write,
-    // surface the failure and let the user export/review data before retrying.
+    // Legacy snapshots are recovery-only. Do not recreate a full-state ring in
+    // localStorage after successful saves; it can starve iOS auth storage.
 
     // IndexedDB is a mirror only. A blocked transaction must not turn an
     // already verified localStorage save into a user-visible failed save.

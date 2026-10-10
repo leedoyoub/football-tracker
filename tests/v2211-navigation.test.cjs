@@ -85,7 +85,7 @@ test('screens use root navigation operations instead of route-shaped local memor
   assert.match(match, /onClick=\{onBack\}/)
   assert.match(match, /onBackToTeam\(teamId\)/)
   assert.match(newMatch, /onComplete\(\{ name: 'match', id: draftId \}\)/)
-  assert.match(newMatch, /if \(editingMatchId\) void clearDraftMatch\(\)\.then\(onBack\)/)
+  assert.match(newMatch, /onClick=\{\(\) => \{ if \(editingMatchId\) clearDraftMatch\(\); onBack\(\) \}\}/)
   assert.match(newPlayer, /onReplace\(\{ name: 'player', id/)
   assert.match(newPlayer, /onClick=\{onBack\}/)
   assert.match(data, /onClick=\{onBack\}/)

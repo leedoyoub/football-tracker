@@ -4,9 +4,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 
+// Cloud access is intentionally held off until a separately approved rollout.
+export const isCloudSyncEnabled = false
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
-// Cloud Sync stays opt-in until its browser/Auth rollout has passed production gates.
-export const isCloudSyncEnabled = isSupabaseConfigured && import.meta.env.VITE_ENABLE_CLOUD_SYNC === 'true'
 
 let client: SupabaseClient | null | undefined
 

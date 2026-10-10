@@ -7,49 +7,12 @@ import { competitionIdentityForMatch } from './competitionContext'
 import { leagueSlotTeamIds } from './leagueSlots'
 import { validateManualOpponentSot } from './opponentSot'
 import { recordedTeamId } from './matchPerspective'
-import { currentTeamIds } from '../lib/roster'
 
 export type IntegritySeverity = 'error' | 'warning' | 'info'
-export type IntegrityEntityType = 'app-state' | 'team' | 'player' | 'match' | 'competition-state'
-export type IntegrityIssue = {
-  code: string
-  severity: IntegritySeverity
-  entityType: IntegrityEntityType
-  entityId?: string
-  relatedIds: string[]
-  impact: string
-  safeAction: string
-  matchId?: string
-  message: string
-}
+export type IntegrityIssue = { severity: IntegritySeverity; matchId?: string; message: string }
 export type IntegrityReport = { issues: IntegrityIssue[]; errors: number; warnings: number; info: number }
 
-type IntegrityIssueDetails = { code?: string; entityType?: IntegrityEntityType; entityId?: string; relatedIds?: string[]; impact?: string; safeAction?: string }
-const issueCode = (message: string) => {
-  const known: Array<[string, string]> = [
-    ['Duplicate stable team ID', 'team.duplicate_id'], ['Duplicate stable player ID', 'player.duplicate_id'],
-    ['Duplicate stable competition state ID', 'competition-state.duplicate_id'], ['Player ', 'player.invalid_reference'],
-    ['Missing stable match ID', 'match.missing_identity'], ['Duplicate stable match ID', 'match.duplicate_id'],
-    ['Lineup references an unknown player', 'match.missing_player_reference'], ['Substitution references an unknown player', 'match.missing_player_reference'],
-    ['Goal scorer references an unknown player', 'match.missing_player_reference'], ['Goal assister references an unknown player', 'match.missing_player_reference'],
-    ['Conceded-goal attribution references an unknown player', 'match.missing_player_reference'], ['Save references an unknown player', 'match.missing_player_reference'],
-    ['Duplicate League slot', 'match.duplicate_league_slot'], ['League slot gap', 'competition.league_slot_gap'],
-    ['Competition state ', 'competition-state.invalid_reference'], ['Player appears more than once', 'match.duplicate_appearance'],
-    ['Event references a team', 'match.invalid_event_team_reference'], ['Kickoff lineup:', 'match.invalid_kickoff_lineup'],
-    ['Incomplete HT/FT Opponent SOT', 'match.incomplete_opponent_sot'], ['Opponent SOT inconsistency', 'match.invalid_opponent_sot'],
-    ['Substitution does not match', 'match.invalid_substitution_reference'], ['Save recorded while', 'match.invalid_save_reference'],
-    ['Event minute is outside', 'match.invalid_event_minute'], ['Unsupported match duration', 'match.unsupported_duration'],
-  ]
-  const match = known.find(([prefix]) => message.startsWith(prefix))
-  if (match) return match[1]
-  return 'integrity.review_required'
-}
-const add = (issues: IntegrityIssue[], severity: IntegritySeverity, match: Match | undefined, message: string, details: IntegrityIssueDetails = {}) => {
-  const entityType = details.entityType ?? (match ? 'match' : 'app-state')
-  const impact = details.impact ?? (severity === 'error' ? 'This record or its derived statistics may be incomplete or inconsistent.' : 'This condition may affect historical interpretation or derived results.')
-  const safeAction = details.safeAction ?? 'Review the referenced source data or restore the original entity from a trusted backup; this audit does not modify data.'
-  issues.push({ code: details.code ?? issueCode(message), severity, entityType, ...(details.entityId ? { entityId: details.entityId } : match ? { entityId: match.id } : {}), relatedIds: details.relatedIds ?? [], impact, safeAction, ...(match ? { matchId: match.id } : {}), message })
-}
+const add = (issues: IntegrityIssue[], severity: IntegritySeverity, match: Match | undefined, message: string) => issues.push({ severity, ...(match ? { matchId: match.id } : {}), message })
 
 /** Read-only diagnostic pass. The Records screen memoizes this explicit-only scan. */
 export function auditDataIntegrity(matches: Match[], players: Player[], teams: Team[], states: CompetitionState[] = []): IntegrityReport {
@@ -57,37 +20,22 @@ export function auditDataIntegrity(matches: Match[], players: Player[], teams: T
   for (const [label, rows] of [['team', teams], ['player', players], ['competition state', states]] as const) {
     const seen = new Set<string>()
     for (const row of rows) {
-      if (seen.has(row.id)) add(issues, 'error', undefined, `Duplicate stable ${label} ID: ${row.id}.`, { code: `${label === 'competition state' ? 'competition-state' : label}.duplicate_id`, entityType: label === 'competition state' ? 'competition-state' : label, entityId: row.id, relatedIds: [row.id] })
+      if (seen.has(row.id)) add(issues, 'error', undefined, `Duplicate stable ${label} ID: ${row.id}.`)
       seen.add(row.id)
     }
   }
   for (const player of players) {
     if (player.teamIds === undefined) {
-      if (player.teamId && !teamIds.has(player.teamId)) add(issues, 'error', undefined, `Player ${player.id} has an unknown current team.`, { code: 'player.unknown_team', entityType: 'player', entityId: player.id, relatedIds: [player.teamId] })
+      if (player.teamId && !teamIds.has(player.teamId)) add(issues, 'error', undefined, `Player ${player.id} has an unknown current team.`)
       continue
     }
     if (!Array.isArray(player.teamIds) || player.teamIds.some(id => typeof id !== 'string' || !id)) {
-      add(issues, 'error', undefined, `Player ${player.id} has malformed current teamIds.`, { code: 'player.invalid_team_ids', entityType: 'player', entityId: player.id })
+      add(issues, 'error', undefined, `Player ${player.id} has malformed current teamIds.`)
       continue
     }
-    if (new Set(player.teamIds).size !== player.teamIds.length) add(issues, 'error', undefined, `Duplicate current team membership for player ${player.id}.`, { code: 'player.duplicate_team_membership', entityType: 'player', entityId: player.id, relatedIds: player.teamIds })
-    if (player.teamId !== (player.teamIds[0] ?? '')) add(issues, 'error', undefined, `Player ${player.id} has inconsistent teamId and teamIds.`, { code: 'player.inconsistent_primary_team', entityType: 'player', entityId: player.id, relatedIds: player.teamIds })
-    if (player.teamIds.some(id => !teamIds.has(id))) add(issues, 'error', undefined, `Player ${player.id} has an unknown current team.`, { code: 'player.unknown_team', entityType: 'player', entityId: player.id, relatedIds: player.teamIds.filter(id => !teamIds.has(id)) })
-  }
-  const rosterCounts = new Map<string, string[]>()
-  for (const player of players) {
-    const validMembership = player.teamIds === undefined || Array.isArray(player.teamIds)
-    if (!validMembership) continue
-    for (const teamId of currentTeamIds(player)) { const ids = rosterCounts.get(teamId) ?? []; ids.push(player.id); rosterCounts.set(teamId, ids) }
-  }
-  for (const [teamId, ids] of rosterCounts) if (ids.length > 23) add(issues, 'warning', undefined, `Team ${teamId} has ${ids.length} current roster members; the limit is 23.`, { code: 'player.roster_capacity_exceeded', entityType: 'team', entityId: teamId, relatedIds: ids, impact: 'New membership additions for this team may be rejected until the roster is within capacity.', safeAction: 'Review current registrations and release or transfer players intentionally; the audit preserves the current roster.' })
-  for (const competition of states) {
-    if (!Array.isArray(competition.teamIds)) {
-      add(issues, 'error', undefined, `Competition state ${competition.id} has malformed teamIds.`, { code: 'competition-state.invalid_team_ids', entityType: 'competition-state', entityId: competition.id })
-      continue
-    }
-    const unknown = competition.teamIds.filter(id => !teamIds.has(id))
-    if (unknown.length) add(issues, 'error', undefined, `Competition state ${competition.id} references an unknown team.`, { code: 'competition-state.unknown_team_reference', entityType: 'competition-state', entityId: competition.id, relatedIds: unknown })
+    if (new Set(player.teamIds).size !== player.teamIds.length) add(issues, 'error', undefined, `Duplicate current team membership for player ${player.id}.`)
+    if (player.teamId !== (player.teamIds[0] ?? '')) add(issues, 'error', undefined, `Player ${player.id} has inconsistent teamId and teamIds.`)
+    if (player.teamIds.some(id => !teamIds.has(id))) add(issues, 'error', undefined, `Player ${player.id} has an unknown current team.`)
   }
   const leagueSlots = new Map<string, Map<number, Match[]>>()
   const knockoutSlots = new Map<string, Match>()
@@ -107,7 +55,7 @@ export function auditDataIntegrity(matches: Match[], players: Player[], teams: T
         const key = `${match.season}:${teamId}`
         const days = leagueSlots.get(key) ?? new Map<number, Match[]>()
         const occupants = days.get(identity.matchDay) ?? []
-        if (occupants.length) add(issues, 'error', match, `Duplicate League slot for ${teamId} MD${identity.matchDay}.`, { code: 'match.duplicate_league_slot', relatedIds: [teamId, ...occupants.map(item => item.id)] })
+        if (occupants.length) add(issues, 'error', match, `Duplicate League slot for ${teamId} MD${identity.matchDay}.`)
         occupants.push(match); days.set(identity.matchDay, occupants); leagueSlots.set(key, days)
       }
     } else {
@@ -132,8 +80,8 @@ export function auditDataIntegrity(matches: Match[], players: Player[], teams: T
     const starters = new Set<string>(); const appearances = new Map<string, number>(); const eventIds = new Set<string>(); const goalFingerprints = new Set<string>(); const subFingerprints = new Set<string>()
     for (const appearance of match.appearances) {
       appearances.set(appearance.playerId, (appearances.get(appearance.playerId) ?? 0) + 1)
-      if (!playerIds.has(appearance.playerId)) add(issues, 'error', match, 'Lineup references an unknown player.', { code: 'match.missing_player_reference', relatedIds: [appearance.playerId] })
-      if (!matchTeamIds.has(appearance.teamId)) add(issues, 'error', match, 'Lineup references a team that is not in this match.', { code: 'match.invalid_team_reference', relatedIds: [appearance.teamId] })
+      if (!playerIds.has(appearance.playerId)) add(issues, 'error', match, 'Lineup references an unknown player.')
+      if (!matchTeamIds.has(appearance.teamId)) add(issues, 'error', match, 'Lineup references a team that is not in this match.')
       if (identity.competitionType === 'champions' && match.teamId && appearance.teamId !== match.teamId) add(issues, 'error', match, 'Champions independent opponent lineup is stored in another team record.')
       if (appearance.role === 'starter') { if (starters.has(appearance.playerId)) add(issues, 'error', match, 'Player is duplicated in the starting XI.'); starters.add(appearance.playerId) }
       if (!normalizeMatchPosition(appearance.matchPosition ?? appearance.position)) add(issues, 'error', match, 'Appearance has an unknown match position.')
@@ -158,7 +106,7 @@ export function auditDataIntegrity(matches: Match[], players: Player[], teams: T
       if (!matchTeamIds.has(event.teamId)) add(issues, 'error', match, 'Event references a team that is not in this match.')
       if (event.type === 'sub') {
         if (event.tacticalSlotId && !tacticalSlotById[event.tacticalSlotId]) add(issues, 'warning', match, 'Substitution has an unknown tactical slot.')
-        if (!playerIds.has(event.playerInId) || !playerIds.has(event.playerOutId)) add(issues, 'error', match, 'Substitution references an unknown player.', { code: 'match.missing_player_reference', relatedIds: [event.playerInId, event.playerOutId].filter(id => !playerIds.has(id)) })
+        if (!playerIds.has(event.playerInId) || !playerIds.has(event.playerOutId)) add(issues, 'error', match, 'Substitution references an unknown player.')
         const fingerprint = [event.teamId, event.minute, event.playerOutId, event.playerInId].join('|')
         if (subFingerprints.has(fingerprint)) add(issues, 'warning', match, 'Duplicate logically identical substitution event.')
         subFingerprints.add(fingerprint)
@@ -174,20 +122,20 @@ export function auditDataIntegrity(matches: Match[], players: Player[], teams: T
         goalFingerprints.add(fingerprint)
         if (!event.ownGoal && event.teamId === match.teamId && !event.playerId) add(issues, 'warning', match, 'Tracked-team goal has no scorer.')
         for (const [label, id] of [['scorer', event.playerId], ['assister', event.assistPlayerId]] as const) if (id) {
-          if (!playerIds.has(id)) add(issues, 'error', match, `Goal ${label} references an unknown player.`, { code: 'match.missing_player_reference', relatedIds: [id] })
+          if (!playerIds.has(id)) add(issues, 'error', match, `Goal ${label} references an unknown player.`)
           const appearance = match.appearances.find(item => item.playerId === id && item.teamId === event.teamId)
           if (!appearance && playerIds.has(id)) add(issues, 'warning', match, `Goal ${label} is not in the event team's lineup.`)
           if (appearance && !isOnPitchAtEvent(match, appearance, event)) add(issues, 'warning', match, `Goal ${label} is outside that player's on-pitch interval.`)
         }
         if (event.concededGoalCausePlayerId) {
-          if (!playerIds.has(event.concededGoalCausePlayerId)) add(issues, 'error', match, 'Conceded-goal attribution references an unknown player.', { code: 'match.missing_player_reference', relatedIds: [event.concededGoalCausePlayerId] })
+          if (!playerIds.has(event.concededGoalCausePlayerId)) add(issues, 'error', match, 'Conceded-goal attribution references an unknown player.')
           const appearance = match.appearances.find(item => item.playerId === event.concededGoalCausePlayerId)
           if (appearance && !isOnPitchAtEvent(match, appearance, event)) add(issues, 'warning', match, 'Conceded-goal attribution is outside that player\'s on-pitch interval.')
         }
       }
       if (event.type === 'save') {
         if (event.count !== undefined && (!Number.isInteger(event.count) || event.count < 0)) add(issues, 'error', match, 'Save count is malformed; expected a non-negative whole number.')
-        if (!playerIds.has(event.playerId)) add(issues, 'error', match, 'Save references an unknown player.', { code: 'match.missing_player_reference', relatedIds: [event.playerId] })
+        if (!playerIds.has(event.playerId)) add(issues, 'error', match, 'Save references an unknown player.')
         const appearance = match.appearances.find(item => item.playerId === event.playerId && item.teamId === event.teamId)
         const goalkeeper = appearance && matchPositionSegments(match, appearance).some(segment => segment.position === 'GK')
         if (!appearance || !goalkeeper || event.minute !== undefined && !isOnPitchAtEvent(match, appearance, event)) add(issues, 'error', match, 'Save recorded while the player cannot be an on-pitch goalkeeper.')

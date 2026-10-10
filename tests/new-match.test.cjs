@@ -4,7 +4,6 @@ const { test } = require('node:test')
 const ts = require('typescript')
 for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename)
 const { allowsGoalkeeperLineupMove, moveLineup, moveSubstitution } = require('../src/screens/matchLineup.ts')
-const { kickoffConfirmedForEditor } = require('../src/lib/draftLifecycle.ts')
 
 const baseline = () => ({ slotAssignments: { GK: 'gk', CM: 'cm', ST: 'st' }, homeBench: ['bench'], events: [], positionHistories: {}, checkpoint: { slotAssignments: { GK: 'gk', CM: 'cm', ST: 'st' }, homeBench: ['bench'] } })
 const positions = { GK: 'GK', CM: 'CM', CAM: 'CAM', ST: 'ST' }
@@ -72,11 +71,7 @@ test('once kickoff is committed, every goalkeeper substitution or tactical move 
     [{ group: 'starting', id: 'CM' }, { group: 'starting', id: 'GK' }],
   ]) assert.equal(allowsGoalkeeperLineupMove(source, target, draft, slots, positions, 'in-match'), false)
   const source = fs.readFileSync(require.resolve('../src/screens/NewMatchScreen.tsx'), 'utf8')
-  assert(source.includes('const lineupLocked = kickoffConfirmed'))
-  assert(source.includes('await saveDraftMatch(checkpoint, { flush: true })'))
-  assert(source.includes('RosterPlayerGroup title={`Available'))
-  assert.equal(kickoffConfirmedForEditor('resume', { id: 'D', events: [], kickoffConfirmed: true }), true)
-  assert.equal(kickoffConfirmedForEditor('resume', { id: 'D', events: [], kickoffConfirmed: false }), false)
+  assert(source.includes("const lineupLocked = step === 1 || matchDraft.events.length > 0"))
   assert(source.includes('aria-label="Total saves"'))
 })
 

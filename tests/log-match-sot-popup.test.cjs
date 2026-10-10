@@ -58,7 +58,7 @@ test('new-match finalization requires the SOT popup values without changing lega
   const source = fs.readFileSync(require.resolve('../src/screens/NewMatchScreen.tsx'), 'utf8')
   assert(source.includes("mode !== 'edit'"), 'new and resumed draft saves should require manual SOT')
   assert(source.includes('SOT control before finishing.'), 'missing SOT guidance should direct the user to the Log Match control')
-  assert(source.includes('...finalMatchData, fulltimeOpponentSotAutoLinked, kickoffConfirmed'), 'draft checkpoint should retain the workflow flag and kickoff state')
+  assert(source.includes('fulltimeOpponentSotAutoLinked: fulltimeOpponentSotAutoLinked'), 'draft persistence should include the workflow flag')
   assert(source.includes('const finalMatchData'), 'final save must be built separately from the draft checkpoint')
 })
 

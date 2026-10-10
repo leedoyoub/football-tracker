@@ -48,7 +48,9 @@ test('validation rejects contradictory modern membership and invalid references'
   assert.equal(validateState(state), true)
   assert.deepEqual(currentTeamIds(state.players[0]), ['A'])
   state.matches = [{ ...game('bad', 1), appearances: [{ playerId: 'missing', teamId: 'A', role: 'starter', position: 'CM' }] }]
-  assert.equal(validateState(state), false)
+  assert.equal(validateState(state), true, 'historical match facts keep a deleted player stable ID')
+  state.matches[0].appearances[0].playerId = ''
+  assert.equal(validateState(state), false, 'malformed player IDs remain rejected')
 })
 
 test('malformed nested import rows are rejected as data, without throwing', () => {

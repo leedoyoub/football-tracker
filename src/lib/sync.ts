@@ -2,276 +2,110 @@ import { getSupabase, isCloudSyncEnabled } from './supabase'
 import { openDB } from './db'
 import { LocalRepository } from './repository'
 import { validateState } from './validation'
-import { deserializeCloudEntity } from './cloudMatch'
+import { deserializeCloudEntity, serializeCloudEntity } from './cloudMatch'
 import type { AppState, CompetitionState, Match, Player, Team } from '../types'
 import { sanitizeDraftLifecycle } from './draftLifecycle'
 import { reconcileChampionsPairingIds } from '../engine/competition'
-import {
-  resolveCloudMerge,
-  stateToCloudEntities,
-  type CloudSyncMutation,
-  type CloudSyncQueueItem,
-  type CloudSyncRecord,
-  type SyncEntityType,
-} from './cloudSyncProtocol'
 
 const QUEUE_STORE = 'sync_queue'
 const META_STORE = 'sync_metadata'
-export type SyncEntity = SyncEntityType
-export type SyncItem = CloudSyncQueueItem & { timestamp: number; status: 'pending' | 'failed' }
-export type SyncMetadata = {
-  lastSyncedUserId: string | null
-  lastSyncAt: number
-  retryAt: number
-  entityCloudRevision: Record<string, number>
-  /** Read for compatibility with phase 2 metadata; no longer used for conflict resolution. */
-  entityCloudUpdatedAt: Record<string, string>
-  lastError?: string
-}
+export type SyncEntity = 'team' | 'player' | 'match' | 'competition'
+export type SyncItem = { id: string; entityType: SyncEntity; entityId: string; operation: 'upsert' | 'delete'; payload?: Team | Player | Match | CompetitionState; timestamp: number; status: 'pending' | 'failed' }
+export type SyncMetadata = { lastSyncedUserId: string | null; lastSyncAt: number; retryAt: number; entityUpdatedAt: Record<string, number>; entityCloudUpdatedAt: Record<string, string>; lastError?: string }
 export const TABLE_FOR: Record<SyncEntity, 'teams' | 'players' | 'matches' | 'competition_states'> = { team: 'teams', player: 'players', match: 'matches', competition: 'competition_states' }
-const emptyMeta = (): SyncMetadata => ({ lastSyncedUserId: null, lastSyncAt: 0, retryAt: 0, entityCloudRevision: {}, entityCloudUpdatedAt: {} })
+const emptyMeta = (): SyncMetadata => ({ lastSyncedUserId: null, lastSyncAt: 0, retryAt: 0, entityUpdatedAt: {}, entityCloudUpdatedAt: {} })
 const key = (type: SyncEntity, id: string) => `${type}:${id}`
 const entities = (state: AppState, type: SyncEntity): (Team | Player | Match | CompetitionState)[] => type === 'team' ? state.teams : type === 'player' ? state.players : type === 'match' ? state.matches : state.competitionStates ?? []
-const emptyState = (): AppState => ({ teams: [], players: [], matches: [], competitionStates: [] })
-const CLOUD_PAGE_SIZE = 500
-const CLOUD_ENTITY_LIMIT = 100000
 let retryTimer: ReturnType<typeof setTimeout> | undefined
-let activeSync: Promise<{ status: 'local-only' | 'synced' | 'pending' | 'error'; message: string }> | undefined
-let rerunRequested = false
-let adapterSequence = 0
-type StoreSnapshot = { revision: number; snapshot: AppState }
-export type SyncStoreAdapter = { read: () => StoreSnapshot; apply: (expectedRevision: number, state: AppState) => Promise<boolean> }
-let storeAdapter: SyncStoreAdapter | undefined
-
 function scheduleRetry(delay: number) {
   if (retryTimer) return
   retryTimer = setTimeout(() => { retryTimer = undefined; void SyncManager.syncNow() }, delay)
 }
-function clearRetry() { if (retryTimer) { clearTimeout(retryTimer); retryTimer = undefined } }
 
 async function allQueue(): Promise<SyncItem[]> { const db = await openDB(); return new Promise((resolve, reject) => { const req = db.transaction(QUEUE_STORE, 'readonly').objectStore(QUEUE_STORE).getAll(); req.onsuccess = () => resolve(req.result ?? []); req.onerror = () => reject(req.error) }) }
-async function metadata(): Promise<SyncMetadata> { const db = await openDB(); return new Promise((resolve, reject) => { const req = db.transaction(META_STORE, 'readonly').objectStore(META_STORE).get('meta'); req.onsuccess = () => resolve({ ...emptyMeta(), ...(req.result ?? {}), entityCloudRevision: (req.result?.entityCloudRevision ?? {}), entityCloudUpdatedAt: (req.result?.entityCloudUpdatedAt ?? {}) }); req.onerror = () => reject(req.error) }) }
+async function metadata(): Promise<SyncMetadata> { const db = await openDB(); return new Promise((resolve, reject) => { const req = db.transaction(META_STORE, 'readonly').objectStore(META_STORE).get('meta'); req.onsuccess = () => resolve({ ...emptyMeta(), ...(req.result ?? {}), entityUpdatedAt: (req.result?.entityUpdatedAt ?? {}), entityCloudUpdatedAt: (req.result?.entityCloudUpdatedAt ?? {}) }); req.onerror = () => reject(req.error) }) }
 async function putMetadata(value: SyncMetadata) { const db = await openDB(); await new Promise<void>((resolve, reject) => { const tx = db.transaction(META_STORE, 'readwrite'); tx.objectStore(META_STORE).put(value, 'meta'); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error) }) }
-async function removeQueueItem(id: string) { const db = await openDB(); await new Promise<void>((resolve, reject) => { const tx = db.transaction(QUEUE_STORE, 'readwrite'); tx.objectStore(QUEUE_STORE).delete(id); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error) }) }
-async function rebaseQueueItems(mutations: CloudSyncMutation[], oldRevision: number, newRevision: number) {
-  if (!mutations.length) return
-  const affected = new Set(mutations.map(mutation => key(mutation.entityType, mutation.entityId)))
-  const rows = await allQueue()
-  const changed = rows.filter(row => affected.has(key(row.entityType, row.entityId)) && row.baseRevision === oldRevision)
-  if (!changed.length) return
-  const db = await openDB()
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(QUEUE_STORE, 'readwrite')
-    for (const row of changed) tx.objectStore(QUEUE_STORE).put({ ...row, baseRevision: newRevision })
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
-  })
-}
-
-async function allRows<T>(query: { range(from: number, to: number): PromiseLike<{ data: T[] | null; error: unknown }> }): Promise<T[]> {
-  const rows: T[] = []
-  for (let from = 0; ; from += CLOUD_PAGE_SIZE) {
-    const to = Math.min(from + CLOUD_PAGE_SIZE - 1, CLOUD_ENTITY_LIMIT)
-    const { data, error } = await query.range(from, to)
-    if (error) throw error
-    const page = data ?? []
-    rows.push(...page)
-    if (page.length < to - from + 1) return rows
-    if (from >= CLOUD_ENTITY_LIMIT) break
-  }
-  throw new Error('Cloud sync row count exceeded the safe initialization limit.')
-}
-
-async function readLegacyEntities(supabase: NonNullable<ReturnType<typeof getSupabase>>, userId: string): Promise<CloudSyncRecord[]> {
-  const [teams, players, matches, competitions] = await Promise.all([
-    allRows<Team>(supabase.from('teams').select('*').eq('user_id', userId).order('id')),
-    allRows<Player>(supabase.from('players').select('*').eq('user_id', userId).order('id')),
-    allRows<Match>(supabase.from('matches').select('*').eq('user_id', userId).order('id')),
-    allRows<CompetitionState>(supabase.from('competition_states').select('*').eq('user_id', userId).order('id')),
-  ])
-  const legacy = {
-    teams: teams.map((row: Team) => deserializeCloudEntity(row)),
-    players: players.map((row: Player) => deserializeCloudEntity(row)),
-    matches: matches.map((row: Match) => deserializeCloudEntity(row)),
-    competitionStates: competitions.map((row: CompetitionState) => deserializeCloudEntity(row)),
-  }
-  const normalized: AppState = {
-    ...legacy,
-    matches: reconcileChampionsPairingIds(legacy.matches, legacy.competitionStates),
-  }
-  if (!validateState(normalized)) throw new Error('Legacy cloud data failed validation; cloud bootstrap stopped without replacing local data.')
-  return stateToCloudEntities(normalized).map(entity => ({ ...entity, revision: 0, deleted: false }))
-}
-
-async function readCloudRecords(supabase: NonNullable<ReturnType<typeof getSupabase>>, userId: string): Promise<{ revision: number; records: CloudSyncRecord[] }> {
-  const stateResult = await supabase.from('cloud_sync_state').select('revision').eq('user_id', userId).maybeSingle()
-  if (stateResult.error) throw stateResult.error
-  if (!stateResult.data) {
-    const legacy = await readLegacyEntities(supabase, userId)
-    const { error } = await supabase.rpc('initialize_cloud_sync', { p_entities: legacy.map(({ entityType, entityId, payload }) => ({ entityType, entityId, payload })) })
-    if (error) throw error
-    const initialized = await supabase.from('cloud_sync_state').select('revision').eq('user_id', userId).maybeSingle()
-    if (initialized.error) throw initialized.error
-    if (!initialized.data) throw new Error('Cloud sync initialization did not create an account state.')
-    return readCloudRecords(supabase, userId)
-  }
-  const entityRows = await allRows<{ entity_type: SyncEntity; entity_id: string; revision: number | string; deleted: boolean; payload: Team | Player | Match | CompetitionState | null }>(
-    supabase.from('cloud_sync_entities').select('entity_type,entity_id,revision,deleted,payload').eq('user_id', userId).order('entity_type').order('entity_id'),
-  )
-  const records = entityRows.map((row: { entity_type: SyncEntity; entity_id: string; revision: number | string; deleted: boolean; payload: Team | Player | Match | CompetitionState | null }) => ({
-    entityType: row.entity_type,
-    entityId: row.entity_id,
-    revision: Number(row.revision),
-    deleted: row.deleted,
-    payload: row.payload,
-  }))
-  const revision = Number(stateResult.data.revision)
-  if (!Number.isSafeInteger(revision) || revision < 0 || records.some(record => !Number.isSafeInteger(record.revision) || record.revision < 0 || record.revision > revision)) throw new Error('Cloud sync returned an invalid revision.')
-  if (records.some(record => !['team', 'player', 'match', 'competition'].includes(record.entityType) || !record.entityId || (!record.deleted && (!record.payload || record.payload.id !== record.entityId)))) throw new Error('Cloud sync returned an invalid entity row.')
-  return { revision, records }
-}
-
-async function currentLocal(): Promise<StoreSnapshot> {
-  if (storeAdapter) return storeAdapter.read()
-  const snapshot = await LocalRepository.getAppState()
-  return { revision: 0, snapshot: snapshot ?? emptyState() }
-}
-async function applyLocal(expectedRevision: number, state: AppState): Promise<boolean> {
-  if (storeAdapter) return storeAdapter.apply(expectedRevision, state)
-  const current = await currentLocal()
-  if (current.revision !== expectedRevision) return false
-  await LocalRepository.saveAppState(state)
-  return true
-}
-async function currentUserId(supabase: NonNullable<ReturnType<typeof getSupabase>>) {
-  const { data, error } = await supabase.auth.getUser()
-  if (error) throw error
-  return data.user?.id ?? null
-}
-
-async function runSync(): Promise<{ status: 'local-only' | 'synced' | 'pending' | 'error'; message: string }> {
-  if (!isCloudSyncEnabled) {
-    clearRetry()
-    return { status: 'local-only', message: 'Cloud Sync is disabled; local data is safe.' }
-  }
-  const supabase = getSupabase()
-  if (!supabase || !navigator.onLine) { scheduleRetry(30000); return { status: 'local-only', message: 'Cloud unavailable; local data is safe.' } }
-  let meta = emptyMeta()
-  try {
-    const userId = await currentUserId(supabase)
-    if (!userId) return { status: 'local-only', message: 'Signed out; using local storage.' }
-    meta = await metadata()
-    if (meta.lastSyncedUserId && meta.lastSyncedUserId !== userId) return { status: 'pending', message: 'Account changed; local data was kept and cloud upload is paused.' }
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const cloud = await readCloudRecords(supabase, userId)
-      if (await currentUserId(supabase) !== userId) { rerunRequested = true; return { status: 'pending', message: 'Account changed during sync; local data was kept.' } }
-      const local = await currentLocal()
-      const queued = await allQueue()
-      const merged = resolveCloudMerge(local.snapshot, cloud.records, queued, meta.entityCloudRevision)
-      if (merged.blockedQueueIds.length) {
-        const message = 'An offline change from an older app conflicts with cloud data. Local data and its sync queue were kept; export or review the local copy before continuing sync.'
-        await putMetadata({ ...meta, retryAt: 0, lastError: message })
-        return { status: 'pending', message }
-      }
-      const safeState = sanitizeDraftLifecycle({ ...merged.state, matches: reconcileChampionsPairingIds(merged.state.matches, merged.state.competitionStates) })
-      if (!validateState(safeState)) throw new Error('Merged cloud data failed validation; sync stopped before local save or upload.')
-
-      // Store state may change while IndexedDB or PostgREST calls are pending.
-      // Recompute from the transaction coordinator before a cloud write.
-      const latest = await currentLocal()
-      if (latest.revision !== local.revision) continue
-      const latestQueue = await allQueue()
-      if (latestQueue.some(row => !queued.some(old => old.id === row.id))) continue
-      if (await currentUserId(supabase) !== userId) { rerunRequested = true; return { status: 'pending', message: 'Account changed before cloud commit; local data was kept.' } }
-
-      if (merged.mutations.length) {
-        const { data, error } = await supabase.rpc('commit_cloud_sync', { p_expected_revision: cloud.revision, p_mutations: merged.mutations })
-        if (error) throw error
-        if (!data?.applied) continue
-        if (await currentUserId(supabase) !== userId) { rerunRequested = true; return { status: 'pending', message: 'Account changed after cloud commit; local queue was kept for a later sync.' } }
-        const nextRevision = Number(data.revision)
-        if (!Number.isSafeInteger(nextRevision) || nextRevision < cloud.revision) throw new Error('Cloud sync returned an invalid committed revision.')
-        for (const mutation of merged.mutations) meta.entityCloudRevision[key(mutation.entityType, mutation.entityId)] = nextRevision
-        await putMetadata(meta)
-        await rebaseQueueItems(merged.mutations, cloud.revision, nextRevision)
-        continue
-      }
-
-      for (const record of cloud.records) meta.entityCloudRevision[key(record.entityType, record.entityId)] = record.revision
-      if (await currentUserId(supabase) !== userId) { rerunRequested = true; return { status: 'pending', message: 'Account changed before local restore; local data was kept.' } }
-      await putMetadata(meta)
-      if (!await applyLocal(local.revision, safeState)) continue
-      for (const id of merged.acknowledgedQueueIds) await removeQueueItem(id)
-      const remaining = await allQueue()
-      const finishedAt = Date.now()
-      await putMetadata({ ...meta, lastSyncedUserId: userId, lastSyncAt: finishedAt, retryAt: 0, lastError: undefined })
-      if (remaining.length) {
-        rerunRequested = true
-        continue
-      }
-      clearRetry()
-      return { status: 'synced', message: 'Cloud backup is up to date.' }
-    }
-    scheduleRetry(1000)
-    return { status: 'pending', message: 'Cloud changed repeatedly; sync will retry with the latest revision.' }
-  } catch (error) {
-    const delay = Math.min(300000, 5000 * 2 ** Math.min(6, (await allQueue().catch(() => [])).length))
-    const message = error instanceof Error ? error.message : String(error)
-    try { await putMetadata({ ...meta, retryAt: Date.now() + delay, lastError: message }) } catch { /* Preserve the durable queue even if retry metadata cannot be saved. */ }
-    console.error('[Football Tracker sync] Cloud operation failed; queue retained for retry.', error)
-    scheduleRetry(delay)
-    return { status: 'pending', message: `Cloud sync pending: ${message}` }
-  }
-}
-
-export function registerSyncStoreAdapter(adapter: SyncStoreAdapter): () => void {
-  const registration = ++adapterSequence
-  storeAdapter = adapter
-  return () => { if (registration === adapterSequence) storeAdapter = undefined }
-}
+type CloudRow<T> = { entity: T; updatedAt?: string }
+const durableTimestamp = (value: unknown) => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : undefined
+const isNewer = (candidate: string | undefined, baseline: string | undefined) => !!candidate && !!baseline && Date.parse(candidate) > Date.parse(baseline)
 
 export const SyncManager = {
-  async queueOperation(item: Omit<SyncItem, 'id' | 'timestamp' | 'status' | 'baseRevision'> & { baseRevision?: number }) {
+  async queueOperation(item: Omit<SyncItem, 'id' | 'timestamp' | 'status'>) {
     if (!isCloudSyncEnabled) return
-    const existing = await allQueue()
-    const prior = existing.find(row => row.entityType === item.entityType && row.entityId === item.entityId)
-    const meta = await metadata()
-    const db = await openDB()
-    const now = Date.now()
-    const tx = db.transaction(QUEUE_STORE, 'readwrite')
-    const store = tx.objectStore(QUEUE_STORE)
+    const existing = await allQueue(); const db = await openDB(); const now = Date.now(); const tx = db.transaction(QUEUE_STORE, 'readwrite'); const store = tx.objectStore(QUEUE_STORE)
+    // Coalesce a pending entity into one latest, idempotent operation.
     existing.filter(row => row.entityType === item.entityType && row.entityId === item.entityId).forEach(row => store.delete(row.id))
-    const carriesUnknownLegacyBase = Boolean(prior && prior.baseRevision === undefined && item.intent !== 'import')
-    const baseRevision = carriesUnknownLegacyBase
-      ? undefined
-      : item.intent === 'import'
-        ? item.baseRevision ?? meta.entityCloudRevision[key(item.entityType, item.entityId)] ?? 0
-        : prior?.baseRevision ?? item.baseRevision ?? meta.entityCloudRevision[key(item.entityType, item.entityId)] ?? 0
-    store.put({ ...item, baseRevision, id: crypto.randomUUID(), timestamp: now, status: 'pending' } satisfies SyncItem)
+    store.put({ ...item, id: crypto.randomUUID(), timestamp: now, status: 'pending' } satisfies SyncItem)
     await new Promise<void>((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error) })
-    if (activeSync) rerunRequested = true
+    const meta = await metadata(); meta.entityUpdatedAt[key(item.entityType, item.entityId)] = now; await putMetadata(meta)
   },
-  async queueStateChange(previous: AppState, next: AppState, options?: { intent?: 'import' }) {
-    if (!isCloudSyncEnabled) return
+  async queueStateChange(previous: AppState, next: AppState) {
     for (const type of ['team', 'player', 'match', 'competition'] as const) {
-      const before = new Map(entities(previous, type).map(entity => [entity.id, entity]))
-      const after = new Map(entities(next, type).map(entity => [entity.id, entity]))
-      for (const [id, entity] of after) if (options?.intent === 'import' || JSON.stringify(before.get(id)) !== JSON.stringify(entity)) await this.queueOperation({ entityType: type, entityId: id, operation: 'upsert', payload: entity, ...(options?.intent ? { intent: options.intent } : {}) })
-      for (const id of before.keys()) if (!after.has(id)) await this.queueOperation({ entityType: type, entityId: id, operation: 'delete', ...(options?.intent ? { intent: options.intent } : {}) })
+      const before = new Map(entities(previous, type).map(entity => [entity.id, entity])); const after = new Map(entities(next, type).map(entity => [entity.id, entity]))
+      for (const [id, entity] of after) if (JSON.stringify(before.get(id)) !== JSON.stringify(entity)) await this.queueOperation({ entityType: type, entityId: id, operation: 'upsert', payload: entity })
+      for (const id of before.keys()) if (!after.has(id)) await this.queueOperation({ entityType: type, entityId: id, operation: 'delete' })
     }
   },
-  syncNow(): Promise<{ status: 'local-only' | 'synced' | 'pending' | 'error'; message: string }> {
-    if (activeSync) return activeSync
-    activeSync = (async () => {
-      try { return await runSync() }
-      finally {
-        activeSync = undefined
-        if (rerunRequested) {
-          rerunRequested = false
-          queueMicrotask(() => { void SyncManager.syncNow() })
+  async syncNow(): Promise<{ status: 'local-only' | 'synced' | 'pending' | 'error'; message: string }> {
+    if (!isCloudSyncEnabled) return { status: 'local-only', message: 'Cloud Sync is disabled; local data remains on this device.' }
+    const supabase = getSupabase()
+    if (!supabase || !navigator.onLine) { scheduleRetry(30000); return { status: 'local-only', message: 'Cloud unavailable; local data is safe.' } }
+    const { data: { user } } = await supabase.auth.getUser(); if (!user) return { status: 'local-only', message: 'Signed out; using local storage.' }
+    // The verified localStorage primary is the authority. IndexedDB is only a
+    // mirror and may be stale after an iOS/PWA teardown, so it must never be
+    // used as the source for a merge which writes back over the primary.
+    const local = await LocalRepository.getAppState(); if (!local) return { status: 'error', message: 'No local state to sync.' }
+    const meta = await metadata(); const pending = await allQueue(); const pendingKeys = new Set(pending.map(item => key(item.entityType, item.entityId)))
+    // Never upload one account's durable local queue into a different account.
+    if (meta.lastSyncedUserId && meta.lastSyncedUserId !== user.id) return { status: 'pending', message: 'Account changed; local data was kept and cloud upload is paused.' }
+    try {
+      const [teams, players, matches, competitions] = await Promise.all([supabase.from('teams').select('*'), supabase.from('players').select('*'), supabase.from('matches').select('*'), supabase.from('competition_states').select('*')])
+      if (teams.error) throw teams.error; if (players.error) throw players.error; if (matches.error) throw matches.error; if (competitions.error) throw competitions.error
+      const cloudRows = <T extends Team | Player | Match | CompetitionState>(rows: T[]) => rows.map(row => ({ entity: deserializeCloudEntity(row), updatedAt: durableTimestamp((row as { updated_at?: unknown }).updated_at) }))
+      const cloud = { teams: cloudRows(teams.data ?? []), players: cloudRows(players.data ?? []), matches: cloudRows(matches.data ?? []), competitionStates: cloudRows(competitions.data ?? []) as CloudRow<CompetitionState>[] }
+      const merge = <T extends { id: string }>(type: SyncEntity, localRows: T[], remoteRows: CloudRow<T>[]) => {
+        const out = new Map(localRows.map(row => [row.id, row]))
+        for (const remote of remoteRows) {
+          const localRow = out.get(remote.entity.id); const entityKey = key(type, remote.entity.id)
+          if (!localRow) {
+            if (!pendingKeys.has(entityKey)) {
+              out.set(remote.entity.id, remote.entity)
+              if (remote.updatedAt) meta.entityCloudUpdatedAt[entityKey] = remote.updatedAt
+            }
+            continue
+          }
+          // A queued device mutation is authoritative until it has reached the
+          // server. Otherwise use the server-issued timestamp compared with
+          // the last cloud version this device accepted. Missing legacy
+          // metadata deliberately remains local-first.
+          const cloudWon = !pendingKeys.has(entityKey) && isNewer(remote.updatedAt, meta.entityCloudUpdatedAt[entityKey])
+          if (cloudWon) out.set(remote.entity.id, remote.entity)
+          if (remote.updatedAt && (cloudWon || JSON.stringify(localRow) === JSON.stringify(remote.entity))) meta.entityCloudUpdatedAt[entityKey] = remote.updatedAt
+        }
+        return [...out.values()]
+      }
+      const mergedDraftSafe = sanitizeDraftLifecycle({ teams: merge('team', local.teams, cloud.teams), players: merge('player', local.players, cloud.players), matches: merge('match', local.matches, cloud.matches), competitionStates: merge('competition', local.competitionStates ?? [], cloud.competitionStates ?? []), draftMatch: local.draftMatch })
+      const merged: AppState = { ...mergedDraftSafe, matches: reconcileChampionsPairingIds(mergedDraftSafe.matches, mergedDraftSafe.competitionStates) }
+      if (!validateState(merged)) throw new Error('Merged cloud data failed validation; sync stopped before local save or upload.')
+      await LocalRepository.saveAppState(merged)
+      // First sign-in / remote-empty safety: every local-only entity gets an upload.
+      for (const type of ['team', 'player', 'match', 'competition'] as const) {
+        const remoteRows = type === 'team' ? cloud.teams : type === 'player' ? cloud.players : type === 'match' ? cloud.matches : cloud.competitionStates
+        const remoteById = new Map(remoteRows.map(row => [row.entity.id, row.entity]))
+        for (const entity of entities(merged, type)) {
+          const remote = remoteById.get(entity.id)
+          // Queue local winners as well as cloud-missing rows. This repairs
+          // legacy installations that predate the cloud watermark.
+          if ((!remote || JSON.stringify(remote) !== JSON.stringify(entity)) && !pendingKeys.has(key(type, entity.id))) await this.queueOperation({ entityType: type, entityId: entity.id, operation: 'upsert', payload: entity })
         }
       }
-    })()
-    return activeSync
+      for (const item of await allQueue()) {
+        const table = TABLE_FOR[item.entityType]
+        const result = item.operation === 'delete' ? await supabase.from(table).delete().eq('id', item.entityId).eq('user_id', user.id) : await supabase.from(table).upsert({ ...serializeCloudEntity(item.payload!), user_id: user.id })
+        if (result.error) throw result.error
+        const db = await openDB(); await new Promise<void>((resolve, reject) => { const tx = db.transaction(QUEUE_STORE, 'readwrite'); tx.objectStore(QUEUE_STORE).delete(item.id); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error) })
+      }
+      await putMetadata({ ...meta, lastSyncedUserId: user.id, lastSyncAt: Date.now(), retryAt: 0, lastError: undefined }); return { status: 'synced', message: 'Cloud backup is up to date.' }
+    } catch (error) { const delay = Math.min(300000, 5000 * 2 ** Math.min(6, pending.length)); const next = Date.now() + delay; const message = error instanceof Error ? error.message : String(error); console.error('[Football Tracker sync] Cloud operation failed; queue retained for retry.', error); await putMetadata({ ...meta, retryAt: next, lastError: message }); scheduleRetry(delay); return { status: 'pending', message: `Cloud sync pending: ${message}` } }
   },
 }

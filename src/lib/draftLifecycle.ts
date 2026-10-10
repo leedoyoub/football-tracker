@@ -16,14 +16,6 @@ export function editorLifecycleMode(input: { editingMatch?: Match; draft?: Match
   return input.draft && input.resumeRequested ? 'resume' : 'fresh'
 }
 
-/** The match boundary is independent of which editor step is visible. */
-export function kickoffConfirmedForEditor(mode: EditorLifecycleMode, source?: Match): boolean {
-  if (mode === 'fresh' || !source) return false
-  if (mode === 'edit') return true
-  if (source.kickoffConfirmed !== undefined) return source.kickoffConfirmed
-  return source.events.length > 0
-}
-
 /** A mounted fresh editor owns the checkpoint it creates during autosave. */
 export function isFreshCheckpointForSession(draft: Match | undefined, freshSessionDraftId: string | undefined): boolean {
   return Boolean(draft && freshSessionDraftId && draft.id === freshSessionDraftId)

@@ -8,7 +8,6 @@ export function NewTeamScreen({ onNavigate }: { onNavigate: (view: View) => void
   const [name, setName] = useState('')
   const [abbreviation, setAbbreviation] = useState('')
   const [primaryColor, setPrimaryColor] = useState<TeamColor>('blue')
-  const [saveError, setSaveError] = useState('')
 
   return (
     <div className="px-4 pb-8 pt-6">
@@ -39,12 +38,14 @@ export function NewTeamScreen({ onNavigate }: { onNavigate: (view: View) => void
         <button
           type="button"
           disabled={!name.trim() || abbreviation.length !== 3}
-          onClick={() => { void addTeam({ name: name.trim(), abbreviation, shortName: abbreviation, visualStyle: 'solid', primaryColor: primaryColor, jerseyNumberColor: 'white' }).then(id => onNavigate({ name: 'team', id })).catch(() => setSaveError('Could not save team.')) }}
+          onClick={() => {
+            const id = addTeam({ name: name.trim(), abbreviation, shortName: abbreviation, visualStyle: 'solid', primaryColor: primaryColor, jerseyNumberColor: 'white' })
+            onNavigate({ name: 'team', id })
+          }}
           className="w-full rounded-xl bg-emerald-500 py-2.5 text-sm font-bold text-black disabled:opacity-40"
         >
           Create team
         </button>
-        {saveError && <p role="alert" className="text-xs font-semibold text-red-400">{saveError}</p>}
       </div>
     </div>
   )

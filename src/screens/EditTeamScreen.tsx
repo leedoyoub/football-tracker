@@ -11,7 +11,6 @@ export function EditTeamScreen({ teamId, onNavigate }: { teamId: string; onNavig
   const [primary, setPrimary] = useState<TeamColor>(team?.primaryColor ?? 'green')
   const [secondary, setSecondary] = useState<TeamColor>(team?.secondaryColor ?? 'white')
   const [numberColor, setNumberColor] = useState<TeamColor>(team?.jerseyNumberColor ?? 'white')
-  const [saveError, setSaveError] = useState('')
 
   if (!team) return <div className="p-6">Team not found.</div>
 
@@ -39,12 +38,14 @@ export function EditTeamScreen({ teamId, onNavigate }: { teamId: string; onNavig
         <button
           type="button"
           disabled={abbreviation.length !== 3}
-          onClick={() => { void updateTeam(teamId, { name: name.trim(), abbreviation, shortName: abbreviation, visualStyle: style, primaryColor: primary, secondaryColor: style === 'striped' ? secondary : null, jerseyNumberColor: numberColor }).then(() => onNavigate({ name: 'team', id: teamId })).catch(() => setSaveError('Could not safely save team. Please retry.')) }}
+          onClick={() => {
+            updateTeam(teamId, { name: name.trim(), abbreviation, shortName: abbreviation, visualStyle: style, primaryColor: primary, secondaryColor: style === 'striped' ? secondary : null, jerseyNumberColor: numberColor });
+            onNavigate({ name: 'team', id: teamId })
+          }}
           className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-black text-black"
         >
           SAVE TEAM
         </button>
-        {saveError && <p role="alert" className="text-xs font-semibold text-red-400">{saveError}</p>}
       </div>
     </div>
   )

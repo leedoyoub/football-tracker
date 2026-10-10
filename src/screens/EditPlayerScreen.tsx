@@ -26,7 +26,6 @@ export function EditPlayerScreen({ playerId, onNavigate, onDone }: { playerId: s
   const [photoError, setPhotoError] = useState('')
   const [nameLoading, setNameLoading] = useState(false)
   const [nameMessage, setNameMessage] = useState('')
-  const [saveError, setSaveError] = useState('')
 
   if (!player) return <div className="p-6">Player not found.</div>
 
@@ -63,7 +62,7 @@ export function EditPlayerScreen({ playerId, onNavigate, onDone }: { playerId: s
   const usePhoto = () => { if (!photoSelected?.photo) return; setPendingPhotoUrl(photoSelected.photo); setPhotoChanged(true); closePhoto() }
   const removePhoto = () => { setPendingPhotoUrl(undefined); setPhotoChanged(true) }
   const refreshApiName = async () => { if (player.externalPlayerId === undefined) return; setNameLoading(true); setNameMessage(''); try { const candidate = await fetchApiFootballPlayer(player.externalPlayerId); const names = deriveApiPlayerNames(candidate); setFullName(names.fullName); setDisplayName(names.displayName); setNameMessage('API names loaded. Review them, then save to apply changes.') } catch (error) { setNameMessage(error instanceof Error ? error.message : 'Could not refresh API name.') } finally { setNameLoading(false) } }
-  
+
   return (
     <div className="px-4 pb-8 pt-6">
       <button type="button" onClick={finish} className="mb-3 text-xs text-emerald-400">Cancel</button>
@@ -96,38 +95,37 @@ export function EditPlayerScreen({ playerId, onNavigate, onDone }: { playerId: s
             const canAdd = count < TEAM_ROSTER_LIMIT || isAssigned
             return (
               <label key={team.id} className={`mb-2 flex items-center gap-2 text-sm ${canAdd ? '' : 'opacity-40'}`}>
-                <input 
-                    type="checkbox" 
-                    checked={isAssigned} 
+                <input
+                    type="checkbox"
+                    checked={isAssigned}
                     disabled={!canAdd}
-                    onChange={() => setTeamIds((ids) => ids.includes(team.id) ? ids.filter((id) => id !== team.id) : [...ids, team.id])} 
+                    onChange={() => setTeamIds((ids) => ids.includes(team.id) ? ids.filter((id) => id !== team.id) : [...ids, team.id])}
                 />
                 {team.name} {canAdd ? `(${count}/${TEAM_ROSTER_LIMIT})` : `— Full (${TEAM_ROSTER_LIMIT}/${TEAM_ROSTER_LIMIT})`}
               </label>
             )
           })}
         </div>
-        <button 
-            type="button" 
-            disabled={!displayName.trim()} 
-            onClick={() => { void (async () => { try {
-                await updatePlayer(playerId, {
-                    name: displayName.trim(), 
-                    fullName: fullName.trim() || displayName.trim(), 
-                    displayName: displayName.trim(), 
-                    number, 
-                    position, 
-                    teamIds, 
+        <button
+            type="button"
+            disabled={!displayName.trim()}
+            onClick={() => {
+                updatePlayer(playerId, {
+                    name: displayName.trim(),
+                    fullName: fullName.trim() || displayName.trim(),
+                    displayName: displayName.trim(),
+                    number,
+                    position,
+                    teamIds,
                     teamId: teamIds[0] ?? '',
                     ...(photoChanged ? { photoUrl: pendingPhotoUrl } : {})
                 });
                 finish()
-              } catch { setSaveError('Could not safely save player. Please retry.') } })() }}
+            }}
             className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-black text-black disabled:opacity-40"
         >
             SAVE PLAYER
         </button>
-        {saveError && <p role="alert" className="text-xs font-semibold text-red-400">{saveError}</p>}
       </div>
       {photoOpen && <div role="dialog" aria-modal="true" aria-label="Change Photo" className="fixed inset-0 z-50 flex items-end bg-black/80 p-4 sm:items-center"><div className="max-h-[85vh] w-full overflow-y-auto rounded-2xl bg-zinc-950 p-4"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">Change Photo</h2><button type="button" onClick={closePhoto} className="text-sm text-zinc-400">Cancel</button></div><p className="mb-3 text-xs text-zinc-400">Search API-Football, then explicitly choose a photo. Names and player data will not change.</p><div className="flex gap-2"><input aria-label="Search API player for photo" value={photoQuery} onChange={event => setPhotoQuery(event.target.value)} placeholder="API-Football Player ID" className="min-w-0 flex-1 rounded-xl bg-zinc-900 px-3 py-2 text-sm" /><button type="button" onClick={() => void searchPhotos()} disabled={photoLoading} className="rounded-xl bg-zinc-800 px-3 py-2 text-xs font-bold disabled:opacity-40">{photoLoading ? 'Searching…' : 'Search'}</button></div>{photoError && <p role="alert" className="mt-2 text-xs text-amber-300">{photoError}</p>}<div className="mt-3 space-y-1">{photoResults.map(candidate => <button key={candidate.id} type="button" onClick={() => setPhotoSelected(candidate)} className={`flex w-full items-center gap-3 rounded-xl p-2 text-left ${photoSelected?.id === candidate.id ? 'bg-emerald-500/15 ring-1 ring-emerald-400' : 'bg-zinc-900'}`}><PlayerAvatar photoUrl={candidate.photo} number={candidate.number ?? undefined} className="h-10 w-10 text-[10px]" /><span className="min-w-0"><b className="block truncate text-sm">{candidate.name}</b><span className="block truncate text-[10px] text-zinc-400">{candidate.position || 'Outfield'} · {candidate.age ? `${candidate.age} yrs` : 'Age unavailable'}{candidate.nationality ? ` · ${candidate.nationality}` : ''}{candidate.currentTeam ? ` · ${candidate.currentTeam}` : ''}</span></span></button>)}</div><div className="mt-4 flex justify-end"><button type="button" disabled={!photoSelected?.photo} onClick={usePhoto} className="rounded-xl bg-emerald-500 px-4 py-3 text-xs font-black text-black disabled:opacity-40">Use This Photo</button></div></div></div>}
     </div>

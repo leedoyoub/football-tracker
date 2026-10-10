@@ -1,7 +1,7 @@
 import { matchScore, ratePlayerMatch } from './rating'
 import { playerSeasonStats } from './stats'
 import { seasonAwards } from './awards'
-import { combinationStats, goalPartnerships, selectBestCombinationForAward, starterSubstituteSplits, type CombinationAwardKind } from './analytics'
+import { combinationStats, goalPartnerships, starterSubstituteSplits } from './analytics'
 import { GOOD_RATING_THRESHOLD, isGoodRating } from './constants'
 import { classifyGoalTypes } from './goalTypes'
 import type { CompetitionState, Match, MatchEvent, Player, Team } from '../types'
@@ -143,8 +143,8 @@ export function seasonRecap(players: Player[], matches: Match[], season: string,
   const awardFor = (id: string, title: string, row: typeof stats[number] | undefined, detail: (row: typeof stats[number]) => string): SeasonAward | undefined => row && { id, title, playerIds: [row.player.id], detail: detail(row) }
   const filter = { season }
   const partnership = goalPartnerships(players, matches, filter)[0]
-  const combination = (kind: CombinationAwardKind) => selectBestCombinationForAward(combinationStats(players, matches, filter, kind), kind)
-  const comboAward = (id: string, title: string, kind: CombinationAwardKind, detail: (row: ReturnType<typeof combinationStats>[number]) => string): SeasonAward | undefined => { const row = combination(kind); return row ? { id, title, playerIds: row.playerIds, detail: detail(row) } : undefined }
+  const combination = (kind: Parameters<typeof combinationStats>[3]) => combinationStats(players, matches, filter, kind).find(row => row.eligible)
+  const comboAward = (id: string, title: string, kind: Parameters<typeof combinationStats>[3], detail: (row: ReturnType<typeof combinationStats>[number]) => string): SeasonAward | undefined => { const row = combination(kind); return row ? { id, title, playerIds: row.playerIds, detail: detail(row) } : undefined }
   const bestSub = pick(stats.filter(row => starterSubstituteSplits(row.player, matches, filter).substitute.apps >= 3), row => starterSubstituteSplits(row.player, matches, filter).substitute.averageRating)
   const xi = startingXILeaders(players, matches, season).mostUsed
   const official = seasonAwards(season, teams, players, matches, states)
@@ -183,7 +183,7 @@ export function homeDataStories(players: Player[], matches: Match[], season: str
   }
   const partnership = goalPartnerships(players, seasonMatches, { season })[0]
   if (partnership) candidates.push({ id: `partnership:${partnership.key}`, eyebrow: '🤝 Best partnership', title: `${nameFor(partnership.assisterId)} → ${nameFor(partnership.scorerId)}`, detail: `${partnership.assistedGoals} assisted goals`, playerIds: [partnership.assisterId, partnership.scorerId], score: partnership.assistedGoals * 2 })
-  const cb = selectBestCombinationForAward(combinationStats(players, seasonMatches, { season }, 'cb'), 'cb')
+  const cb = combinationStats(players, seasonMatches, { season }, 'cb').find(row => row.eligible)
   if (cb) candidates.push({ id: `cb:${cb.key}`, eyebrow: '🧱 Best CB pair', title: cb.playerIds.map(nameFor).join(' + '), detail: `${(cb.goalsAgainst / cb.togetherMinutes * 90).toFixed(2)} GA/90`, playerIds: cb.playerIds, score: 4 - cb.goalsAgainst / cb.togetherMinutes * 90 })
   return candidates.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id)).slice(0, 4).map(({ score: _, ...story }) => story)
 }

@@ -1,7 +1,6 @@
 import type { MatchEvent, Position, PositionChange } from '../types'
 import { nextTimelineSequence } from '../engine/timeline'
 import { ratingPositionForSlot } from '../engine/tacticalSlots'
-import { isValidMatchdayLineup, MATCH_BENCH_LIMIT, STARTING_XI_LIMIT } from '../lib/matchdayLineup'
 
 export type Lineup = { slotAssignments: Record<string, string>; homeBench: string[] }
 export type LineupTarget = { group: 'starting' | 'substitute' | 'squad'; id: string }
@@ -54,21 +53,11 @@ export function lineupTarget(id: string): LineupTarget | undefined {
 
 // Both lineup setup and live substitutions use this same swap/assign operation.
 export function moveLineup(lineup: Lineup, source: LineupTarget, target: LineupTarget): Lineup {
-  if (!isValidMatchdayLineup(lineup)) return lineup
   if (source.group === target.group && source.id === target.id) return lineup
+  if (source.group !== 'starting' && target.group === 'starting') return moveLineup(lineup, target, source)
   const assignments = { ...lineup.slotAssignments }
   const bench = [...lineup.homeBench]
-  if (source.group !== 'starting' && target.group === 'starting') {
-    const incoming = source.id
-    if (!incoming || Object.values(assignments).includes(incoming)) return lineup
-    if (source.group === 'substitute') {
-      const index = bench.indexOf(incoming)
-      if (index < 0) return lineup
-      if (assignments[target.id]) bench[index] = assignments[target.id]
-      else bench.splice(index, 1)
-    } else if (bench.includes(incoming)) return lineup
-    assignments[target.id] = incoming
-  } else if (source.group === 'starting') {
+  if (source.group === 'starting') {
     const outgoing = assignments[source.id]
     if (target.group === 'starting') {
       if (!outgoing) return lineup
@@ -76,56 +65,27 @@ export function moveLineup(lineup: Lineup, source: LineupTarget, target: LineupT
       else delete assignments[source.id]
       assignments[target.id] = outgoing
     } else {
-      if (!outgoing) return lineup
       const incoming = target.id
+      if (incoming && Object.values(assignments).includes(incoming)) return lineup
+      if (target.group === 'substitute' && incoming && !bench.includes(incoming)) return lineup
+      if (!outgoing && !incoming) return lineup
+      if (incoming) assignments[source.id] = incoming
+      else delete assignments[source.id]
       if (target.group === 'substitute') {
-        if (!incoming) {
-          delete assignments[source.id]
-          if (bench.length < MATCH_BENCH_LIMIT) bench.push(outgoing)
-        } else {
-          const index = bench.indexOf(incoming)
-          if (index < 0) return lineup
-          assignments[source.id] = incoming
-          bench[index] = outgoing
-        }
-      } else if (!incoming) delete assignments[source.id]
-      else {
-        if (Object.values(assignments).includes(incoming) || bench.includes(incoming)) return lineup
-        assignments[source.id] = incoming
+        const index = bench.indexOf(incoming)
+        if (index >= 0) { if (outgoing) bench[index] = outgoing; else bench.splice(index, 1) }
+        else if (outgoing && !bench.includes(outgoing)) bench.push(outgoing)
       }
-    }
-  } else if (source.group === 'substitute') {
-    const index = bench.indexOf(source.id)
-    if (index < 0) return lineup
-    if (target.group === 'substitute') {
-      if (!target.id) bench.splice(index, 1)
-      else {
-        const targetIndex = bench.indexOf(target.id)
-        if (targetIndex < 0) return lineup
-        bench[index] = target.id
-        bench[targetIndex] = source.id
-      }
-    } else if (!target.id) bench.splice(index, 1)
-    else {
-      if (bench.includes(target.id) || Object.values(assignments).includes(target.id)) return lineup
-      bench[index] = target.id
     }
   } else {
-    if (!source.id || bench.includes(source.id) || Object.values(assignments).includes(source.id)) return lineup
-    if (target.group === 'substitute') {
-      if (!target.id) {
-        if (bench.length >= MATCH_BENCH_LIMIT) return lineup
-        bench.push(source.id)
-      } else {
-        const index = bench.indexOf(target.id)
-        if (index < 0) return lineup
-        bench[index] = source.id
-      }
-    } else return lineup
+    if (source.group === target.group) return lineup
+    const fromBench = source.group === 'substitute' ? source.id : target.id
+    const fromSquad = source.group === 'squad' ? source.id : target.id
+    const index = bench.indexOf(fromBench)
+    if (index < 0 || !fromSquad || bench.includes(fromSquad) || Object.values(assignments).includes(fromSquad)) return lineup
+    bench[index] = fromSquad
   }
-  const next = { slotAssignments: assignments, homeBench: bench }
-  const starterCount = Object.values(assignments).filter(Boolean).length
-  return starterCount <= STARTING_XI_LIMIT && isValidMatchdayLineup(next) ? next : lineup
+  return { slotAssignments: assignments, homeBench: bench }
 }
 
 export function moveSubstitution(

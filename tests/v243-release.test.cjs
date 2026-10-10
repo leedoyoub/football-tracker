@@ -18,13 +18,13 @@ const match = (id, date, competitionType, events, season = 'Season 1') => ({
   appearances: [...new Set(events.flatMap(event => [event.playerId, event.assistPlayerId]).filter(Boolean))].map(playerId => ({ playerId, teamId: 'A', role: 'starter', position: 'ST', matchPosition: 'ST' })),
 })
 
-test('v2.5.4 release metadata uses rating revision 13', () => {
+test('v2.5.3 release metadata uses rating revision 13', () => {
   const packageJson = require('../package.json')
   const lockfile = require('../package-lock.json')
-  assert.equal(packageJson.version, '2.5.4')
-  assert.equal(lockfile.version, '2.5.4')
-  assert.equal(lockfile.packages[''].version, '2.5.4')
-  assert.equal(APP_VERSION, '2.5.4')
+  assert.equal(packageJson.version, '2.5.3')
+  assert.equal(lockfile.version, '2.5.3')
+  assert.equal(lockfile.packages[''].version, '2.5.3')
+  assert.equal(APP_VERSION, '2.5.3')
   assert.equal(RATING_ENGINE_REVISION, 13)
 })
 

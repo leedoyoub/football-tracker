@@ -6,7 +6,9 @@ type AtomicImportDependencies = {
   prior: () => AppState
   cancelDraft: () => void
   invalidateDraft: () => void
-  replaceDurably: (next: AppState, fence: () => void) => Promise<unknown>
+  nextPersistenceEpoch: () => number
+  currentPersistenceEpoch: () => number
+  enqueue: (next: AppState, valid: () => boolean) => Promise<unknown>
   invalidateDerived: () => void
   replaceLive: (next: AppState) => void
   sync?: (prior: AppState, next: AppState) => void
@@ -21,7 +23,9 @@ export async function performAtomicImport(json: string, dependencies: AtomicImpo
   const prior = dependencies.prior()
   dependencies.preserveBackup()
   dependencies.cancelDraft()
-  await dependencies.replaceDurably(next, dependencies.invalidateDraft)
+  dependencies.invalidateDraft()
+  const epoch = dependencies.nextPersistenceEpoch()
+  await dependencies.enqueue(next, () => epoch === dependencies.currentPersistenceEpoch())
   dependencies.invalidateDerived()
   dependencies.replaceLive(next)
   dependencies.sync?.(prior, next)

@@ -57,12 +57,12 @@ export function SquadImportScreen({ teamId, onBack }: { teamId: string; onBack: 
     })
   }
 
-  const submit = async () => {
+  const submit = () => {
     if (!selected.size) return
     setImporting(true); setError(''); setComplete('')
     try {
       const chosen = squad.filter((entry) => selected.has(entry.id))
-      await importPlayers(chosen.map((entry) => ({ teamId, externalPlayerId: entry.id, name: entry.name.trim() || `Player ${entry.id}`, number: validImportedNumber(entry.number), position: importedPosition(entry.position), photoUrl: entry.photo || undefined })))
+      importPlayers(chosen.map((entry) => ({ teamId, externalPlayerId: entry.id, name: entry.name.trim() || `Player ${entry.id}`, number: validImportedNumber(entry.number), position: importedPosition(entry.position), photoUrl: entry.photo || undefined })))
       setComplete(`${chosen.length} player${chosen.length === 1 ? '' : 's'} imported. Your roster is saved locally and will sync when cloud backup is available.`)
       setSelected(new Set())
     } catch (cause) {
