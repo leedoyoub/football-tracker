@@ -99,6 +99,24 @@ function averageTeamRating(teamId: string, games: Match[], players: Player[]): n
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
 }
 
+function averageTeamRatings(games: Match[], players: Player[]): Map<string, number> {
+  const totals = new Map<string, { sum: number; count: number }>()
+  for (const match of games) {
+    const teamsByPlayer = new Map<string, Set<string>>()
+    for (const appearance of match.appearances) {
+      const teams = teamsByPlayer.get(appearance.playerId) ?? new Set<string>()
+      teams.add(appearance.teamId); teamsByPlayer.set(appearance.playerId, teams)
+    }
+    // For each team, additions follow exactly the prior flatMap/reduce order:
+    // saved game order, then roster order. Do not group/sort matches by day.
+    for (const rating of rateMatch(match, players)) for (const teamId of teamsByPlayer.get(rating.playerId) ?? []) {
+      const total = totals.get(teamId) ?? { sum: 0, count: 0 }
+      total.sum += rating.raw; total.count++; totals.set(teamId, total)
+    }
+  }
+  return new Map([...totals].map(([teamId, total]) => [teamId, total.sum / total.count]))
+}
+
 function allowedShots(teamId: string, games: Match[]): number {
   return games.reduce((total, match) => {
     if (!hasPlayed(match, teamId)) return total
@@ -116,7 +134,8 @@ function stableDrawValue(seed: string, id: string): number {
 
 function stageRanking(teamIds: string[], games: Match[], season: string, players: Player[], drawSeed: string): StageMetric[] {
   const basic = seasonStandings(teamIds.map(id => ({ id } as Team)), games, season)
-  const metrics = new Map<string, StandingTieMetrics>(basic.map(row => [row.teamId, { averageRating: averageTeamRating(row.teamId, games, players), opponentShotsOnTarget: allowedShots(row.teamId, games) }]))
+  const averages = averageTeamRatings(games, players)
+  const metrics = new Map<string, StandingTieMetrics>(basic.map(row => [row.teamId, { averageRating: averages.get(row.teamId) ?? 0, opponentShotsOnTarget: allowedShots(row.teamId, games) }]))
   return basic.map(row => ({ ...row, ...(metrics.get(row.teamId) ?? { averageRating: 0, opponentShotsOnTarget: 0 }) }))
     .sort((a, b) => compareStandings(a, b, metrics) || stableDrawValue(drawSeed, a.teamId) - stableDrawValue(drawSeed, b.teamId))
     .map((row, index) => ({ ...row, rank: index + 1 }))

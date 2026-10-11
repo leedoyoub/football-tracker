@@ -4,6 +4,23 @@ import { creditedPositionSegments, hasPitchAppearance, isOnPitchAtEvent, matchPo
 type GoalEvent = Extract<MatchEvent, { type: 'goal' }>
 type SaveEvent = Extract<MatchEvent, { type: 'save' }>
 
+const appearanceMatchIndex = new WeakMap<Match[], { matches: Match[]; appearances: Appearance[][]; byPlayer: Map<string, Match[]> }>()
+
+/** Historical membership is indexed from recorded appearances, including
+ * unused substitutes and IDs no longer present in the current roster. */
+export function matchesWithPlayerAppearance(playerId: string, matches: Match[]): Match[] {
+  let index = appearanceMatchIndex.get(matches)
+  if (!index || index.matches.length !== matches.length || matches.some((match, position) => match !== index!.matches[position] || match.appearances !== index!.appearances[position])) {
+    const byPlayer = new Map<string, Match[]>()
+    for (const match of matches) for (const id of new Set(match.appearances.map(appearance => appearance.playerId))) {
+      const rows = byPlayer.get(id) ?? []
+      rows.push(match); byPlayer.set(id, rows)
+    }
+    index = { matches: matches.slice(), appearances: matches.map(match => match.appearances), byPlayer }; appearanceMatchIndex.set(matches, index)
+  }
+  return index.byPlayer.get(playerId)?.slice() ?? []
+}
+
 /** These are read-time player facts; raw events and lineup records are never changed. */
 export function isPlayerGoalEvent(match: Match, appearance: Appearance, event: MatchEvent): event is GoalEvent {
   return event.type === 'goal' && !event.ownGoal && event.teamId === appearance.teamId && event.playerId === appearance.playerId && isOnPitchAtEvent(match, appearance, event)

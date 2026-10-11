@@ -18,7 +18,7 @@ import { positionFamily, scopedAwardFamilyByPlayer, scopedPositionFamilyByPlayer
 import { matchCompetitionType } from './competitionContext'
 import { isGoodRating } from './constants'
 import { isRecordedForTeam, teamsCreditedWithResult, teamPerspectiveScore } from './matchPerspective'
-import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts, playerSaveCount } from './playerMatchFacts'
+import { matchesWithPlayerAppearance, playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts, playerSaveCount } from './playerMatchFacts'
 import { addDefensiveRankingFacts, appendRecordedTeamOpportunities, defensiveMatchFacts, defensiveRankingValue, emptyDefensiveRankingFacts, emptyTeamOpportunityIndex, teamAppearanceHistory, teamOpportunityMinutesFromIndex, type DefensiveRankingFacts } from './defensiveRanking'
 import { isAwardEligible, rankAwardCandidates, selectAwardBestXI, type AwardCandidate } from './awardRules'
 
@@ -36,6 +36,7 @@ export function aggregatePlayerStats(
   allPlayers: Player[],
   matches: Match[],
 ): PlayerSeasonStats {
+  matches = matchesWithPlayerAppearance(player.id, matches)
   const ratings: RatingBreakdown[] = []
   let wins = 0
   let draws = 0
@@ -114,7 +115,7 @@ export function playerSeasonStats(
   teamId?: string,
   competitionType?: CompetitionType,
 ): PlayerSeasonStats {
-  const seasonMatches = matches.filter((m) =>
+  const seasonMatches = matchesWithPlayerAppearance(player.id, matches).filter((m) =>
     m.season === season && (!competitionType || matchCompetitionType(m) === competitionType) && (!teamId || m.appearances.some((appearance) =>
       appearance.playerId === player.id && appearance.teamId === teamId,
     )),

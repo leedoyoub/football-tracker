@@ -2,6 +2,7 @@ import { creditedPositionSegments, hasPitchAppearance, isOnPitchAtEvent, matchPo
 import { opponentSot, opponentSotExposure } from './opponentSot'
 import { isPlayerAssistEvent, isPlayerGoalEvent, playerAssistEvents, playerGoalEvents } from './playerMatchFacts'
 import type { Match, Player, Position } from '../types'
+import { RATING_ENGINE_REVISION } from './ratingRevision'
 
 export type AnalyticsFilter = { season?: string; teamId?: string }
 export type CombinationKind = 'duo' | 'attack' | 'midfield' | 'cb' | 'fullback' | 'backFour'
@@ -98,7 +99,7 @@ function buildCombination(match: Match, playerIds: string[], teamId: string, rol
   return { togetherMinutes, matches: 1, startsTogether, goalsFor, goalsAgainst, weightedOpponentSot, onPitchGoalsFor: goalsFor, onPitchGoalsAgainst: goalsAgainst, onPitchGoalDifference, onPitchGoalsForPer90: goalsFor / togetherMinutes * 90, onPitchGoalsAgainstPer90: goalsAgainst / togetherMinutes * 90, onPitchGoalDifferencePer90: onPitchGoalDifference / togetherMinutes * 90, startingGoalsFor: startsTogether ? ours : 0, startingGoalsAgainst: startsTogether ? theirs : 0, startingCombinedGA, startingGoalInvolvements, startingOpponentSot: startsTogether ? opponentSot(match, teamId) : 0, startingWins: startsTogether && ours > theirs ? 1 : 0, startingDraws: startsTogether && ours === theirs ? 1 : 0, startingLosses: startsTogether && ours < theirs ? 1 : 0, startingCleanSheets: startsTogether && theirs === 0 ? 1 : 0, goalDifference: onPitchGoalDifference, combinedGoals, combinedAssists, combinedGA: combinedGoals + combinedAssists, averageRating: ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 0, wins: ours > theirs ? 1 : 0, draws: ours === theirs ? 1 : 0, losses: ours < theirs ? 1 : 0, cleanSheets: goalsAgainst === 0 ? 1 : 0 }
 }
 
-export function combinationStats(players: Player[], matches: Match[], filter: AnalyticsFilter, kind: CombinationKind): CombinationStats[] {
+function buildCombinationStats(players: Player[], matches: Match[], filter: AnalyticsFilter, kind: CombinationKind): CombinationStats[] {
   const playersById = new Map(players.map(player => [player.id, player]))
   const totals = new Map<string, CombinationStats>()
   for (const match of matches.filter(match => isScoped(match, filter))) for (const teamId of teamIds(match)) {
@@ -119,6 +120,31 @@ export function combinationStats(players: Player[], matches: Match[], filter: An
     else { const count = kind === 'duo' || kind === 'cb' ? 2 : 3; const role = roleFor(kind); for (const ids of combinations(available(role), count)) add(ids, Object.fromEntries(ids.map(id => [id, role]))) }
   }
   return [...totals.values()].map(row => ({ ...row, onPitchGoalsForPer90: row.togetherMinutes ? row.onPitchGoalsFor / row.togetherMinutes * 90 : 0, onPitchGoalsAgainstPer90: row.togetherMinutes ? row.onPitchGoalsAgainst / row.togetherMinutes * 90 : 0, onPitchGoalDifferencePer90: row.togetherMinutes ? row.onPitchGoalDifference / row.togetherMinutes * 90 : 0, eligible: eligible(row.matches, row.togetherMinutes) })).sort((a, b) => Number(b.eligible) - Number(a.eligible) || b.togetherMinutes - a.togetherMinutes || b.goalDifference - a.goalDifference)
+}
+
+type CombinationCacheEntry = { matches: Match[]; inputs: { events: Match['events']; appearances: Match['appearances']; duration: number }[]; byPlayers: WeakMap<Player[], Map<string, CombinationStats[]>> }
+const combinationCache = new WeakMap<Match[], CombinationCacheEntry>()
+
+export function combinationStats(players: Player[], matches: Match[], filter: AnalyticsFilter, kind: CombinationKind): CombinationStats[] {
+  let entry = combinationCache.get(matches)
+  if (!entry || entry.matches.length !== matches.length || entry.matches.some((match, index) => match !== matches[index] || match.events !== entry!.inputs[index].events || match.appearances !== entry!.inputs[index].appearances || match.duration !== entry!.inputs[index].duration)) {
+    // Capture the timeline's input identities without calculating unselected seasons.
+    entry = { matches: matches.slice(), inputs: matches.map(({ events, appearances, duration }) => ({ events, appearances, duration })), byPlayers: new WeakMap() }
+    combinationCache.set(matches, entry)
+  }
+  const byPlayers = entry.byPlayers
+  let byScope = byPlayers.get(players)
+  if (!byScope) { byScope = new Map(); byPlayers.set(players, byScope) }
+  const key = JSON.stringify([RATING_ENGINE_REVISION, filter.season ?? null, filter.teamId ?? null, kind])
+  let rows = byScope.get(key)
+  if (!rows) {
+    rows = buildCombinationStats(players, matches, filter, kind)
+    // Each snapshot owns a small set of recent queries; obsolete snapshots
+    // and their Match references are collectable through the outer weak keys.
+    if (byScope.size >= 16) byScope.delete(byScope.keys().next().value!)
+    byScope.set(key, rows)
+  }
+  return rows.map(row => ({ ...row, playerIds: row.playerIds.slice() }))
 }
 
 export type CombinationOnPitchMetric = 'onPitchGF90' | 'onPitchGA90' | 'onPitchGD90'

@@ -6,7 +6,7 @@ import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import { creditedPositionSegments, isOnPitchAtEvent, scoringTeamId } from './timeline'
 import { newestMatches, oldestMatches } from './matchChronology'
 import { matchCompetitionType } from './competitionContext'
-import { isPlayerAssistEvent, isPlayerGoalEvent, playerGoalkeeperFacts } from './playerMatchFacts'
+import { matchesWithPlayerAppearance, isPlayerAssistEvent, isPlayerGoalEvent, playerGoalkeeperFacts } from './playerMatchFacts'
 
 export type PlayerScope = { season?: string; competition?: CompetitionType | 'all'; teamIds?: string[] }
 export type DerivedAppearance = { match: Match; appearance: Appearance; rating: RatingBreakdown }
@@ -26,7 +26,7 @@ const scoped = (matches: Match[], scope: PlayerScope) => matches.filter(match =>
 
 /** Historical match lists belong to recorded appearances, never a player's current team. */
 export function playerAppearanceMatches(player: Player, matches: Match[]): Match[] {
-  return newestMatches(matches.filter(match => match.appearances.some(appearance => appearance.playerId === player.id && ratePlayerMatch(match, player))))
+  return newestMatches(matchesWithPlayerAppearance(player.id, matches).filter(match => ratePlayerMatch(match, player)))
 }
 const goalForPlayer = (match: Match, appearance: Appearance, _playerId: string, event: Match['events'][number]) => isPlayerGoalEvent(match, appearance, event)
 const assistForPlayer = (match: Match, appearance: Appearance, _playerId: string, event: Match['events'][number]) => isPlayerAssistEvent(match, appearance, event)

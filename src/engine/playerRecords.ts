@@ -7,7 +7,7 @@ import { getMatchManOfTheMatch, ratePlayerMatch } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { playerStreaks } from './seasonInsights'
 import { goalTypeTotals } from './goalTypes'
-import { playerGoalkeeperFacts, playerGoalEvents, playerAssistEvents } from './playerMatchFacts'
+import { matchesWithPlayerAppearance, playerGoalkeeperFacts, playerGoalEvents, playerAssistEvents } from './playerMatchFacts'
 import { buildGlobalRankingData, rankGlobalRankingRows } from './stats'
 import type { DefensiveRankingMetric } from './defensiveRanking'
 
@@ -58,7 +58,7 @@ function buildFacts(players: Player[], matches: Match[], scope: PlayerRecordScop
   const momByMatch = new Map(selected.map(match => [match.id, getMatchManOfTheMatch(match, players)]))
   return players.flatMap(player => {
     if (allowedFamilies.size && !allowedFamilies.has(historicalFamilies?.get(player.id)!)) return []
-    const games = newestMatches(selected.filter(match => match.appearances.some(appearance => appearance.playerId === player.id && (!scope.teamIds?.length || scope.teamIds.includes(appearance.teamId)))))
+    const games = newestMatches(matchesWithPlayerAppearance(player.id, selected).filter(match => !scope.teamIds?.length || match.appearances.some(appearance => appearance.playerId === player.id && scope.teamIds!.includes(appearance.teamId))))
     const rated = games.flatMap(match => {
       const appearance = match.appearances.find(item => item.playerId === player.id && (!scope.teamIds?.length || scope.teamIds.includes(item.teamId)))
       if (!appearance) return []
@@ -67,13 +67,14 @@ function buildFacts(players: Player[], matches: Match[], scope: PlayerRecordScop
       const goals = playerGoalEvents(match, appearance).length
       const assists = playerAssistEvents(match, appearance).length
       const goalkeeper = playerGoalkeeperFacts(match, appearance)
-      return [{ match, teamId: appearance.teamId, rating, goals, assists, saves: goalkeeper.saves, cleanSheet: goalkeeper.cleanSheet }]
+      return [{ match, teamId: appearance.teamId, rating, goals, assists, saves: goalkeeper.saves, cleanSheet: goalkeeper.cleanSheet, goalTypes: goalTypeTotals(match, player.id, appearance.teamId) }]
     })
     if (!rated.length) return []
     const count = (predicate: (row: typeof rated[number]) => boolean) => rated.filter(predicate).length
     const sum = (metric: (row: typeof rated[number]) => number) => rated.reduce((total, row) => total + metric(row), 0)
-    const streak = (key: 'goodRating' | 'goals' | 'goalContributions') => playerStreaks(player, games).find(row => row.key === key)?.best ?? 0
-    const goalTypes = (key: Parameters<typeof goalTypeTotals>[0] extends never ? never : keyof ReturnType<typeof goalTypeTotals>) => rated.reduce((total, row) => total + goalTypeTotals(row.match, player.id, row.teamId)[key], 0)
+    const streaks = playerStreaks(player, games)
+    const streak = (key: 'goodRating' | 'goals' | 'goalContributions') => streaks.find(row => row.key === key)?.best ?? 0
+    const goalTypes = (key: keyof ReturnType<typeof goalTypeTotals>) => rated.reduce((total, row) => total + row.goalTypes[key], 0)
     return [{
       playerId: player.id, appearances: rated.length,
       goals: sum(row => row.goals), assists: sum(row => row.assists), matchesScoredIn: count(row => row.goals >= 1), matchesGA: count(row => row.goals + row.assists >= 1), braces: count(row => row.goals >= 2), hatTricks: count(row => row.goals >= 3),

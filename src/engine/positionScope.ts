@@ -1,6 +1,7 @@
 import type { Match, Player, Position, PositionFilterKey } from '../types'
 import { creditedPositionSegments, normalizePositionFamily } from './timeline'
 import { awardPositionFamily, type AwardPositionFamily } from './awardRules'
+import { RATING_ENGINE_REVISION } from './ratingRevision'
 
 export type PositionFamily = 'ST' | 'SS' | 'LW' | 'RW' | 'CAM' | 'LM' | 'RM' | 'CM' | 'CDM' | 'LB' | 'CB' | 'RB' | 'GK'
 export type { PositionFilterKey } from '../types'
@@ -8,6 +9,8 @@ export type PositionScope = { seasons?: string[]; teams?: string[] }
 
 const FAMILY_ORDER: PositionFamily[] = ['GK', 'CB', 'LB', 'RB', 'CDM', 'CM', 'LM', 'RM', 'CAM', 'LW', 'RW', 'SS', 'ST']
 const AWARD_ORDER: AwardPositionFamily[] = ['GK', 'LB', 'CB', 'RB', 'MID', 'ATT']
+type MinuteCacheEntry = { matches: Match[]; inputs: { events: Match['events']; appearances: Match['appearances']; duration: number }[]; players: Player[]; byPlayers: WeakMap<Player[], Map<string, Map<string, Map<Position, number>>>> }
+const minuteCache = new WeakMap<Match[], MinuteCacheEntry>()
 
 export function positionFamily(position?: string): PositionFamily | undefined {
   const value = normalizePositionFamily(position)
@@ -39,6 +42,19 @@ export function dominantPositionFamily(minutes: Map<PositionFamily, number>): Po
 }
 
 function positionMinutesByPlayer(players: Player[], matches: Match[], scope: PositionScope) {
+  let entry = minuteCache.get(matches)
+  // Legacy callers can replace/delete items in the same collection. Preserve
+  // that behavior while avoiding a second traversal of appearance timelines.
+  if (!entry || entry.matches.length !== matches.length || entry.matches.some((match, index) => match !== matches[index] || match.events !== entry!.inputs[index].events || match.appearances !== entry!.inputs[index].appearances || match.duration !== entry!.inputs[index].duration) || entry.players.length !== players.length || entry.players.some((player, index) => player !== players[index])) {
+    entry = { matches: matches.slice(), inputs: matches.map(({ events, appearances, duration }) => ({ events, appearances, duration })), players: players.slice(), byPlayers: new WeakMap() }
+    minuteCache.set(matches, entry)
+  }
+  const byPlayers = entry.byPlayers
+  let byScope = byPlayers.get(players)
+  if (!byScope) { byScope = new Map(); byPlayers.set(players, byScope) }
+  const key = JSON.stringify([RATING_ENGINE_REVISION, (scope.seasons ?? []).slice().sort(), (scope.teams ?? []).slice().sort()])
+  const cached = byScope.get(key)
+  if (cached) return cached
   const known = new Set(players.map(player => player.id))
   const rows = new Map<string, Map<Position, number>>()
   for (const match of matches) {
@@ -50,6 +66,8 @@ function positionMinutesByPlayer(players: Player[], matches: Match[], scope: Pos
       rows.set(appearance.playerId, minutes)
     }
   }
+  if (byScope.size >= 64) byScope.delete(byScope.keys().next().value!)
+  byScope.set(key, rows)
   return rows
 }
 

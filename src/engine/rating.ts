@@ -244,7 +244,38 @@ function calculatePlayerMatch(match: Match, player: Player): RatingBreakdown | n
   return breakdown
 }
 
-export function rateMatch(match: Match, players: Player[]): RatingBreakdown[] { return players.map(player => ratePlayerMatch(match, player)).filter((row): row is RatingBreakdown => row !== null) }
+type MatchRatings = { revision: number; rows: RatingBreakdown[]; mom?: { matchId: string; playerId: string | undefined } }
+const matchRatingsCache = new WeakMap<ReturnType<typeof normalizeMatchTimeline>, WeakMap<Player[], MatchRatings>>()
+const rosterIndex = new WeakMap<Player[], Map<string, { player: Player; order: number }[]>>()
+
+function matchRatings(match: Match, players: Player[]): MatchRatings {
+  const timeline = normalizeMatchTimeline(match)
+  let byPlayers = matchRatingsCache.get(timeline)
+  if (!byPlayers) { byPlayers = new WeakMap(); matchRatingsCache.set(timeline, byPlayers) }
+  const cached = byPlayers.get(players)
+  if (cached?.revision === RATING_ENGINE_REVISION) return cached
+  let roster = rosterIndex.get(players)
+  if (!roster) {
+    roster = new Map()
+    players.forEach((player, order) => {
+      const entries = roster!.get(player.id) ?? []
+      entries.push({ player, order }); roster!.set(player.id, entries)
+    })
+    rosterIndex.set(players, roster)
+  }
+  // Preserve the original roster order (including duplicate IDs in legacy
+  // callers), while never rating players absent from this Match.
+  const participants = [...new Set(match.appearances.map(appearance => appearance.playerId))]
+    .flatMap(id => roster.get(id) ?? []).sort((left, right) => left.order - right.order)
+  const rows = participants.map(({ player }) => ratePlayerMatch(match, player)).filter((row): row is RatingBreakdown => row !== null)
+  const entry = { revision: RATING_ENGINE_REVISION, rows }
+  byPlayers.set(players, entry)
+  return entry
+}
+
+export function rateMatch(match: Match, players: Player[]): RatingBreakdown[] {
+  return matchRatings(match, players).rows.slice()
+}
 const MOM_POSITION_PRIORITY: Record<Position, number> = {
   GK: 0, CB: 1, LCB: 1, RCB: 1, LB: 2, LWB: 2, RB: 2, RWB: 2,
   CDM: 3, LDM: 3, RDM: 3, CM: 4, LCM: 4, RCM: 4, LM: 5, RM: 5,
@@ -269,7 +300,9 @@ function seededTieIndex(matchId: string, playerIds: string[]): number {
 }
 /** Uses the same effective match position exposed by the authoritative rating breakdown. */
 export function getMatchManOfTheMatch(match: Match, players: Player[]): string | undefined {
-  const candidates = rateMatch(match, players).map(rating => ({
+  const entry = matchRatings(match, players)
+  if (entry.mom?.matchId === match.id) return entry.mom.playerId
+  const candidates = entry.rows.map(rating => ({
     rating,
     priority: momPositionPriority(rating.position)!,
     goals: momEventCount(match, rating.playerId, 'playerId'),
@@ -287,7 +320,7 @@ export function getMatchManOfTheMatch(match: Match, players: Player[]): string |
     return rightRating.minutes - leftRating.minutes
   })
   const best = ordered[0]
-  if (!best) return undefined
+  if (!best) { entry.mom = { matchId: match.id, playerId: undefined }; return undefined }
   const tied = ordered.filter(candidate =>
     candidate.rating.raw === best.rating.raw &&
     candidate.priority === best.priority &&
@@ -296,5 +329,7 @@ export function getMatchManOfTheMatch(match: Match, players: Player[]): string |
     candidate.rating.minutes === best.rating.minutes,
   )
   const tiedIds = tied.map(candidate => candidate.rating.playerId).sort()
-  return tiedIds[seededTieIndex(match.id, tiedIds)]
+  const playerId = tiedIds[seededTieIndex(match.id, tiedIds)]
+  entry.mom = { matchId: match.id, playerId }
+  return playerId
 }
