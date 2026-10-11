@@ -42,8 +42,15 @@ test('v2.5.4 whole-object equivalence: all 30 History days, monthly awards, rank
     equal('engine/competition.ts', 'cupCompetition', s.teams, s.matches, season, s.players)
     equal('engine/competition.ts', 'championsCompetition', s.competitionStates.find(d => d.season === season), s.matches, season, s.players)
     equal('engine/awards.ts', 'seasonAwards', season, s.teams, s.players, s.matches, s.competitionStates)
-    for (const metric of ['rating', 'goals', 'assists', 'g+a', 'minutes', 'mom', 'saves', 'cleanSheets', 'sotAllowed', 'defenderGaPer90', 'goalkeeperGaPer90']) {
-      equal('engine/stats.ts', 'buildGlobalRankingData', s.players, s.matches, { seasons: [season], teams: [], positions: [] }, metric)
+    const metrics = current('lib/rankingMetrics.ts').RANKING_METRICS
+    assert.deepStrictEqual(metrics, before('lib/rankingMetrics.ts').RANKING_METRICS)
+    const oldStats = before('engine/stats.ts'); const newStats = current('engine/stats.ts')
+    for (const metric of [...metrics.map(row => row.value), 'goalsConceded']) {
+      const filters = { seasons: [season], teams: [], positions: [] }
+      const oldRows = oldStats.buildGlobalRankingData(s.players, s.matches, filters, metric)
+      const newRows = newStats.buildGlobalRankingData(s.players, s.matches, filters, metric)
+      assert.deepStrictEqual(newRows, oldRows, `ranking facts: ${metric}`)
+      assert.deepStrictEqual(newStats.rankGlobalRankingRows(newRows, s.players, metric), oldStats.rankGlobalRankingRows(oldRows, s.players, metric), `ranking order: ${metric}`)
     }
     for (const type of ['league', 'cup', 'champions']) equal('engine/awards.ts', 'competitionAwardResult', type, season, s.teams, s.players, s.matches, s.competitionStates)
   }
