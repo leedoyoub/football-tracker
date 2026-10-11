@@ -65,5 +65,7 @@
 - [x] Run final benchmark with the same fixture/sample count; compare median, p95 and retained baseline.
 - [x] Review full diff and obtain a fresh whole-branch review; fix meaningful findings with regression tests.
 - [x] Run `npm test`, `npm run lint`, `npm run build`, `git diff --check`; compare prior lint warnings.
-- [ ] Update version to 2.5.5, commit the reviewed release and push `origin/main`.
-- [ ] Verify the commit's Actions build/deploy and published Pages version; report exact statuses.
+- [x] Update version to 2.5.5, commit the reviewed release and push `origin/main`.
+- [x] Verify the commit's Actions build/deploy and published Pages version; report exact statuses.
+
+Release evidence: `aad4f7be156c166427f03f7a209e3094090668a7`, Actions run 38168225910 build/deploy success; published Pages HTML/module HTTP 200 and version 2.5.5. 848/848 tests, existing 45 lint warnings/new 0, build and diff checks pass. See `docs/performance/v2.5.5-report.md` for measurements and limits.
