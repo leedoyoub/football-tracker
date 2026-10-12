@@ -27,7 +27,7 @@ export function useMetricSwipe<T extends string>(values: readonly T[], value: T,
   }
 }
 
-export function RankingMetricTabs<T extends string>({ label, value, onChange, options, size = 'metric', pinnedOption }: { label: string; value: T; onChange: (value: T) => void; options: readonly { value: T; label: string }[]; size?: 'metric' | 'navigation'; pinnedOption?: { value: T; label: string } }) {
+export function RankingMetricTabs<T extends string>({ label, value, onChange, options, size = 'metric', pinnedOption }: { label: string; value: T; onChange: (value: T) => void; options: readonly { value: T; label: string }[]; size?: 'metric' | 'navigation' | 'award'; pinnedOption?: { value: T; label: string } }) {
   const container = useRef<HTMLDivElement | null>(null)
   const selected = useRef<HTMLButtonElement | null>(null)
   useEffect(() => {
@@ -35,7 +35,10 @@ export function RankingMetricTabs<T extends string>({ label, value, onChange, op
     const item = selected.current
     if (viewport && item) ensureHorizontalTabVisible(viewport, item)
   }, [value])
-  const button = (option: { value: T; label: string }, scrolls: boolean) => <button key={option.value} ref={scrolls && option.value === value ? selected : undefined} type="button" aria-pressed={option.value === value} onClick={() => onChange(option.value)} className={`shrink-0 rounded-full ${size === 'navigation' ? 'min-h-9 px-4 py-2 text-xs' : 'px-3 py-1.5 text-[10px]'} font-bold ${option.value === value ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-zinc-400'} focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-300`}>{option.label}</button>
+  const sizing = size === 'award' ? 'px-2.5 py-1 text-[10px] font-black' : size === 'navigation' ? 'min-h-9 px-4 py-2 text-xs font-bold' : 'px-3 py-1.5 text-[10px] font-bold'
+  const selectedTone = size === 'award' ? 'bg-emerald-400 text-black' : 'bg-emerald-500 text-black'
+  const idleTone = size === 'award' ? 'bg-zinc-800 text-zinc-300' : 'bg-zinc-900 text-zinc-400'
+  const button = (option: { value: T; label: string }, scrolls: boolean) => <button key={option.value} ref={scrolls && option.value === value ? selected : undefined} type="button" aria-pressed={option.value === value} onClick={() => onChange(option.value)} className={`shrink-0 rounded-full ${sizing} ${option.value === value ? selectedTone : idleTone} focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-300`}>{option.label}</button>
   const tabs = <div ref={container} role={pinnedOption ? undefined : 'group'} className={`no-scrollbar relative flex min-w-0 max-w-full gap-1 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x ${pinnedOption ? 'flex-1' : ''}`} aria-label={pinnedOption ? `${label} scrollable options` : label}>{options.map(option => button(option, true))}</div>
   return pinnedOption ? <div role="group" aria-label={label} className="flex min-w-0 max-w-full items-start gap-2">{tabs}{button(pinnedOption, false)}</div> : tabs
 }

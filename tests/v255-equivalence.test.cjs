@@ -36,7 +36,7 @@ function equal(file, fn, ...args) {
       const recent = chronology.newestMatches(league.filter(match => perspective.teamsCreditedWithResult(match).includes(team.id))).slice(0, 5)
       return standings.seasonStandings([team], recent, season)[0]
     }).sort(standings.compareStandings).map((row, index) => ({ ...row, rank: index + 1 }))
-    assert.deepStrictEqual(actualForm, expected, 'v2.5.7 Form matches the independent five-game baseline projection')
+    assert.deepStrictEqual(actualForm, expected, 'v2.5.8 Form matches the independent five-game baseline projection')
   } else assert.deepStrictEqual(actual, original, `${file}:${fn}`)
 }
 

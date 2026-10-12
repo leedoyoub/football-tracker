@@ -2,17 +2,18 @@ import type { CupStage, Match, Player, Team } from '../types'
 import type { Standing } from '../engine/standings'
 import { boundaryTieIds, competitionMatches, cupCompetition, stageRanking, type CupCompetition, type CupTableRow } from '../engine/competition'
 import { competitionIdentityForMatch } from '../engine/competitionContext'
+import { teamsCreditedWithResult } from '../engine/matchPerspective'
 import { CUP_TABLE_STAGES } from './competitionScreenState'
 
-export type CupDisplayRow = Standing & { state: CupTableRow['state'] | 'normal'; eliminatedStage?: number; status: string }
-export type CupTableModel = { rows: CupDisplayRow[]; availableStages: CupStage[]; selection: CupStage | 'total'; label: string; complete: boolean; eliminationDrawTeamIds: string[]; replayRequired: boolean }
+export type CupDisplayRow = Standing & { state: CupTableRow['state'] | 'normal' | 'not-played'; eliminatedStage?: number; status: string }
+export type CupTableModel = { rows: CupDisplayRow[]; availableStages: CupStage[]; selection: CupStage | 'total'; label: string; complete: boolean; eliminationDrawTeamIds: string[]; replayRequired: boolean; provisional?: boolean }
 const cache = new WeakMap<CupCompetition, Map<string, CupTableModel>>()
 export function cupStageLabel(stage: CupStage): string {
   return stage === 'finalReplay' ? 'Final Replay' : stage === 'final' ? 'Final' : `Stage ${stage.replace('stage', '')}`
 }
 
-/** This model only projects official engine decisions. A selected past Stage
- * never changes the current competition or includes a later Stage's records. */
+/** Only the current incomplete regular Stage has a played-team provisional
+ * display. Official decisions and selected past Stage results stay untouched. */
 export function cupTableModel(teams: Team[], matches: Match[], season: string, players: Player[], cup: CupCompetition, selection: CupStage | 'total' | null): CupTableModel {
   const availableStages = CUP_TABLE_STAGES.slice(0, CUP_TABLE_STAGES.indexOf(cup.stage) + 1) as CupStage[]
   const selected = selection === 'total' || selection && availableStages.includes(selection) ? selection : cup.stage
@@ -24,11 +25,22 @@ export function cupTableModel(teams: Team[], matches: Match[], season: string, p
     const totals = new Map(cup.cumulativeStandings.map(row => [row.teamId, row]))
     const rows: CupDisplayRow[] = cup.rows.map(row => ({ ...(totals.get(row.teamId) ?? row), rank: row.rank, state: 'normal', eliminatedStage: row.eliminatedStage, status: row.teamId === cup.championId ? 'Champion' : row.teamId === cup.runnerUpId ? 'Runner-up' : row.eliminatedStage ? `Stage ${row.eliminatedStage}` : `Active · ${cupStageLabel(cup.stage)}` }))
     model = { rows, availableStages, selection: selected, label: cup.championId ? 'Final Standings' : 'Provisional Standings', complete: Boolean(cup.championId), eliminationDrawTeamIds: [], replayRequired: false }
-  } else if (selected === cup.stage) {
-    const rows: CupDisplayRow[] = cup.rows.map(row => {
-      const state = !cup.stageMatches.length && row.state === 'at-risk' ? 'surviving' : row.state
-      return { ...row, state, status: status(row.teamId, state, row.eliminatedStage) }
+  } else if (selected === cup.stage && /^stage[1-7]$/.test(selected) && !cup.stageComplete) {
+    const participants = new Set(cup.activeTeamIds)
+    const played = new Set(cup.stageMatches.flatMap(teamsCreditedWithResult).filter(id => participants.has(id)))
+    // cup.rows already carries the canonical Stage comparator order. Stable
+    // partitioning preserves that order within both played and unplayed groups.
+    const activeRows = cup.rows.filter(row => participants.has(row.teamId))
+    const playedRows = activeRows.filter(row => played.has(row.teamId))
+    const atRisk = new Set(playedRows.slice(-2).map(row => row.teamId))
+    const rows: CupDisplayRow[] = [...playedRows, ...activeRows.filter(row => !played.has(row.teamId))].map((row, index) => {
+      const state = !played.has(row.teamId) ? 'not-played' : atRisk.has(row.teamId) ? 'at-risk' : 'surviving'
+      return { ...row, rank: index + 1, state, status: state === 'not-played' ? 'Not Played' : status(row.teamId, state) }
     })
+    rows.push(...cup.rows.filter(row => !participants.has(row.teamId)).map(row => ({ ...row, status: status(row.teamId, row.state, row.eliminatedStage) })))
+    model = { rows, availableStages, selection: selected, label: cupStageLabel(selected), complete: false, eliminationDrawTeamIds: [], replayRequired: false, provisional: true }
+  } else if (selected === cup.stage) {
+    const rows: CupDisplayRow[] = cup.rows.map(row => ({ ...row, status: status(row.teamId, row.state, row.eliminatedStage) }))
     model = { rows, availableStages, selection: selected, label: cupStageLabel(selected), complete: cup.stageComplete, eliminationDrawTeamIds: cup.stageMatches.length ? cup.eliminationDrawTeamIds : [], replayRequired: false }
   } else {
     const ordinal = CUP_TABLE_STAGES.indexOf(selected)
