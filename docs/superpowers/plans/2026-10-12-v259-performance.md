@@ -66,7 +66,7 @@
 - [x] Run npm.cmd test/lint/build/diff checks, sequential final 7-sample engine/workflow/target benchmarks; report median/p95/raw, unchanged caches, bundle and all 15 candidate decisions.
 - [x] Bump package/lock/config to2.5.9 and update version assertions; repeat full release checks.
 - [x] Get one independent final code review; fix Important/Critical issues with RED→GREEN plus full suite. No blanket lint cleanup.
-- [x] Commit `09d6642` (perf: optimize application performance and refine cup labels v2.5.9), push origin/main; Actions run #115 and GitHub Pages build/deploy jobs succeeded. Public Pages URL recorded in the performance report; direct host asset fetch was unavailable from this environment. Record deployment evidence in docs, commit and push the docs follow-up, then verify the resulting workflow and clean state.
+- [x] Commit `09d6642` v2.5.9 release and push origin/main; Actions #115 build/deploy succeeded. Record deployment evidence in docs, commit/push `f2f9492`, and verify follow-up Actions #116 build/deploy success plus clean worktree. Pages URL and direct asset-fetch limitation are recorded in the performance report.
 
 ## Execution record
 
