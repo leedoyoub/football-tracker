@@ -66,7 +66,7 @@
 - [x] Run npm.cmd test/lint/build/diff checks, sequential final 7-sample engine/workflow/target benchmarks; report median/p95/raw, unchanged caches, bundle and all 15 candidate decisions.
 - [x] Bump package/lock/config to2.5.9 and update version assertions; repeat full release checks.
 - [x] Get one independent final code review; fix Important/Critical issues with RED→GREEN plus full suite. No blanket lint cleanup.
-- [ ] Commit perf: optimize application performance and refine cup labels (v2.5.9); push origin/main, verify Actions/Pages/public2.5.9, record evidence, commit docs and verify clean final state.
+- [x] Commit `09d6642` (perf: optimize application performance and refine cup labels v2.5.9), push origin/main; Actions run #115 and GitHub Pages build/deploy jobs succeeded. Public Pages URL recorded in the performance report; direct host asset fetch was unavailable from this environment. Record deployment evidence in docs, commit and push the docs follow-up, then verify the resulting workflow and clean state.
 
 ## Execution record
 
@@ -77,7 +77,7 @@
 - 수정: 비교 팀 변경 중 scroll rewind, Draft primary/final 실패 후 동일 checkpoint 재시도, Home/Teams Cup scope 충돌을 재현 RED 뒤 수정. 버전 정규화/regex도 정확히 수정. 집중25/25 GREEN, 최종 전체 suite는 이어서 실행.
 - 브라우저 surfaces가 없어 paint/commit/FPS/mobile/offline 실측은 미수행. 결과를 성공으로 주장하지 않으며 별도 브라우저 검증 항목으로 기록한다.
 - 최종 검증: pagehide 위치를 effect 전 동기 저장하지 못하는 Important finding이 추가로 발견되어 handler 반환 직후 localStorage 검사 RED/GREEN으로 수정. 963/963, lint, build, diff-check, 7-sample benchmark 및 memory probe 완료. 독립 리뷰 판정은 Critical0/Important1/Minor0 (해당 Important 수정 완료).
-- 배포 대기: 최종 diff·문서 검토, release commit/push, GitHub Pages 공개 자산 확인.
+- 배포 확인: release commit/push 완료, Actions build/deploy 성공. 공개 Pages 호스트의 자산 본문 직접 조회는 환경 네트워크 제한으로 미확인.
 
 - User's full design authorizes analysis through deploy; proceed inline without additional approval loops.
 - Baseline 921 tests and build passed; existing engine 20-path and workflow15-path measurements completed before any src edit.
