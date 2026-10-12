@@ -1,14 +1,13 @@
 import { useMemo } from 'react'
-import { recentMatches } from './recentMatches'
+import { derivedResults } from '../lib/results'
+import { ResultCard } from '../components/ResultCard'
 import { Pitch } from '../components/Pitch'
 import { TeamIcon } from '../components/TeamIcon'
-import { formatDate, SubstitutePlayerCard } from '../components/ui'
+import { SubstitutePlayerCard } from '../components/ui'
 import { RankingMetricTabs, RankingRow, useMetricSwipe } from '../components/RankingRow'
 import { RANKING_METRICS, formatRankingMetricValue } from '../lib/rankingMetrics'
-import { matchScore } from '../engine/rating'
 import { buildGlobalRankingData, rankGlobalRankingRows, playerSeasonStats, seasonsFromMatches, teamBestEleven, type LeaderboardMetric } from '../engine/stats'
 import { matchCompetitionType, teamCompetitionOverview } from '../engine/competition'
-import { assignmentSnapshotForMatch, formatCompactCompetitionContext } from '../engine/competitionContext'
 import { teamsCreditedWithResult } from '../engine/matchPerspective'
 import { buildSeasonAnalytics } from '../engine/seasonAnalytics'
 import { RankDelta, SegmentedControl } from '../components/SeasonUI'
@@ -49,7 +48,7 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
     })
     return { best: { ...canonicalBest, slots }, statsByPlayer, starterIds: new Set(slots.flatMap(slot => slot.playerId ? [slot.playerId] : [])), allTeamPlayers: sortPlayersByPosition(players.filter(player => (player.teamIds ?? [player.teamId]).includes(teamId)), [], representative) }
   }, [tab, players, matches, teamId, activeSeason, representative])
-  const matchData = useMemo(() => tab === 'matches' ? recentMatches(matches.filter(match => match.season === activeSeason && (matchesCompetition === 'all' || matchCompetitionType(match) === matchesCompetition) && teamsCreditedWithResult(match).includes(teamId))) : [], [tab, matches, activeSeason, matchesCompetition, teamId])
+  const matchData = useMemo(() => tab === 'matches' ? derivedResults(matches.filter(match => match.season === activeSeason && (matchesCompetition === 'all' || matchCompetitionType(match) === matchesCompetition) && teamsCreditedWithResult(match).includes(teamId)), teams, teamId) : [], [tab, matches, teams, activeSeason, matchesCompetition, teamId])
   const form = useMemo(() => tab === 'overview' ? teamForm(teamId, players, matches, selectedBestSeason, bestCompetition) : undefined, [tab, teamId, players, matches, selectedBestSeason, bestCompetition])
   if (!team) return <div className="p-6 text-sm text-zinc-400">Team not found.</div>
 
@@ -97,7 +96,7 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
       )}
     </section></>}
 
-    {tab === 'matches' && <section className="mt-4"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-semibold">Matches</h2><CompetitionScopeSelector value={matchesCompetition} onChange={value => setMatchesCompetition(value)} /></div>{matchData.map((match) => { const score = matchScore(match); const home = teams.find((item) => item.id === match.homeTeamId); const away = teams.find((item) => item.id === match.awayTeamId); return <button key={match.id} type="button" onClick={() => onNavigate({ name: 'match', id: match.id })} className="mb-2 grid min-h-12 w-full grid-cols-[1fr_auto_1fr] items-center rounded-xl bg-zinc-900 px-3 py-3 text-left"><span className="min-w-0 justify-self-start text-[10px] text-zinc-500">{formatCompactCompetitionContext(assignmentSnapshotForMatch(match))}</span><span className="shrink-0 justify-self-center text-center text-sm font-bold tabular-nums">{home?.shortName} {score.home}–{score.away} {away?.shortName}</span><span className="justify-self-end text-right text-[10px] text-zinc-500">{formatDate(match.date)}</span></button> })}{!matchData.length && <p className="rounded-xl bg-zinc-900 p-3 text-xs text-zinc-500">No matches in this scope.</p>}</section>}
+    {tab === 'matches' && <section className="mt-4"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-semibold">Matches</h2><CompetitionScopeSelector value={matchesCompetition} onChange={value => setMatchesCompetition(value)} /></div><div className="space-y-2">{matchData.map(result => <ResultCard key={result.match.id} result={result} teams={teams} showCompetition onMatchNavigate={() => onNavigate({ name: 'match', id: result.match.id })} onTeamNavigate={id => onNavigate({ name: 'team', id })} />)}{!matchData.length && <p className="rounded-xl bg-zinc-900 p-3 text-xs text-zinc-500">No matches in this scope.</p>}</div></section>}
   </div>
 }
 

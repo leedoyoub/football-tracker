@@ -111,8 +111,9 @@ test('Cup displays 16 team actions, fixed Total and neutral cumulative rows with
   const rowButtons = walk(tree, n => n.type === 'button' && String(n.props.className).includes('grid w-full'))
   assert.equal(rowButtons.length, 16)
   rowButtons[0].props.onClick(); assert.equal(h.destinations[0].name, 'team')
-  const total = walk(tree, n => n.type === 'button' && n.props.children === 'Total')[0]
-  total.props.onClick(); assert.equal(h.state.cupTableStage, 'total')
+  const selector = walk(tree, n => n.type?.name === 'RankingMetricTabs' && n.props.label === 'Cup table stage')[0]
+  assert.deepEqual(selector.props.pinnedOption, { value: 'total', label: 'Total' })
+  selector.props.onChange('total'); assert.equal(h.state.cupTableStage, 'total')
   const html = renderToStaticMarkup(h.render())
   assert.match(html, /Provisional Standings/)
   assert.doesNotMatch(html, /View All 16|Show Survival Line|At Risk|Eliminated|opacity-60/)

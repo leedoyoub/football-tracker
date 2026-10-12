@@ -32,8 +32,8 @@ function game(day, options = {}) {
   }
 }
 
-test('v2.5.6 metadata and the revision-13 position table are exact', () => {
-  assert.equal(APP_VERSION, '2.5.6'); assert.equal(require('../package.json').version, '2.5.6'); assert.equal(RATING_ENGINE_REVISION, 13)
+test('v2.5.7 metadata and the revision-13 position table are exact', () => {
+  assert.equal(APP_VERSION, '2.5.7'); assert.equal(require('../package.json').version, '2.5.7'); assert.equal(RATING_ENGINE_REVISION, 13)
   const expected = {
     LB: [.04, 1], LWB: [.04, 1], RB: [.04, 1], RWB: [.04, 1],
     CDM: [.06, .80], LDM: [.06, .80], RDM: [.06, .80],
@@ -145,7 +145,7 @@ test('mobile screen hierarchy, compare mode, cached snapshots and navigation mem
   const playerDetail = fs.readFileSync(require.resolve('../src/screens/PlayerDetailScreen.tsx'), 'utf8')
   const matchDetail = fs.readFileSync(require.resolve('../src/screens/MatchDetailScreen.tsx'), 'utf8')
   for (const token of ['screenState.leaderMetric', 'Global Ranking', 'Latest Changes', 'slice(0, 10)', 'slice(0, 4)', 'seasonMatches']) assert(home.includes(token), token)
-  for (const token of ['screenState.competitionType', 'screenState.rankingMetric', "label: 'Players'", "label: 'Table'", "label: 'Form · Last 5'", "label: 'History'", "label: 'Matches'", 'Team of the Month', 'Best XI view']) assert(competition.includes(token), token)
+  for (const token of ['screenState.competitionType', 'screenState.rankingMetric', "label: 'Players'", "label: 'Table'", "label: 'Form'", 'Last 5 League matches only', "label: 'History'", "label: 'Matches'", 'Team of the Month', 'Best XI view']) assert(competition.includes(token), token)
   for (const token of ['screenState.bestPlayersMetric', "label: 'Overview'", "label: 'Matches'", "label: 'Players'", 'Roster management', 'Latest XI', 'Bench', 'RANKING_METRICS']) assert(team.includes(token), token)
   for (const token of ['RankedMetric', 'Overall rank', 'Position-family rank', 'Team rank', 'Season avg', 'Last 5 avg', 'Active Streaks', 'Awards']) assert(playerDetail.includes(token), token)
   for (const token of ['Match Facts', 'Lineup', 'Ratings', 'What Changed', 'Top 3 Ratings']) assert(matchDetail.includes(token), token)

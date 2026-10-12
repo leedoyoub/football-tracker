@@ -27,7 +27,7 @@ import { currentMembershipPresentation } from '../lib/currentMembershipPresentat
 import { recentFormLabelColor, scrollTrendToLatest, TREND_POINT_SPACING, trendPlotWidth } from '../lib/trendPlot'
 import type { CompetitionType, Match, Player, RatingBreakdown, ScreenStateByView, View } from '../types'
 
-const competitions: { value: CompetitionType | 'all'; label: string }[] = [{ value: 'all', label: 'All competitions' }, { value: 'league', label: 'League' }, { value: 'cup', label: 'Cup' }, { value: 'champions', label: 'Champions' }]
+const competitions: { value: CompetitionType | 'all'; label: string }[] = [{ value: 'all', label: 'All' }, { value: 'league', label: 'League' }, { value: 'cup', label: 'Cup' }, { value: 'champions', label: 'Champions' }]
 const pct = (number: number) => `${number.toFixed(0)}%`
 const value = (number: number | null | undefined, digits = 2) => number === null || number === undefined || !Number.isFinite(number) ? '—' : number.toFixed(digits)
 const fieldPositions = new Set(['CB', 'LB', 'RB'])
@@ -69,7 +69,7 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
   return <div className="px-4 pb-8 pt-6">
     <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">Back</button>
     <header className="mb-4 flex items-start gap-3"><PlayerAvatar photoUrl={player.photoUrl || player.image} number={player.number} className="h-14 w-14 text-sm" /><div className="min-w-0 flex-1"><p className="text-xs text-zinc-400"><TeamIdentityAction team={currentTeam} onNavigate={id => onNavigate({ name: 'team', id })} className="inline-flex items-center gap-1">{membership.label}</TeamIdentityAction> · #{player.number} · {dominantPosition}</p><h1 className="break-words text-2xl font-semibold">{playerFullName(player)}</h1><div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => onNavigate({ name: 'edit-player', id: player.id })} className="rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-bold">Edit player</button><button type="button" onClick={() => onNavigate({ name: 'comparison', leftId: player.id, season: selectedSeason, competitionType: competition })} className="rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-bold">Compare</button></div></div></header>
-    <div className="mb-4 grid grid-cols-2 gap-2"><CompactFilterMenu value={selectedSeason} options={seasons.map(item => ({ value: item, label: item }))} onChange={setSelectedSeason} label="Player detail season" popupAlign="start" /><CompactFilterMenu value={competition} options={competitions} onChange={setCompetition} label="Player detail competition" allValue="all" allLabel="All competitions" allAccessibilityLabel="All competitions" /></div>
+    <div className="mb-4 min-w-0 space-y-2"><CompactFilterMenu value={selectedSeason} options={seasons.map(item => ({ value: item, label: item }))} onChange={setSelectedSeason} label="Player detail season" popupAlign="start" /><RankingMetricTabs value={competition} options={competitions} onChange={setCompetition} label="Player detail competition" /></div>
     <Overview data={data} ranks={ranks} />
     <RecentForm form={form} playerId={playerId} players={players} teams={teams} onNavigate={onNavigate} />
     <DeferredRankTrend playerId={playerId} players={players} matches={matches} season={selectedSeason} competition={competition} position={dominantPosition} metric={screenState.rankTrendMetric} onMetric={rankTrendMetric => onStateChange({ ...screenState, rankTrendMetric })} />
@@ -120,7 +120,7 @@ function DeferredRankTrend({ playerId, players, matches, season, competition, po
 }
 
 export function RankTrend({ playerId, players, matches, season, competition, position, metric = 'rating', onMetric }: { playerId: string; players: Player[]; matches: Match[]; season: string; competition: CompetitionType | 'all'; position?: string; metric?: RankTrendMetric; onMetric?: (metric: RankTrendMetric) => void }) {
-  const [selected, setSelected] = useState<'overall' | 'position' | 'team'>('position')
+  const [selected, setSelected] = useState<'overall' | 'position' | 'team'>('overall')
   const scrollRef = useRef<HTMLDivElement>(null)
   const scopedMatches = useMemo(() => matches.filter(match => match.season === season && (competition === 'all' || matchCompetitionType(match) === competition)), [matches, season, competition])
   const family = position ?? scopedPositionFamilyByPlayer(players, scopedMatches, {}).get(playerId) ?? players.find(player => player.id === playerId)?.position

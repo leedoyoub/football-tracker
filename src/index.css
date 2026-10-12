@@ -84,3 +84,59 @@ body {
       #166534 12.5% 25%
     );
 }
+
+/* Only the League History Matchday slider uses this dark native range theme. */
+.league-history-range {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 36px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.league-history-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, #059669 0%, #059669 var(--league-range-progress, 0%), #27272a var(--league-range-progress, 0%), #27272a 100%);
+}
+
+.league-history-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border: 2px solid #18181b;
+  border-radius: 50%;
+  background: #059669;
+}
+
+.league-history-range::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: #27272a;
+}
+
+.league-history-range::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: #059669;
+}
+
+.league-history-range::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #18181b;
+  border-radius: 50%;
+  background: #059669;
+}
+
+.league-history-range:focus-visible {
+  outline: 2px solid #34d399;
+  outline-offset: 3px;
+  border-radius: 8px;
+}

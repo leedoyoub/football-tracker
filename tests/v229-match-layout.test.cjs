@@ -21,11 +21,13 @@ test('v2.2.9 canonical context parts provide full two-line Champions wording', (
   assert.deepEqual(competitionContextParts({ competitionType: 'champions', season: 'Season 1', teamId: 'T1', stage: 'final', seriesGame: 2, matchDay: 1 }), { primary: 'Season 1 · Champions', secondary: 'Final · Game 2/2' })
 })
 
-test('v2.2.9 Team Detail match rows keep scores at the mathematical card center', () => {
+test('Team Detail match rows reuse the shared card with canonical metadata and a fixed right-side score', () => {
   const team = source('../src/screens/TeamDetailScreen.tsx')
   const rows = team.slice(team.indexOf('{matchData.map'), team.indexOf('{!matchData.length'))
-  assert(rows.includes('grid-cols-[1fr_auto_1fr]') && rows.includes('items-center'))
-  assert(rows.includes('justify-self-start') && rows.includes('justify-self-center') && rows.includes('justify-self-end'))
-  assert(rows.includes('formatCompactCompetitionContext(assignmentSnapshotForMatch(match))'))
-  assert(rows.includes('font-bold') && rows.includes('tabular-nums'))
+  assert(rows.includes('<ResultCard') && rows.includes('showCompetition'))
+  assert(rows.includes("name: 'match', id: result.match.id"))
+  const card = source('../src/components/ResultCard.tsx')
+  assert(card.includes('resultCompetitionLabel(result.match)'))
+  assert(card.includes('flex shrink-0 items-center gap-2') && card.includes('tabular-nums'))
+  assert(!rows.includes('grid-cols-[1fr_auto_1fr]'))
 })

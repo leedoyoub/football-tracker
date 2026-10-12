@@ -2,6 +2,8 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const { test } = require('node:test')
 const ts = require('typescript')
+const Module = require('node:module')
+const path = require('node:path')
 for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename)
 
 const React = require('react')
@@ -18,23 +20,32 @@ const matches = [game(3), game(8), game(1), game(6), game(4), game(2), game(7), 
 const storePath = require.resolve('../src/store.tsx')
 const previousStore = require.cache[storePath]
 require.cache[storePath] = { id: storePath, filename: storePath, loaded: true, exports: { useStore: () => ({ teams, players: [], matches, competitionStates: [] }) } }
-const { TeamDetailScreen } = require('../src/screens/TeamDetailScreen.tsx')
+const filename = path.resolve('src/screens/TeamDetailScreen.tsx')
+const compiled = new Module(filename, module)
+compiled.filename = filename; compiled.paths = Module._nodeModulePaths(path.dirname(filename))
+const originalRequire = compiled.require.bind(compiled)
+compiled.require = name => name === 'react' ? { ...React, useMemo: fn => fn() } : originalRequire(name)
+compiled._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename)
+const { TeamDetailScreen } = compiled.exports
 if (previousStore) require.cache[storePath] = previousStore
 else delete require.cache[storePath]
 
 function renderTeam(competition = 'all', season = 'S1', tab = 'matches') {
-  return renderToStaticMarkup(React.createElement(TeamDetailScreen, {
+  const tree = TeamDetailScreen({
     teamId: 'A', season,
     screenState: { ...navigation.defaultScreenState({ name: 'team', id: 'A' }), tab, matchesCompetition: competition },
     onStateChange() {}, onNavigate() {}, onBack() {},
-  }))
+  })
+  const cards = node => Array.isArray(node) ? node.flatMap(cards) : node && typeof node === 'object' ? [...(node.type?.name === 'ResultCard' ? [node] : []), ...cards(node.props?.children)] : []
+  return { html: renderToStaticMarkup(tree), matchIds: cards(tree).map(card => card.props.result.match.id) }
 }
 
-const opponents = html => [...html.matchAll(/OP(\d+)<\/span>/g)].map(match => Number(match[1]))
+const opponents = rendered => rendered.matchIds.map(id => Number(id.replace('match-', '')))
 
 test('Team Matches renders every in-season team match newest first without an expansion control', () => {
-  const html = renderTeam()
-  assert.deepEqual(opponents(html), [8, 7, 6, 5, 4, 3, 2, 1])
+  const rendered = renderTeam()
+  const { html } = rendered
+  assert.deepEqual(opponents(rendered), [8, 7, 6, 5, 4, 3, 2, 1])
   assert.equal(html.includes('View All'), false)
   assert.equal(html.includes('Show Less'), false)
 })
@@ -50,8 +61,9 @@ test('Team Matches competition filters retain the complete selected scope', () =
 })
 
 test('Team Matches keeps the empty scope message without an expansion control', () => {
-  const html = renderTeam('champions', 'S2')
-  assert.deepEqual(opponents(html), [])
+  const rendered = renderTeam('champions', 'S2')
+  const { html } = rendered
+  assert.deepEqual(opponents(rendered), [])
   assert.match(html, /No matches in this scope\./)
   assert.equal(html.includes('View All'), false)
   assert.equal(html.includes('Show Less'), false)
