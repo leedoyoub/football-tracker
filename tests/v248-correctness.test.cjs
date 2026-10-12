@@ -243,10 +243,10 @@ test('last route keeps valid Competition panel selections and drops stale entity
   const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) }
   const state = { teams: [{ id: 'A' }], players: [{ id: 'P' }], matches: [{ id: 'm', season: 'Season 2' }] }
   const view = { name: 'competition', season: 'Season 2', competitionType: 'league' }
-  const screenState = { ...navigation.defaultScreenState(view), tab: 'history', bestXiMode: 'monthly', monthlyAwardBlock: 2, historyMatchday: 3, historyComparedTeamIds: ['A', 'missing'], comparedPlayerIds: ['P', 'missing'] }
+  const screenState = { ...navigation.defaultScreenState(view), leagueMenu: 'history', bestXiMode: 'monthly', monthlyAwardBlock: 2, historyMatchday: 3, historyComparedTeamIds: ['A', 'missing'], comparedPlayerIds: ['P', 'missing'] }
   saveLastRoute(view, undefined, storage, screenState)
   const restored = loadLastNavigationEntry(state, storage).screenState
-  assert.deepEqual([restored.tab, restored.bestXiMode, restored.monthlyAwardBlock, restored.historyMatchday, restored.historyComparedTeamIds, restored.comparedPlayerIds], ['history', 'period', 2, 3, ['A'], undefined])
+  assert.deepEqual([restored.leagueMenu, restored.bestXiMode, restored.monthlyAwardBlock, restored.historyMatchday, restored.historyComparedTeamIds, restored.comparedPlayerIds], ['history', 'period', 2, 3, ['A'], undefined])
 })
 
 test('Records Insights ignores hidden season and team filters, and team records use recorded identity', () => {

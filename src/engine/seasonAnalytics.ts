@@ -127,9 +127,9 @@ function emptyStanding(teamId: string): Standing {
   return { rank: 0, teamId, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 }
 }
 
-function formTable(teams: Team[], leagueMatches: Match[]): Standing[] {
+export function leagueFormTable(teams: Team[], leagueMatches: Match[]): Standing[] {
   const rows = teams.map(team => {
-    const recent = newestMatches(leagueMatches.filter(match => teamsCreditedWithResult(match).includes(team.id))).slice(0, 3)
+    const recent = newestMatches(leagueMatches.filter(match => teamsCreditedWithResult(match).includes(team.id))).slice(0, 5)
     const row = emptyStanding(team.id)
     for (const match of recent) {
       const perspective = teamPerspectiveScore(match, team.id)!
@@ -224,8 +224,12 @@ function buildReview(day: number, snapshots: Map<number, LeagueSnapshot>, player
   return { matchDay: day, highestRated: daily, biggestWin, biggestMover: biggestMover ? { teamId: biggestMover.teamId, movement: biggestMover.movement! } : undefined }
 }
 
-export function buildSeasonAnalytics(teams: Team[], players: Player[], matches: Match[], season: string): SeasonAnalytics {
-  let byPlayers = cache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); cache.set(matches, byPlayers) }
+export type LeagueHistoryAnalytics = Pick<SeasonAnalytics, 'season' | 'leagueMatches' | 'currentMatchDay' | 'latestCompletedMatchDay' | 'leagueSnapshots'>
+const historyCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], Map<string, LeagueHistoryAnalytics>>>>()
+
+/** Standings and graph snapshots are shared without deriving player awards. */
+export function buildLeagueHistory(teams: Team[], players: Player[], matches: Match[], season: string): LeagueHistoryAnalytics {
+  let byPlayers = historyCache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); historyCache.set(matches, byPlayers) }
   let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
   let bySeason = byTeams.get(teams); if (!bySeason) { bySeason = new Map(); byTeams.set(teams, bySeason) }
   const key = `${RATING_ENGINE_REVISION}:${season}`
@@ -243,6 +247,18 @@ export function buildSeasonAnalytics(teams: Team[], players: Player[], matches: 
   }
   const completedSnapshots = [...leagueSnapshots.values()].filter(snapshot => snapshot.complete)
   const latestCompletedMatchDay = completedSnapshots[completedSnapshots.length - 1]?.matchDay ?? 0
+  const result = { season, leagueMatches, currentMatchDay, latestCompletedMatchDay, leagueSnapshots }
+  bySeason.set(key, result)
+  return result
+}
+
+export function buildSeasonAnalytics(teams: Team[], players: Player[], matches: Match[], season: string): SeasonAnalytics {
+  let byPlayers = cache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); cache.set(matches, byPlayers) }
+  let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
+  let bySeason = byTeams.get(teams); if (!bySeason) { bySeason = new Map(); byTeams.set(teams, bySeason) }
+  const key = `${RATING_ENGINE_REVISION}:${season}`
+  const existing = bySeason.get(key); if (existing) return existing
+  const { leagueMatches, currentMatchDay, leagueSnapshots, latestCompletedMatchDay } = buildLeagueHistory(teams, players, matches, season)
   const playerSnapshots = buildPlayerSnapshots(players, leagueMatches)
   const monthlyAwards = new Map<number, MonthlyAwards>()
   for (let blockId = 1; blockId <= 10; blockId++) {
@@ -258,7 +274,7 @@ export function buildSeasonAnalytics(teams: Team[], players: Player[], matches: 
     : undefined
   const result: SeasonAnalytics = {
     season, leagueMatches, currentMatchDay, latestCompletedMatchDay, leagueSnapshots, playerSnapshots,
-    formTable: formTable(teams, leagueMatches), monthlyAwards, activeMonthlyAwards, latestMonthlyAwards,
+    formTable: leagueFormTable(teams, leagueMatches), monthlyAwards, activeMonthlyAwards, latestMonthlyAwards,
     latestReview: latestCompletedMatchDay ? buildReview(latestCompletedMatchDay, leagueSnapshots, playerSnapshots) : undefined,
   }
   bySeason.set(key, result)

@@ -1,15 +1,12 @@
 import type { NavigationEntry, ScreenStateByView, View } from '../types'
+import { defaultCompetitionScreenState } from './competitionScreenState'
 
 export function defaultScreenState<V extends View>(view: V): ScreenStateByView[V['name']] {
   let state: ScreenStateByView[keyof ScreenStateByView]
   switch (view.name) {
     case 'home': state = { name: 'home', leaderMetric: 'rating', positionFilter: 'all' }; break
     case 'latest-changes': state = { name: 'latest-changes' }; break
-    case 'competition': state = {
-      name: 'competition', competitionType: view.competitionType ?? 'league', tab: 'players', rankingMetric: view.rankingMetric ?? 'rating',
-      bestXiMode: 'period', monthlyAwardBlock: null, cupAwardStage: null, championsAwardRound: null, cupViewAll: false,
-      historyMatchday: null, historyComparedTeamIds: [],
-    }; break
+    case 'competition': state = defaultCompetitionScreenState(view.competitionType, view.rankingMetric); break
     case 'global-ranking': state = { name: 'global-ranking', metric: view.rankingMetric ?? 'rating', scope: view.competitionType ?? 'all', positionFilter: 'all', teamId: view.teamId ?? null }; break
     case 'award-race': state = { name: 'award-race', season: view.season ?? null, scope: view.competitionType ?? 'all', positionFilter: 'all', teamId: null }; break
     case 'records': state = { name: 'records', category: 'player', competition: 'all', positionFilter: 'all', filterSeasonIds: [], filterTeamIds: [], combinationPosition: 'attack', combinationPlayers: 2, combinationMetric: 'starts', bestUnitId: 'best-unit:attack:2:goals', historyPanel: null, historySeason: null, historyBlock: null }; break

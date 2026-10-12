@@ -251,15 +251,21 @@ export interface ScreenStateByView {
   competition: {
     name: 'competition'
     competitionType: CompetitionType
-    tab: 'players' | 'table' | 'form' | 'history'
+    leagueMenu: 'players' | 'table' | 'history' | 'matches'
+    cupMenu: 'players' | 'table' | 'matches'
+    championsMenu: 'players' | 'bracket' | 'matches'
+    leagueTableMode: 'overall' | 'form'
+    cupTableStage: CupStage | 'total' | null
+    matchFilters: Record<CompetitionType, { teamId: string | null; period: string | null }>
     rankingMetric: RankSort
     bestXiMode: 'period' | 'competition'
     monthlyAwardBlock: number | null
     cupAwardStage: CupStage | null
     championsAwardRound: Exclude<ChampionsStage, 'finalReplay'> | null
-    cupViewAll: boolean
     historyMatchday: number | null
     historyComparedTeamIds: string[]
+    historyFocusedTeamId: string | null
+    historyPlotScrollLeft: number | null
   }
   'global-ranking': { name: 'global-ranking'; metric: RankSort; scope: CompetitionType | 'all'; positionFilter: PositionFilterKey; teamId: string | null }
   'award-race': { name: 'award-race'; season: string | null; scope: CompetitionType | 'all'; positionFilter: PositionFilterKey; teamId: string | null }

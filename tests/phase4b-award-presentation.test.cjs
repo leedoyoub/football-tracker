@@ -74,7 +74,7 @@ test('Home renders canonical Season Best XI beneath Global Ranking and Player De
 
 test('competition screen owns historical award selector state rather than local selector state', () => {
   const types = fs.readFileSync('src/types.ts', 'utf8')
-  const defaults = fs.readFileSync('src/lib/navigation.ts', 'utf8')
+  const defaults = fs.readFileSync('src/lib/competitionScreenState.ts', 'utf8')
   assert.match(types, /monthlyAwardBlock/)
   assert.match(types, /cupAwardStage/)
   assert.match(types, /championsAwardRound/)

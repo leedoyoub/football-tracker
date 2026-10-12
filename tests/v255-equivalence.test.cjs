@@ -18,7 +18,27 @@ after(() => fs.rmSync(baseline, { recursive: true, force: true }))
 const before = file => require(path.join(baseline, 'src', file))
 const current = file => require(path.join(root, 'src', file))
 const s = performanceFixture()
-function equal(file, fn, ...args) { assert.deepStrictEqual(current(file)[fn](...args), before(file)[fn](...args), `${file}:${fn}`) }
+function equal(file, fn, ...args) {
+  const actual = current(file)[fn](...args)
+  const original = before(file)[fn](...args)
+  if (file === 'engine/seasonAnalytics.ts' && fn === 'buildSeasonAnalytics') {
+    const { formTable: actualForm, ...actualUnchanged } = actual
+    const { formTable: _oldThreeMatchForm, ...originalUnchanged } = original
+    assert.deepStrictEqual(actualUnchanged, originalUnchanged, 'all historical standings, player snapshots, monthly awards and reviews stay exactly equivalent')
+    // Independently derive the intentionally changed five-game window using
+    // only the archived baseline's chronology and standings implementations.
+    const [teams, _players, matches, season] = args
+    const league = before('engine/competition.ts').competitionMatches(matches, season, 'league')
+    const perspective = before('engine/matchPerspective.ts')
+    const chronology = before('engine/matchChronology.ts')
+    const standings = before('engine/standings.ts')
+    const expected = teams.map(team => {
+      const recent = chronology.newestMatches(league.filter(match => perspective.teamsCreditedWithResult(match).includes(team.id))).slice(0, 5)
+      return standings.seasonStandings([team], recent, season)[0]
+    }).sort(standings.compareStandings).map((row, index) => ({ ...row, rank: index + 1 }))
+    assert.deepStrictEqual(actualForm, expected, 'v2.5.6 Form matches the independent five-game baseline projection')
+  } else assert.deepStrictEqual(actual, original, `${file}:${fn}`)
+}
 
 test('realistic benchmark history is accepted by the unchanged durable-state validator', () => {
   assert.equal(current('lib/validation.ts').validateState(s), true)

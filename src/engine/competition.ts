@@ -132,7 +132,7 @@ function stableDrawValue(seed: string, id: string): number {
   return [...`${seed}|${id}`].reduce((value, character) => Math.imul(value ^ character.charCodeAt(0), 16777619), 2166136261) >>> 0
 }
 
-function stageRanking(teamIds: string[], games: Match[], season: string, players: Player[], drawSeed: string): StageMetric[] {
+export function stageRanking(teamIds: string[], games: Match[], season: string, players: Player[], drawSeed: string): StageMetric[] {
   const basic = seasonStandings(teamIds.map(id => ({ id } as Team)), games, season)
   const averages = averageTeamRatings(games, players)
   const metrics = new Map<string, StandingTieMetrics>(basic.map(row => [row.teamId, { averageRating: averages.get(row.teamId) ?? 0, opponentShotsOnTarget: allowedShots(row.teamId, games) }]))
@@ -141,7 +141,7 @@ function stageRanking(teamIds: string[], games: Match[], season: string, players
     .map((row, index) => ({ ...row, rank: index + 1 }))
 }
 
-function boundaryTieIds(rows: StageMetric[]): string[] {
+export function boundaryTieIds(rows: StageMetric[]): string[] {
   if (rows.length < 3) return []
   const boundary = rows[rows.length - 2]
   const tied = rows.filter(row => metricTie(row, boundary)).map(row => row.teamId)

@@ -1,6 +1,7 @@
 import { POSITIONS, type AppState, type NavigationEntry, type ScreenState, type ScreenStateByView, type View } from '../types'
 import { draftContext, isResumableDraft } from './draftLifecycle'
 import { createNavigationEntry, defaultScreenState } from './navigation'
+import { normalizeCompetitionScreenState } from './competitionScreenState'
 import { rankTrendMetricOptions } from '../engine/playerRankTrend'
 import { scopedPositionFamilyByPlayer } from '../engine/positionScope'
 import { matchCompetitionType } from '../engine/competitionContext'
@@ -123,17 +124,15 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
   }
   if (view.name === 'competition') {
     const base = fallback as ScreenStateByView['competition']
-    return { ...base,
+    return normalizeCompetitionScreenState(saved, { ...base,
       competitionType: competitionTypes.includes(saved.competitionType as typeof competitionTypes[number]) ? saved.competitionType as typeof competitionTypes[number] : base.competitionType,
-      tab: ['players', 'table', 'form', 'history'].includes(saved.tab as string) ? saved.tab as typeof base.tab : base.tab,
       rankingMetric: validMetric(saved.rankingMetric) ? saved.rankingMetric as typeof base.rankingMetric : base.rankingMetric,
       bestXiMode: saved.bestXiMode === 'season' || saved.bestXiMode === 'competition' ? 'competition' : 'period',
       monthlyAwardBlock: Number.isInteger(saved.monthlyAwardBlock) && (saved.monthlyAwardBlock as number) >= 1 && (saved.monthlyAwardBlock as number) <= 10 ? saved.monthlyAwardBlock as number : null,
       cupAwardStage: ['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'stage6', 'stage7', 'final', 'finalReplay'].includes(saved.cupAwardStage as string) ? saved.cupAwardStage as typeof base.cupAwardStage : null,
       championsAwardRound: ['roundOf16', 'quarterFinal', 'semiFinal', 'final'].includes(saved.championsAwardRound as string) ? saved.championsAwardRound as typeof base.championsAwardRound : null,
-      cupViewAll: saved.cupViewAll === true,
       historyMatchday: leagueDay(saved.historyMatchday), historyComparedTeamIds: teamIds(saved.historyComparedTeamIds),
-    }
+    }, state.teams.map(team => team.id))
   }
   if (view.name === 'global-ranking') {
     const base = fallback as ScreenStateByView['global-ranking']

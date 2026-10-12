@@ -58,9 +58,10 @@ test('defaults retain every approved state-bearing screen field', () => {
     name: 'team', tab: 'overview', bestPlayersSeason: null, bestPlayersCompetition: 'all', bestPlayersMetric: 'rating', matchesCompetition: 'all',
   })
   assert.deepEqual(defaultScreenState({ name: 'competition', competitionType: 'champions', rankingMetric: 'mom' }), {
-    name: 'competition', competitionType: 'champions', tab: 'players', rankingMetric: 'mom',
-    bestXiMode: 'period', monthlyAwardBlock: null, cupAwardStage: null, championsAwardRound: null, cupViewAll: false,
-    historyMatchday: null, historyComparedTeamIds: [],
+    name: 'competition', competitionType: 'champions', leagueMenu: 'players', cupMenu: 'table', championsMenu: 'bracket', rankingMetric: 'mom',
+    leagueTableMode: 'overall', cupTableStage: null, matchFilters: { league: { teamId: null, period: null }, cup: { teamId: null, period: null }, champions: { teamId: null, period: null } },
+    bestXiMode: 'period', monthlyAwardBlock: null, cupAwardStage: null, championsAwardRound: null,
+    historyMatchday: null, historyComparedTeamIds: [], historyFocusedTeamId: null, historyPlotScrollLeft: null,
   })
   assert.deepEqual(defaultScreenState({ name: 'records' }), {
     name: 'records', category: 'player', competition: 'all', positionFilter: 'all', filterSeasonIds: [], filterTeamIds: [],

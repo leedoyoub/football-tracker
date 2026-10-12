@@ -67,7 +67,11 @@ test('Cup total boundary tie performs a stable Elimination Draw only among affec
 
 test('Cup UI retains eliminated teams, stage/frozen columns and a Survival Line above orange At Risk rows', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
-  for (const token of ['W-D-L', 'GF-GA', 'Survival Line', 'At Risk', 'Eliminated · Stage', 'Show Survival Line', 'View All 16']) assert(source.includes(token), token)
+  const model = fs.readFileSync(require.resolve('../src/lib/cupTable.ts'), 'utf8')
+  for (const token of ['W-D-L', 'GF-GA', 'Survival Line']) assert(source.includes(token), token)
+  for (const token of ['At Risk', 'Eliminated · Stage']) assert(model.includes(token), token)
+  assert(!source.includes('Show Survival Line') && !source.includes('View All 16'))
+  assert(source.includes('model.rows.map') && source.includes("onSelection('total')"))
   assert(source.includes("bg-orange-400/10") && !source.includes('bg-red-500/10'))
   assert(source.includes('Survivors show this Stage; eliminated teams are frozen at elimination.'))
 })
@@ -183,9 +187,9 @@ test('season completion is synchronized as backward-compatible CompetitionState 
   assert(validation.includes("'season-complete'"))
 })
 
-test('visible and package metadata version are exactly v2.5.5 / 2.5.5', () => {
-  assert.equal(APP_VERSION, '2.5.5')
-  assert.equal(require('../package.json').version, '2.5.5')
+test('visible and package metadata version are exactly v2.5.6 / 2.5.6', () => {
+  assert.equal(APP_VERSION, '2.5.6')
+  assert.equal(require('../package.json').version, '2.5.6')
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('v{APP_VERSION}'))
 })
