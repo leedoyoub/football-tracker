@@ -56,12 +56,12 @@
 
 **Files:** package.json, package-lock.json, src/config.ts, release metadata tests, docs/performance/v2.5.6-report.md.
 
-- [ ] Bump synchronized metadata to 2.5.6 and update metadata expectations without weakening invariants.
-- [ ] Run npm.cmd test, npm.cmd run lint, npm.cmd run build and git diff --check; inspect outputs.
-- [ ] Re-run the v2.5.5 benchmark on its 16-team, 23-player, two-season fixture; compare unchanged engine paths and cached revisits.
-- [ ] Review the entire diff and obtain the final independent review required by executing-plans.
-- [ ] Commit the verified changes, push origin/main, inspect Actions/Pages and verify the deployed version from public assets.
-- [ ] Record commit, deployment evidence, test count, benchmark results and any unresolved limitation.
+- [x] Bump synchronized metadata to 2.5.6 and update metadata expectations without weakening invariants.
+- [x] Run npm.cmd test, npm.cmd run lint, npm.cmd run build and git diff --check; inspect outputs.
+- [x] Re-run the v2.5.5 benchmark on its 16-team, 23-player, two-season fixture; compare unchanged engine paths and cached revisits.
+- [x] Review the entire diff and obtain the final independent review required by executing-plans.
+- [x] Commit the verified changes, push origin/main, inspect Actions/Pages and verify the deployed version from public assets.
+- [x] Record commit, deployment evidence, test count, benchmark results and any unresolved limitation.
 
 ## Execution Record
 
@@ -73,3 +73,5 @@
 - Final review complete: no Critical/Important findings; automatic History focus reload finding fixed with RED/GREEN regression. Rating-revision cache invalidation restored with RED/GREEN regression.
 - Benchmark complete: 7 alternating samples on all20 v2.5.5 paths; raw evidence in docs/performance/v2.5.6-benchmark.json. Lint baseline/current45 each; new0.
 - Browser unavailable: empty inventory, IAB creation unsupported; rendering/handler tests used, real mobile/touch/PWA checks remain unverified.
+
+- Task3 complete: final2.5.6 suite871/871 (new23), lint exit0/existing45/new0, build exit0, git diff --check exit0. Code commit12018202de0ab407f2c32f61094b60379b5c59ef pushed to origin/main. Actions38210720520 success; public HTML and index-DDdeoQON.js HTTP200/version2.5.6 verified2026-10-12 15:05KST. Follow-up records commit contains documentation/evidence only.
