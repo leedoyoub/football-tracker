@@ -49,8 +49,8 @@
 - [x] Run npm.cmd test, npm.cmd run lint, npm.cmd run build, git diff --check.
 - [x] Re-run the v2.5.6 benchmark with7 alternating samples against e4ee68f; compare lint warnings with its baseline.
 - [x] Audit all changes and get the single final independent review required by executing-plans/requesting-code-review.
-- [ ] Commit as style: refine competition navigation and match cards (v2.5.7), push origin/main, verify Actions and public2.5.7 assets.
-- [ ] Record test count, new tests, files, performance, commits, deployment and actual-browser limitations.
+- [x] Commit as style: refine competition navigation and match cards (v2.5.7), push origin/main, verify Actions and public2.5.7 assets.
+- [x] Record test count, new tests, files, performance, commits, deployment and actual-browser limitations.
 
 ## Execution Record
 
@@ -62,3 +62,5 @@
 - Baseline results equivalence: archived e4ee68f independent graphs and all16 perspectives passed. Benchmark20 paths ×7 samples, plus idle selected5 paths ×7; timings have noise and Chemistry revisit increase, recorded without claiming zero regression.
 - Independent final review approved: Critical0 / Important0 / Minor0, reviewer independently ran14 new tests.
 - Browser inventory empty; actual mobile/touch/WebKit/Firefox appearance unverified.
+- Implementation committed as0933b8dd9579da55547bafd90b319c20feb0bc7e and pushed origin/main. Actions38230852600 build/deploy completed successfully.
+- Public HTML and referenced index-DzRHLyaG.js returned HTTP200, declared2.5.7 at2026-10-12T09:37:37Z. Evidence recorded in docs/performance/v2.5.7-pages.json and report.
