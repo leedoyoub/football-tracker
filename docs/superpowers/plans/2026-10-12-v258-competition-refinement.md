@@ -48,8 +48,8 @@
 - [x] Run npm.cmd test (expected all existing 885 tests plus new tests pass), npm.cmd run lint (expected exit 0, no new warnings), npm.cmd run build (expected TypeScript/Vite success), git diff --check (expected exit 0).
 - [x] Run existing 20-path benchmark sequentially after test/build against 53ea649, 7 alternating samples; record timing uncertainty, cache/guard evidence and baseline lint comparison.
 - [x] Update version metadata/assertions to 2.5.8 and rerun full release commands. Audit product diff and independent review; fix any Important/Critical findings with RED→GREEN and full suite.
-- [ ] Commit feat: refine cup survival line and competition UI (v2.5.8); push origin/main; verify Actions build/deploy and public JS version.
-- [ ] Record implementation, test count, performance, changed files, SHA/Actions/Pages and actual-browser limitations; commit/push docs and verify clean final remote state.
+- [x] Commit feat: refine cup survival line and competition UI (v2.5.8); push origin/main; verify Actions build/deploy and public JS version.
+- [x] Record implementation, test count, performance, changed files, SHA/Actions/Pages and actual-browser limitations; commit/push docs and verify clean final remote state.
 
 ## Execution Ledger
 
@@ -65,3 +65,5 @@
 - Independent final review approved: Critical/Important/Minor all 0. Reviewed 32 directly run UI/model tests plus retained equivalence 4/4 and final suite.
 - Benchmark 20 paths x 7 alternating samples completed after test/build/reviewer execution; selected 4 paths x 7 recheck preserved separately. Initial cold Ranking/League and revisit Chemistry increases did not repeat. No absolute zero-regression timing claim.
 - Final review limits: no live mobile browser; root verifies timing/deployment; existing lint/bundle warnings retained; immutable cache inputs and existing team-count contract retained as specified.
+- Task 2: complete. Implementation e602e09c4bd7917e1cb314c8af38a7f4c81f2522 pushed origin/main; Actions 38241681360 build/deploy success. Public HTML/index-Bqjl5bdR.js HTTP 200, declared 2.5.8 at 2026-10-12T11:18:40Z. Evidence saved in v2.5.8-pages.json.
+- Own ignored task scratch directory safely removed after preserving both benchmark outputs. Final documentation commit records deployment without product changes.

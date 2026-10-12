@@ -1,0 +1,15 @@
+﻿{
+    "pageUrl":  "https://leedoyoub.github.io/football-tracker/",
+    "pageStatus":  200,
+    "assetUrl":  "https://leedoyoub.github.io/football-tracker/assets/index-Bqjl5bdR.js",
+    "assetStatus":  200,
+    "version":  "2.5.8",
+    "versionFound":  true,
+    "versionDeclaration":  "var C=`2.5.8`;",
+    "verifiedAtUtc":  "2026-10-12T11:18:40.9067425Z",
+    "implementationCommit":  "e602e09c4bd7917e1cb314c8af38a7f4c81f2522",
+    "actionsRunId":  38241681360,
+    "actionsConclusion":  "success",
+    "buildJobId":  114785565968,
+    "deployJobId":  114785689179
+}
