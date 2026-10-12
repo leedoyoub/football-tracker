@@ -40,9 +40,11 @@ export const SyncManager = {
     const meta = await metadata(); meta.entityUpdatedAt[key(item.entityType, item.entityId)] = now; await putMetadata(meta)
   },
   async queueStateChange(previous: AppState, next: AppState) {
+    if (!isCloudSyncEnabled || previous === next) return
     for (const type of ['team', 'player', 'match', 'competition'] as const) {
+      if (entities(previous, type) === entities(next, type)) continue
       const before = new Map(entities(previous, type).map(entity => [entity.id, entity])); const after = new Map(entities(next, type).map(entity => [entity.id, entity]))
-      for (const [id, entity] of after) if (JSON.stringify(before.get(id)) !== JSON.stringify(entity)) await this.queueOperation({ entityType: type, entityId: id, operation: 'upsert', payload: entity })
+      for (const [id, entity] of after) if (before.get(id) !== entity && JSON.stringify(before.get(id)) !== JSON.stringify(entity)) await this.queueOperation({ entityType: type, entityId: id, operation: 'upsert', payload: entity })
       for (const id of before.keys()) if (!after.has(id)) await this.queueOperation({ entityType: type, entityId: id, operation: 'delete' })
     }
   },

@@ -9,12 +9,12 @@ import type { View } from '../types'
 
 export function SeasonHighlightScreen({ season, kind, onNavigate, onBack }: { season: string; kind: 'monthly' | 'review' | 'news'; onNavigate: (view: View) => void; onBack: () => void }) {
   const { players, teams, matches, competitionStates = [] } = useStore()
-  const analytics = useMemo(() => buildSeasonAnalytics(teams, players, matches, season), [teams, players, matches, season])
+  const analytics = useMemo(() => kind === 'news' ? undefined : buildSeasonAnalytics(teams, players, matches, season), [kind, teams, players, matches, season])
   const playerById = useMemo(() => Object.fromEntries(players.map(player => [player.id, player])), [players])
   const teamById = useMemo(() => Object.fromEntries(teams.map(team => [team.id, team])), [teams])
-  const news = useMemo(() => majorNewsEvents(players, teams, matches, competitionStates, season), [players, teams, matches, competitionStates, season])
-  const awards = analytics.latestMonthlyAwards
-  const review = analytics.latestReview
+  const news = useMemo(() => kind === 'news' ? majorNewsEvents(players, teams, matches, competitionStates, season) : [], [kind, players, teams, matches, competitionStates, season])
+  const awards = analytics?.latestMonthlyAwards
+  const review = analytics?.latestReview
   const title = kind === 'monthly' ? 'Monthly Awards' : kind === 'review' ? 'Matchday Review' : 'News'
   return <div className="px-4 pb-8 pt-6"><button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">Back</button><header className="mb-4"><h1 className="text-2xl font-semibold">{title}</h1><p className="text-xs text-zinc-500">{season} · League-only awards and review data</p></header>
     {kind === 'monthly' && (awards ? <section className="space-y-3"><div className="rounded-2xl bg-zinc-900 p-4"><p className="text-[10px] font-black uppercase tracking-[.16em] text-amber-300">{awards.scopeLabel}</p><h2 className="mt-2 text-lg font-bold">Player of the Month</h2>{awards.playerOfMonth ? <button type="button" onClick={() => onNavigate({ name: 'player', id: awards.playerOfMonth!.playerId })} className="mt-2 text-left text-sm text-emerald-300">{playerFullName(playerById[awards.playerOfMonth.playerId])} · {awards.playerOfMonth.avgRating.toFixed(2)}</button> : <p className="mt-2 text-sm text-zinc-500">No eligible player.</p>}</div><AwardBestXI title="Team of the Month" result={awards} players={players} teams={teams} onPlayerOpen={id => onNavigate({ name: 'player', id })} /></section> : <Empty text="No finalized Monthly Awards yet." />)}

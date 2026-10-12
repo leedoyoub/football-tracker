@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { createScrollCheckpoint, registerScrollCheckpoint } from '../lib/scrollCheckpoint'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { CompactFilterMenu } from '../components/CompactFilterMenu'
 import { AwardBestXI } from '../components/AwardBestXI'
 import { RankingMetricTabs, RankingRow, useMetricSwipe } from '../components/RankingRow'
@@ -35,6 +36,8 @@ import { positionHistoryLabelVisible, scrollTrendToLatest, TREND_POINT_SPACING, 
 import { useStore } from '../store'
 import type { ChampionsStage, CompetitionState, CompetitionType, CupStage, Match, Player, ScreenStateByView, Team, View } from '../types'
 
+type CompetitionStateChange = (state: ScreenStateByView['competition'], patch?: Partial<ScreenStateByView['competition']>) => void
+
 const LABELS: Record<CompetitionType, string> = { league: 'League', cup: 'Cup', champions: 'Champions' }
 const SYMBOLS: Record<CompetitionType, string> = { league: '👑', cup: '🥇', champions: '🏆' }
 const STAGE_LABELS: Record<string, string> = {
@@ -66,7 +69,7 @@ function reportCompetitionCache(label: string, diagnostic: { key: string; hit: b
   console.debug(`[Football Tracker performance] ${label} derived cache: ${diagnostic.hit ? 'HIT' : 'MISS'} · ${diagnostic.key} · ${diagnostic.reason} · ${diagnostic.durationMs.toFixed(3)}ms`)
 }
 
-export function CompetitionScreen({ season, screenState, onStateChange, onCompetitionTypeChange, onSeason, onNavigate }: { season: string; screenState: ScreenStateByView['competition']; onStateChange: (state: ScreenStateByView['competition']) => void; onCompetitionTypeChange: (type: CompetitionType) => void; onSeason: (season: string) => void; onNavigate: (view: View) => void }) {
+export function CompetitionScreen({ season, screenState, onStateChange, onCompetitionTypeChange, onSeason, onNavigate, onPersistPlotScroll }: { season: string; screenState: ScreenStateByView['competition']; onStateChange: CompetitionStateChange; onCompetitionTypeChange: (type: CompetitionType) => void; onSeason: (season: string) => void; onNavigate: (view: View) => void; onPersistPlotScroll?: (left: number) => void }) {
   const { teams, players, matches, competitionStates = [], competitionRevisions = {}, competitionCacheOwner, teamCatalogRevision = 0, setChampionsDraw, completeSeason } = useStore()
   const type = screenState.competitionType
   const menu = competitionMenu(screenState)
@@ -105,7 +108,7 @@ export function CompetitionScreen({ season, screenState, onStateChange, onCompet
     <RankingMetricTabs size="navigation" label={LABELS[type] + ' menu'} value={menu} onChange={value => patchState(type === 'league' ? { leagueMenu: value as typeof screenState.leagueMenu } : type === 'cup' ? { cupMenu: value as typeof screenState.cupMenu } : { championsMenu: value as typeof screenState.championsMenu })} options={type === 'league' ? [{ value: 'players', label: 'Players' }, { value: 'table', label: 'Table' }, { value: 'history', label: 'History' }, { value: 'matches', label: 'Matches' }] : type === 'cup' ? [{ value: 'players', label: 'Players' }, { value: 'table', label: 'Table' }, { value: 'matches', label: 'Matches' }] : [{ value: 'players', label: 'Players' }, { value: 'bracket', label: 'Bracket' }, { value: 'matches', label: 'Matches' }]} />
 
     {menu === 'matches' && <CompetitionMatches matches={matches} teams={teams} season={season} type={type} filters={screenState.matchFilters[type]} onFiltersChange={filters => patchState({ matchFilters: { ...screenState.matchFilters, [type]: filters } })} onNavigate={onNavigate} />}
-    {type === 'league' && league && <section className="mt-3"><CompetitionHeader type="league" label="League" season={season} champion={league.championId ? teamById[league.championId] : undefined} progress={league.complete ? 'Completed · 30/30' : 'MD ' + league.matchdayProgress + ' / ' + LEAGUE_MATCHES_PER_TEAM} />{menu !== 'players' && <LeagueView season={season} teams={teams} players={players} matches={matches} league={league} screenState={screenState} onStateChange={onStateChange} onNavigate={onNavigate} />}</section>}
+    {type === 'league' && league && <section className="mt-3"><CompetitionHeader type="league" label="League" season={season} champion={league.championId ? teamById[league.championId] : undefined} progress={league.complete ? 'Completed · 30/30' : 'MD ' + league.matchdayProgress + ' / ' + LEAGUE_MATCHES_PER_TEAM} />{menu !== 'players' && <LeagueView season={season} teams={teams} players={players} matches={matches} league={league} screenState={screenState} onStateChange={onStateChange} onNavigate={onNavigate} onPersistPlotScroll={onPersistPlotScroll} />}</section>}
     {type === 'cup' && cup && <section className="mt-3"><CompetitionHeader type="cup" label={cup.stage} season={season} champion={cup.championId ? teamById[cup.championId] : undefined} progress={cup.championId ? 'Champ' : STAGE_LABELS[cup.stage]} />{menu === 'table' && <CupView season={season} teams={teams} tournamentTeams={tournamentTeams} players={players} matches={matches} cup={cup} selection={screenState.cupTableStage} onSelection={value => patchState({ cupTableStage: value })} onNavigate={onNavigate} />}</section>}
     {type === 'champions' && champions && <section className="mt-3">
       <CompetitionHeader type="champions" label={champions.currentStage} season={season} champion={champions.championId ? teamById[champions.championId] : undefined} progress={champions.championId ? 'Champ' : STAGE_LABELS[champions.currentStage] ?? champions.currentStage} />
@@ -119,7 +122,7 @@ export function CompetitionScreen({ season, screenState, onStateChange, onCompet
 
 /** Leave standings/header on the first paint. Each stage gets a separate idle
  * turn so Rankings, Best XI, and completion checks cannot form one long task. */
-function DeferredCompetitionPanels({ season, type, screenState, onStateChange, players, teams, tournamentTeams, matches, league, draw, cup, champions, finalized, nextSeason, onComplete, onNavigate }: { season: string; type: CompetitionType; screenState: ScreenStateByView['competition']; onStateChange: (state: ScreenStateByView['competition']) => void; players: Player[]; teams: Team[]; tournamentTeams: Team[]; matches: Match[]; league: ReturnType<typeof leagueCompetition> | null; draw?: CompetitionState; cup: CupCompetition | null; champions: ReturnType<typeof championsCompetition> | null; finalized: boolean; nextSeason: string; onComplete: () => void; onNavigate: (view: View) => void }) {
+function DeferredCompetitionPanels({ season, type, screenState, onStateChange, players, teams, tournamentTeams, matches, league, draw, cup, champions, finalized, nextSeason, onComplete, onNavigate }: { season: string; type: CompetitionType; screenState: ScreenStateByView['competition']; onStateChange: CompetitionStateChange; players: Player[]; teams: Team[]; tournamentTeams: Team[]; matches: Match[]; league: ReturnType<typeof leagueCompetition> | null; draw?: CompetitionState; cup: CupCompetition | null; champions: ReturnType<typeof championsCompetition> | null; finalized: boolean; nextSeason: string; onComplete: () => void; onNavigate: (view: View) => void }) {
   const [stage, setStage] = useState(0)
   useEffect(() => {
     if (stage >= 3) return
@@ -136,12 +139,12 @@ function DeferredCompetitionPanels({ season, type, screenState, onStateChange, p
   </>
 }
 
-function DeferredCompetitionRankings({ season, type, screenState, onStateChange, players, teams, allMatches, leagueMatches, onNavigate }: { season: string; type: CompetitionType; screenState: ScreenStateByView['competition']; onStateChange: (state: ScreenStateByView['competition']) => void; players: Player[]; teams: Team[]; allMatches: Match[]; leagueMatches?: Match[]; onNavigate: (view: View) => void }) {
+function DeferredCompetitionRankings({ season, type, screenState, onStateChange, players, teams, allMatches, leagueMatches, onNavigate }: { season: string; type: CompetitionType; screenState: ScreenStateByView['competition']; onStateChange: CompetitionStateChange; players: Player[]; teams: Team[]; allMatches: Match[]; leagueMatches?: Match[]; onNavigate: (view: View) => void }) {
   const matches = useMemo(() => measuredInDevelopment('Competition match filtering/index lookup', () => type === 'league' && leagueMatches ? leagueMatches : competitionMatches(allMatches, season, type)), [type, leagueMatches, allMatches, season])
   return <CompetitionRankings season={season} type={type} screenState={screenState} onStateChange={onStateChange} players={players} teams={teams} matches={matches} onNavigate={onNavigate} />
 }
 
-function DeferredCompetitionBestElevens({ season, type, screenState, onStateChange, players, teams, allMatches, leagueMatches, cup, champions, onNavigate }: { season: string; type: CompetitionType; screenState: ScreenStateByView['competition']; onStateChange: (state: ScreenStateByView['competition']) => void; players: Player[]; teams: Team[]; allMatches: Match[]; leagueMatches?: Match[]; cup: CupCompetition | null; champions: ReturnType<typeof championsCompetition> | null; onNavigate: (view: View) => void }) {
+function DeferredCompetitionBestElevens({ season, type, screenState, onStateChange, players, teams, allMatches, leagueMatches, cup, champions, onNavigate }: { season: string; type: CompetitionType; screenState: ScreenStateByView['competition']; onStateChange: CompetitionStateChange; players: Player[]; teams: Team[]; allMatches: Match[]; leagueMatches?: Match[]; cup: CupCompetition | null; champions: ReturnType<typeof championsCompetition> | null; onNavigate: (view: View) => void }) {
   const matches = useMemo(() => measuredInDevelopment('Best XI match scope lookup', () => type === 'league' && leagueMatches ? leagueMatches : competitionMatches(allMatches, season, type)), [type, leagueMatches, allMatches, season])
   return <CompetitionBestElevens season={season} type={type} screenState={screenState} onStateChange={onStateChange} players={players} teams={teams} matches={matches} allMatches={allMatches} cup={cup} champions={champions} onNavigate={onNavigate} />
 }
@@ -160,16 +163,16 @@ function CompetitionHeader({ type, label, season, champion, progress }: { type: 
   return <header className="mb-4 rounded-2xl border border-white/10 bg-gradient-to-br from-zinc-900 to-black p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em] text-emerald-400">{SYMBOLS[type]} {LABELS[type]} · {season}</p><h2 className="mt-1 text-xl font-black">{STAGE_LABELS[label] ?? label}</h2></div><div className="text-right">{progress && <b className="block text-xs text-emerald-300">{progress}</b>}{champion && <span className="mt-2 flex items-center justify-end gap-2 text-xs font-black text-amber-300"><TeamIcon team={champion} className="h-8 w-8 text-[8px]" /> Champion</span>}</div></div></header>
 }
 
-function LeagueView({ season, teams, players, matches, league, screenState, onStateChange, onNavigate }: { season: string; teams: Team[]; players: Player[]; matches: Match[]; league: ReturnType<typeof leagueCompetition>; screenState: ScreenStateByView['competition']; onStateChange: (state: ScreenStateByView['competition']) => void; onNavigate: (view: View) => void }) {
+function LeagueView({ season, teams, players, matches, league, screenState, onStateChange, onNavigate, onPersistPlotScroll }: { season: string; teams: Team[]; players: Player[]; matches: Match[]; league: ReturnType<typeof leagueCompetition>; screenState: ScreenStateByView['competition']; onStateChange: CompetitionStateChange; onNavigate: (view: View) => void; onPersistPlotScroll?: (left: number) => void }) {
   const needsHistory = screenState.leagueMenu === 'history' || screenState.leagueTableMode === 'overall'
   const analytics = useMemo(() => needsHistory ? buildLeagueHistory(teams, players, matches, season) : null, [needsHistory, teams, players, matches, season])
   const form = useMemo(() => screenState.leagueMenu === 'table' && screenState.leagueTableMode === 'form' ? leagueFormTable(teams, league.matches) : [], [screenState.leagueMenu, screenState.leagueTableMode, teams, league.matches])
   const current = analytics?.leagueSnapshots.get(analytics.currentMatchDay)?.standings ?? league.standings
-  if (screenState.leagueMenu === 'history' && analytics) return <LeagueHistory analytics={analytics} teams={teams} screenState={screenState} onStateChange={onStateChange} onNavigate={onNavigate} />
+  if (screenState.leagueMenu === 'history' && analytics) return <LeagueHistory analytics={analytics} teams={teams} screenState={screenState} onStateChange={onStateChange} onNavigate={onNavigate} onPersistPlotScroll={onPersistPlotScroll} />
   return <div><RankingMetricTabs label="League table mode" value={screenState.leagueTableMode} onChange={value => onStateChange({ ...screenState, leagueTableMode: value as 'overall' | 'form' })} options={[{ value: 'overall', label: 'Overall' }, { value: 'form', label: 'Form' }]} /><div className="mt-3">{screenState.leagueTableMode === 'overall' ? <StandingsTable standings={current} teams={teams} compact onTeamNavigate={id => onNavigate({ name: 'team', id })} /> : <><p className="mb-2 text-xs text-zinc-500">Last 5 League matches only · recent form comparison.</p>{form.some(row => row.played) ? <StandingsTable standings={form} teams={teams} compact onTeamNavigate={id => onNavigate({ name: 'team', id })} /> : <Empty text="No League matches for Last 5." />}</>}</div></div>
 }
 
-function LeaguePlayers({ season, teams, players, matches, league, screenState, onStateChange, onNavigate }: { season: string; teams: Team[]; players: Player[]; matches: Match[]; league: ReturnType<typeof leagueCompetition>; screenState: ScreenStateByView['competition']; onStateChange: (state: ScreenStateByView['competition']) => void; onNavigate: (view: View) => void }) {
+function LeaguePlayers({ season, teams, players, matches, league, screenState, onStateChange, onNavigate }: { season: string; teams: Team[]; players: Player[]; matches: Match[]; league: ReturnType<typeof leagueCompetition>; screenState: ScreenStateByView['competition']; onStateChange: CompetitionStateChange; onNavigate: (view: View) => void }) {
   const playerMetric = screenState.rankingMetric as RankingDisplayMetric
   const bestXiMode = screenState.bestXiMode
   const patchState = (patch: Partial<ScreenStateByView['competition']>) => onStateChange({ ...screenState, ...patch })
@@ -190,7 +193,7 @@ function LeaguePlayers({ season, teams, players, matches, league, screenState, o
   return <section><RankingMetricTabs label="League player category" value={playerMetric} onChange={setPlayerMetric} options={RANKING_METRICS} /><section className="mt-3"><SectionHeader title={rankingTitle('league')} subtitle="Top 10" /><div {...playerSwipe} className="mt-2 overflow-hidden rounded-xl bg-zinc-900 touch-pan-y" aria-label="Swipe League ranking metrics">{playerRows.map((row, index) => { const player = playerById.get(row.playerId); return <div key={row.playerId} className="border-b border-white/5 last:border-0"><RankingRow positionLabel={row.scopedPositionFamily} rank={index + 1} compact player={player} team={teamById.get(row.historicalTeamId ?? row.teamId)} value={playerValue(row)} onPlayerNavigate={id => onNavigate({ name: 'player', id, season, competitionType: 'league' })} onTeamNavigate={id => onNavigate({ name: 'team', id })} /></div> })}{!playerRows.length && <p className="p-3 text-xs text-zinc-500">No qualifying players yet.</p>}</div><button type="button" onClick={() => onNavigate({ name: 'global-ranking', season, competitionType: 'league', rankingMetric: playerMetric })} className="secondary-view-all mt-3 w-full">View All</button></section><AwardRacePanel candidates={canonicalAward?.candidates ?? []} title="Award Race" previewCount={5} season={season} type="league" players={players} teams={teams} matches={matches} onNavigate={onNavigate} /><section className="mt-5"><h2 className="mb-3 text-lg font-semibold">{canonicalAward?.complete ? 'Best XI' : 'Best XI Race'}</h2><SegmentedControl label="Best XI view" value={bestXiMode} onChange={value => setBestXiMode(value as typeof bestXiMode)} options={[{ value: 'period', label: 'Team of the Month' }, { value: 'competition', label: 'League Best XI' }]} />{bestXiMode === 'competition' ? <BestEleven title="League Best XI" xi={seasonXi} bestPlayerId={canonicalAward?.bestPlayerId} season={season} competitionType="league" players={players} teams={teams} onNavigate={onNavigate} /> : selectedMonthlyAward ? <><AwardScopeSelector ariaLabel="Team of the Month period" options={startedMonthlyBlocks.map(block => ({ value: block, label: `${Number(season.match(/\d+/)?.[0] ?? 1)}-${block}` }))} value={selectedMonthlyBlock} onChange={block => patchState({ monthlyAwardBlock: Number(block) })} /><p className="mt-2 text-[10px] text-zinc-500">{selectedMonthlyAward.scopeLabel} · {selectedMonthlyAward.finalized ? 'Finalized' : 'In progress'} · Player of the Month is marked blue.</p><AwardBestXI title="Team of the Month" result={selectedMonthlyAward} players={players} teams={teams} onPlayerOpen={id => onNavigate({ name: 'player', id, season, competitionType: 'league' })} /></> : <Empty text="Not available yet." />}</section></section>
 }
 
-function LeagueHistory({ analytics, teams, screenState, onStateChange, onNavigate }: { analytics: LeagueHistoryAnalytics; teams: Team[]; screenState: ScreenStateByView['competition']; onStateChange: (state: ScreenStateByView['competition']) => void; onNavigate: (view: View) => void }) {
+function LeagueHistory({ analytics, teams, screenState, onStateChange, onNavigate, onPersistPlotScroll }: { analytics: LeagueHistoryAnalytics; teams: Team[]; screenState: ScreenStateByView['competition']; onStateChange: CompetitionStateChange; onNavigate: (view: View) => void; onPersistPlotScroll?: (left: number) => void }) {
   const day = Math.min(screenState.historyMatchday ?? Math.max(1, analytics.currentMatchDay), Math.max(1, analytics.currentMatchDay))
   const compared = screenState.historyComparedTeamIds.length ? screenState.historyComparedTeamIds : analytics.leagueSnapshots.get(analytics.currentMatchDay)?.standings.slice(0, 1).map(row => row.teamId) ?? []
   const setDay = (value: number) => onStateChange({ ...screenState, historyMatchday: value })
@@ -202,20 +205,47 @@ function LeagueHistory({ analytics, teams, screenState, onStateChange, onNavigat
   if (!analytics.currentMatchDay || !snapshot) return <Empty text="No League history available yet." />
   return <div><div className="rounded-xl bg-zinc-900 p-3"><div className="flex items-center justify-between text-xs"><b>MD {snapshot.matchDay}</b><span className={snapshot.complete ? 'text-emerald-400' : 'text-amber-300'}>{snapshot.complete ? 'Complete' : 'Incomplete Matchday'}</span></div><input aria-label="Historical League Matchday" type="range" min="1" max={analytics.currentMatchDay} value={snapshot.matchDay} onChange={event => setDay(Number(event.target.value))} className="league-history-range mt-3" style={{ '--league-range-progress': `${analytics.currentMatchDay > 1 ? (snapshot.matchDay - 1) / (analytics.currentMatchDay - 1) * 100 : 0}%` } as React.CSSProperties} /><div className="mt-1 flex justify-between text-[9px] text-zinc-600"><span>MD1</span><span>MD{analytics.currentMatchDay}</span></div></div>
     <div className="no-scrollbar my-3 flex gap-1 overflow-x-auto">{teams.map(team => <button key={team.id} type="button" aria-pressed={compared.includes(team.id)} onClick={() => toggle(team.id)} className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold ${compared.includes(team.id) ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-zinc-400'}`}>{team.shortName}</button>)}</div>
-    <PositionHistory analytics={analytics} teamIds={compared} teams={teams} focusedTeamId={screenState.historyFocusedTeamId} plotScrollLeft={screenState.historyPlotScrollLeft} onFocus={id => onStateChange({ ...screenState, historyFocusedTeamId: id })} onPlotScroll={left => onStateChange({ ...screenState, historyPlotScrollLeft: left })} />
+    <PositionHistory analytics={analytics} teamIds={compared} teams={teams} focusedTeamId={screenState.historyFocusedTeamId} plotScrollLeft={screenState.historyPlotScrollLeft} onFocus={id => onStateChange({ ...screenState, historyFocusedTeamId: id })} onPlotScroll={left => onStateChange({ ...screenState, historyPlotScrollLeft: left }, { historyPlotScrollLeft: left })} onPersistPlotScroll={onPersistPlotScroll} />
     <div className="mt-3"><StandingsTable standings={snapshot.standings} teams={teams} compact onTeamNavigate={id => onNavigate({ name: 'team', id })} /></div>
     <section className="mt-5"><SectionHeader title="MD Results" subtitle={'MD ' + day + ' · ' + mdResults.length + ' recorded matches'} /><div className="mt-2 grid grid-cols-4 gap-1.5" aria-label="Selected Matchday results">{mdResults.length ? mdResults.map(result => <button key={result.match.id} type="button" onClick={() => onNavigate({ name: 'match', id: result.match.id })} aria-label={'Open ' + result.teamName + ', ' + result.outcome + ', ' + result.goalsFor + ' to ' + result.goalsAgainst + ', match details'} className={'flex min-h-20 min-w-0 flex-col items-center justify-center gap-2 rounded-xl border px-1 py-2 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-300 ' + resultTone(result.outcome)}><TeamIcon team={teamById.get(result.teamId)} className="h-7 w-7 text-[7px]" /><b className="text-xs tabular-nums">{result.goalsFor}–{result.goalsAgainst}</b></button>) : <div className="col-span-4"><Empty text="No recorded matches in this Matchday." /></div>}</div></section>
   </div>
 }
 
-export function PositionHistory({ analytics, teamIds, teams, focusedTeamId, plotScrollLeft, onFocus, onPlotScroll }: { analytics: LeagueHistoryAnalytics; teamIds: string[]; teams: Team[]; focusedTeamId?: string | null; plotScrollLeft?: number | null; onFocus?: (id: string | null) => void; onPlotScroll?: (left: number) => void }) {
+export function PositionHistory({ analytics, teamIds, teams, focusedTeamId, plotScrollLeft, onFocus, onPlotScroll, onPersistPlotScroll }: { analytics: LeagueHistoryAnalytics; teamIds: string[]; teams: Team[]; focusedTeamId?: string | null; plotScrollLeft?: number | null; onFocus?: (id: string | null) => void; onPlotScroll?: (left: number) => void; onPersistPlotScroll?: (left: number) => void }) {
   const [focused, setFocused] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const plotCallback = useRef(onPlotScroll)
+  const persistPlotCallback = useRef(onPersistPlotScroll)
+  const initialOffset = useRef(plotScrollLeft)
+  useLayoutEffect(() => { plotCallback.current = onPlotScroll; persistPlotCallback.current = onPersistPlotScroll; initialOffset.current = plotScrollLeft }, [onPlotScroll, onPersistPlotScroll, plotScrollLeft])
+  const ownOffset = useRef<number | undefined>(undefined)
+  const restoredScope = useRef<{ season: string; days: number; teams: string; offset: number | null | undefined } | null>(null)
+  const checkpointRef = useRef<ReturnType<typeof createScrollCheckpoint> | null>(null)
+  const checkpoint = useCallback(() => checkpointRef.current ??= createScrollCheckpoint(left => { ownOffset.current = left; plotCallback.current?.(left) }, initialOffset.current, window.requestAnimationFrame.bind(window), window.cancelAnimationFrame.bind(window)), [])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const control = checkpoint()
+    const unregister = registerScrollCheckpoint(control.flush)
+    const onHide = () => { const left = control.flush(); if (left !== undefined) persistPlotCallback.current?.(left) }
+    const onVisibility = () => { if (document.visibilityState === 'hidden') onHide() }
+    window.addEventListener('pagehide', onHide)
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      control.dispose(); unregister(); checkpointRef.current = null
+      window.removeEventListener('pagehide', onHide)
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [analytics.season, checkpoint])
   const days = [...analytics.leagueSnapshots.keys()].sort((a, b) => a - b)
   const storedFocus = onFocus ? focusedTeamId : focused
   const activeFocus = storedFocus && teamIds.includes(storedFocus) ? storedFocus : null
   const comparedTeamKey = teamIds.join('|')
   useEffect(() => {
+    const prior = restoredScope.current
+    const sameGeometry = prior?.season === analytics.season && prior.days === days.length && Boolean(prior.teams) && Boolean(comparedTeamKey)
+    restoredScope.current = { season: analytics.season, days: days.length, teams: comparedTeamKey, offset: plotScrollLeft }
+    // A checkpoint acknowledges native movement; it is not a restore request.
+    if (sameGeometry && (prior?.offset === plotScrollLeft || plotScrollLeft != null && plotScrollLeft === ownOffset.current)) return
     if (plotScrollLeft != null && scrollRef.current) scrollRef.current.scrollLeft = plotScrollLeft
     else scrollTrendToLatest(scrollRef.current)
   }, [analytics.season, days.length, comparedTeamKey, plotScrollLeft])
@@ -225,7 +255,7 @@ export function PositionHistory({ analytics, teamIds, teams, focusedTeamId, plot
   const colors = ['#34d399', '#60a5fa', '#fbbf24', '#f472b6']
   return <div className="rounded-xl bg-zinc-900 p-3" aria-label="League position history line chart">
     <div className="mb-2 flex flex-wrap gap-1">{series.map((row, index) => <button key={row.teamId} type="button" onClick={() => (onFocus ?? setFocused)(activeFocus === row.teamId ? null : row.teamId)} className={'rounded-full px-2 py-1 text-[10px] font-bold ' + (activeFocus === row.teamId ? 'bg-white text-black' : 'bg-black/30 text-zinc-300')}><span aria-hidden className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: colors[index] }} />{teams.find(team => team.id === row.teamId)?.shortName}</button>)}</div>
-    <div ref={scrollRef} onScroll={event => onPlotScroll?.(event.currentTarget.scrollLeft)} className="no-scrollbar overflow-x-auto overscroll-x-contain" aria-label="League Position History horizontal plot"><svg role="img" aria-label="League position comparison, first place at top" width={width} height={height} className="block"><text x="2" y="18" fill="#a1a1aa" fontSize="9">1</text><text x="2" y="148" fill="#a1a1aa" fontSize="9">{rankCount}</text>{series.map((row, index) => { const muted = activeFocus !== null && activeFocus !== row.teamId; const points = row.points.map(point => point.x + ',' + point.y).join(' '); return <g key={row.teamId} opacity={muted ? .22 : 1}><polyline fill="none" stroke={colors[index]} strokeWidth={activeFocus === row.teamId ? 3 : 2} points={points} />{row.points.map((point, pointIndex) => <g key={point.day}><circle cx={point.x} cy={point.y} r="2.5" fill={colors[index]} /><title>{'MD' + point.day + ': #' + point.rank}</title>{positionHistoryLabelVisible(teamIds.length, activeFocus, row.teamId, pointIndex, row.points.length) && <text x={point.x} y={point.y - 6} textAnchor="middle" fill={colors[index]} fontSize="8">{'#' + point.rank}</text>}</g>)}</g> })}</svg></div>
+    <div ref={scrollRef} onScroll={event => checkpoint().record(event.currentTarget.scrollLeft)} className="no-scrollbar overflow-x-auto overscroll-x-contain" aria-label="League Position History horizontal plot"><svg role="img" aria-label="League position comparison, first place at top" width={width} height={height} className="block"><text x="2" y="18" fill="#a1a1aa" fontSize="9">1</text><text x="2" y="148" fill="#a1a1aa" fontSize="9">{rankCount}</text>{series.map((row, index) => { const muted = activeFocus !== null && activeFocus !== row.teamId; const points = row.points.map(point => point.x + ',' + point.y).join(' '); return <g key={row.teamId} opacity={muted ? .22 : 1}><polyline fill="none" stroke={colors[index]} strokeWidth={activeFocus === row.teamId ? 3 : 2} points={points} />{row.points.map((point, pointIndex) => <g key={point.day}><circle cx={point.x} cy={point.y} r="2.5" fill={colors[index]} /><title>{'MD' + point.day + ': #' + point.rank}</title>{positionHistoryLabelVisible(teamIds.length, activeFocus, row.teamId, pointIndex, row.points.length) && <text x={point.x} y={point.y - 6} textAnchor="middle" fill={colors[index]} fontSize="8">{'#' + point.rank}</text>}</g>)}</g> })}</svg></div>
     <p className="mt-2 text-[9px] text-zinc-500">Matchday progression · 1st at top. Scroll only the plot for long seasons.</p>
   </div>
 }
@@ -236,7 +266,7 @@ function CupView({ season, teams, tournamentTeams, players, matches, cup, select
   const total = model.selection === 'total'
   const playedTeams = new Set(cup.stageMatches.flatMap(match => teamsCreditedWithResult(match)).filter(id => cup.activeTeamIds.includes(id))).size
   return <section><div className="mb-4 flex items-center justify-between gap-2 rounded-xl bg-zinc-900 px-3 py-2.5"><span className="text-xs text-zinc-400">{STAGE_LABELS[cup.stage]} · {playedTeams}/{cup.activeTeamIds.length} played</span><b className="text-xs text-emerald-400">{cup.activeTeamIds.length} teams remaining</b></div>
-    <div className="mb-3"><RankingMetricTabs size="award" label="Cup table stage" value={model.selection} onChange={onSelection} options={model.availableStages.map(stage => ({ value: stage, label: stage === 'finalReplay' ? 'Replay' : stage === 'final' ? 'Final' : `s${stage.replace('stage', '')}` }))} pinnedOption={{ value: 'total', label: 'Total' }} /></div>
+    <div className="mb-3"><RankingMetricTabs size="award" label="Cup table stage" value={model.selection} onChange={onSelection} options={model.availableStages.map(stage => ({ value: stage, label: stage === 'finalReplay' ? 'Replay' : stage === 'final' ? 'Final' : `S${stage.replace('stage', '')}` }))} pinnedOption={{ value: 'total', label: 'Total' }} /></div>
     <p className="mb-2 text-xs font-bold text-zinc-400">{model.label}{!total && model.complete ? ' · Complete' : ''}</p>
     {model.replayRequired && <p className="mb-2 text-xs text-amber-300">Final tied · Final Replay required.</p>}
     {model.eliminationDrawTeamIds.length > 0 && <p className="mb-2 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-[10px] font-bold text-amber-200">Elimination Draw applies only to {model.eliminationDrawTeamIds.length} teams tied across the Survival Line.</p>}
@@ -276,7 +306,7 @@ function Round({ title, pairs, card, side }: { title: string; pairs: ChampionsPa
   return <div className="relative"><span aria-hidden className={`absolute top-1/2 h-px w-4 bg-cyan-300/20 ${side === 'left' ? '-right-4' : '-left-4'}`} /><p className="mb-2 text-center text-[9px] font-black uppercase tracking-wide text-cyan-200/50">{title}</p><div className="space-y-3">{pairs.map(card)}</div></div>
 }
 
-function CompetitionRankings({ season, type, screenState, onStateChange, players, teams, matches, onNavigate }: { season: string; type: CompetitionType; screenState: ScreenStateByView['competition']; onStateChange: (state: ScreenStateByView['competition']) => void; players: Player[]; teams: Team[]; matches: Match[]; onNavigate: (view: View) => void }) {
+function CompetitionRankings({ season, type, screenState, onStateChange, players, teams, matches, onNavigate }: { season: string; type: CompetitionType; screenState: ScreenStateByView['competition']; onStateChange: CompetitionStateChange; players: Player[]; teams: Team[]; matches: Match[]; onNavigate: (view: View) => void }) {
   const metric = screenState.rankingMetric as LeaderboardMetric
   const setMetric = (next: LeaderboardMetric) => onStateChange({ ...screenState, rankingMetric: next })
   const rankingIndex = useMemo(() => measuredInDevelopment('Deferred Global Rankings/player stats/rating derivation', () => buildGlobalRankingData(players, matches, { seasons: [season], teams: [], positions: [] }, 'rating')), [players, matches, season])
@@ -297,7 +327,7 @@ function AwardScopeSelector({ ariaLabel, options, value, onChange }: { ariaLabel
   return <div role="group" aria-label={ariaLabel} className="mt-3 flex flex-wrap gap-1">{options.map(option => <button key={option.value} type="button" aria-pressed={option.value === value} onClick={() => onChange(option.value)} className={`rounded-full px-2.5 py-1 text-[10px] font-black ${option.value === value ? 'bg-emerald-400 text-black' : 'bg-zinc-800 text-zinc-300'}`}>{option.label}</button>)}</div>
 }
 
-function CompetitionBestElevens({ season, type, screenState, onStateChange, players, teams, matches, allMatches, cup, champions, onNavigate }: { season: string; type: CompetitionType; screenState: ScreenStateByView['competition']; onStateChange: (state: ScreenStateByView['competition']) => void; players: Player[]; teams: Team[]; matches: Match[]; allMatches: Match[]; cup: CupCompetition | null; champions: ReturnType<typeof championsCompetition> | null; onNavigate: (view: View) => void }) {
+function CompetitionBestElevens({ season, type, screenState, onStateChange, players, teams, matches, allMatches, cup, champions, onNavigate }: { season: string; type: CompetitionType; screenState: ScreenStateByView['competition']; onStateChange: CompetitionStateChange; players: Player[]; teams: Team[]; matches: Match[]; allMatches: Match[]; cup: CupCompetition | null; champions: ReturnType<typeof championsCompetition> | null; onNavigate: (view: View) => void }) {
   const { competitionStates = [] } = useStore()
   const tournamentTeams = useMemo(() => currentStaticTeams(teams), [teams])
   const awardModels = useMemo(() => type === 'cup' ? { cup: cup ?? undefined } : type === 'champions' ? { champions: champions ?? undefined } : {}, [type, cup, champions])

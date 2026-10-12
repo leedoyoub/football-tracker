@@ -2,7 +2,6 @@ import type { CompetitionType, Match, Player } from '../types'
 import { matchCompetitionType } from './competitionContext'
 import { oldestMatches } from './matchChronology'
 import { dominantPositionFamily, positionFamily, type PositionFamily } from './positionScope'
-import { scopedMetricRanks } from './seasonAnalytics'
 import { compareCoreLeaderboardRows } from './stats'
 import { ratePlayerMatch } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
@@ -45,6 +44,7 @@ export function playerRankTrend(playerId: string, players: Player[], matches: Ma
   const appearancesByPlayer = new Map<string, TeamAppearance[]>()
   const positionMinutes = new Map<string, Map<PositionFamily, number>>()
   const result: PlayerRankPoint[] = []
+  const needsOpportunities = metric === 'defenderGaPer90' || metric === 'goalkeeperGaPer90'
   const valueFor = (row: Running, availableTeamMinutes: number) => {
     if (metric === 'rating') return row.sum / row.apps
     if (metric === 'goals') return row.goals
@@ -54,13 +54,30 @@ export function playerRankTrend(playerId: string, players: Player[], matches: Ma
     if (metric === 'saves') return row.defensive.goalkeeperMinutes > 0 ? row.saves : null
     return defensiveRankingValue(metric, { ...row.defensive, availableTeamMinutes })
   }
-  const ranked = (rows: Iterable<Running>) => [...rows].flatMap(row => {
-    const available = teamOpportunityMinutesFromIndex(opportunityIndex, row.representedTeams, appearancesByPlayer.get(row.playerId) ?? [])
+  const presented = (rows: Iterable<Running>) => [...rows].flatMap(row => {
+    const available = needsOpportunities ? teamOpportunityMinutesFromIndex(opportunityIndex, row.representedTeams, appearancesByPlayer.get(row.playerId) ?? []) : 0
     const value = valueFor(row, available)
     return value === null ? [] : [{ playerId: row.playerId, teamId: row.teamId, historicalTeamId: row.teamId, avgRating: row.sum / row.apps, goals: row.goals, assists: row.assists, mom: 0, value }]
-  }).sort((left, right) => core(metric) ? compareCoreLeaderboardRows(left, right, metric) : (lowerIsBetter(metric) ? left.value - right.value : right.value - left.value) || right.avgRating - left.avgRating || left.playerId.localeCompare(right.playerId))
+  })
+  // The comparator is unchanged. Only the target's rank is needed at each point.
+  const targetRanks = (rows: ReturnType<typeof presented>, families?: Map<string, PositionFamily>) => {
+    const target = rows.find(row => row.playerId === playerId)
+    if (!target) return { overall: null, position: null, team: null }
+    const member = playerById.get(playerId)!
+    const family = families?.get(playerId) ?? positionFamily(member.position)
+    const rowFamily = (id: string) => families?.get(id) ?? positionFamily(playerById.get(id)?.position ?? 'ST')
+    let overall = 1; let position = rowFamily(playerId) === family ? 1 : null; let team = 1
+    for (const row of rows) {
+      const comparison = core(metric) ? compareCoreLeaderboardRows(row, target, metric) : (lowerIsBetter(metric) ? row.value - target.value : target.value - row.value) || target.avgRating - row.avgRating || row.playerId.localeCompare(target.playerId)
+      if (!(comparison < 0)) continue
+      overall++
+      if (position !== null && rowFamily(row.playerId) === family) position++
+      if (row.historicalTeamId === target.historicalTeamId) team++
+    }
+    return { overall, position, team }
+  }
   for (const [matchIndex, match] of ordered.entries()) {
-    appendRecordedTeamOpportunities(opportunityIndex, match, matchIndex)
+    if (needsOpportunities) appendRecordedTeamOpportunities(opportunityIndex, match, matchIndex)
     let targetTeamId: string | undefined
     for (const appearance of match.appearances) {
       const member = playerById.get(appearance.playerId)
@@ -74,20 +91,22 @@ export function playerRankTrend(playerId: string, players: Player[], matches: Ma
       }
       const rating = member && ratePlayerMatch(match, member)
       if (!rating) continue
-      const history = appearancesByPlayer.get(member.id) ?? []
-      history.push({ season: match.season, teamId: appearance.teamId, matchIndex })
-      appearancesByPlayer.set(member.id, history)
+      if (needsOpportunities) {
+        const history = appearancesByPlayer.get(member.id) ?? []
+        history.push({ season: match.season, teamId: appearance.teamId, matchIndex })
+        appearancesByPlayer.set(member.id, history)
+      }
       if (member.id === playerId) targetTeamId = appearance.teamId
-      const goalkeeper = playerGoalkeeperFacts(match, appearance)
-      const facts = defensiveMatchFacts(match, appearance, goalkeeper)
+      const goalkeeper = core(metric) ? null : playerGoalkeeperFacts(match, appearance)
+      const facts = goalkeeper && defensiveMatchFacts(match, appearance, goalkeeper)
       const goals = playerGoalEvents(match, appearance).length
       const assists = playerAssistEvents(match, appearance).length
       const add = (row: Running) => {
         row.sum += rating.raw; row.apps++; row.teamId = appearance.teamId
         row.goals += goals; row.assists += assists
-        row.cleanSheets += Number(goalkeeper.cleanSheet); row.saves += goalkeeper.saves
-        row.representedTeams.add(appearance.teamId)
-        addDefensiveRankingFacts(row.defensive, facts)
+        if (goalkeeper) { row.cleanSheets += Number(goalkeeper.cleanSheet); row.saves += goalkeeper.saves }
+        if (needsOpportunities) row.representedTeams.add(appearance.teamId)
+        if (facts) addDefensiveRankingFacts(row.defensive, facts)
       }
       const overall = totals.get(member.id) ?? running(member.id, appearance.teamId)
       add(overall); totals.set(member.id, overall)
@@ -101,10 +120,11 @@ export function playerRankTrend(playerId: string, players: Player[], matches: Ma
       const family = dominantPositionFamily(positionMinutes.get(member.id) ?? new Map()) ?? positionFamily(member.position)
       return family ? [[member.id, family] as const] : []
     }))
-    const rank = scopedMetricRanks(ranked(totals.values()), players, playerId, families)
-    const team = scopedMetricRanks(ranked(byTeam.get(targetTeamId)?.values() ?? []), players, playerId).team
+    const rank = targetRanks(presented(totals.values()), families)
+    const team = targetRanks(presented(byTeam.get(targetTeamId)?.values() ?? [])).team
     result.push({ match, teamId: targetTeamId, overall: rank.overall, position: rank.position, team })
   }
+  if (byScope.size >= 64) byScope.delete(byScope.keys().next().value!)
   byScope.set(key, result)
   return result
 }

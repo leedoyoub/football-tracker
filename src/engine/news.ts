@@ -24,7 +24,7 @@ type Streak = { scoring: number; contribution: number }
 type TeamRun = { wins: number; unbeaten: number; cleanSheets: number; seasonGoals: number; seasonCleanSheets: number }
 
 const EMPTY_STATES: CompetitionState[] = []
-type NewsCacheEntry = { revision: number; items: NewsItem[] }
+type NewsCacheEntry = { revision: number; items?: NewsItem[]; playerMilestones: Map<string, NewsItem[]> }
 const newsCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], NewsCacheEntry>>>>()
 
 /** The sole News chronology rule: newest date, newest anchored Match, then ID. */
@@ -113,7 +113,7 @@ function addAttackingMilestones(add: (item: NewsDraft) => void, player: Player, 
  * Deterministic milestone projection from raw Match/Event data. Stable IDs make
  * rerenders, hydration, sync and reopening an old match naturally idempotent.
  */
-function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[]): NewsItem[] {
+function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[], targetPlayerId?: string): NewsItem[] {
   const playerById = new Map<string, Player>()
   const teamById = new Map<string, Team>()
   const drawsBySeason = new Map<string, CompetitionState>()
@@ -124,7 +124,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
   const teamName = (_teams: Team[], id?: string) => teamById.get(id ?? '')?.name ?? 'Team'
   const scoreText = (match: Match, _teams: Team[]) => { const score = matchScore(match); return `${teamName(teams, match.homeTeamId)} ${score.home}-${score.away} ${teamName(teams, match.awayTeamId)} · ${competitionName(matchCompetitionType(match))}` }
   const items = new Map<string, NewsItem>()
-  const add = (item: NewsDraft) => { if (!items.has(item.id)) items.set(item.id, { ...item, emoji: newsEmoji(item) }) }
+  const add = (item: NewsDraft) => { if (targetPlayerId !== undefined && (item.playerId !== targetPlayerId || !item.milestone)) return; if (!items.has(item.id)) items.set(item.id, { ...item, emoji: newsEmoji(item) }) }
   const career = new Map<string, Totals>()
   const season = new Map<string, Totals>()
   const competition = new Map<string, Totals>()
@@ -132,7 +132,8 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
   const playerRuns = new Map<string, Streak>()
   const teamRuns = new Map<string, TeamRun>()
   const chronological = ordered(matches)
-  const analyticsBySeason = new Map([...new Set(matches.map(match => match.season))].map(seasonName => [seasonName, buildSeasonAnalytics(teams, players, matches, seasonName)]))
+  const analyticsBySeason = new Map((targetPlayerId === undefined ? [...new Set(matches.map(match => match.season))] : []).map(seasonName => [seasonName, buildSeasonAnalytics(teams, players, matches, seasonName)]))
+  const milestonePlayers = targetPlayerId === undefined ? players : players.filter(player => player.id === targetPlayerId)
   const chronologicalPrefixBySeason = new Map<string, Match[]>()
   // Track canonical snapshot and knockout transitions for News.
   const teamLeads = new Map<string, boolean>()
@@ -146,7 +147,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
     const context = scoreText(match, teams)
     
     // Team News: Knockout Stages (Cup / Champions)
-    if (type === 'cup' || type === 'champions') {
+    if (targetPlayerId === undefined && (type === 'cup' || type === 'champions')) {
         const matchesUpToDate = seasonPrefix
         if (type === 'cup') {
             const cup = cupCompetition(teams, matchesUpToDate, match.season, players)
@@ -222,7 +223,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
         }
     }
 
-    for (const event of match.events) {
+    for (const event of targetPlayerId === undefined ? match.events : []) {
       if (event.type === 'goal' && !event.ownGoal) {
         if (event.playerId && event.assistPlayerId) {
           const scorer = match.appearances.find(item => item.playerId === event.playerId && item.teamId === event.teamId)
@@ -236,7 +237,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
     }
     // ...
     const momId = getMatchManOfTheMatch(match, players)
-    for (const player of players) {
+    for (const player of milestonePlayers) {
       if (!didAppear(match, player.id)) continue
       const appearance = match.appearances.find(item => item.playerId === player.id)!
       const goalkeeper = playerGoalkeeperFacts(match, appearance)
@@ -287,7 +288,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
       if (run.contribution === 5) add({ id: `streak:contribution:${match.id}:${player.id}:5`, kind: 'player', date: match.date, matchId: match.id, playerId: player.id, eyebrow: 'FORM STREAK', title: `${playerName(players, player.id)} contributes in 5 consecutive appearances`, detail: 'Goal or assist in each appearance.', context })
     }
 
-    for (const teamId of teamsCreditedWithResult(match)) {
+    for (const teamId of targetPlayerId === undefined ? teamsCreditedWithResult(match) : []) {
       if (!teamById.has(teamId)) continue
       const perspective = teamPerspectiveScore(match, teamId)!
       const ours = perspective.goalsFor; const theirs = perspective.goalsAgainst
@@ -301,6 +302,8 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
       for (const value of crossed(priorCleanSheets, run.seasonCleanSheets, [10, 20])) add({ id: `team-season-clean-sheets:${match.season}:${teamId}:${value}`, kind: 'team', date: match.date, matchId: match.id, teamId, eyebrow: 'TEAM MILESTONE', title: `${teamName(teams, teamId)} reach ${value} clean sheets this season`, detail: 'All competitions combined.', context })
     }
   }
+
+  if (targetPlayerId !== undefined) return sortNewsNewestFirst([...items.values()], matches)
 
   // Rank and Monthly Award stories consume the shared season snapshots. They
   // never rebuild historical tables or player leaderboards inside this feed.
@@ -380,17 +383,32 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
   return sortNewsNewestFirst([...items.values()], matches)
 }
 
-export function deriveNews(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES): NewsItem[] {
+function newsEntry(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[]): NewsCacheEntry {
   let byPlayers = newsCache.get(matches)
   if (!byPlayers) { byPlayers = new WeakMap(); newsCache.set(matches, byPlayers) }
   let byTeams = byPlayers.get(players)
   if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
   let byStates = byTeams.get(teams)
   if (!byStates) { byStates = new WeakMap(); byTeams.set(teams, byStates) }
-  const cached = byStates.get(states)
-  if (cached?.revision === RATING_ENGINE_REVISION) return cached.items
-  const result = deriveNewsUncached(players, teams, matches, states)
-  byStates.set(states, { revision: RATING_ENGINE_REVISION, items: result })
+  let cached = byStates.get(states)
+  if (!cached || cached.revision !== RATING_ENGINE_REVISION) { cached = { revision: RATING_ENGINE_REVISION, playerMilestones: new Map() }; byStates.set(states, cached) }
+  return cached
+}
+
+export function deriveNews(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES): NewsItem[] {
+  const entry = newsEntry(players, teams, matches, states)
+  return entry.items ??= deriveNewsUncached(players, teams, matches, states)
+}
+
+/** Reuse canonical attacking milestone generation without building unrelated
+ * team/ranking/award stories for the Player Detail preview. */
+export function derivePlayerMilestones(playerId: string, players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES): NewsItem[] {
+  const entry = newsEntry(players, teams, matches, states)
+  const cached = entry.playerMilestones.get(playerId)
+  if (cached) return cached
+  const result = entry.items ? entry.items.filter(item => item.playerId === playerId && item.milestone) : deriveNewsUncached(players, teams, matches, states, playerId)
+  if (entry.playerMilestones.size >= 64) entry.playerMilestones.delete(entry.playerMilestones.keys().next().value!)
+  entry.playerMilestones.set(playerId, result)
   return result
 }
 

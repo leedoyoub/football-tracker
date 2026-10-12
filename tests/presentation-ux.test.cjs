@@ -4,6 +4,7 @@ const Module = require('node:module')
 const { test } = require('node:test')
 const ts = require('typescript')
 const React = require('react')
+const { renderToStaticMarkup } = require('react-dom/server')
 for (const ext of ['.ts', '.tsx']) require.extensions[ext] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
 }).outputText, filename)
@@ -124,7 +125,7 @@ test('Home footer reads the central version and common layout reserves nav plus 
   const tree = screen(HomeScreen, { players: [], matches: [], teams }).render()
   const footer = nodes(tree, n => n.type === 'footer')[0]
   assert(text(footer).includes('Football Tracker \u00b7 v' + APP_VERSION))
-  const sections = nodes(tree, n => n.props?.['data-home-section']).map(n => n.props['data-home-section'])
+  const sections = [...renderToStaticMarkup(tree).matchAll(/data-home-section="([^"]+)"/g)].map(match => match[1])
   assert.deepEqual(sections, ['recent-matches', 'latest-changes', 'season-leaders', 'season-award-race', 'season-best-xi'])
   assert(nodes(tree, n => n.type === 'footer').includes(footer))
   const css = fs.readFileSync(require.resolve('../src/index.css'), 'utf8')

@@ -1,0 +1,56 @@
+﻿{
+    "baseSha":  "090d6f07d7d9910b41fd1fbb05382dcf0d884258",
+    "entryJsKb":  919.52,
+    "entryGzipKb":  259.9,
+    "largestOriginalSources":  [
+                                   {
+                                       "source":  "../../../../node_modules/react-dom/cjs/react-dom-client.production.js",
+                                       "originalSourceChars":  536016
+                                   },
+                                   {
+                                       "source":  "../../../../node_modules/@supabase/auth-js/dist/module/GoTrueClient.js",
+                                       "originalSourceChars":  265556
+                                   },
+                                   {
+                                       "source":  "../../../../node_modules/@supabase/postgrest-js/dist/index.mjs",
+                                       "originalSourceChars":  111215
+                                   },
+                                   {
+                                       "source":  "../../../../node_modules/@supabase/storage-js/dist/index.mjs",
+                                       "originalSourceChars":  110833
+                                   },
+                                   {
+                                       "source":  "../../../../node_modules/@dnd-kit/core/dist/core.esm.js",
+                                       "originalSourceChars":  104325
+                                   },
+                                   {
+                                       "source":  "../../../../src/screens/NewMatchScreen.tsx",
+                                       "originalSourceChars":  64841
+                                   },
+                                   {
+                                       "source":  "../../../../node_modules/@supabase/phoenix/priv/static/phoenix.mjs",
+                                       "originalSourceChars":  56197
+                                   },
+                                   {
+                                       "source":  "../../../../src/screens/CompetitionScreen.tsx",
+                                       "originalSourceChars":  53613
+                                   },
+                                   {
+                                       "source":  "../../../../src/engine/competition.ts",
+                                       "originalSourceChars":  46834
+                                   },
+                                   {
+                                       "source":  "../../../../src/engine/news.ts",
+                                       "originalSourceChars":  42830
+                                   },
+                                   {
+                                       "source":  "../../../../node_modules/@supabase/auth-js/dist/module/GoTrueAdminApi.js",
+                                       "originalSourceChars":  40608
+                                   },
+                                   {
+                                       "source":  "../../../../src/screens/PlayerDetailScreen.tsx",
+                                       "originalSourceChars":  38691
+                                   }
+                               ],
+    "caveat":  "Original source character counts from the production sourcemap identify modules; they are not minified module byte attribution or browser parse/execute timings."
+}

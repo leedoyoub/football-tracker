@@ -126,6 +126,7 @@ export function buildPlayerRecordLeaderboards(players: Player[], matches: Match[
     group('highest-rating', 'Highest Match Rating', row => row.highestRating, '', row => `${row.highestRating.toFixed(2)} canonical raw rating`), group('highest-goals', 'Most Goals in a Match', row => row.highestGoals, ' goals'),
     group('highest-assists', 'Most Assists in a Match', row => row.highestAssists, ' assists'), group('highest-ga', 'Most G+A in a Match', row => row.highestGA, ' G+A'),
   ]
+  if (byScope.size >= 32) byScope.delete(byScope.keys().next().value!)
   byScope.set(key, result)
   return result
 }

@@ -6,6 +6,7 @@ import { positionFamily, scopedPositionFamilyByPlayer } from '../engine/position
 import { useStore } from '../store'
 import { currentMembershipPresentation } from '../lib/currentMembershipPresentation'
 import { currentTeamIds } from '../lib/roster'
+import { playerAppearanceMatchIndex } from '../engine/playerMatchFacts'
 import { matchesForPlayer, playerHasNoCurrentTeam, RankingFilterButton } from './RankingFilters'
 import type { ScreenStateByView, View } from '../types'
 import type { RankingFilters } from './RankingFilters'
@@ -20,11 +21,13 @@ export function PlayersScreen({ screenState, onStateChange, onNavigate }: { scre
   const setSearch = (value: string) => onStateChange({ ...screenState, search: value })
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
+    const needsHistory = appliedFilters.seasons.length > 0 || appliedFilters.teams.length > 0
+    const appearanceIndex = needsHistory ? playerAppearanceMatchIndex(matches) : undefined
     return players
       .filter(player => !appliedFilters.positions.length || appliedFilters.positions.some(position => positionFamily(position) === representative.get(player.id)))
       .filter(player => [player.displayName, player.fullName, player.name].some(name => name?.toLowerCase().includes(query)))
       .map(player => {
-        const playerMatches = matchesForPlayer(player, matches, appliedFilters)
+        const playerMatches = needsHistory ? matchesForPlayer(player, matches, appliedFilters, appearanceIndex) : []
         const membership = currentMembershipPresentation(player, appliedFilters.teams, teams)
         return { player, team: teams.find(team => team.id === membership.teamId), membershipLabel: membership.label, matchesFilter: (!appliedFilters.seasons.length && !appliedFilters.teams.length) || playerMatches.length > 0 || (appliedFilters.teams.includes('__no-team__') && playerHasNoCurrentTeam(player)) || (!appliedFilters.seasons.length && currentTeamIds(player).some(id => appliedFilters.teams.includes(id))) }
       })

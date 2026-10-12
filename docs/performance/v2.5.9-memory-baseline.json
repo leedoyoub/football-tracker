@@ -1,0 +1,171 @@
+{
+  "baseSha": "090d6f07d7d9910b41fd1fbb05382dcf0d884258",
+  "queries": 128,
+  "samples": 3,
+  "node": "v24.19.0",
+  "caveat": "Forced-GC Node probe of active-snapshot query retention, not browser heap, peak memory or a universal leak proof. Fixture is intentionally restricted to64 matches to isolate cached query objects.",
+  "before": {
+    "Global Ranking query scopes": [
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 29051512,
+        "finalHeapBytes": 38436032,
+        "retainedHeapDeltaBytes": 9384520
+      },
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 30348064,
+        "finalHeapBytes": 39155304,
+        "retainedHeapDeltaBytes": 8807240
+      },
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 30375480,
+        "finalHeapBytes": 39147680,
+        "retainedHeapDeltaBytes": 8772200
+      }
+    ],
+    "Rank Trend player scopes": [
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 30391016,
+        "finalHeapBytes": 31828376,
+        "retainedHeapDeltaBytes": 1437360
+      },
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 30706680,
+        "finalHeapBytes": 31995568,
+        "retainedHeapDeltaBytes": 1288888
+      },
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 30711320,
+        "finalHeapBytes": 32018488,
+        "retainedHeapDeltaBytes": 1307168
+      }
+    ],
+    "Player Derived scopes": [
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 30727024,
+        "finalHeapBytes": 31288880,
+        "retainedHeapDeltaBytes": 561856
+      },
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 31106904,
+        "finalHeapBytes": 31608360,
+        "retainedHeapDeltaBytes": 501456
+      },
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 31190464,
+        "finalHeapBytes": 31626640,
+        "retainedHeapDeltaBytes": 436176
+      }
+    ],
+    "Player Records scopes": [
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 31198760,
+        "finalHeapBytes": 40960752,
+        "retainedHeapDeltaBytes": 9761992
+      },
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 31581512,
+        "finalHeapBytes": 41136384,
+        "retainedHeapDeltaBytes": 9554872
+      },
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 31567416,
+        "finalHeapBytes": 41144056,
+        "retainedHeapDeltaBytes": 9576640
+      }
+    ]
+  },
+  "after": {
+    "Global Ranking query scopes": [
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 29714416,
+        "finalHeapBytes": 39070432,
+        "retainedHeapDeltaBytes": 9356016
+      },
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 30335880,
+        "finalHeapBytes": 39136248,
+        "retainedHeapDeltaBytes": 8800368
+      },
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 30380144,
+        "finalHeapBytes": 39159424,
+        "retainedHeapDeltaBytes": 8779280
+      }
+    ],
+    "Rank Trend player scopes": [
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 30551960,
+        "finalHeapBytes": 31984280,
+        "retainedHeapDeltaBytes": 1432320
+      },
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 30694984,
+        "finalHeapBytes": 31991904,
+        "retainedHeapDeltaBytes": 1296920
+      },
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 30719080,
+        "finalHeapBytes": 32030160,
+        "retainedHeapDeltaBytes": 1311080
+      }
+    ],
+    "Player Derived scopes": [
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 30871136,
+        "finalHeapBytes": 31453192,
+        "retainedHeapDeltaBytes": 582056
+      },
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 31025992,
+        "finalHeapBytes": 31532992,
+        "retainedHeapDeltaBytes": 507000
+      },
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 31196144,
+        "finalHeapBytes": 31628576,
+        "retainedHeapDeltaBytes": 432432
+      }
+    ],
+    "Player Records scopes": [
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 31400848,
+        "finalHeapBytes": 41151096,
+        "retainedHeapDeltaBytes": 9750248
+      },
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 31593496,
+        "finalHeapBytes": 41146488,
+        "retainedHeapDeltaBytes": 9552992
+      },
+      {
+        "retainedResults": 128,
+        "startingHeapBytes": 31580112,
+        "finalHeapBytes": 41155296,
+        "retainedHeapDeltaBytes": 9575184
+      }
+    ]
+  }
+}

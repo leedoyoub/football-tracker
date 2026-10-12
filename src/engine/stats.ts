@@ -385,6 +385,7 @@ export function buildGlobalRankingData(
     return [{ ...stats, ...defensive, value, historicalTeamId: latest?.appearances.find(item => item.playerId === player.id)?.teamId, playedGoalkeeper, concededOnPitch, qualifyingConceded: concededOnPitch, qualifyingGoalkeeperMinutes, qualifyingGoalkeeperAppearances, qualifyingSaves, cleanSheets, goalkeeperRatings, goalkeeperMinutes, allGoalkeeperMinutes: goalkeeperMinutes, goalkeeperAppearances, goalkeeperConceded, scopedPositionFamily: historicalPositionFamilies.get(player.id) }]
   })
   const presented = presentMetric(rows, _metric)
+  if (byFilter.size >= 64) byFilter.delete(byFilter.keys().next().value!)
   byFilter.set(cacheKey, { rows, presented: new Map([[_metric, presented]]) })
   return presented
 }

@@ -89,6 +89,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const persistenceQueue = useRef(createPersistenceQueue(LocalRepository.saveAppState))
   const draftTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const draftEpoch = useRef(0)
+  const draftNeedsRetry = useRef(false)
   const persistenceEpoch = useRef(0)
   /** Finalised IDs reject any late editor-effect checkpoint for that draft. */
   const finalizingDraftIds = useRef(new Set<string>())
@@ -168,7 +169,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!safety.safe) throw new Error(safety.message)
     }
     if (draftTimer.current) { clearTimeout(draftTimer.current); draftTimer.current = undefined }
-    draftEpoch.current++
+    const cancelledDraftEpoch = ++draftEpoch.current
     finalizingDraftIds.current.add(saved.id)
     const nextWithoutMarkers: AppState = previousMatch
       ? { ...prior, matches: prior.matches.map(item => item.id === saved.id ? saved : item) }
@@ -181,6 +182,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       durability = await persistLocal(next)
     } catch (error) {
       finalizingDraftIds.current.delete(saved.id)
+      if (draftEpoch.current === cancelledDraftEpoch) draftNeedsRetry.current = true
       throw error
     }
     setSnapshot(current => {
@@ -199,11 +201,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (finalizingDraftIds.current.has(match.id)) return
     setSnapshot(current => {
       if (finalizingDraftIds.current.has(match.id)) return current
-      const next = { ...current.data, draftMatch: match }
+      const unchanged = current.data.draftMatch && sameRawMatch(current.data.draftMatch, match)
+      if (unchanged && !draftNeedsRetry.current) return current
+      draftNeedsRetry.current = false
+      const next = unchanged ? current.data : { ...current.data, draftMatch: match }
       if (draftTimer.current) clearTimeout(draftTimer.current)
       const epoch = ++draftEpoch.current
-      draftTimer.current = setTimeout(() => { draftTimer.current = undefined; void persistLocal(next, () => draftEpoch.current === epoch).catch(() => undefined) }, 450)
-      return { ...current, data: next }
+      draftTimer.current = setTimeout(() => { draftTimer.current = undefined; void persistLocal(next, () => draftEpoch.current === epoch).catch(() => { if (draftEpoch.current === epoch) draftNeedsRetry.current = true }) }, 450)
+      return unchanged ? current : { ...current, data: next }
     })
   }, [persistLocal])
   const clearDraftMatch = useCallback(() => {

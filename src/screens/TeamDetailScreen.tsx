@@ -9,7 +9,7 @@ import { RANKING_METRICS, formatRankingMetricValue } from '../lib/rankingMetrics
 import { buildGlobalRankingData, rankGlobalRankingRows, playerSeasonStats, seasonsFromMatches, teamBestEleven, type LeaderboardMetric } from '../engine/stats'
 import { matchCompetitionType, teamCompetitionOverview } from '../engine/competition'
 import { teamsCreditedWithResult } from '../engine/matchPerspective'
-import { buildSeasonAnalytics } from '../engine/seasonAnalytics'
+import { buildLeagueHistory } from '../engine/seasonAnalytics'
 import { RankDelta, SegmentedControl } from '../components/SeasonUI'
 import { CompetitionScopeSelector } from '../components/CompetitionScopeSelector'
 import { useStore } from '../store'
@@ -34,7 +34,7 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
   const representative = useMemo(() => scopedPositionFamilyByPlayer(players, matches, {}), [players, matches])
   const selectedBestSeason = seasons.includes(bestSeason) ? bestSeason : activeSeason
   const overview = useMemo(() => tab === 'overview' ? teamCompetitionOverview(teamId, teams, matches, activeSeason, players, competitionStates) : undefined, [tab, teamId, teams, matches, activeSeason, players, competitionStates])
-  const analytics = useMemo(() => tab === 'overview' ? buildSeasonAnalytics(teams, players, matches, activeSeason) : undefined, [tab, teams, players, matches, activeSeason])
+  const analytics = useMemo(() => tab === 'overview' ? buildLeagueHistory(teams, players, matches, activeSeason) : undefined, [tab, teams, players, matches, activeSeason])
   const playerData = useMemo(() => {
     if (tab !== 'players') return undefined
     const canonicalBest = teamBestEleven(players, matches, teamId, activeSeason)

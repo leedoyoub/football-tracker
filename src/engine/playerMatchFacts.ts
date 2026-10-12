@@ -4,21 +4,30 @@ import { creditedPositionSegments, hasPitchAppearance, isOnPitchAtEvent, matchPo
 type GoalEvent = Extract<MatchEvent, { type: 'goal' }>
 type SaveEvent = Extract<MatchEvent, { type: 'save' }>
 
-const appearanceMatchIndex = new WeakMap<Match[], { matches: Match[]; appearances: Appearance[][]; byPlayer: Map<string, Match[]> }>()
+const appearanceMatchIndex = new WeakMap<Match[], { matches: Match[]; appearances: Appearance[][]; playerIds: string[][]; byPlayer: Map<string, Match[]> }>()
 
 /** Historical membership is indexed from recorded appearances, including
  * unused substitutes and IDs no longer present in the current roster. */
-export function matchesWithPlayerAppearance(playerId: string, matches: Match[]): Match[] {
+function appearanceIndex(matches: Match[], inspectPlayerIds: boolean): ReadonlyMap<string, readonly Match[]> {
   let index = appearanceMatchIndex.get(matches)
-  if (!index || index.matches.length !== matches.length || matches.some((match, position) => match !== index!.matches[position] || match.appearances !== index!.appearances[position])) {
+  if (!index || index.matches.length !== matches.length || matches.some((match, position) => match !== index!.matches[position] || match.appearances !== index!.appearances[position] || inspectPlayerIds && (match.appearances.length !== index!.playerIds[position].length || match.appearances.some((appearance, i) => appearance.playerId !== index!.playerIds[position][i])))) {
     const byPlayer = new Map<string, Match[]>()
     for (const match of matches) for (const id of new Set(match.appearances.map(appearance => appearance.playerId))) {
       const rows = byPlayer.get(id) ?? []
       rows.push(match); byPlayer.set(id, rows)
     }
-    index = { matches: matches.slice(), appearances: matches.map(match => match.appearances), byPlayer }; appearanceMatchIndex.set(matches, index)
+    index = { matches: matches.slice(), appearances: matches.map(match => match.appearances), playerIds: matches.map(match => match.appearances.map(appearance => appearance.playerId)), byPlayer }; appearanceMatchIndex.set(matches, index)
   }
-  return index.byPlayer.get(playerId)?.slice() ?? []
+  return index.byPlayer
+}
+
+/** Validate legacy membership edits once for an entire directory query. */
+export function playerAppearanceMatchIndex(matches: Match[]): ReadonlyMap<string, readonly Match[]> {
+  return appearanceIndex(matches, true)
+}
+
+export function matchesWithPlayerAppearance(playerId: string, matches: Match[]): Match[] {
+  return appearanceIndex(matches, false).get(playerId)?.slice() ?? []
 }
 
 /** These are read-time player facts; raw events and lineup records are never changed. */

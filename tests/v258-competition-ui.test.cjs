@@ -67,7 +67,7 @@ test('Cup selector uses award-size labels and original IDs with pinned Total and
   const render = () => h.render({ season: 'S1', teams, tournamentTeams: teams, players: [], matches, cup: cupCompetition(teams, matches, 'S1'), selection: selected, onSelection: value => { selected = value }, onNavigate() {} })
   let tree = render(); const tabs = nodes(tree, n => n.type?.name === 'RankingMetricTabs')[0]
   assert.equal(tabs.props.size, 'award')
-  assert.deepEqual(tabs.props.options.map(o => [o.value, o.label]), [['stage1', 's1'], ['stage2', 's2'], ['stage3', 's3'], ['stage4', 's4'], ['stage5', 's5'], ['stage6', 's6'], ['stage7', 's7'], ['final', 'Final']])
+  assert.deepEqual(tabs.props.options.map(o => [o.value, o.label]), [['stage1', 'S1'], ['stage2', 'S2'], ['stage3', 'S3'], ['stage4', 'S4'], ['stage5', 'S5'], ['stage6', 'S6'], ['stage7', 'S7'], ['final', 'Final']])
   const pills = harness('src/components/RankingRow.tsx', 'RankingMetricTabs')
   const pillTree = pills.render(tabs.props)
   const buttons = nodes(pillTree, n => n.type === 'button')

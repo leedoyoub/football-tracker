@@ -61,11 +61,12 @@ export function selectCupCompetition(
   teamCatalogRevision: number,
   players: Player[] = EMPTY_PLAYERS,
   onDiagnostic?: (diagnostic: CompetitionCacheDiagnostic) => void,
+  teamScope: LeagueTeamScope = 'all',
 ): CupValue {
   const start = clock()
   let cache = caches.get(owner)
   if (!cache) { cache = new Map(); caches.set(owner, cache) }
-  const key = `${season}:cup`
+  const key = `${season}:cup${teamScope === 'all' ? '' : ':tournament'}`
   const prior = cache.get(key) as CupEntry | undefined
   if (prior?.revision === revision && prior.ratingRevision === RATING_ENGINE_REVISION && prior.teamCatalogRevision === teamCatalogRevision && prior.players === players) {
     onDiagnostic?.({ key: `${season}:cup:r${revision}:t${teamCatalogRevision}`, hit: true, reason: 'unchanged-revision', durationMs: clock() - start })

@@ -37,6 +37,7 @@ import { appContentOverflowClass } from './lib/routeLayout'
 import { loadLocalModePreference, saveLocalModePreference } from './lib/localMode'
 import { backFromTeamDetailEntries, closeTransientWorkflow, completeTransientWorkflowToBrowse, createNavigationEntry, enterTransientWorkflow, navigateBrowseEntry, popNavigationEntry, replaceNavigationEntry, resetNavigationEntries, updateCurrentScreenState } from './lib/navigation'
 import { restoreScrollWhenReachable } from './lib/scrollRestoration'
+import { flushScrollCheckpoints } from './lib/scrollCheckpoint'
 import { resetCompetitionTypeScroll } from './lib/competitionTypeScroll'
 import { resolvePlayerDestination } from './lib/playerNavigation'
 import { resetCompetitionSeasonState } from './lib/competitionScreenState'
@@ -111,6 +112,7 @@ export default function App() {
   }, [view])
 
   function onTab(next: Tab) {
+    flushScrollCheckpoints()
     restoreScroll.current = true
     if (next === 'home') setHistory(resetNavigationEntries({ name: 'home' }))
     if (next === 'teams') setHistory(resetNavigationEntries({ name: 'teams' }))
@@ -120,6 +122,7 @@ export default function App() {
   }
 
   function onNavigate(next: View) {
+    flushScrollCheckpoints()
     restoreScroll.current = true
     setHistory((prev) => {
       const scrollTop = scrollRef.current?.scrollTop ?? 0
@@ -134,40 +137,60 @@ export default function App() {
   }
 
   function onBack() {
+    flushScrollCheckpoints()
     restoreScroll.current = true
     setHistory(popNavigationEntry)
   }
 
   function onTeamDetailBack() {
+    flushScrollCheckpoints()
     restoreScroll.current = true
     setHistory(backFromTeamDetailEntries)
   }
 
   function onCloseTransientWorkflow() {
+    flushScrollCheckpoints()
     restoreScroll.current = true
     setHistory(prev => closeTransientWorkflow(prev, { name: 'home' }))
   }
 
   function onCompleteTransientWorkflow(next: View) {
+    flushScrollCheckpoints()
     restoreScroll.current = true
     setHistory(prev => closeTransientWorkflow(prev, next))
   }
 
   function onCompleteNewMatchWorkflow(next: View) {
+    flushScrollCheckpoints()
     restoreScroll.current = true
     setHistory(prev => completeTransientWorkflowToBrowse(prev, next))
   }
 
   function onReplace(next: View) {
+    flushScrollCheckpoints()
     restoreScroll.current = true
     setHistory(prev => replaceNavigationEntry(prev, next))
   }
 
-  function onStateChange(next: ScreenState) {
-    setHistory(prev => updateCurrentScreenState(prev, next))
+  function onStateChange(next: ScreenState, patch?: Partial<ScreenState>) {
+    setHistory(prev => {
+      if (!patch) return updateCurrentScreenState(prev, next)
+      const current = prev[prev.length - 1]
+      if (!current || current.screenState.name !== next.name) return prev
+      if (Object.entries(patch).every(([key, value]) => Object.is((current.screenState as unknown as Record<string, unknown>)[key], value))) return prev
+      return updateCurrentScreenState(prev, { ...current.screenState, ...patch } as ScreenState)
+    })
+  }
+
+  function persistPlotScroll(left: number) {
+    if (!routeRestored || loading || !canUseApp(startup)) return
+    const current = history[history.length - 1]
+    if (!current || current.view.name !== 'competition' || current.screenState.name !== 'competition') return
+    saveLastRoute(current.view, store.draftMatch, undefined, { ...current.screenState, historyPlotScrollLeft: left })
   }
 
   function onCompetitionTypeChange(next: CompetitionType) {
+    flushScrollCheckpoints()
     resetCompetitionTypeScroll(scrollRef.current)
     setHistory(prev => {
       const current = prev[prev.length - 1]
@@ -178,11 +201,13 @@ export default function App() {
   }
 
   function onBackToTeam(teamId: string) {
+    flushScrollCheckpoints()
     restoreScroll.current = true
     setHistory(prev => navigateBrowseEntry(prev, { name: 'team', id: teamId }, scrollRef.current?.scrollTop ?? 0))
   }
 
   function dismissPlayerEdit(playerId: string) {
+    flushScrollCheckpoints()
     restoreScroll.current = true
     setHistory(prev => {
       const previous = prev[prev.length - 2]?.view
@@ -205,7 +230,7 @@ export default function App() {
             <HomeScreen season={season} screenState={entry.screenState as ScreenStateByView['home']} onStateChange={onStateChange} onSeason={setSeason} onNavigate={onNavigate} />
           )}
           {view.name === 'latest-changes' && <LatestChangesScreen season={view.season ?? season} onNavigate={onNavigate} onBack={onBack} />}
-          {view.name === 'competition' && <CompetitionScreen season={view.season ?? season} screenState={entry.screenState as ScreenStateByView['competition']} onStateChange={onStateChange} onCompetitionTypeChange={onCompetitionTypeChange} onSeason={(nextSeason) => { if (nextSeason === (view.season ?? season)) return; setSeason(nextSeason); setHistory(previous => previous.map((item, index) => index === previous.length - 1 && item.view.name === 'competition' ? { ...item, scrollTop: 0, view: { ...item.view, season: nextSeason }, screenState: resetCompetitionSeasonState(item.screenState as ScreenStateByView['competition']) } : item)); resetCompetitionTypeScroll(scrollRef.current) }} onNavigate={onNavigate} />}
+          {view.name === 'competition' && <CompetitionScreen season={view.season ?? season} screenState={entry.screenState as ScreenStateByView['competition']} onStateChange={onStateChange} onCompetitionTypeChange={onCompetitionTypeChange} onSeason={(nextSeason) => { if (nextSeason === (view.season ?? season)) return; flushScrollCheckpoints(); setSeason(nextSeason); setHistory(previous => previous.map((item, index) => index === previous.length - 1 && item.view.name === 'competition' ? { ...item, scrollTop: 0, view: { ...item.view, season: nextSeason }, screenState: resetCompetitionSeasonState(item.screenState as ScreenStateByView['competition']) } : item)); resetCompetitionTypeScroll(scrollRef.current) }} onNavigate={onNavigate} onPersistPlotScroll={persistPlotScroll} />}
           {view.name === 'global-ranking' && <GlobalRankingScreen season={view.season ?? season} screenState={entry.screenState as ScreenStateByView['global-ranking']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'award-race' && <AwardRaceScreen screenState={entry.screenState as ScreenStateByView['award-race']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'results' && <ResultsScreen onNavigate={onNavigate} onBack={onBack} />}

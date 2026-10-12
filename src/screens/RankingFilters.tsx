@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { POSITION_GROUPS, REGISTRATION_POSITIONS, type Match, type Player, type Position, type Team } from '../types'
+import { playerAppearanceMatchIndex } from '../engine/playerMatchFacts'
 
 export type RankingFilters = { seasons: string[]; teams: string[]; positions: Position[] }
 export const emptyFilters: RankingFilters = { seasons: [], teams: [], positions: [] }
@@ -7,8 +8,9 @@ export const emptyFilters: RankingFilters = { seasons: [], teams: [], positions:
 export const NO_TEAM_FILTER = '__no-team__'
 export function playerHasNoCurrentTeam(player: Player) { return ![player.teamId, ...(player.teamIds ?? [])].filter(Boolean).length }
 
-export function matchesForPlayer(player: Player, matches: Match[], filters: RankingFilters) {
-  return matches.filter(match =>
+export function matchesForPlayer(player: Player, matches: Match[], filters: RankingFilters, index?: ReadonlyMap<string, readonly Match[]>) {
+  const appearances = (index ?? playerAppearanceMatchIndex(matches)).get(player.id) ?? []
+  return appearances.filter(match =>
     (!filters.seasons.length || filters.seasons.includes(match.season)) &&
     match.appearances.some(appearance => appearance.playerId === player.id) &&
     (!filters.teams.length ||

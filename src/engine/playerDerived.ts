@@ -71,7 +71,10 @@ export function derivePlayerScope(player: Player, players: Player[], matches: Ma
   let byScope = byPlayers.get(players)
   if (!byScope) { byScope = new Map(); byPlayers.set(players, byScope) }
   const key = `${RATING_ENGINE_REVISION}:${scopeKey(scope)}`; let byPlayer = byScope.get(key)
-  if (!byPlayer) { byPlayer = new Map(); byScope.set(key, byPlayer) }
+  if (!byPlayer) {
+    if (byScope.size >= 32) byScope.delete(byScope.keys().next().value!)
+    byPlayer = new Map(); byScope.set(key, byPlayer)
+  }
   const existing = byPlayer.get(player.id); if (existing) { onDiagnostic?.({ cacheHit: true }); return existing }
   const appearances: DerivedAppearance[] = []
   for (const match of scoped(matches, scope)) {
