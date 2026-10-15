@@ -1,0 +1,15 @@
+{
+  "releaseCommit": "cd934ad675324cfc23558d49167097db9445d095",
+  "runId": 38778805983,
+  "runNumber": 118,
+  "status": "completed",
+  "conclusion": "success",
+  "url": "https://github.com/leedoyoub/football-tracker/actions/runs/38778805983",
+  "jobs": [
+    { "name": "build", "status": "completed", "conclusion": "success" },
+    { "name": "deploy", "status": "completed", "conclusion": "success" }
+  ],
+  "pageUrl": "https://leedoyoub.github.io/football-tracker/",
+  "publicAssetEvidence": "v2.5.10-public-assets.json",
+  "browserDeviceOfflineValidation": "not performed"
+}

@@ -48,4 +48,4 @@
 - [x] 동일 fixture 반복 cold/revisit Node CPU, Home/Ranking/Results/Log Match/Players, 번들 비교. 측정 증거가 있는 최적화만 반영.
 - [x] 독립 리뷰 및 지적 재현/수정, 전체 test/lint/build/diff 검사.
 - [x] 2.5.10 버전·assertion·릴리스 보고서 작성 후 최종 검사.
-- [ ] commit, non-force main push, Actions/Pages 결과 확인, 가능하면 배포 버전 검사 및 clean tree 보고.
+- [x] commit, non-force main push, Actions/Pages 결과 확인, 공개 자산2.5.10·HTTP200 및 clean tree 확인. 코드 릴리스 cd934ad, Actions #118 build/deploy success. 증빙 문서는 후속 커밋에 보존.
