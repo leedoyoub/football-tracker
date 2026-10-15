@@ -1,7 +1,8 @@
 import type { Best11Slot, Player, Position, Team } from '../types'
 import { PlayerIcon } from './PlayerIcon'
 import { TeamIcon } from './TeamIcon'
-import { playerCompactName, playerDisplayName, Badge, SubstitutionMarker, SubstitutionSelection, ratingBadgeColor } from './ui'
+import { playerCompactName, Badge, SubstitutionMarker, SubstitutionSelection, ratingBadgeColor } from './ui'
+import { historicalPlayerLabel } from '../lib/historicalPlayerDisplay'
 import { useRef } from 'react'
 import { DndContext, PointerSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type CollisionDetection, type DragEndEvent } from '@dnd-kit/core'
 import { NAMED_TACTICAL_FORMATIONS, TACTICAL_SLOT_DEFINITIONS } from '../engine/tacticalSlots'
@@ -110,17 +111,18 @@ export function Pitch({ compact = false, slots, players, teams, statsByPlayer, o
     const basePoint = savedX !== undefined && savedY !== undefined ? { x: savedX, y: savedY } : layout === 'free' ? homePositions[slot.slot] ?? tactical ?? { x: 50, y: 50 } : tactical ?? { x: 50, y: 50 }
     const offset = presentation === 'history' ? HISTORY_SLOT_OFFSETS[slot.slot] : undefined
     const point = offset ? { x: clampCoordinate(basePoint.x + (offset.x ?? 0)), y: clampCoordinate(basePoint.y + (offset.y ?? 0)) } : basePoint
-    const player = slot.playerId ? byId[slot.playerId] : undefined; if (!player) return draggable ? <EmptyPitchSlotDrop key={slot.slot} slot={slot} point={point} onClick={onEmptySlotClick ? () => onEmptySlotClick(slot) : undefined} /> : onEmptySlotClick ? <EmptyPitchSlot key={slot.slot} slot={slot} point={point} onClick={() => onEmptySlotClick(slot)} /> : null; const stats = statsByPlayer?.[player.id]; const matchPosition = (slot.matchPosition ?? tactical?.matchPosition ?? 'CM') as Position; const displayPosition = slot.displayPosition ?? tactical?.displayPosition ?? matchPosition
+    const playerId = slot.playerId
+    const player = playerId ? byId[playerId] : undefined; if (!playerId) return draggable ? <EmptyPitchSlotDrop key={slot.slot} slot={slot} point={point} onClick={onEmptySlotClick ? () => onEmptySlotClick(slot) : undefined} /> : onEmptySlotClick ? <EmptyPitchSlot key={slot.slot} slot={slot} point={point} onClick={() => onEmptySlotClick(slot)} /> : null; const stats = statsByPlayer?.[playerId]; const matchPosition = (slot.matchPosition ?? tactical?.matchPosition ?? 'CM') as Position; const displayPosition = slot.displayPosition ?? tactical?.displayPosition ?? matchPosition
     const representativeTeam = teamById[slot.teamId ?? '']
     const badges = (
       <>
         {badgeMode === 'rating' && (
           <Badge
-            colorClass={player.id === motmPlayerId ? 'bg-blue-500 text-white' : ratingColor(slot.avgRating)}
+            colorClass={playerId === motmPlayerId ? 'bg-blue-500 text-white' : ratingColor(slot.avgRating)}
             className="absolute -right-3 -top-3 z-30 shadow-lg"
             size="large"
           >
-            {slot.matches > 0 ? slot.avgRating.toFixed(slot.matches > 1 ? 2 : 1) : '--'}{player.id === motmPlayerId ? ' ★' : ''}
+            {slot.matches > 0 ? slot.avgRating.toFixed(slot.matches > 1 ? 2 : 1) : '--'}{playerId === motmPlayerId ? ' ★' : ''}
           </Badge>
         )}
       </>
@@ -128,12 +130,12 @@ export function Pitch({ compact = false, slots, players, teams, statsByPlayer, o
     const SlotContainer = !draggable && onSlotClick ? 'button' : 'div'
     return (
       <SlotContainer
-        {...(SlotContainer === 'button' ? { type: 'button' as const, 'aria-label': playerDisplayName(player), disabled: disabledPlayerIds?.includes(player.id) } : {})}
+        {...(SlotContainer === 'button' ? { type: 'button' as const, 'aria-label': historicalPlayerLabel(playerId, player), disabled: disabledPlayerIds?.includes(playerId) } : {})}
         key={slot.slot}
-        className={`absolute flex w-20 max-w-[23%] -translate-x-1/2 -translate-y-1/2 flex-col items-center transition-transform ${substitutionSelection?.[player.id] || goalSelection?.[player.id] ? 'z-20 scale-110' : ''} ${disabledPlayerIds?.includes(player.id) && !goalSelection?.[player.id] ? 'opacity-40' : (Object.keys(goalSelection ?? {}).length || Object.keys(substitutionSelection ?? {}).length) && !goalSelection?.[player.id] && !substitutionSelection?.[player.id] ? 'opacity-70' : ''}`}
+        className={`absolute flex w-20 max-w-[23%] -translate-x-1/2 -translate-y-1/2 flex-col items-center transition-transform ${substitutionSelection?.[playerId] || goalSelection?.[playerId] ? 'z-20 scale-110' : ''} ${disabledPlayerIds?.includes(playerId) && !goalSelection?.[playerId] ? 'opacity-40' : (Object.keys(goalSelection ?? {}).length || Object.keys(substitutionSelection ?? {}).length) && !goalSelection?.[playerId] && !substitutionSelection?.[playerId] ? 'opacity-70' : ''}`}
         style={{ left: `${point.x}%`, top: `${point.y}%` }}
         onClick={() => {
-          if (!suppressClick.current && !disabledPlayerIds?.includes(player.id)) onSlotClick?.(slot)
+          if (!suppressClick.current && !disabledPlayerIds?.includes(playerId)) onSlotClick?.(slot)
         }}
       >
         <div className="relative">
@@ -146,10 +148,10 @@ export function Pitch({ compact = false, slots, players, teams, statsByPlayer, o
           <span className="justify-self-start">{(stats?.assists ?? 0) > 0 && <span className="flex items-center gap-0.5 rounded-full bg-black/80 px-1 py-0.5"><AssistIcon />{stats?.assists}</span>}</span>
           <span className="justify-self-end">{(stats?.goals ?? 0) > 0 ? <span className="flex items-center gap-0.5 rounded-full bg-black/80 px-1 py-0.5"><GoalIcon />{stats?.goals}</span> : showGoalkeeperSaves && matchPosition === 'GK' ? <span className="rounded-full bg-black/80 px-1 py-0.5">🧤 {stats?.saves ?? 0}</span> : null}</span>
         </div>}
-        <div className="relative z-10 -mt-0.5 h-4 max-w-full truncate rounded-full bg-black/70 px-1.5 py-0.5 text-center text-[9px] font-semibold leading-tight">{playerCompactName(player)}</div>
-        {goalSelection?.[player.id] && <span className="pointer-events-none flex items-center gap-1 rounded bg-black/80 px-1 text-[9px] font-bold text-emerald-300">{goalSelection[player.id] === 'scorer' ? <><GoalIcon /> SCORER</> : goalSelection[player.id] === 'assist' ? <><AssistIcon /> ASSIST</> : 'FAULT'}</span>}
-        {substitutionSelection?.[player.id] && <span className="rounded bg-black/80 px-1 leading-none"><SubstitutionSelection direction={substitutionSelection[player.id]} /></span>}
-        {outMinutesByPlayer?.[player.id] !== undefined && <span className="rounded bg-black/80 px-1 leading-none"><SubstitutionMarker direction="out" minute={outMinutesByPlayer[player.id]} /></span>}
+        <div title={player ? undefined : historicalPlayerLabel(playerId)} className="relative z-10 -mt-0.5 h-4 max-w-full truncate rounded-full bg-black/70 px-1.5 py-0.5 text-center text-[9px] font-semibold leading-tight">{player ? playerCompactName(player) : historicalPlayerLabel(playerId)}</div>
+        {goalSelection?.[playerId] && <span className="pointer-events-none flex items-center gap-1 rounded bg-black/80 px-1 text-[9px] font-bold text-emerald-300">{goalSelection[playerId] === 'scorer' ? <><GoalIcon /> SCORER</> : goalSelection[playerId] === 'assist' ? <><AssistIcon /> ASSIST</> : 'FAULT'}</span>}
+        {substitutionSelection?.[playerId] && <span className="rounded bg-black/80 px-1 leading-none"><SubstitutionSelection direction={substitutionSelection[playerId]} /></span>}
+        {outMinutesByPlayer?.[playerId] !== undefined && <span className="rounded bg-black/80 px-1 leading-none"><SubstitutionMarker direction="out" minute={outMinutesByPlayer[playerId]} /></span>}
       </SlotContainer>
     )
   })}</div>

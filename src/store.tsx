@@ -31,6 +31,8 @@ interface StoreValue extends AppState {
   competitionRevisions: CompetitionRevisions
   competitionCacheOwner: object
   teamCatalogRevision: number
+  persistenceStatus: 'saved' | 'pending' | 'error'
+  retryPersistence: () => Promise<void>
   addTeam: (team: Omit<Team, 'id'> & { id?: string }) => string
   updateTeam: (id: string, team: Partial<Team>) => void
   addPlayer: (player: Omit<Player, 'id'> & { id?: string }) => string
@@ -85,20 +87,48 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const state = snapshot.data
   const [hydration, setHydration] = useState<'loading' | 'ready' | 'error'>('loading')
   const [attempt, setAttempt] = useState(0)
+  const [persistenceStatus, setPersistenceStatus] = useState<'saved' | 'pending' | 'error'>('saved')
   const snapshotRef = useRef(snapshot)
   const persistenceQueue = useRef(createPersistenceQueue(LocalRepository.saveAppState))
   const draftTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const draftEpoch = useRef(0)
   const draftNeedsRetry = useRef(false)
   const persistenceEpoch = useRef(0)
+  const saveRequest = useRef(0)
+  const unsaved = useRef(false)
+  const verifiedState = useRef(snapshot.data)
+  const importing = useRef(false)
+  const importBarrier = useRef<Promise<void> | undefined>(undefined)
+  const afterImport = useRef<Array<() => void>>([])
   /** Finalised IDs reject any late editor-effect checkpoint for that draft. */
   const finalizingDraftIds = useRef(new Set<string>())
-  snapshotRef.current = snapshot
-
-  const persistLocal = useCallback((next: AppState, valid?: () => boolean) => {
-    const epoch = persistenceEpoch.current
-    return persistenceQueue.current.enqueue(next, () => epoch === persistenceEpoch.current && (!valid || valid()))
+  const publishSnapshot = useCallback((next: StoreSnapshot) => {
+    snapshotRef.current = next
+    setSnapshot(next)
   }, [])
+
+  const persistLatest = useCallback((read: () => AppState, valid?: () => boolean, onSaved?: (next: AppState) => void, track = true, sync = true) => {
+    const epoch = persistenceEpoch.current
+    const request = track ? ++saveRequest.current : saveRequest.current
+    if (track) { unsaved.current = true; setPersistenceStatus('pending') }
+    return persistenceQueue.current.enqueueLatest(read, () => epoch === persistenceEpoch.current && (!valid || valid()), next => {
+      const prior = verifiedState.current
+      verifiedState.current = next
+      onSaved?.(next)
+      if (request === saveRequest.current && !draftTimer.current && sameRawFootballValue(snapshotRef.current.data, next)) { unsaved.current = false; setPersistenceStatus('saved') }
+      if (sync) void SyncManager.queueStateChange(prior, next).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker sync] Cloud sync pending after verified local save.'))
+    }).catch(error => {
+      if (track && epoch === persistenceEpoch.current && (!valid || valid()) && request === saveRequest.current) setPersistenceStatus('error')
+      throw error
+    })
+  }, [])
+  const persistLocal = useCallback((next: AppState) => persistLatest(() => next), [persistLatest])
+  const retryPersistence = useCallback(async () => {
+    if (importBarrier.current) await importBarrier.current
+    if (draftTimer.current) { clearTimeout(draftTimer.current); draftTimer.current = undefined }
+    ++draftEpoch.current
+    try { await persistLatest(() => snapshotRef.current.data) } catch { /* The persistent banner retains the retry action. */ }
+  }, [persistLatest])
 
   useEffect(() => {
     let active = true
@@ -108,8 +138,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const saved = await LocalRepository.getAppState()
         if (active && saved) {
           const reconciled = sanitizeDraftLifecycle(reconcilePersistedState(reconcileTeamCatalog(saved)))
-          setSnapshot(current => reconcileRepositorySnapshot(current, reconciled))
-          if (reconciled !== saved) void persistLocal(reconciled).then(() => SyncManager.queueStateChange(saved, reconciled)).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker storage] Catalog update deferred.'))
+          verifiedState.current = saved
+          publishSnapshot(reconcileRepositorySnapshot(snapshotRef.current, reconciled))
+          if (reconciled !== saved) void persistLocal(reconciled).catch(() => console.error('[Football Tracker storage] Catalog update deferred.'))
         }
       } catch {
         // Do not replace potentially recoverable durable data with an empty
@@ -123,18 +154,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     void load()
     return () => { active = false }
-  }, [attempt])
+  }, [attempt, persistLocal, publishSnapshot])
 
   useEffect(() => {
     if (hydration !== 'ready' || !user) return
     const sync = async () => {
       try {
+        const before = snapshotRef.current
+        if (unsaved.current || draftTimer.current) return
         await SyncManager.syncNow()
         const restored = await LocalRepository.getAppState()
-        if (restored) {
+        if (restored && snapshotRef.current === before && !unsaved.current && !draftTimer.current) {
           const reconciled = sanitizeDraftLifecycle(reconcilePersistedState(reconcileTeamCatalog(restored)))
-          setSnapshot(current => reconcileRepositorySnapshot(current, reconciled))
-          if (reconciled !== restored) void persistLocal(reconciled).then(() => SyncManager.queueStateChange(restored, reconciled)).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker sync] Catalog update deferred.'))
+          verifiedState.current = restored
+          publishSnapshot(reconcileRepositorySnapshot(snapshotRef.current, reconciled))
+          if (reconciled !== restored) void persistLocal(reconciled).catch(() => console.error('[Football Tracker sync] Catalog update deferred.'))
         }
       } catch {
         // Cloud backup is non-critical to local startup.
@@ -145,21 +179,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const onOnline = () => { void sync() }
     window.addEventListener('online', onOnline)
     return () => window.removeEventListener('online', onOnline)
-  }, [hydration, user?.id, persistLocal])
+  }, [hydration, user?.id, persistLocal, publishSnapshot])
 
-  const update = useCallback((fn: (prev: AppState) => AppState, revise?: (current: StoreSnapshot, prev: AppState, next: AppState) => Pick<StoreSnapshot, 'competitionRevisions' | 'teamCatalogRevision'>) => {
-    setSnapshot((current) => {
-      const prev = current.data
-      const next = fn(prev)
-      if (next === prev) return current
-      // Local persistence is always first. Cloud queueing is deliberately
-      // detached so offline/auth/network failures never affect match recording.
-      void persistLocal(next).then(() => SyncManager.queueStateChange(prev, next)).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker storage] Primary save failed; changes remain visible for retry.'))
-      return { data: next, ...(revise?.(current, prev, next) ?? { competitionRevisions: current.competitionRevisions, teamCatalogRevision: current.teamCatalogRevision }) }
-    })
-  }, [persistLocal])
+  const update = useCallback(function update(fn: (prev: AppState) => AppState, revise?: (current: StoreSnapshot, prev: AppState, next: AppState) => Pick<StoreSnapshot, 'competitionRevisions' | 'teamCatalogRevision'>) {
+    // Keep the import replacement atomic while preserving edits requested
+    // during its write. Replay their transformations against its final state.
+    if (importing.current) { afterImport.current.push(() => update(fn, revise)); return }
+    const current = snapshotRef.current
+    const prev = current.data
+    const next = fn(prev)
+    if (next === prev) return
+    if (draftTimer.current) { clearTimeout(draftTimer.current); draftTimer.current = undefined }
+    ++draftEpoch.current
+    publishSnapshot({ data: next, ...(revise?.(current, prev, next) ?? { competitionRevisions: current.competitionRevisions, teamCatalogRevision: current.teamCatalogRevision }) })
+    void persistLatest(() => snapshotRef.current.data).catch(() => console.error('[Football Tracker storage] Primary save failed; changes remain visible for retry.'))
+  }, [persistLatest, publishSnapshot])
 
   const saveMatchDurably = useCallback((match: Match) => measureInDevelopment('saveMatchDurably', async () => {
+    if (importBarrier.current) await importBarrier.current
     const before = snapshotRef.current
     const prior = before.data
     const previousMatch = prior.matches.find(item => item.id === match.id)
@@ -171,51 +208,55 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (draftTimer.current) { clearTimeout(draftTimer.current); draftTimer.current = undefined }
     const cancelledDraftEpoch = ++draftEpoch.current
     finalizingDraftIds.current.add(saved.id)
-    const nextWithoutMarkers: AppState = previousMatch
-      ? { ...prior, matches: prior.matches.map(item => item.id === saved.id ? saved : item) }
-      : { ...prior, matches: [...prior.matches, saved] }
+    const withSavedMatch = (data: AppState): AppState => {
+      const matches = data.matches.some(item => item.id === saved.id)
+        ? data.matches.map(item => item.id === saved.id ? saved : item)
+        : [...data.matches, saved]
+      return sanitizeDraftLifecycle({ ...data, matches, competitionStates: reconcileSeasonCompletionMarkers(data.competitionStates ?? [], data.teams, matches, data.players) })
+    }
     // The final Match and removal of its matching checkpoint share one
     // authoritative primary write. An unrelated draft is intentionally kept.
-    const next: AppState = sanitizeDraftLifecycle({ ...nextWithoutMarkers, competitionStates: reconcileSeasonCompletionMarkers(nextWithoutMarkers.competitionStates ?? [], nextWithoutMarkers.teams, nextWithoutMarkers.matches, nextWithoutMarkers.players) })
     let durability: DurableSaveResult
     try {
-      durability = await persistLocal(next)
+      durability = await persistLatest(() => withSavedMatch(snapshotRef.current.data), () => finalizingDraftIds.current.has(saved.id), () => {
+        const current = snapshotRef.current
+        const currentPrevious = current.data.matches.find(item => item.id === saved.id)
+        publishSnapshot({ data: withSavedMatch(current.data), competitionRevisions: reviseChangedMatch(current.competitionRevisions, currentPrevious, saved), teamCatalogRevision: current.teamCatalogRevision })
+      }, false)
     } catch (error) {
       finalizingDraftIds.current.delete(saved.id)
       if (draftEpoch.current === cancelledDraftEpoch) draftNeedsRetry.current = true
       throw error
     }
-    setSnapshot(current => {
-      const currentPrevious = current.data.matches.find(item => item.id === saved.id)
-      const currentData = sanitizeDraftLifecycle(currentPrevious
-        ? { ...current.data, matches: current.data.matches.map(item => item.id === saved.id ? saved : item) }
-        : { ...current.data, matches: [...current.data.matches, saved] })
-      return { data: currentData, competitionRevisions: reviseChangedMatch(current.competitionRevisions, currentPrevious, saved), teamCatalogRevision: current.teamCatalogRevision }
-    })
     // Upload remains optional; a queue/cloud failure cannot negate durable
     // primary success or the navigation that follows it.
-    void SyncManager.queueStateChange(prior, next).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker sync] Cloud sync pending after verified local save.'))
     return durability
-  }), [persistLocal])
-  const saveDraftMatch = useCallback((match: Match) => {
+  }), [persistLatest, publishSnapshot])
+  const saveDraftMatch = useCallback(function saveDraftMatch(match: Match) {
+    if (importing.current) { afterImport.current.push(() => saveDraftMatch(match)); return }
     if (finalizingDraftIds.current.has(match.id)) return
-    setSnapshot(current => {
-      if (finalizingDraftIds.current.has(match.id)) return current
-      const unchanged = current.data.draftMatch && sameRawMatch(current.data.draftMatch, match)
-      if (unchanged && !draftNeedsRetry.current) return current
-      draftNeedsRetry.current = false
-      const next = unchanged ? current.data : { ...current.data, draftMatch: match }
-      if (draftTimer.current) clearTimeout(draftTimer.current)
-      const epoch = ++draftEpoch.current
-      draftTimer.current = setTimeout(() => { draftTimer.current = undefined; void persistLocal(next, () => draftEpoch.current === epoch).catch(() => { if (draftEpoch.current === epoch) draftNeedsRetry.current = true }) }, 450)
-      return unchanged ? current : { ...current, data: next }
-    })
-  }, [persistLocal])
+    const current = snapshotRef.current
+    const unchanged = current.data.draftMatch && sameRawMatch(current.data.draftMatch, match)
+    if (unchanged && !draftNeedsRetry.current) return
+    draftNeedsRetry.current = false
+    if (!unchanged) publishSnapshot({ ...current, data: { ...current.data, draftMatch: match } })
+    if (draftTimer.current) clearTimeout(draftTimer.current)
+    const epoch = ++draftEpoch.current
+    unsaved.current = true
+    draftTimer.current = setTimeout(() => {
+      draftTimer.current = undefined
+      void persistLatest(() => snapshotRef.current.data, () => draftEpoch.current === epoch, undefined, true, false).catch(() => { if (draftEpoch.current === epoch) draftNeedsRetry.current = true })
+    }, 450)
+  }, [persistLatest, publishSnapshot])
   const clearDraftMatch = useCallback(() => {
     update((prev) => ({ ...prev, draftMatch: undefined }))
   }, [update])
   const importAppState = useCallback(async (json: string) => {
-    await performAtomicImport(json, {
+    if (importing.current) throw new Error('An import is already in progress. Please retry when it finishes.')
+    importing.current = true
+    let releaseImport!: () => void
+    importBarrier.current = new Promise<void>(resolve => { releaseImport = resolve })
+    try { await performAtomicImport(json, {
       prepare: value => reconcilePersistedState(reconcileTeamCatalog(prepareImportData(value))),
       preserveBackup: preservePreImportBackup,
       prior: () => snapshotRef.current.data,
@@ -225,10 +266,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       currentPersistenceEpoch: () => persistenceEpoch.current,
       enqueue: (next, valid) => persistenceQueue.current.enqueue(next, valid),
       invalidateDerived: clearGlobalRankingCache,
-      replaceLive: prepared => setSnapshot(current => reconcileRepositorySnapshot(current, prepared)),
+      replaceLive: prepared => {
+        verifiedState.current = prepared
+        unsaved.current = false
+        setPersistenceStatus('saved')
+        finalizingDraftIds.current.clear()
+        publishSnapshot(reconcileRepositorySnapshot(snapshotRef.current, prepared))
+      },
       sync: (prior, prepared) => { void SyncManager.queueStateChange(prior, prepared).then(() => SyncManager.syncNow()).catch(() => console.error('[Football Tracker sync] Imported state queued for sync.')) },
-    })
-  }, [])
+    }) } catch (error) {
+      if (unsaved.current) setPersistenceStatus('error')
+      throw error
+    } finally {
+      importing.current = false
+      const pending = afterImport.current.splice(0)
+      try { for (const mutation of pending) mutation() } finally { importBarrier.current = undefined; releaseImport() }
+    }
+  }, [publishSnapshot])
 
   const value = useMemo<StoreValue>(
     () => ({
@@ -236,6 +290,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       competitionRevisions: snapshot.competitionRevisions,
       competitionCacheOwner,
       teamCatalogRevision: snapshot.teamCatalogRevision,
+      persistenceStatus,
+      retryPersistence,
       addTeam: (team) => {
         const id = team.id ?? crypto.randomUUID()
         update((prev) => ({ ...prev, teams: [...prev.teams, { ...team, id }] }), current => ({ competitionRevisions: current.competitionRevisions, teamCatalogRevision: current.teamCatalogRevision + 1 }))
@@ -316,13 +372,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         update(prev => ({ ...prev, competitionStates: [...(prev.competitionStates ?? []).filter(item => item.id !== completion.id), completion] }))
       },
     }),
-    [state, snapshot.competitionRevisions, snapshot.teamCatalogRevision, competitionCacheOwner, update, saveDraftMatch, clearDraftMatch, saveMatchDurably, importAppState],
+    [state, snapshot.competitionRevisions, snapshot.teamCatalogRevision, competitionCacheOwner, update, saveDraftMatch, clearDraftMatch, saveMatchDurably, importAppState, persistenceStatus, retryPersistence],
   )
 
   if (hydration === 'loading') return <BootstrapShell />
   if (hydration === 'error') return <StartupRecovery onRetry={() => setAttempt(value => value + 1)} />
 
-  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
+  return <StoreContext.Provider value={value}>{children}{persistenceStatus === 'error' && <div role="alert" className="fixed inset-x-3 bottom-24 z-50 mx-auto max-w-md rounded-xl border border-red-400/40 bg-zinc-900 p-4 text-sm text-white shadow-xl"><p>Save failed. Your latest changes are still open but have not been safely stored. Keep the app open and retry.</p><button type="button" className="mt-3 rounded-lg bg-white px-4 py-2 font-semibold text-black" onClick={() => { void retryPersistence() }}>Retry save</button></div>}</StoreContext.Provider>
 }
 
 export function useStore() {

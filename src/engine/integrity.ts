@@ -76,11 +76,14 @@ export function auditDataIntegrity(matches: Match[], players: Player[], teams: T
     if (match.kickoffLineup?.length) {
       const kickoff = validateKickoffLineup(match.kickoffLineup)
       for (const message of kickoff.errors) add(issues, 'error', match, `Kickoff lineup: ${message}`)
+      for (const slot of match.kickoffLineup.filter(item => item.playerId)) {
+        if (!match.appearances.some(item => item.playerId === slot.playerId && item.teamId === recordedTeamId(match) && item.role === 'starter')) add(issues, 'error', match, 'Kickoff player does not match the recorded starting lineup.')
+      }
     }
     const starters = new Set<string>(); const appearances = new Map<string, number>(); const eventIds = new Set<string>(); const goalFingerprints = new Set<string>(); const subFingerprints = new Set<string>()
     for (const appearance of match.appearances) {
       appearances.set(appearance.playerId, (appearances.get(appearance.playerId) ?? 0) + 1)
-      if (!playerIds.has(appearance.playerId)) add(issues, 'error', match, 'Lineup references an unknown player.')
+      if (!playerIds.has(appearance.playerId) && appearances.get(appearance.playerId) === 1) add(issues, 'info', match, `Historical player ${appearance.playerId} is absent from the current roster; saved match identity is retained.`)
       if (!matchTeamIds.has(appearance.teamId)) add(issues, 'error', match, 'Lineup references a team that is not in this match.')
       if (identity.competitionType === 'champions' && match.teamId && appearance.teamId !== match.teamId) add(issues, 'error', match, 'Champions independent opponent lineup is stored in another team record.')
       if (appearance.role === 'starter') { if (starters.has(appearance.playerId)) add(issues, 'error', match, 'Player is duplicated in the starting XI.'); starters.add(appearance.playerId) }
@@ -106,7 +109,8 @@ export function auditDataIntegrity(matches: Match[], players: Player[], teams: T
       if (!matchTeamIds.has(event.teamId)) add(issues, 'error', match, 'Event references a team that is not in this match.')
       if (event.type === 'sub') {
         if (event.tacticalSlotId && !tacticalSlotById[event.tacticalSlotId]) add(issues, 'warning', match, 'Substitution has an unknown tactical slot.')
-        if (!playerIds.has(event.playerInId) || !playerIds.has(event.playerOutId)) add(issues, 'error', match, 'Substitution references an unknown player.')
+        if ((!playerIds.has(event.playerInId) && !appearances.has(event.playerInId)) || (!playerIds.has(event.playerOutId) && !appearances.has(event.playerOutId))) add(issues, 'error', match, 'Substitution references an unknown player.')
+        if (event.playerInId === event.playerOutId) add(issues, 'error', match, 'Substitution brings on the same player it takes off.')
         const fingerprint = [event.teamId, event.minute, event.playerOutId, event.playerInId].join('|')
         if (subFingerprints.has(fingerprint)) add(issues, 'warning', match, 'Duplicate logically identical substitution event.')
         subFingerprints.add(fingerprint)
@@ -122,20 +126,20 @@ export function auditDataIntegrity(matches: Match[], players: Player[], teams: T
         goalFingerprints.add(fingerprint)
         if (!event.ownGoal && event.teamId === match.teamId && !event.playerId) add(issues, 'warning', match, 'Tracked-team goal has no scorer.')
         for (const [label, id] of [['scorer', event.playerId], ['assister', event.assistPlayerId]] as const) if (id) {
-          if (!playerIds.has(id)) add(issues, 'error', match, `Goal ${label} references an unknown player.`)
+          if (!playerIds.has(id) && !appearances.has(id)) add(issues, 'error', match, `Goal ${label} references an unknown player.`)
           const appearance = match.appearances.find(item => item.playerId === id && item.teamId === event.teamId)
-          if (!appearance && playerIds.has(id)) add(issues, 'warning', match, `Goal ${label} is not in the event team's lineup.`)
+          if (!appearance && (playerIds.has(id) || appearances.has(id))) add(issues, 'warning', match, `Goal ${label} is not in the event team's lineup.`)
           if (appearance && !isOnPitchAtEvent(match, appearance, event)) add(issues, 'warning', match, `Goal ${label} is outside that player's on-pitch interval.`)
         }
         if (event.concededGoalCausePlayerId) {
-          if (!playerIds.has(event.concededGoalCausePlayerId)) add(issues, 'error', match, 'Conceded-goal attribution references an unknown player.')
+          if (!playerIds.has(event.concededGoalCausePlayerId) && !appearances.has(event.concededGoalCausePlayerId)) add(issues, 'error', match, 'Conceded-goal attribution references an unknown player.')
           const appearance = match.appearances.find(item => item.playerId === event.concededGoalCausePlayerId)
           if (appearance && !isOnPitchAtEvent(match, appearance, event)) add(issues, 'warning', match, 'Conceded-goal attribution is outside that player\'s on-pitch interval.')
         }
       }
       if (event.type === 'save') {
         if (event.count !== undefined && (!Number.isInteger(event.count) || event.count < 0)) add(issues, 'error', match, 'Save count is malformed; expected a non-negative whole number.')
-        if (!playerIds.has(event.playerId)) add(issues, 'error', match, 'Save references an unknown player.')
+        if (!playerIds.has(event.playerId) && !appearances.has(event.playerId)) add(issues, 'error', match, 'Save references an unknown player.')
         const appearance = match.appearances.find(item => item.playerId === event.playerId && item.teamId === event.teamId)
         const goalkeeper = appearance && matchPositionSegments(match, appearance).some(segment => segment.position === 'GK')
         if (!appearance || !goalkeeper || event.minute !== undefined && !isOnPitchAtEvent(match, appearance, event)) add(issues, 'error', match, 'Save recorded while the player cannot be an on-pitch goalkeeper.')

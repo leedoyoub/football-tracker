@@ -1,6 +1,7 @@
 import type { MatchEvent, Position, PositionChange } from '../types'
 import { nextTimelineSequence } from '../engine/timeline'
 import { ratingPositionForSlot } from '../engine/tacticalSlots'
+import { assignLineupVacancies } from '../engine/lineupSuggestion'
 
 export type Lineup = { slotAssignments: Record<string, string>; homeBench: string[] }
 export type LineupTarget = { group: 'starting' | 'substitute' | 'squad'; id: string }
@@ -25,16 +26,16 @@ export function createFreshLineup(
   const used = new Set<string>()
   for (const [slot, id] of Object.entries(preferred).slice(0, 11)) {
     const player = byId.get(id)
-    if (!player || used.has(id) || (slot === 'GK') !== (player.position === 'GK')) continue
+    if (!player || used.has(id) || (slot === 'GK' && player.position !== 'GK')) continue
     slotAssignments[slot] = id
     used.add(id)
   }
   const candidates = [...new Set([...recentBench, ...squad.map(player => player.id)])]
-  for (const slot of Object.keys(preferred).slice(0, 11)) {
-    if (slotAssignments[slot]) continue
-    const replacement = candidates.find(id => !used.has(id) && byId.has(id) && (slot === 'GK') === (byId.get(id)!.position === 'GK'))
-    if (replacement) { slotAssignments[slot] = replacement; used.add(replacement) }
-  }
+    .filter(id => !used.has(id) && byId.has(id)).map(id => byId.get(id)!)
+  const vacancies = Object.keys(preferred).slice(0, 11).filter(slot => !slotAssignments[slot])
+    .flatMap(slot => { const position = ratingPositionForSlot(slot); return position ? [{ slot, position }] : [] })
+  const replacements = assignLineupVacancies(candidates, vacancies)
+  vacancies.forEach(({ slot }, index) => { if (replacements[index]) slotAssignments[slot] = replacements[index] })
   return reconcileFreshBench({ slotAssignments, homeBench: recentBench }, squad)
 }
 

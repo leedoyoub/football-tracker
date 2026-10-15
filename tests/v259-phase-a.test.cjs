@@ -33,8 +33,13 @@ test('Players without season/team filters skips every historical match query dur
   })
 })
 
-test('Players queries preserve baseline markup for scope combinations, former teams, No Team and released history', () => {
+test('Players retains baseline controls while scope combinations classify recorded positions and current No Team', () => {
   const store = performanceFixture(2)
+  const React = require('react')
+  const { scopedPositionFamilyByPlayer, positionFamily } = require('../src/engine/positionScope.ts')
+  const { matchesForPlayer, playerHasNoCurrentTeam } = require('../src/screens/RankingFilters.tsx')
+  const { currentTeamIds } = require('../src/lib/roster.ts')
+  const { playerFullName } = require('../src/components/ui.tsx')
   for (const filters of [
     { seasons: [], teams: [], positions: [] }, { seasons: ['Season 1'], teams: [], positions: [] },
     { seasons: ['Season 2'], teams: [store.teams[0].id], positions: [] },
@@ -43,7 +48,27 @@ test('Players queries preserve baseline markup for scope combinations, former te
     { seasons: [], teams: [store.teams[1].id], positions: ['CB'] },
   ]) for (const search of ['', 'synthetic', '0', 'missing']) {
     const p = { ...props, screenState: { ...navigation.defaultScreenState({ name: 'players' }), filters, search } }
-    assert.equal(renderToStaticMarkup(harness('PlayersScreen', store).render(p)), renderToStaticMarkup(harness('PlayersScreen', store, baseline).render(p)))
+    const tree = harness('PlayersScreen', store).render(p)
+    const original = harness('PlayersScreen', store, baseline).render(p)
+    // Keep exact markup equality for the controls. The result rows have the
+    // explicitly changed v2.5.10 scope semantics, verified independently below.
+    const controls = node => renderToStaticMarkup(React.cloneElement(node, {}, node.props.children.slice(0, -1)))
+    assert.equal(controls(tree), controls(original))
+    const historicalTeams = filters.teams.filter(id => id !== '__no-team__')
+    const projection = store.matches.filter(m => !filters.seasons.length || filters.seasons.includes(m.season)).map(m => ({ ...m, appearances: m.appearances.filter(a => !historicalTeams.length || historicalTeams.includes(a.teamId) || filters.teams.includes('__no-team__') && playerHasNoCurrentTeam(store.players.find(p => p.id === a.playerId) ?? { teamId: a.teamId })) }))
+    const families = scopedPositionFamilyByPlayer(store.players, projection, { fallback: filters.seasons.length || historicalTeams.length ? 'none' : 'career' })
+    const expected = store.players.filter(player => {
+      const history = matchesForPlayer(player, store.matches, filters)
+      const membership = !filters.seasons.length && (!filters.teams.length || filters.teams.includes('__no-team__') && playerHasNoCurrentTeam(player) || currentTeamIds(player).some(id => filters.teams.includes(id))) || history.length > 0
+      return membership && [player.displayName, player.fullName, player.name].some(name => name?.toLowerCase().includes(search)) && (!filters.positions.length || filters.positions.some(position => positionFamily(position) === families.get(player.id)))
+    }).sort((a, b) => playerFullName(a).localeCompare(playerFullName(b)))
+    const resultRows = nodes(tree.props.children.at(-1), node => node.type === 'button')
+    assert.deepEqual(resultRows.map(row => row.key), expected.map(player => player.id), JSON.stringify({ filters, search }))
+    for (const row of resultRows) {
+      const label = nodes(row, node => node.type === 'span' && node.props.className === 'text-[11px] text-zinc-400')[0]
+      assert.equal(label.props.children.at(-1), families.get(row.key) ?? store.players.find(player => player.id === row.key).position)
+    }
+    if (!filters.seasons.length && !filters.teams.length) assert.equal(renderToStaticMarkup(tree), renderToStaticMarkup(original))
   }
 })
 

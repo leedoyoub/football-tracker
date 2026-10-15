@@ -1,5 +1,6 @@
 import type { Appearance, Match, MatchEvent, Position, PositionChange } from '../types'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
+import { displayPositionForSlot } from './tacticalSlots'
 
 export type PositionSegment = { enter: number; exit: number; position: Position }
 export type OrderedEvent = { event: MatchEvent; index: number }
@@ -172,6 +173,33 @@ function intervalAtEvent(match: Match, appearance: Appearance, event: MatchEvent
 }
 export function isOnPitchAtEvent(match: Match, appearance: Appearance, event: MatchEvent): boolean { return Boolean(intervalAtEvent(match, appearance, event)) }
 export function matchPositionSegments(match: Match, appearance: Appearance): PositionSegment[] { return normalizeMatchTimeline(match).players.get(key(appearance))?.positions ?? [] }
+
+/** Display-only projection of the canonical intervals and move ordering. Keep
+ * exact saved tactical labels without changing normalized rating/minute facts. */
+export function matchDisplayPositionSegments(match: Match, appearance: Appearance): { enter: number; exit: number; position: string }[] {
+  const player = normalizeMatchTimeline(match).players.get(key(appearance))
+  if (!player) return []
+  const label = (position: string, slotId?: string) => {
+    const slot = slotId ? displayPositionForSlot(slotId) : undefined
+    return slot && normalizeMatchPosition(slot) === normalizeMatchPosition(position) ? slot : position
+  }
+  const kickoff = appearance.role === 'starter' ? match.kickoffLineup?.find(slot => slot.playerId === appearance.playerId) : undefined
+  const saved = appearance.matchPosition
+  const kickoffPosition = kickoff?.displayPosition ?? (kickoff ? displayPositionForSlot(kickoff.id) ?? kickoff.matchPosition : undefined)
+  const initial = kickoffPosition && (!saved || normalizeMatchPosition(kickoffPosition) === normalizeMatchPosition(saved))
+    ? kickoffPosition : saved ?? appearance.position
+  return player.positions.map(segment => {
+    const interval = player.intervals.find(row => row.enter <= segment.enter && segment.enter < row.exit)!
+    let position = interval.on ? label(interval.on.position, interval.on.tacticalSlotId) : initial
+    for (const change of player.changes) {
+      if (change.minute < interval.enter || (change.minute === interval.enter && interval.startOrder !== undefined && change.order <= interval.startOrder)) continue
+      if (change.minute > segment.enter) break
+      const raw = appearance.positionHistory![change.index]
+      position = label(raw.position, raw.tacticalSlotId)
+    }
+    return { enter: segment.enter, exit: segment.exit, position }
+  })
+}
 export function matchPositionAt(match: Match, appearance: Appearance, minute?: number): Position | undefined {
   const segments = matchPositionSegments(match, appearance)
   if (minute === undefined) return segments[0]?.position

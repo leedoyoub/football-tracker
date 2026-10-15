@@ -5,7 +5,7 @@ import { RATING_ENGINE_REVISION } from './ratingRevision'
 
 export type PositionFamily = 'ST' | 'SS' | 'LW' | 'RW' | 'CAM' | 'LM' | 'RM' | 'CM' | 'CDM' | 'LB' | 'CB' | 'RB' | 'GK'
 export type { PositionFilterKey } from '../types'
-export type PositionScope = { seasons?: string[]; teams?: string[] }
+export type PositionScope = { seasons?: string[]; teams?: string[]; fallback?: 'career' | 'none' }
 
 const FAMILY_ORDER: PositionFamily[] = ['GK', 'CB', 'LB', 'RB', 'CDM', 'CM', 'LM', 'RM', 'CAM', 'LW', 'RW', 'SS', 'ST']
 const AWARD_ORDER: AwardPositionFamily[] = ['GK', 'LB', 'CB', 'RB', 'MID', 'ATT']
@@ -82,6 +82,7 @@ export function scopedPositionFamilyByPlayer(players: Player[], matches: Match[]
     const family = dominantPositionFamily(minutes)
     if (family) result.set(playerId, family)
   }
+  if (scope.fallback === 'none') return result
   const hasScope = Boolean(scope.seasons?.length || scope.teams?.length)
   const career = hasScope ? scopedPositionFamilyByPlayer(players, matches, {}) : undefined
   for (const player of players) if (!result.has(player.id)) {

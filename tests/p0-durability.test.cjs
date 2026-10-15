@@ -64,10 +64,15 @@ test('Cloud Sync is disabled before any automatic merge or queue access', () => 
   assert(disabledGuard < sync.indexOf('const meta = await metadata()'))
 })
 
-test('store serializes durable saves and restores the queue after a rejected write', () => {
-  const store = fs.readFileSync(require.resolve('../src/store.tsx'), 'utf8')
-  assert(store.includes('createPersistenceQueue(LocalRepository.saveAppState)'))
-  assert(store.includes('persistenceQueue.current.enqueue(next, () => epoch === persistenceEpoch.current && (!valid || valid()))'))
+test('queued saves recover after rejection and resolve the latest snapshot in order', async () => {
+  const { createPersistenceQueue } = require('../src/lib/persistenceQueue.ts')
+  let current = 'first'; const durable = []
+  const queue = createPersistenceQueue(async next => { if (next === 'first') throw new Error('quota'); durable.push(next) })
+  const failed = queue.enqueueLatest(() => current)
+  const next = queue.enqueueLatest(() => current)
+  current = 'newest'
+  await assert.rejects(() => failed, /quota/); await next
+  assert.deepEqual(durable, ['newest'])
 })
 
 test('match editor waits for durable save, preserves a failed form, and exposes explicit feedback', () => {

@@ -38,7 +38,7 @@ export function ComparisonScreen({ season, screenState, onStateChange, onNavigat
   const setCompetition = (value: CompetitionType | 'all') => patchState({ competition: value })
   const filter = useMemo(() => ({ season, competition, ...(teamId ? { teamId } : {}) }), [season, competition, teamId]); const left = players.find(player => player.id === leftId); const right = players.find(player => player.id === rightId)
   const scoped = useMemo(() => matches.filter(match => match.season === season && (competition === 'all' || matchCompetitionType(match) === competition)), [matches, season, competition])
-  const representative = useMemo(() => scopedPositionFamilyByPlayer(players, matches, {}), [players, matches])
+  const representative = useMemo(() => scopedPositionFamilyByPlayer(players, scoped, { teams: teamId ? [teamId] : [], fallback: 'none' }), [players, scoped, teamId])
   const rankingIndex = useMemo(() => buildGlobalRankingData(players, scoped, { seasons: [season], teams: teamId ? [teamId] : [], positions: [] }, 'rating'), [players, scoped, season, teamId]); const ranking = useMemo(() => rankGlobalRankingRows(rankingIndex, players, 'rating'), [rankingIndex, players])
   const summaries = useMemo(() => new Map([left, right].filter((player): player is Player => Boolean(player)).map(player => [player.id, summary(player, players, scoped, filter, ranking)])), [left, right, players, scoped, filter, ranking])
   const chooseLeft = (id: string) => patchState({ leftId: id, ...(id && id === rightId ? { rightId: '' } : {}) })

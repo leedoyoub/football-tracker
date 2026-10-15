@@ -18,6 +18,9 @@ import { scopedPositionFamilyByPlayer } from '../engine/positionScope'
 import { positionFamily } from '../engine/positionScope'
 import { latestAppearanceTeamId } from '../engine/playerDetailScope'
 import { playerForm } from '../engine/playerForm'
+import { playerAssistEvents, playerGoalEvents, representativeMatchPosition } from '../engine/playerMatchFacts'
+import { creditedMinutesPlayed, hasPitchAppearance, matchDisplayPositionSegments } from '../engine/timeline'
+import { historicalPlayerLabel } from '../lib/historicalPlayerDisplay'
 import { playerRankTrend, rankTrendMetricOptions, type RankTrendMetric } from '../engine/playerRankTrend'
 import { careerNextMilestones } from '../engine/nextMilestones'
 import { recordedTeamId } from '../engine/matchPerspective'
@@ -55,7 +58,24 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
   const historicalTeamId = latestAppearanceTeamId(playerId, playerScopedMatches)
   const teamRankingIndex = historicalTeamId ? buildGlobalRankingData(players, scopedMatches, { seasons: [selectedSeason], teams: [historicalTeamId], positions: [] }, 'rating') : []
   const teamRankingRows = { rating: rankGlobalRankingRows(teamRankingIndex, players, 'rating'), goals: rankGlobalRankingRows(teamRankingIndex, players, 'goals'), assists: rankGlobalRankingRows(teamRankingIndex, players, 'assists') }
-  if (!player || !data) return <div className="p-6 text-sm text-zinc-400">Player not found.</div>
+  if (!player || !data) {
+    if (!matches.some(match => match.appearances.some(row => row.playerId === playerId))) return <div className="p-6 text-sm text-zinc-400">Player not found.</div>
+    return <div className="px-4 pb-8 pt-6">
+      <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">Back</button>
+      <h1 className="text-2xl font-semibold">{historicalPlayerLabel(playerId)}</h1>
+      <p className="mb-4 mt-2 text-xs text-zinc-400">This player is absent from the current roster. Saved match records retain their original identity. Rating unavailable.</p>
+      <div className="mb-4 space-y-2"><CompactFilterMenu value={selectedSeason} options={seasons.map(item => ({ value: item, label: item }))} onChange={setSelectedSeason} label="Player detail season" popupAlign="start" /><RankingMetricTabs value={competition} options={competitions} onChange={setCompetition} label="Player detail competition" /></div>
+      <h2 className="mb-2 text-sm font-semibold">Matches</h2>
+      <div className="space-y-2">{playerScopedMatches.map(match => {
+        const appearance = match.appearances.find(row => row.playerId === playerId)!
+        const goals = playerGoalEvents(match, appearance).length; const assists = playerAssistEvents(match, appearance).length
+        return <button key={match.id} type="button" onClick={() => onNavigate({ name: 'match', id: match.id })} className="block w-full rounded-2xl bg-zinc-900 p-3 text-left text-xs">
+          <span className="block">{formatCompactCompetitionContext(assignmentSnapshotForMatch(match))} · {formatDate(match.date)}</span>
+          <span className="mt-1 block">{representativeMatchPosition(match, appearance)} · {hasPitchAppearance(match, appearance) ? `${creditedMinutesPlayed(match, appearance)}'` : 'Unused'} · {'⚽'.repeat(goals)} {'👟'.repeat(assists)}</span>
+        </button>
+      })}{!playerScopedMatches.length && <p className="text-xs text-zinc-500">No matches in this scope.</p>}</div>
+    </div>
+  }
   const membership = currentMembershipPresentation(player, [], teams)
   const currentTeam = teams.find(team => team.id === membership.teamId)
   const form = playerForm(data.appearances)
@@ -181,13 +201,13 @@ function MatchRow({ match, player, displayCacheHit, onNavigate }: { match: Match
   const appearance = match.appearances.find(a => a.playerId === player.id)
   const rating = appearance ? ratePlayerMatch(match, player) : null
   const score = matchScore(match)
-  const goals = appearance ? match.events.filter(e => e.type === 'goal' && !e.ownGoal && e.playerId === player.id).length : 0
-  const assists = appearance ? match.events.filter(e => e.type === 'goal' && !e.ownGoal && e.assistPlayerId === player.id).length : 0
+  const goals = appearance ? playerGoalEvents(match, appearance).length : 0
+  const assists = appearance ? playerAssistEvents(match, appearance).length : 0
   return <article className="rounded-2xl bg-zinc-900 p-3">
     <button type="button" onClick={() => onNavigate({ name: 'match', id: match.id })} className="flex w-full justify-between text-left">
       <span className="text-xs">{formatCompactCompetitionContext(assignmentSnapshotForMatch(match))} · {formatDate(match.date)} · {score.home}-{score.away}</span>
       <div className="flex gap-2">
-        <span className="text-xs">{appearance ? appearance.position : '--'}</span>
+        <span className="text-xs" title={appearance && !appearance.matchPosition && !appearance.positionHistory?.length && !match.kickoffLineup?.some(slot => slot.playerId === player.id) && !match.events.some(event => event.type === 'sub' && event.playerInId === player.id) ? 'Registered position fallback' : undefined}>{appearance ? representativeMatchPosition(match, appearance) : '--'}</span>
         <span className="text-xs">{rating ? `${rating.minutes}'` : '--\''}</span>
         <b className={rating ? ratingTone(rating.rating) : 'text-zinc-500'}>{rating ? rating.rating.toFixed(1) : '--'}</b>
       </div>
@@ -202,11 +222,13 @@ function MatchRow({ match, player, displayCacheHit, onNavigate }: { match: Match
 function RatingDetails({ match, player, rating, displayCacheHit }: { match: Match; player: Player; rating: RatingBreakdown; displayCacheHit: boolean }) {
   const [open, setOpen] = useState(false)
   const trace = useMemo(() => open ? tracePlayerMatchRating(match, player) : null, [open, match, player])
+  const appearance = match.appearances.find(row => row.playerId === player.id)
+  const displayTimeline = useMemo(() => open && appearance ? matchDisplayPositionSegments(match, appearance) : [], [open, match, appearance])
   return <details className="mt-2 border-t border-white/5 pt-2 text-xs" onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary className="cursor-pointer text-zinc-400">Rating Details · {rating.position} · {rating.minutes}'</summary>
+    <summary className="cursor-pointer text-zinc-400">Rating Details</summary>
     {trace && <div className="mt-3 space-y-3">
       <div className="grid grid-cols-3 gap-1.5">{metric('Entry', `${trace.enter}'`)}{metric('Exit', `${trace.exit}'`)}{metric('Minutes', trace.minutes)}</div>
-      <div><h3 className="mb-1 font-semibold text-zinc-400">Position timeline</h3>{trace.intervals.map((row, index) => <p key={index}>{row.enter}'–{row.exit}' <b>{row.position}</b></p>)}</div>
+      <div><h3 className="mb-1 font-semibold text-zinc-400">Position timeline</h3>{displayTimeline.map((row, index) => <p key={index}>{row.enter}'–{row.exit}' <b>{row.position}</b></p>)}</div>
       <div><h3 className="mb-1 font-semibold text-zinc-400">Conceded goals</h3>{trace.concededGoals.length ? trace.concededGoals.map(row => <div key={row.eventId} className="flex justify-between gap-2 rounded-lg bg-black/20 p-2"><span>{row.minute}' · {row.onPitch ? row.position : 'Off pitch'}</span><b>{value(row.penalty)}</b></div>) : <p className="text-zinc-500">None</p>}</div>
       <div><h3 className="mb-1 font-semibold text-zinc-400">SOT suppression</h3><p className="mb-1 text-zinc-500">Opponent SOT {trace.opponentSot} × {value(trace.sotMultiplier)} multiplier</p>{trace.suppressionIntervals.map((row, index) => <div key={index} className="flex justify-between"><span>{row.position} · {row.minutes} min</span><b>+{value(row.bonus, 5)}</b></div>)}</div>
       <div className="grid grid-cols-2 gap-1.5">

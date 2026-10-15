@@ -1,8 +1,16 @@
 import type { Appearance, Match, MatchEvent } from '../types'
-import { creditedPositionSegments, hasPitchAppearance, isOnPitchAtEvent, matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './timeline'
+import { creditedPositionSegments, hasPitchAppearance, isOnPitchAtEvent, matchDisplayPositionSegments, matchPositionAtEvent, matchPositionSegments, scoringTeamId } from './timeline'
 
 type GoalEvent = Extract<MatchEvent, { type: 'goal' }>
 type SaveEvent = Extract<MatchEvent, { type: 'save' }>
+
+/** Longest actual display role; equal durations retain first-played order.
+ * A missing match role falls back to the saved registration, never a guess. */
+export function representativeMatchPosition(match: Match, appearance: Appearance): string {
+  const minutes = new Map<string, number>()
+  for (const segment of matchDisplayPositionSegments(match, appearance)) minutes.set(segment.position, (minutes.get(segment.position) ?? 0) + segment.exit - segment.enter)
+  return [...minutes].sort((a, b) => b[1] - a[1])[0]?.[0] ?? appearance.matchPosition ?? appearance.position
+}
 
 const appearanceMatchIndex = new WeakMap<Match[], { matches: Match[]; appearances: Appearance[][]; playerIds: string[][]; byPlayer: Map<string, Match[]> }>()
 

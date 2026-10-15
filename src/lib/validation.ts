@@ -2,6 +2,9 @@ import type { AppState } from '../types';
 import { validateManualOpponentSot } from '../engine/opponentSot';
 import { currentTeamIds } from './roster';
 import { matchPositionAtEvent, matchPositionSegments, normalizeMatchPosition } from '../engine/timeline';
+import { validateKickoffLineup } from '../engine/kickoffLineup';
+import { tacticalSlotById } from '../engine/tacticalSlots';
+import type { FormationSlot } from '../types';
 
 // Robust validation checking deep structure
 export function validateState(state: any): state is AppState {
@@ -62,7 +65,15 @@ export function validateState(state: any): state is AppState {
       if (appearance.teamId !== match.homeTeamId && appearance.teamId !== match.awayTeamId) return false;
       if (!normalizeMatchPosition(appearance.matchPosition ?? appearance.position)) return false;
       if (appearance.positionHistory !== undefined && (!Array.isArray(appearance.positionHistory) || appearance.positionHistory.some((change: { minute?: unknown; position?: unknown } | null) => !change || !Number.isFinite(change.minute) || Number(change.minute) < 0 || typeof change.position !== 'string' || !normalizeMatchPosition(change.position)))) return false;
+      if (appearance.positionHistory?.some((change: { tacticalSlotId?: string }) => change.tacticalSlotId !== undefined && !tacticalSlotById[change.tacticalSlotId])) return false;
       appearancePlayerIds.add(appearance.playerId);
+    }
+    if (match.kickoffLineup !== undefined) {
+      if (!Array.isArray(match.kickoffLineup) || match.kickoffLineup.some((slot: FormationSlot | null) => !slot || typeof slot.id !== 'string' || !slot.id || slot.playerId !== null && (typeof slot.playerId !== 'string' || !slot.playerId))) return false;
+      // Modern snapshots own tactical identities. Legacy snapshots can have
+      // player IDs as slot IDs and retain their existing reconstruction route.
+      const modern = match.kickoffLineup.some((slot: FormationSlot) => slot.ratingPosition !== undefined || slot.displayPosition !== undefined);
+      if (modern && (!validateKickoffLineup(match.kickoffLineup, false).valid || match.kickoffLineup.some((slot: FormationSlot) => slot.playerId && !match.appearances.some((row: { playerId: string; teamId: string; role: string }) => row.playerId === slot.playerId && row.teamId === (match.teamId ?? match.homeTeamId) && row.role === 'starter')))) return false;
     }
     // Check events structure
     for (const event of match.events) {
@@ -75,6 +86,7 @@ export function validateState(state: any): state is AppState {
           if (event.assistPlayerId !== undefined && (event.ownGoal || !match.appearances.some((row: { playerId: string; teamId: string }) => row.playerId === event.assistPlayerId && row.teamId === event.teamId))) return false;
         } else if (event.type === 'sub') {
           if (event.playerInId === event.playerOutId) return false;
+          if (event.tacticalSlotId !== undefined && !tacticalSlotById[event.tacticalSlotId]) return false;
           if (!match.appearances.some((row: { playerId: string; teamId: string }) => row.playerId === event.playerInId && row.teamId === event.teamId) || !match.appearances.some((row: { playerId: string; teamId: string }) => row.playerId === event.playerOutId && row.teamId === event.teamId)) return false;
         } else if (event.type === 'save') {
           const appearance = match.appearances.find((row: { playerId: string; teamId: string }) => row.playerId === event.playerId && row.teamId === event.teamId);

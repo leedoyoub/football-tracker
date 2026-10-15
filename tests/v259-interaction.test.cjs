@@ -46,11 +46,12 @@ test('Player Overview first browser render does not build full seasonal awards o
   })
 }))
 
-test('settled Home and Player Detail retain exact v2.5.8 section order, values, milestones, awards and navigation markup', () => {
+test('settled Home and Player Detail retain v2.5.8 markup with the approved Rating Details summary simplification', () => {
   const store = performanceFixture(1)
   for (const [name, view, extra] of [['HomeScreen', { name: 'home' }, {}], ['PlayerDetailScreen', { name: 'player', id: store.players[9].id }, { playerId: store.players[9].id }]]) {
     const props = { season: 'Season 1', screenState: navigation.defaultScreenState(view), onNavigate: noop, onStateChange: noop, onBack: noop, ...extra }
-    assert.equal(renderToStaticMarkup(h(root, name, store).render(props)).replace('Football Tracker \u00b7 v2.5.9', 'Football Tracker \u00b7 v2.5.8'), renderToStaticMarkup(h(baseline, name, store).render(props)))
+    const expected = renderToStaticMarkup(h(baseline, name, store).render(props)).replace(/(<summary class="cursor-pointer text-zinc-400">)Rating Details · [A-Z]+ · \d+&#x27;(<\/summary>)/g, '$1Rating Details$2')
+    assert.equal(renderToStaticMarkup(h(root, name, store).render(props)).replace('Football Tracker \u00b7 v2.5.10', 'Football Tracker \u00b7 v2.5.8'), expected)
   }
 })
 
@@ -155,7 +156,9 @@ test('an identical Draft retries a failed primary save without resetting a pendi
     value.saveDraftMatch(structuredClone(draft))
     assert.equal(timers.size, 1, 'failed identical checkpoint must schedule a retry')
     assert.equal([...timers.values()][0].delay, 450)
-    assert.equal(store.stateChanges, changes); assert.equal(store.render({ children: null }).props.value.draftMatch, identity)
+    // The new global pending/error status is visible; the Draft itself retains
+    // its identity and a retry still creates exactly one 450 ms timer.
+    assert.equal(store.stateChanges, changes + 2); assert.equal(store.render({ children: null }).props.value.draftMatch, identity)
     const retry = [...timers.values()][0]; timers.clear(); retry.fn()
     for (let i = 0; i < 20; i++) await Promise.resolve()
     assert.equal(writes, 2)

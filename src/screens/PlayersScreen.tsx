@@ -7,16 +7,28 @@ import { useStore } from '../store'
 import { currentMembershipPresentation } from '../lib/currentMembershipPresentation'
 import { currentTeamIds } from '../lib/roster'
 import { playerAppearanceMatchIndex } from '../engine/playerMatchFacts'
-import { matchesForPlayer, playerHasNoCurrentTeam, RankingFilterButton } from './RankingFilters'
+import { matchesForPlayer, NO_TEAM_FILTER, playerHasNoCurrentTeam, RankingFilterButton } from './RankingFilters'
 import type { ScreenStateByView, View } from '../types'
 import type { RankingFilters } from './RankingFilters'
 
 export function PlayersScreen({ screenState, onStateChange, onNavigate }: { screenState: ScreenStateByView['players']; onStateChange: (state: ScreenStateByView['players']) => void; onNavigate: (view: View) => void }) {
   const { players, teams, matches } = useStore()
   const seasons = useMemo(() => seasonsFromMatches(matches), [matches])
-  const representative = useMemo(() => scopedPositionFamilyByPlayer(players, matches, {}), [players, matches])
   const search = screenState.search
   const appliedFilters = screenState.filters
+  const representative = useMemo(() => {
+    const { seasons, teams } = appliedFilters
+    const historicalTeams = teams.filter(id => id !== NO_TEAM_FILTER)
+    const families = scopedPositionFamilyByPlayer(players, matches, { seasons, teams: historicalTeams, fallback: seasons.length || historicalTeams.length ? 'none' : 'career' })
+    if (teams.includes(NO_TEAM_FILTER) && historicalTeams.length) {
+      const noTeamFamilies = scopedPositionFamilyByPlayer(players, matches, { seasons, fallback: seasons.length ? 'none' : 'career' })
+      for (const player of players) if (playerHasNoCurrentTeam(player)) {
+        const family = noTeamFamilies.get(player.id)
+        if (family) families.set(player.id, family); else families.delete(player.id)
+      }
+    }
+    return families
+  }, [players, matches, appliedFilters])
   const onFiltersChange = (filters: RankingFilters) => onStateChange({ ...screenState, filters })
   const setSearch = (value: string) => onStateChange({ ...screenState, search: value })
   const rows = useMemo(() => {
@@ -29,7 +41,7 @@ export function PlayersScreen({ screenState, onStateChange, onNavigate }: { scre
       .map(player => {
         const playerMatches = needsHistory ? matchesForPlayer(player, matches, appliedFilters, appearanceIndex) : []
         const membership = currentMembershipPresentation(player, appliedFilters.teams, teams)
-        return { player, team: teams.find(team => team.id === membership.teamId), membershipLabel: membership.label, matchesFilter: (!appliedFilters.seasons.length && !appliedFilters.teams.length) || playerMatches.length > 0 || (appliedFilters.teams.includes('__no-team__') && playerHasNoCurrentTeam(player)) || (!appliedFilters.seasons.length && currentTeamIds(player).some(id => appliedFilters.teams.includes(id))) }
+        return { player, team: teams.find(team => team.id === membership.teamId), membershipLabel: membership.label, matchesFilter: (!appliedFilters.seasons.length && !appliedFilters.teams.length) || playerMatches.length > 0 || (!appliedFilters.seasons.length && ((appliedFilters.teams.includes(NO_TEAM_FILTER) && playerHasNoCurrentTeam(player)) || currentTeamIds(player).some(id => appliedFilters.teams.includes(id)))) }
       })
       .filter(row => row.matchesFilter)
       .sort((left, right) => playerFullName(left.player).localeCompare(playerFullName(right.player)))

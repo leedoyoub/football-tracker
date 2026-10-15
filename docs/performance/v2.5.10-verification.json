@@ -1,0 +1,29 @@
+{
+  "baseSha": "964922fe647b136096bd5646bd9462ce665c06a9",
+  "version": "2.5.10",
+  "ratingRevision": 13,
+  "tests": {
+    "baseline": 963,
+    "added": 62,
+    "total": 1025,
+    "pass": 1025,
+    "fail": 0,
+    "skipped": 0,
+    "durationMs": 151932.0969
+  },
+  "lint": {
+    "baselineWarnings": 45,
+    "finalWarnings": 43,
+    "newWarnings": []
+  },
+  "typescript": "passed via tsc -b",
+  "productionBuild": "passed",
+  "diffCheck": "passed",
+  "independentReview": {
+    "important": 3,
+    "minor": 1,
+    "fixed": 4,
+    "typedAssignmentComparisonInputs": 120
+  },
+  "browserValidation": "not available; apps and browsers inventory empty"
+}

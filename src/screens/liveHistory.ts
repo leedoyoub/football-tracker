@@ -4,11 +4,12 @@ import { isOnPitchAtEvent, orderedEvents } from '../engine/timeline'
 import { tacticalAssignmentsAtMoment } from '../engine/tacticalHistory'
 
 // Rebuild a draft after an event correction; reject edits that orphan later events.
-export function rebuildLiveHistory(starters: Record<string, string>, roster: string[], events: MatchEvent[], histories: Record<string, PositionChange[]>, positions: Record<string, Position>) {
+export function rebuildLiveHistory(starters: Record<string, string>, roster: string[], events: MatchEvent[], histories: Record<string, PositionChange[]>, positions: Record<string, Position>, recordedTeamId?: string) {
   const entered = new Set(Object.values(starters))
   const enteredAt = new Map<string, number>()
-  const teamId = events.find(event => event.type === 'sub')?.teamId ?? events[0]?.teamId ?? ''
-  const timelineMatch = { id: 'preview', season: '', matchDay: 0, date: '', duration: 90, homeTeamId: '', awayTeamId: '', events, appearances: roster.map(playerId => ({ playerId, teamId, role: Object.values(starters).includes(playerId) ? 'starter' as const : 'bench' as const, position: positions[Object.keys(starters).find(slot => starters[slot] === playerId) ?? ''] ?? 'CM' as Position, positionHistory: histories[playerId] })) }
+  const teamId = recordedTeamId ?? events.find(event => event.type === 'sub')?.teamId ?? events[0]?.teamId ?? ''
+  const scopedEvents = recordedTeamId ? events.filter(event => event.type === 'goal' || event.teamId === recordedTeamId) : events
+  const timelineMatch = { id: 'preview', season: '', matchDay: 0, date: '', duration: 90, homeTeamId: '', awayTeamId: '', events: scopedEvents, appearances: roster.map(playerId => ({ playerId, teamId, role: Object.values(starters).includes(playerId) ? 'starter' as const : 'bench' as const, position: positions[Object.keys(starters).find(slot => starters[slot] === playerId) ?? ''] ?? 'CM' as Position, positionHistory: histories[playerId] })) }
   const subs = orderedEvents(timelineMatch).flatMap(({ event }) => event.type === 'sub' ? [event] : [])
   const positionHistories = Object.fromEntries(Object.entries(histories).map(([id, changes]) => [id, changes.filter(c =>
     c.sourceSubstitutionIds?.length
@@ -20,10 +21,10 @@ export function rebuildLiveHistory(starters: Record<string, string>, roster: str
     entered.add(event.playerInId)
     enteredAt.set(event.playerInId, event.minute)
   }
-  const slots = tacticalAssignmentsAtMoment(starters, events, positionHistories, positions)
-  for (const event of events) {
+  const slots = tacticalAssignmentsAtMoment(starters, scopedEvents, positionHistories, positions)
+  for (const event of scopedEvents) {
     if (event.type === 'goal') {
-      if ([event.playerId, event.assistPlayerId, event.concededGoalCausePlayerId].some(id => {
+      if ([...(recordedTeamId && event.teamId !== teamId ? [] : [event.playerId, event.assistPlayerId]), event.concededGoalCausePlayerId].some(id => {
         if (!id) return false
         const appearance = timelineMatch.appearances.find(row => row.playerId === id)
         return !appearance || !isOnPitchAtEvent(timelineMatch, appearance, event)

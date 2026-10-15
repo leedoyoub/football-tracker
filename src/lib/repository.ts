@@ -61,10 +61,14 @@ export const LocalRepository = {
       ...LEGACY_STORAGE_KEYS.map(key => () => Promise.resolve(localStorage.getItem(key))),
     ];
 
+    let readableEmptySource = false;
+    let existingPayload = false;
+    let primaryUnavailable = false;
     for (const getSource of sources) {
       try {
         const raw = await getSource();
-        if (!raw) continue;
+        if (!raw) { readableEmptySource = true; continue; }
+        existingPayload = true;
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (validateState(parsed)) {
           // Migration: Ensure player position is valid
@@ -85,10 +89,14 @@ export const LocalRepository = {
           if (typeof raw === 'string') void saveToIndexedDB(STORAGE_KEY, migratedState).catch(() => {})
           return migratedState;
         }
-      } catch (e) {
-        console.error('Recovery attempt failed for a source', e);
+      } catch {
+        if (getSource === sources[0]) primaryUnavailable = true;
+        console.error('[Football Tracker storage] Recovery source unavailable or invalid.');
       }
     }
+    // An inaccessible or damaged data namespace is a recovery condition, not
+    // evidence of a fresh install. Never let startup overwrite it as empty.
+    if (primaryUnavailable || !readableEmptySource || existingPayload) throw new Error('Local storage recovery failed. Existing data has not been changed.');
     return null;
   },
 
