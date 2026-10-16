@@ -29,7 +29,7 @@
 - [x] Add regression tests for player award and team history ranking filters, totals, best-season records and replay deduplication; implement Records selector integration using optional competition states.
 - [x] Replace Player Detail awards with expandable career groups; use the same events in Records History; unify Champions round pitch and final MVP display using existing controls and AwardBestXI.
 - [x] Measure existing virtualization and calculation cache reuse; improve same-count remeasurement and Records full lists only where necessary; validate window bounds and disposal.
-- [ ] Review semantic diff, run complete test suite, lint, TypeScript/production build and diff check; bump version consistently; commit, push main and verify Pages workflow/public version.
+- [x] Review semantic diff, run complete test suite, lint, TypeScript/production build and diff check; bump version consistently; commit, push main and verify Pages workflow/public version.
 
 ## Execution evidence
 - Targeted v2512 regressions: 15/15 passed. Complete suite: 1,063/1,063 before the last two added policy tests; 1,065 unique passing tests including those additions. Existing virtual-window regressions also passed.
@@ -38,3 +38,4 @@
 - Two-season synthetic benchmark: 367 players, 1,152 matches; cold awards Records 741ms, cached Records 100 reads 0.091ms, shared season model 100 reads 0.027ms; initial virtual rows 19/350. CPU/SSR measurements, not browser FPS.
 - Production build, lint and diff check exited 0. Lint retains pre-existing warnings and Vite retains the bundle-size warning.
 - Browser QA unavailable: browser inventory was empty; isolated synthetic QA files were removed. React render/interaction/window tests remain the UI evidence.
+- Feature commit `95586beccec2537cd5dc855387a62b22295bb4f2` pushed to main. Pages workflow `38891151054` completed successfully. Public HTTP 200 and `/football-tracker/assets/index-BhhGCjzw.js` confirmed version `2.5.12`, Career Awards and Honors & History.
