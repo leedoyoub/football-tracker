@@ -34,13 +34,13 @@ function ranked(rows: Omit<RecordsLeaderboardRow, 'rank'>[], ascending = false):
   let previous: number | undefined, rank = 0
   return rows.sort((a, b) => (ascending ? a.numeric - b.numeric : b.numeric - a.numeric) || a.id.localeCompare(b.id)).map((row, i) => { if (previous !== row.numeric) rank = i + 1; previous = row.numeric; return { ...row, rank } })
 }
-export function awardRecordGroups(teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], scope: RecordsScope): RecordsLeaderboardGroup[] {
+export function awardRecordGroups(teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], scope: RecordsScope, selectedIds?: string[]): RecordsLeaderboardGroup[] {
   const families = positionFilterFamilies(scope.positionFilter)
   const events = officialAwardSeasons(matches, states).filter(season => !scope.seasons.length || scope.seasons.includes(season)).flatMap(season => officialSeasonModel(teams, players, matches, states, season).events).filter(e => (scope.competition === 'all' || e.competition === scope.competition) && (!scope.teamIds.length || scope.teamIds.includes(e.teamId)) && (!families.length || e.position && families.includes(e.position)))
   const byPlayer = new Map<string, OfficialAwardEvent[]>()
   for (const event of events) { const list = byPlayer.get(event.playerId) ?? []; list.push(event); byPlayer.set(event.playerId, list) }
   const byId = new Map(players.map(player => [player.id, player]))
-  return AWARD_RECORD_METRICS.map(metric => ({ id: `awards-${metric.id}`, title: metric.title, kind: 'player', applicableFilters: { position: true, team: true }, rows: ranked([...byPlayer].flatMap(([id, awards]) => {
+  return AWARD_RECORD_METRICS.filter(metric => !selectedIds || selectedIds.includes(`awards-${metric.id}`)).map(metric => ({ id: `awards-${metric.id}`, title: metric.title, kind: 'player', applicableFilters: { position: true, team: true }, rows: ranked([...byPlayer].flatMap(([id, awards]) => {
     const selected = awards.filter(metric.accepts)
     if (!selected.length) return []
     const player = byId.get(id)

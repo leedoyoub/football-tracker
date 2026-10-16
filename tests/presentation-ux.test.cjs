@@ -29,6 +29,7 @@ const { PlayerDetailScreen } = require('../src/screens/PlayerDetailScreen.tsx')
 const { playerFullName, playerDisplayName } = require('../src/components/ui.tsx')
 const { APP_VERSION } = require('../src/config.ts')
 const { defaultScreenState } = require('../src/lib/navigation.ts')
+const { expandCardLists } = require('./helpers/card-list-tree.cjs')
 const player = (id, position = 'ST') => ({ id, name: 'Legacy ' + id, fullName: 'Complete Name ' + id, displayName: 'Short ' + id, position, number: 9, teamId: 'A', teamIds: ['A', 'B'] })
 const match = (id, players, props = {}) => ({ id, season: 'S1', matchDay: 1, date: '2026-09-01', duration: 90, homeTeamId: 'A', awayTeamId: 'OPP', teamId: 'A', appearances: players.map(p => ({ playerId: p.id, teamId: 'A', role: 'starter', position: p.position, matchPosition: p.position })), events: [], ...props })
 const goal = (id, minute, props = {}) => ({ id, type: 'goal', teamId: 'A', minute, ...props })
@@ -40,7 +41,7 @@ function screen(Component, store, props = {}) {
   const h = { cursor: 0, state: [], store, screenState: defaultScreenState(route) }
   const render = () => {
     owner = h; h.cursor = 0
-    return Component({ season: 'S1', onSeason() {}, onNavigate() {}, onBack() {}, screenState: h.screenState, onStateChange(next) { h.screenState = next }, ...props })
+    return expandCardLists(Component({ season: 'S1', onSeason() {}, onNavigate() {}, onBack() {}, screenState: h.screenState, onStateChange(next) { h.screenState = next }, ...props }))
   }
   return { render }
 }

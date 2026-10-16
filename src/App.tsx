@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { BottomNav } from './components/BottomNav'
+import { FloatingScrollToTop } from './components/FloatingScrollToTop'
+import { hasPageScrollToTop, pageScrollScopeKey } from './components/scrollToTop'
 import { HomeScreen } from './screens/HomeScreen'
 import { MatchDetailScreen } from './screens/MatchDetailScreen'
 import { NewMatchScreen } from './screens/NewMatchScreen'
@@ -228,6 +230,7 @@ export default function App() {
     <div className="min-h-[100dvh] bg-zinc-950">
       <div className="relative mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-black text-white shadow-2xl">
         <div ref={scrollRef} className={`app-content no-scrollbar min-h-0 flex-1 ${appContentOverflowClass(view)}`}>
+          {hasPageScrollToTop(view, entry.screenState) && <FloatingScrollToTop key={pageScrollScopeKey(view, entry.screenState)} distance={500} />}
           {view.name === 'home' && (
             <HomeScreen season={season} screenState={entry.screenState as ScreenStateByView['home']} onStateChange={onStateChange} onSeason={setSeason} onNavigate={onNavigate} />
           )}

@@ -1,16 +1,19 @@
+import { VirtualCardList } from '../components/VirtualCardList'
 import { useMemo } from 'react'
 import { playerFullName } from '../components/ui'
 import { PlayerIcon } from '../components/PlayerIcon'
 import { seasonsFromMatches } from '../engine/stats'
 import { positionFamily, scopedPositionFamilyByPlayer } from '../engine/positionScope'
+import { playerDirectoryPosition } from '../engine/playerDirectoryPosition'
 import { useStore } from '../store'
 import { currentMembershipPresentation } from '../lib/currentMembershipPresentation'
 import { currentTeamIds } from '../lib/roster'
 import { playerAppearanceMatchIndex } from '../engine/playerMatchFacts'
 import { matchesForPlayer, NO_TEAM_FILTER, playerHasNoCurrentTeam, RankingFilterButton } from './RankingFilters'
-import type { ScreenStateByView, View } from '../types'
+import type { Player, ScreenStateByView, View } from '../types'
 import type { RankingFilters } from './RankingFilters'
 
+const playerKey = (row: { player: Player }) => row.player.id
 export function PlayersScreen({ screenState, onStateChange, onNavigate }: { screenState: ScreenStateByView['players']; onStateChange: (state: ScreenStateByView['players']) => void; onNavigate: (view: View) => void }) {
   const { players, teams, matches } = useStore()
   const seasons = useMemo(() => seasonsFromMatches(matches), [matches])
@@ -19,6 +22,15 @@ export function PlayersScreen({ screenState, onStateChange, onNavigate }: { scre
   const representative = useMemo(() => {
     const { seasons, teams } = appliedFilters
     const historicalTeams = teams.filter(id => id !== NO_TEAM_FILTER)
+    if (!appliedFilters.positions.length) {
+      const byId = new Map(players.map(player => [player.id, player]))
+      return { get(id: string) {
+        const player = byId.get(id)
+        if (!player) return undefined
+        const selectedTeams = teams.includes(NO_TEAM_FILTER) && historicalTeams.length && playerHasNoCurrentTeam(player) ? [] : historicalTeams
+        return playerDirectoryPosition(player, matches, { seasons, teams: selectedTeams, fallback: seasons.length || selectedTeams.length ? 'none' : 'career' })
+      } }
+    }
     const families = scopedPositionFamilyByPlayer(players, matches, { seasons, teams: historicalTeams, fallback: seasons.length || historicalTeams.length ? 'none' : 'career' })
     if (teams.includes(NO_TEAM_FILTER) && historicalTeams.length) {
       const noTeamFamilies = scopedPositionFamilyByPlayer(players, matches, { seasons, fallback: seasons.length ? 'none' : 'career' })
@@ -46,5 +58,5 @@ export function PlayersScreen({ screenState, onStateChange, onNavigate }: { scre
       .filter(row => row.matchesFilter)
       .sort((left, right) => playerFullName(left.player).localeCompare(playerFullName(right.player)))
   }, [players, teams, matches, appliedFilters, search, representative])
-  return <div className="px-4 pb-8 pt-6"><div className="mb-4 flex items-center justify-between"><h1 className="text-2xl font-semibold">Players</h1><button type="button" onClick={() => onNavigate({ name: 'new-player' })} className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-bold text-black">Add</button></div><div className="mb-4 flex gap-2"><input type="search" aria-label="Search players" placeholder="Search players" value={search} onChange={event => setSearch(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm" /><RankingFilterButton applied={appliedFilters} onApply={onFiltersChange} seasons={seasons} teams={teams} /></div><div className="space-y-2">{rows.length === 0 && <p className="py-4 text-sm text-zinc-400">No players found.</p>}{rows.map(({ player, team, membershipLabel }) => <button key={player.id} type="button" onClick={() => onNavigate({ name: 'player', id: player.id })} className="flex w-full items-center gap-3 rounded-2xl bg-zinc-900 px-3 py-2.5 text-left"><PlayerIcon player={player} team={team} className="h-10 w-10 text-[10px]" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{playerFullName(player)}</span><span className="text-[11px] text-zinc-400">{membershipLabel} · {representative.get(player.id) ?? player.position}</span></span></button>)}</div></div>
+  return <div className="px-4 pb-8 pt-6"><div className="mb-4 flex items-center justify-between"><h1 className="text-2xl font-semibold">Players</h1><button type="button" onClick={() => onNavigate({ name: 'new-player' })} className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-bold text-black">Add</button></div><div className="mb-4 flex gap-2"><input type="search" aria-label="Search players" placeholder="Search players" value={search} onChange={event => setSearch(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm" /><RankingFilterButton applied={appliedFilters} onApply={onFiltersChange} seasons={seasons} teams={teams} /></div><div className="space-y-2">{rows.length === 0 && <p className="py-4 text-sm text-zinc-400">No players found.</p>}{<VirtualCardList rows={rows} itemKey={playerKey} estimate={60} measurementOwner={players} renderRow={({ player, team, membershipLabel }) => <button type="button" onClick={() => onNavigate({ name: 'player', id: player.id })} className="flex w-full items-center gap-3 rounded-2xl bg-zinc-900 px-3 py-2.5 text-left"><PlayerIcon player={player} team={team} className="h-10 w-10 text-[10px]" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{playerFullName(player)}</span><span className="text-[11px] text-zinc-400">{membershipLabel} · {representative.get(player.id) ?? player.position}</span></span></button>} />}</div></div>
 }

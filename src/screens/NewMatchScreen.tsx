@@ -4,7 +4,7 @@ import { eligibleAtEvent, previewGoalEvent, tacticalAssignmentsAtMoment, tactica
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FORMATION_SLOTS, Pitch, UNIVERSAL_TACTICAL_SLOTS } from '../components/Pitch'
 import { calculateFormation, kickoffFormation } from '../engine/formation'
-import { playerSeasonStats } from '../engine/stats'
+import { seasonGoalContributions } from '../engine/seasonGoalContributions'
 import { liveGoalAssistCounts } from './liveEventStats'
 import { scopedPositionFamilyByPlayer } from '../engine/positionScope'
 import { fillFormationSlots } from '../engine/lineupSuggestion'
@@ -185,10 +185,7 @@ function MatchEditor({
     return [...historical, ...homeSquad.filter(player => !historicalIds.has(player.id))]
   }, [mode, sourceMatch, homeSquad, players, selectedTeamId])
   const draftRosterIds = useMemo(() => [...new Set([...(sourceMatch?.appearances.filter(row => row.teamId === selectedTeamId).map(row => row.playerId) ?? []), ...draftPlayers.map(player => player.id)])], [sourceMatch, selectedTeamId, draftPlayers])
-  const seasonStats = useMemo(() => Object.fromEntries(draftPlayers.map((player) => {
-    const stats = playerSeasonStats(player, players, matches, season, selectedTeamId, competitionType)
-    return [player.id, { goals: stats.goals, assists: stats.assists }]
-  })), [draftPlayers, players, matches, season, selectedTeamId, competitionType])
+  const seasonStats = useMemo(() => seasonGoalContributions(draftPlayers, matches, season, selectedTeamId, competitionType), [draftPlayers, matches, season, selectedTeamId, competitionType])
   const activeDraft = substitutionDraft ?? matchDraft
   // Visual feedback comes only from the current selection and unconfirmed draft.
   const substitutionSelection: Record<string, 'in' | 'out'> = {}

@@ -1,0 +1,675 @@
+{
+  "baseSha": "5fca29a69317922206e64329b3e2928fe662c4e0",
+  "node": "v24.19.0",
+  "cpu": "Intel(R) Core(TM) Ultra 7 256V",
+  "method": "Alternating independent archived/current graphs, production React SSR and screen CPU; not browser layout/FPS. Detail uses independent cold data to exclude earlier directory role-cache priming. Explicit GC between sides when --expose-gc is enabled. Extra directory players above 367 have no recorded appearances.",
+  "explicitGc": true,
+  "before": {
+    "structure": {
+      "ResultsScreen": {
+        "domNodes": 9029,
+        "bytes": 2169376
+      },
+      "PlayersScreen": {
+        "domNodes": 2626,
+        "bytes": 232526
+      },
+      "CompetitionMatches": {
+        "domNodes": 3848
+      }
+    },
+    "timings": {
+      "ResultsScreen first CPU": {
+        "medianMs": 6.51089999999931,
+        "p95Ms": 12.633399999999938,
+        "samples": [
+          12.633399999999938,
+          8.716300000000047,
+          5.423099999999977,
+          6.51089999999931,
+          5.75539999999819
+        ]
+      },
+      "ResultsScreen repeat CPU": {
+        "medianMs": 4.974599999999555,
+        "p95Ms": 8.094500000000153,
+        "samples": [
+          2.7566000000000486,
+          8.094500000000153,
+          4.264699999999721,
+          4.974599999999555,
+          7.110799999998562
+        ]
+      },
+      "ResultsScreen SSR": {
+        "medianMs": 19.284999999999854,
+        "p95Ms": 41.259399999999005,
+        "samples": [
+          18.34430000000009,
+          19.284999999999854,
+          18.705700000000434,
+          40.39730000000054,
+          41.259399999999005
+        ]
+      },
+      "PlayersScreen first CPU": {
+        "medianMs": 55.56880000000001,
+        "p95Ms": 63.912399999999934,
+        "samples": [
+          63.912399999999934,
+          55.56880000000001,
+          58.1203000000005,
+          46.126399999999194,
+          49.85570000000007
+        ]
+      },
+      "PlayersScreen repeat CPU": {
+        "medianMs": 0.18449999999938882,
+        "p95Ms": 0.2734999999993306,
+        "samples": [
+          0.18479999999999563,
+          0.17090000000007421,
+          0.18449999999938882,
+          0.15489999999954307,
+          0.2734999999993306
+        ]
+      },
+      "PlayersScreen SSR": {
+        "medianMs": 2.277900000000045,
+        "p95Ms": 4.716099999999642,
+        "samples": [
+          3.6779999999999973,
+          2.277900000000045,
+          4.716099999999642,
+          1.8912000000000262,
+          2.271100000001752
+        ]
+      },
+      "Players search and render": {
+        "medianMs": 0.47110000000247965,
+        "p95Ms": 0.9853999999995722,
+        "samples": [
+          0.6041999999999916,
+          0.4602000000004409,
+          0.9853999999995722,
+          0.4158999999999651,
+          0.47110000000247965
+        ]
+      },
+      "Players filter and render": {
+        "medianMs": 12.522500000000036,
+        "p95Ms": 14.364500000000021,
+        "samples": [
+          14.364500000000021,
+          12.522500000000036,
+          12.845799999999144,
+          9.135000000000218,
+          12.193999999999505
+        ]
+      },
+      "CompetitionMatches SSR": {
+        "medianMs": 6.343999999999141,
+        "p95Ms": 6.836500000000001,
+        "samples": [
+          6.836500000000001,
+          6.594599999999446,
+          6.343999999999141,
+          3.900000000001455,
+          6.074500000002445
+        ]
+      },
+      "PlayerDetailScreen first CPU": {
+        "medianMs": 278.39830000000075,
+        "p95Ms": 322.4923000000017,
+        "samples": [
+          228.12599999999998,
+          302.82810000000063,
+          322.4923000000017,
+          278.39830000000075,
+          246.43089999999938
+        ]
+      },
+      "PlayerDetailScreen repeat CPU": {
+        "medianMs": 0.25240000000007967,
+        "p95Ms": 0.3848999999991065,
+        "samples": [
+          0.25240000000007967,
+          0.24610000000029686,
+          0.3848999999991065,
+          0.34769999999844003,
+          0.21900000000096043
+        ]
+      },
+      "Player Detail remount CPU": {
+        "medianMs": 137.57730000000083,
+        "p95Ms": 159.9940999999999,
+        "samples": [
+          98.03659999999991,
+          123.8095000000003,
+          137.57730000000083,
+          159.9940999999999,
+          149.25970000000234
+        ]
+      },
+      "Player Detail next player remount CPU": {
+        "medianMs": 136.3132999999998,
+        "p95Ms": 183.42669999999998,
+        "samples": [
+          93.1087,
+          134.02279999999973,
+          136.3132999999998,
+          155.4190000000017,
+          183.42669999999998
+        ]
+      },
+      "Awards Records cold": {
+        "medianMs": 901.8181000000004,
+        "p95Ms": 1014.4580000000024,
+        "samples": [
+          681.0928999999999,
+          901.8181000000004,
+          895.6494999999995,
+          932.5532999999996,
+          1014.4580000000024
+        ]
+      },
+      "Awards Records warm": {
+        "medianMs": 0.02169999999978245,
+        "p95Ms": 0.024400000000241562,
+        "samples": [
+          0.02169999999978245,
+          0.023699999999735155,
+          0.024400000000241562,
+          0.010000000002037268,
+          0.016400000000430737
+        ]
+      },
+      "Team History cold": {
+        "medianMs": 934.0249000000003,
+        "p95Ms": 1032.3345999999983,
+        "samples": [
+          567.4396000000002,
+          956.2347,
+          934.0249000000003,
+          885.2344999999987,
+          1032.3345999999983
+        ]
+      },
+      "New Match season badges": {
+        "medianMs": 6.429299999999785,
+        "p95Ms": 8.789999999999054,
+        "samples": [
+          5.5142000000000735,
+          6.429299999999785,
+          8.789999999999054,
+          7.644199999998818,
+          5.171099999999569
+        ]
+      }
+    }
+  },
+  "after": {
+    "structure": {
+      "ResultsScreen": {
+        "domNodes": 125,
+        "bytes": 27268
+      },
+      "PlayersScreen": {
+        "domNodes": 180,
+        "bytes": 15636
+      },
+      "CompetitionMatches": {
+        "domNodes": 128
+      }
+    },
+    "timings": {
+      "ResultsScreen first CPU": {
+        "medianMs": 8.627200000000812,
+        "p95Ms": 26.860000000000582,
+        "samples": [
+          4.296299999999974,
+          11.77980000000025,
+          26.860000000000582,
+          8.627200000000812,
+          8.497800000001007
+        ]
+      },
+      "ResultsScreen repeat CPU": {
+        "medianMs": 0.03449999999793363,
+        "p95Ms": 0.038900000000467116,
+        "samples": [
+          0.011000000000422006,
+          0.038900000000467116,
+          0.0352999999995518,
+          0.026100000000951695,
+          0.03449999999793363
+        ]
+      },
+      "ResultsScreen SSR": {
+        "medianMs": 3.031299999998737,
+        "p95Ms": 11.41059999999925,
+        "samples": [
+          2.783799999999701,
+          1.4760999999998603,
+          11.41059999999925,
+          3.031299999998737,
+          3.691000000002532
+        ]
+      },
+      "PlayersScreen first CPU": {
+        "medianMs": 1.5349999999998545,
+        "p95Ms": 4.496399999999994,
+        "samples": [
+          1.240099999999984,
+          1.5349999999998545,
+          1.0410000000010768,
+          1.685300000001007,
+          4.496399999999994
+        ]
+      },
+      "PlayersScreen repeat CPU": {
+        "medianMs": 0.02959999999984575,
+        "p95Ms": 0.0433999999986554,
+        "samples": [
+          0.01470000000017535,
+          0.02959999999984575,
+          0.01900000000023283,
+          0.030300000000352156,
+          0.0433999999986554
+        ]
+      },
+      "PlayersScreen SSR": {
+        "medianMs": 17.691200000001118,
+        "p95Ms": 43.347100000000864,
+        "samples": [
+          11.078599999999824,
+          17.51970000000074,
+          43.347100000000864,
+          17.691200000001118,
+          23.360799999998562
+        ]
+      },
+      "Players search and render": {
+        "medianMs": 7.58600000000115,
+        "p95Ms": 23.305500000002212,
+        "samples": [
+          4.170399999999972,
+          9.803400000000693,
+          6.209199999999328,
+          7.58600000000115,
+          23.305500000002212
+        ]
+      },
+      "Players filter and render": {
+        "medianMs": 13.553899999999885,
+        "p95Ms": 17.460699999999633,
+        "samples": [
+          7.9547999999999774,
+          13.553899999999885,
+          8.920799999999872,
+          15.733900000001086,
+          17.460699999999633
+        ]
+      },
+      "CompetitionMatches SSR": {
+        "medianMs": 2.077400000000125,
+        "p95Ms": 3.055499999998574,
+        "samples": [
+          2.1765000000000327,
+          1.4655000000002474,
+          1.6461999999992258,
+          2.077400000000125,
+          3.055499999998574
+        ]
+      },
+      "PlayerDetailScreen first CPU": {
+        "medianMs": 258.6859999999997,
+        "p95Ms": 364.8879999999999,
+        "samples": [
+          364.8879999999999,
+          284.7574000000004,
+          203.41280000000006,
+          258.6859999999997,
+          186.22379999999976
+        ]
+      },
+      "PlayerDetailScreen repeat CPU": {
+        "medianMs": 0.3045000000001892,
+        "p95Ms": 1.3087000000000444,
+        "samples": [
+          1.3087000000000444,
+          0.43290000000069995,
+          0.3045000000001892,
+          0.16610000000036962,
+          0.2426999999988766
+        ]
+      },
+      "Player Detail remount CPU": {
+        "medianMs": 2.4079999999999018,
+        "p95Ms": 2.7863999999972293,
+        "samples": [
+          2.4079999999999018,
+          2.5214999999998327,
+          2.0943999999999505,
+          2.10570000000007,
+          2.7863999999972293
+        ]
+      },
+      "Player Detail next player remount CPU": {
+        "medianMs": 6.282999999999447,
+        "p95Ms": 9.967800000000352,
+        "samples": [
+          4.221499999999651,
+          9.967800000000352,
+          6.282999999999447,
+          3.6441000000013446,
+          9.90350000000035
+        ]
+      },
+      "Awards Records cold": {
+        "medianMs": 807.0839999999989,
+        "p95Ms": 880.1207000000004,
+        "samples": [
+          880.1207000000004,
+          745.5262000000002,
+          807.0839999999989,
+          629.4493999999995,
+          850.4377999999997
+        ]
+      },
+      "Awards Records warm": {
+        "medianMs": 0.01330000000052678,
+        "p95Ms": 0.03390000000035798,
+        "samples": [
+          0.03390000000035798,
+          0.0136000000002241,
+          0.011899999999513966,
+          0.01330000000052678,
+          0.010900000001129229
+        ]
+      },
+      "Team History cold": {
+        "medianMs": 223.22200000000157,
+        "p95Ms": 342.70799999999963,
+        "samples": [
+          342.70799999999963,
+          228.58050000000003,
+          190.67239999999947,
+          223.22200000000157,
+          209.0502000000015
+        ]
+      },
+      "New Match season badges": {
+        "medianMs": 1.8202999999994063,
+        "p95Ms": 2.522899999999936,
+        "samples": [
+          1.60779999999977,
+          1.6926999999996042,
+          2.138999999999214,
+          2.522899999999936,
+          1.8202999999994063
+        ]
+      }
+    }
+  },
+  "sizes": [
+    {
+      "players": 100,
+      "seasons": 1,
+      "before": {
+        "measurements": {
+          "ResultsScreen first CPU": 0.39020000000164146,
+          "ResultsScreen repeat CPU": 0.14129999999931897,
+          "ResultsScreen SSR": 1.727100000000064,
+          "PlayersScreen first CPU": 4.475900000001275,
+          "PlayersScreen repeat CPU": 0.06600000000253203,
+          "PlayersScreen SSR": 0.7680000000000291,
+          "Players search and render": 0.5724000000009255,
+          "Players filter and render": 2.220900000000256,
+          "CompetitionMatches SSR": 2.2986000000018976,
+          "PlayerDetailScreen first CPU": 32.247299999999086,
+          "PlayerDetailScreen repeat CPU": 0.21570000000065193,
+          "Player Detail remount CPU": 14.840199999998731,
+          "Player Detail next player remount CPU": 23.426000000003114,
+          "Awards Records cold": 45.33230000000185,
+          "Awards Records warm": 0.014000000002852175,
+          "Team History cold": 582.3113999999987,
+          "New Match season badges": 1.0859000000018568
+        },
+        "structure": {
+          "ResultsScreen": {
+            "domNodes": 805,
+            "bytes": 189383
+          },
+          "PlayersScreen": {
+            "domNodes": 756,
+            "bytes": 66848
+          },
+          "CompetitionMatches": {
+            "domNodes": 808
+          }
+        },
+        "fixture": {
+          "players": 100,
+          "matches": 100,
+          "seasons": 1,
+          "extraPlayersHaveMatches": true
+        }
+      },
+      "after": {
+        "measurements": {
+          "ResultsScreen first CPU": 0.3103999999984808,
+          "ResultsScreen repeat CPU": 0.017300000003160676,
+          "ResultsScreen SSR": 0.6959999999999127,
+          "PlayersScreen first CPU": 0.9834999999984575,
+          "PlayersScreen repeat CPU": 0.02630000000135624,
+          "PlayersScreen SSR": 1.1228999999984808,
+          "Players search and render": 0.613099999998667,
+          "Players filter and render": 1.7211999999999534,
+          "CompetitionMatches SSR": 1.4395000000004075,
+          "PlayerDetailScreen first CPU": 41.85729999999967,
+          "PlayerDetailScreen repeat CPU": 0.07269999999698484,
+          "Player Detail remount CPU": 0.17970000000059372,
+          "Player Detail next player remount CPU": 2.367600000001403,
+          "Awards Records cold": 19.789300000000367,
+          "Awards Records warm": 0.004999999997380655,
+          "Team History cold": 81.67480000000069,
+          "New Match season badges": 0.2474000000001979
+        },
+        "structure": {
+          "ResultsScreen": {
+            "domNodes": 125,
+            "bytes": 27221
+          },
+          "PlayersScreen": {
+            "domNodes": 179,
+            "bytes": 15758
+          },
+          "CompetitionMatches": {
+            "domNodes": 128
+          }
+        },
+        "fixture": {
+          "players": 100,
+          "matches": 100,
+          "seasons": 1,
+          "extraPlayersHaveMatches": true
+        }
+      }
+    },
+    {
+      "players": 300,
+      "seasons": 2,
+      "before": {
+        "measurements": {
+          "ResultsScreen first CPU": 1.184000000001106,
+          "ResultsScreen repeat CPU": 0.8688000000001921,
+          "ResultsScreen SSR": 7.78610000000117,
+          "PlayersScreen first CPU": 19.673800000000483,
+          "PlayersScreen repeat CPU": 0.14050000000133878,
+          "PlayersScreen SSR": 1.25,
+          "Players search and render": 0.6628999999993539,
+          "Players filter and render": 6.977999999999156,
+          "CompetitionMatches SSR": 6.96310000000085,
+          "PlayerDetailScreen first CPU": 198.25050000000192,
+          "PlayerDetailScreen repeat CPU": 0.24550000000090222,
+          "Player Detail remount CPU": 89.92020000000048,
+          "Player Detail next player remount CPU": 91.48619999999937,
+          "Awards Records cold": 341.3123000000014,
+          "Awards Records warm": 0.014100000000325963,
+          "Team History cold": 871.8099000000002,
+          "New Match season badges": 4.409899999998743
+        },
+        "structure": {
+          "ResultsScreen": {
+            "domNodes": 3987,
+            "bytes": 941292
+          },
+          "PlayersScreen": {
+            "domNodes": 2156,
+            "bytes": 190850
+          },
+          "CompetitionMatches": {
+            "domNodes": 3848
+          }
+        },
+        "fixture": {
+          "players": 300,
+          "matches": 500,
+          "seasons": 2,
+          "extraPlayersHaveMatches": true
+        }
+      },
+      "after": {
+        "measurements": {
+          "ResultsScreen first CPU": 1.105599999998958,
+          "ResultsScreen repeat CPU": 0.02419999999983702,
+          "ResultsScreen SSR": 0.40970000000015716,
+          "PlayersScreen first CPU": 1.1481999999996333,
+          "PlayersScreen repeat CPU": 0.021600000000034925,
+          "PlayersScreen SSR": 4.412000000000262,
+          "Players search and render": 2.840200000002369,
+          "Players filter and render": 9.508900000000722,
+          "CompetitionMatches SSR": 3.3234000000011292,
+          "PlayerDetailScreen first CPU": 169.30040000000008,
+          "PlayerDetailScreen repeat CPU": 0.1624999999985448,
+          "Player Detail remount CPU": 0.7145999999993364,
+          "Player Detail next player remount CPU": 1.4579999999987194,
+          "Awards Records cold": 210.9356000000007,
+          "Awards Records warm": 0.006299999997281702,
+          "Team History cold": 205.666500000003,
+          "New Match season badges": 1.1657000000013795
+        },
+        "structure": {
+          "ResultsScreen": {
+            "domNodes": 125,
+            "bytes": 27267
+          },
+          "PlayersScreen": {
+            "domNodes": 179,
+            "bytes": 15549
+          },
+          "CompetitionMatches": {
+            "domNodes": 128
+          }
+        },
+        "fixture": {
+          "players": 300,
+          "matches": 500,
+          "seasons": 2,
+          "extraPlayersHaveMatches": true
+        }
+      }
+    },
+    {
+      "players": 500,
+      "seasons": 3,
+      "before": {
+        "measurements": {
+          "ResultsScreen first CPU": 6.362400000001799,
+          "ResultsScreen repeat CPU": 4.145399999997608,
+          "ResultsScreen SSR": 20.24170000000231,
+          "PlayersScreen first CPU": 92.3012000000017,
+          "PlayersScreen repeat CPU": 0.30159999999887077,
+          "PlayersScreen SSR": 2.98070000000007,
+          "Players search and render": 1.3052999999999884,
+          "Players filter and render": 10.979400000000169,
+          "CompetitionMatches SSR": 10.962099999997008,
+          "PlayerDetailScreen first CPU": 344.7491000000009,
+          "PlayerDetailScreen repeat CPU": 0.3894000000000233,
+          "Player Detail remount CPU": 92.34059999999954,
+          "Player Detail next player remount CPU": 123.25830000000133,
+          "Awards Records cold": 1354.9147000000012,
+          "Awards Records warm": 0.008400000002438901,
+          "Team History cold": 1879.1452000000027,
+          "New Match season badges": 7.362499999999272
+        },
+        "structure": {
+          "ResultsScreen": {
+            "domNodes": 13541,
+            "bytes": 3253200
+          },
+          "PlayersScreen": {
+            "domNodes": 3558,
+            "bytes": 312998
+          },
+          "CompetitionMatches": {
+            "domNodes": 3848
+          }
+        },
+        "fixture": {
+          "players": 500,
+          "matches": 1728,
+          "seasons": 3,
+          "extraPlayersHaveMatches": false
+        }
+      },
+      "after": {
+        "measurements": {
+          "ResultsScreen first CPU": 5.1974000000009255,
+          "ResultsScreen repeat CPU": 0.02530000000115251,
+          "ResultsScreen SSR": 1.5367000000005646,
+          "PlayersScreen first CPU": 6.149600000000646,
+          "PlayersScreen repeat CPU": 0.033100000000558794,
+          "PlayersScreen SSR": 6.304599999999482,
+          "Players search and render": 11.687699999998586,
+          "Players filter and render": 10.609599999999773,
+          "CompetitionMatches SSR": 2.3554000000003725,
+          "PlayerDetailScreen first CPU": 264.2644,
+          "PlayerDetailScreen repeat CPU": 0.16340000000127475,
+          "Player Detail remount CPU": 1.354700000003504,
+          "Player Detail next player remount CPU": 3.6493999999984226,
+          "Awards Records cold": 908.352600000002,
+          "Awards Records warm": 0.00480000000243308,
+          "Team History cold": 365.94980000000214,
+          "New Match season badges": 1.7563999999983935
+        },
+        "structure": {
+          "ResultsScreen": {
+            "domNodes": 125,
+            "bytes": 27268
+          },
+          "PlayersScreen": {
+            "domNodes": 181,
+            "bytes": 15507
+          },
+          "CompetitionMatches": {
+            "domNodes": 128
+          }
+        },
+        "fixture": {
+          "players": 500,
+          "matches": 1728,
+          "seasons": 3,
+          "extraPlayersHaveMatches": false
+        }
+      }
+    }
+  ],
+  "fixture": {
+    "players": 367,
+    "matches": 1152,
+    "seasons": 2,
+    "extraPlayersHaveMatches": true
+  }
+}

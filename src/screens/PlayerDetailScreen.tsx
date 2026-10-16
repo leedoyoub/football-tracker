@@ -9,8 +9,8 @@ import { substituteImpact } from '../engine/substituteImpact'
 import { derivePlayerScope, playerAppearanceMatches, playerCareerTimeline, playerPersonalRecords, type PlayerDerived } from '../engine/playerDerived'
 import { matchCompetitionType, assignmentSnapshotForMatch, formatCompactCompetitionContext } from '../engine/competitionContext'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch, tracePlayerMatchRating } from '../engine/rating'
-import { buildGlobalRankingData, rankGlobalRankingRows, seasonsFromMatches } from '../engine/stats'
-import { scopedMetricRanks } from '../engine/seasonAnalytics'
+import { seasonsFromMatches } from '../engine/stats'
+import { playerDetailRankingScope } from '../engine/playerDetailRanks'
 import { playerStreaks } from '../engine/seasonInsights'
 import { derivePlayerMilestones } from '../engine/news'
 import { PlayerCareerAwards } from '../components/PlayerCareerAwards'
@@ -46,19 +46,14 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
   const competition = screenState.competition
   const setSelectedSeason = (value: string) => onStateChange({ ...screenState, season: value, rankTrendMetric: 'rating' })
   const setCompetition = (value: CompetitionType | 'all') => onStateChange({ ...screenState, competition: value, rankTrendMetric: 'rating' })
-  const scopedMatches = useMemo(() => matches.filter(match => match.season === selectedSeason && (competition === 'all' || matchCompetitionType(match) === competition)), [matches, selectedSeason, competition])
+  const rankingScope = useMemo(() => playerDetailRankingScope(players, matches, selectedSeason, competition), [players, matches, selectedSeason, competition])
+  const scopedMatches = rankingScope.games
   const playerScopedMatches = useMemo(() => scopedMatches.filter(match => match.appearances.some(appearance => appearance.playerId === playerId)), [scopedMatches, playerId])
-  const scopedFamilies = useMemo(() => scopedPositionFamilyByPlayer(players, scopedMatches, {}), [players, scopedMatches])
-  const careerFamilies = useMemo(() => scopedPositionFamilyByPlayer(players, matches, {}), [players, matches])
-  const rankingIndex = useMemo(() => buildGlobalRankingData(players, scopedMatches, { seasons: [selectedSeason], teams: [], positions: [] }, 'rating'), [players, scopedMatches, selectedSeason])
-  const rankingRows = useMemo(() => ({ rating: rankGlobalRankingRows(rankingIndex, players, 'rating'), goals: rankGlobalRankingRows(rankingIndex, players, 'goals'), assists: rankGlobalRankingRows(rankingIndex, players, 'assists') }), [rankingIndex, players])
   const activeStreaks = useMemo(() => player ? playerStreaks(player, playerScopedMatches).filter(row => row.current > 1).sort((a, b) => b.current - a.current).slice(0, 3) : [], [player, playerScopedMatches])
   let playerDerivedCacheHit = false
   const data = player ? derivePlayerScope(player, players, matches, { season: selectedSeason, competition }, diagnostic => { playerDerivedCacheHit = diagnostic.cacheHit }) : null
-  const dominantPosition = (data?.minutes ? scopedFamilies.get(playerId) : careerFamilies.get(playerId)) ?? player?.position
+  const dominantPosition = (data?.minutes ? rankingScope.families.get(playerId) : scopedPositionFamilyByPlayer(players, matches, {}).get(playerId)) ?? player?.position
   const historicalTeamId = latestAppearanceTeamId(playerId, playerScopedMatches)
-  const teamRankingIndex = historicalTeamId ? buildGlobalRankingData(players, scopedMatches, { seasons: [selectedSeason], teams: [historicalTeamId], positions: [] }, 'rating') : []
-  const teamRankingRows = { rating: rankGlobalRankingRows(teamRankingIndex, players, 'rating'), goals: rankGlobalRankingRows(teamRankingIndex, players, 'goals'), assists: rankGlobalRankingRows(teamRankingIndex, players, 'assists') }
   if (!player || !data) {
     if (!matches.some(match => match.appearances.some(row => row.playerId === playerId))) return <div className="p-6 text-sm text-zinc-400">Player not found.</div>
     return <div className="px-4 pb-8 pt-6">
@@ -80,8 +75,7 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
   const membership = currentMembershipPresentation(player, [], teams)
   const currentTeam = teams.find(team => team.id === membership.teamId)
   const form = playerForm(data.appearances)
-  const rankIn = (metric: 'rating' | 'goals' | 'assists') => ({ ...scopedMetricRanks(rankingRows[metric], players, player.id, scopedFamilies), team: scopedMetricRanks(teamRankingRows[metric], players, player.id).team })
-  const ranks = { rating: rankIn('rating'), goals: rankIn('goals'), assists: rankIn('assists') }
+  const ranks = rankingScope.ranksFor(playerId, historicalTeamId)
   const positions = [...data.positionMinutes.entries()].map(([position, minutes]) => ({ position, minutes, share: data.minutes ? minutes / data.minutes * 100 : 0 })).filter(row => row.minutes > 0).sort((left, right) => right.minutes - left.minutes)
   return <div className="px-4 pb-8 pt-6">
     <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">Back</button>

@@ -1,3 +1,32 @@
+import type { ScreenState, ScreenStateByView, View } from '../types'
+import { competitionMenu } from '../lib/competitionScreenState'
+
+/** Existing ranking/race controls keep their original screen-owned behavior. */
+export function hasPageScrollToTop(view: View, state: ScreenState): boolean {
+  if (['player', 'records', 'records-leaderboard', 'results', 'players'].includes(view.name)) return true
+  return view.name === 'competition' && state.name === 'competition' && competitionMenu(state) === 'matches'
+}
+
+export function pageScrollScopeKey(view: View, state: ScreenState): string {
+  const competition = state.name === 'competition' ? `${state.competitionType}:${competitionMenu(state as ScreenStateByView['competition'])}` : ''
+  return `${view.name}:${'id' in view ? view.id : ''}:${competition}`
+}
+
+type DistanceSurface = Pick<HTMLElement, 'scrollTop' | 'scrollHeight' | 'clientHeight' | 'addEventListener' | 'removeEventListener'>
+/** One cheap comparison per native scroll; React updates only at visibility edges. */
+export function observeScrollDistance(surface: DistanceSurface, threshold: number, onVisible: (visible: boolean) => void) {
+  let previous: boolean | undefined
+  const update = () => {
+    const visible = surface.scrollHeight > surface.clientHeight && surface.scrollTop >= threshold
+    if (visible !== previous) { previous = visible; onVisible(visible) }
+  }
+  update()
+  surface.addEventListener('scroll', update, { passive: true })
+  const resize = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(update)
+  resize?.observe(surface as HTMLElement)
+  return () => { surface.removeEventListener('scroll', update); resize?.disconnect() }
+}
+
 type Observer = { observe: (target: Element) => void; disconnect: () => void }
 type ObserverFactory = (callback: (entries: { isIntersecting: boolean }[]) => void) => Observer
 type ScrollSurface = { scrollTo: (options: ScrollToOptions) => void }

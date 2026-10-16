@@ -3,6 +3,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const path = require('node:path')
 const { screenHarness, nodes } = require('./helpers/v259-harness.cjs')
+const { expandCardLists } = require('./helpers/card-list-tree.cjs')
 const { defaultScreenState } = require('../src/lib/navigation.ts')
 const { representativeMatchPosition } = require('../src/engine/playerMatchFacts.ts')
 const { matchDisplayPositionSegments, creditedPositionSegments } = require('../src/engine/timeline.ts')
@@ -69,7 +70,7 @@ test('Rating Details summary omits duplicate position/time and retains expandabl
 function directory(players, matches, filters, search = '') {
   const h = screenHarness(root, 'screens/PlayersScreen.tsx', 'PlayersScreen', { players, teams, matches })
   const tree = h.render({ screenState: { ...defaultScreenState({ name: 'players' }), filters, search }, onStateChange() {}, onNavigate() {} })
-  return nodes(tree, n => n.type === 'button' && n.key !== null).map(n => n.key)
+  return nodes(expandCardLists(tree), n => n.type === 'button' && n.key !== null).map(n => n.key)
 }
 const f = (seasons = [], teams = [], positions = []) => ({ seasons, teams, positions })
 

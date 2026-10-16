@@ -8,6 +8,7 @@ const { execFileSync } = require('node:child_process')
 const { test, after } = require('node:test')
 const { renderToStaticMarkup } = require('react-dom/server')
 const { screenHarness, nodes } = require('./helpers/v259-harness.cjs')
+const { expandCardLists } = require('./helpers/card-list-tree.cjs')
 const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const navigation = require('../src/lib/navigation.ts')
 const root = path.resolve(__dirname, '..')
@@ -49,7 +50,7 @@ test('Players retains baseline controls while scope combinations classify record
     { seasons: [], teams: [store.teams[1].id], positions: ['CB'] },
   ]) for (const search of ['', 'synthetic', '0', 'missing']) {
     const p = { ...props, screenState: { ...navigation.defaultScreenState({ name: 'players' }), filters, search } }
-    const tree = harness('PlayersScreen', store).render(p)
+    const tree = expandCardLists(harness('PlayersScreen', store).render(p))
     const original = harness('PlayersScreen', store, baseline).render(p)
     // Keep exact markup equality for the controls. The result rows have the
     // explicitly changed v2.5.10 scope semantics, verified independently below.

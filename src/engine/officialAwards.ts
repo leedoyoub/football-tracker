@@ -41,55 +41,9 @@ export function officialSeasonModel(teams: Team[], players: Player[], matches: M
   const cached = bySeason.get(key); if (cached) return cached
   const tournamentTeams = currentStaticTeams(teams)
   const status = competitionSeasonStatus(tournamentTeams, matches, season, players, states.find(state => state.kind === 'champions-draw' && state.season === season))
-  const events = new Map<string, OfficialAwardEvent>()
   const teamResults: TeamSeasonResult[] = []
   const competitionAwards = {} as Record<CompetitionType, CompetitionAwards>
   const games = matches.filter(match => match.season === season)
-  const add = (kind: string, label: string, playerId: string | undefined, competition: CompetitionType | 'all', scope: Match[], teamId?: string, period?: OfficialAwardEvent['period'], category: OfficialAwardEvent['category'] = 'individual') => {
-    if (!playerId) return
-    const historicalTeam = teamId ?? newestMatches(scope).find(match => match.appearances.some(a => a.playerId === playerId && hasPitchAppearance(match, a)))?.appearances.find(a => a.playerId === playerId)?.teamId
-    if (!historicalTeam) return
-    const position = scopedPositionFamilyByPlayer(players, scope, { teams: [historicalTeam], fallback: 'none' }).get(playerId)
-    const id = JSON.stringify([season, competition, kind, period ?? '', playerId, category === 'individual' ? '' : historicalTeam])
-    events.set(id, { id, kind, label, playerId, teamId: historicalTeam, season, competition, period, category, position, finalized: true })
-  }
-  for (let block = 1; block <= 10; block++) {
-    const award = monthlyAwardForBlock(tournamentTeams, players, matches, season, block)
-    if (!award?.finalized) continue
-    const scope = competitionMatches(matches, season, 'league').filter(match => { const day = competitionIdentityForMatch(match).matchDay; return day >= (block - 1) * 3 + 1 && day <= block * 3 })
-    add('monthly-player', 'Player of the Month', award.playerOfMonth?.playerId, 'league', scope, award.playerOfMonth?.teamId, block)
-    for (const slot of award.bestXI) add('monthly-xi', 'Team of the Month', slot.playerId ?? undefined, 'league', scope, slot.teamId, block)
-  }
-  for (const competition of ['league', 'cup', 'champions'] as const) {
-    const scope = competitionMatches(matches, season, competition)
-    const award = awardsForCompetition(competition, season, tournamentTeams, players, matches, states, status)
-    competitionAwards[competition] = award
-    if (award.complete) {
-      const title = competition === 'league' ? 'League' : competition === 'cup' ? 'Cup' : 'Champions'
-      const publish = (kind: string, label: string, winner?: AwardWinner) => add(`${competition}-${kind}`, label, winner?.playerId, competition, scope, winner?.teamId)
-      publish('mvp', competition === 'league' ? 'Player of the League' : competition === 'cup' ? 'Player of the Cup' : 'Player of the Tournament', award.mvp)
-      publish('scorer', `${title} Top Scorer`, award.scorer)
-      publish('assists', `${title} Assist King`, award.assists)
-      publish('gk', award.goalkeeper?.label ?? '', award.goalkeeper)
-      for (const slot of award.bestXI ?? []) add(`${competition}-xi`, `${title} Best XI`, slot.playerId ?? undefined, competition, scope, slot.teamId)
-    }
-    if (competition !== 'league' && award.complete) {
-      const finals = matchesForAwardPeriod(matches, season, competition, 'final')
-      add(`${competition}-final`, `${competition === 'cup' ? 'Cup' : 'Champions'} Player of the Final`, finalPlayerAward(players, finals)?.playerId, competition, finals)
-    }
-  }
-  for (const stage of ROUND_AWARD_STAGES) {
-    if (!isChampionsRoundFinalized(status.champions, stage)) continue
-    const scope = matchesForAwardPeriod(matches, season, 'champions', stage)
-    const award = performanceAwardResult(players, scope)
-    add('champions-round-player', 'Champions Player of the Round', award.bestPlayerId, 'champions', scope, award.candidates[0]?.teamId, stage)
-    for (const slot of award.bestXI) add('champions-round-xi', 'Champions Team of the Round', slot.playerId ?? undefined, 'champions', scope, slot.teamId, stage)
-  }
-  if (status.complete) {
-    const award = seasonAwards(season, tournamentTeams, players, matches, states, status)
-    for (const [kind, label, winner] of [['mvp', 'Player of the Season', award.ballon], ['scorer', 'Season Top Scorer', award.goldenBoot], ['assists', 'Season Assist King', award.assistLeader], ['gk', 'Goalkeeper of the Season', award.goalkeeper]] as const) add(`season-${kind}`, label, winner?.playerId, 'all', games, winner?.teamId)
-    for (const slot of award.bestXI) add('season-xi', 'Season Best XI', slot.playerId ?? undefined, 'all', games, slot.teamId)
-  }
   for (const row of status.league.complete ? status.league.standings : []) teamResults.push({ season, competition: 'league', teamId: row.teamId, champion: row.rank === 1, runnerUp: row.rank === 2, finalAppearance: false, finish: row.rank, finishLabel: `#${row.rank}`, points: row.points, wins: row.wins, goalDifference: row.goalDifference })
   const historicalTeamIds = new Set([...tournamentTeams.map(team => team.id), ...teams.map(team => team.id), ...(states.find(state => state.kind === 'champions-draw' && state.season === season)?.teamIds ?? [])])
   for (const teamId of historicalTeamIds) {
@@ -104,14 +58,70 @@ export function officialSeasonModel(teams: Team[], players: Player[], matches: M
     const stage = reached[reached.length - 1]
     if (stage) teamResults.push({ season, competition: 'champions', teamId: teamId, champion: champions.championId === teamId, runnerUp: champions.runnerUpId === teamId, finalAppearance: stage === 'final', finish: champions.championId === teamId ? 0 : 4 - stages.indexOf(stage), finishLabel: champions.championId === teamId ? 'Champion' : stage === 'final' ? 'Final' : ROUND_AWARD_LABELS[stage] })
   }
-  for (const result of teamResults) {
-    if (!result.champion && !result.runnerUp) continue
-    const scope = competitionMatches(matches, season, result.competition)
-    const ids = new Set(scope.flatMap(match => match.appearances.filter(a => a.teamId === result.teamId && hasPitchAppearance(match, a)).map(a => a.playerId)))
-    const title = result.competition === 'league' ? 'League' : result.competition === 'cup' ? 'Cup' : 'Champions'
-    for (const id of ids) add(result.champion ? 'championship' : 'runner-up', `${title} ${result.champion ? 'Champion' : 'Runner-up'}`, id, result.competition, scope, result.teamId, undefined, result.champion ? 'championship' : 'runner-up')
+  let publishedEvents: OfficialAwardEvent[] | undefined
+  const buildEvents = () => {
+    if (publishedEvents) return publishedEvents
+    const events = new Map<string, OfficialAwardEvent>()
+    const positions = new WeakMap<Match[], Map<string, Map<string, PositionFamily>>>()
+    const add = (kind: string, label: string, playerId: string | undefined, competition: CompetitionType | 'all', scope: Match[], teamId?: string, period?: OfficialAwardEvent['period'], category: OfficialAwardEvent['category'] = 'individual') => {
+      if (!playerId) return
+      const historicalTeam = teamId ?? newestMatches(scope).find(match => match.appearances.some(a => a.playerId === playerId && hasPitchAppearance(match, a)))?.appearances.find(a => a.playerId === playerId)?.teamId
+      if (!historicalTeam) return
+      let byTeam = positions.get(scope); if (!byTeam) { byTeam = new Map(); positions.set(scope, byTeam) }
+      let families = byTeam.get(historicalTeam)
+      if (!families) { families = scopedPositionFamilyByPlayer(players, scope, { teams: [historicalTeam], fallback: 'none' }); byTeam.set(historicalTeam, families) }
+      const position = families.get(playerId)
+      const id = JSON.stringify([season, competition, kind, period ?? '', playerId, category === 'individual' ? '' : historicalTeam])
+      events.set(id, { id, kind, label, playerId, teamId: historicalTeam, season, competition, period, category, position, finalized: true })
+    }
+    for (let block = 1; block <= 10; block++) {
+      const award = monthlyAwardForBlock(tournamentTeams, players, matches, season, block)
+      if (!award?.finalized) continue
+      const scope = competitionMatches(matches, season, 'league').filter(match => { const day = competitionIdentityForMatch(match).matchDay; return day >= (block - 1) * 3 + 1 && day <= block * 3 })
+      add('monthly-player', 'Player of the Month', award.playerOfMonth?.playerId, 'league', scope, award.playerOfMonth?.teamId, block)
+      for (const slot of award.bestXI) add('monthly-xi', 'Team of the Month', slot.playerId ?? undefined, 'league', scope, slot.teamId, block)
+    }
+    for (const competition of ['league', 'cup', 'champions'] as const) {
+      const scope = competitionMatches(matches, season, competition)
+      const award = awardsForCompetition(competition, season, tournamentTeams, players, matches, states, status)
+      competitionAwards[competition] = award
+      if (award.complete) {
+        const title = competition === 'league' ? 'League' : competition === 'cup' ? 'Cup' : 'Champions'
+        const publish = (kind: string, label: string, winner?: AwardWinner) => add(`${competition}-${kind}`, label, winner?.playerId, competition, scope, winner?.teamId)
+        publish('mvp', competition === 'league' ? 'Player of the League' : competition === 'cup' ? 'Player of the Cup' : 'Player of the Tournament', award.mvp)
+        publish('scorer', `${title} Top Scorer`, award.scorer)
+        publish('assists', `${title} Assist King`, award.assists)
+        publish('gk', award.goalkeeper?.label ?? '', award.goalkeeper)
+        for (const slot of award.bestXI ?? []) add(`${competition}-xi`, `${title} Best XI`, slot.playerId ?? undefined, competition, scope, slot.teamId)
+      }
+      if (competition !== 'league' && award.complete) {
+        const finals = matchesForAwardPeriod(matches, season, competition, 'final')
+        add(`${competition}-final`, `${competition === 'cup' ? 'Cup' : 'Champions'} Player of the Final`, finalPlayerAward(players, finals)?.playerId, competition, finals)
+      }
+    }
+    for (const stage of ROUND_AWARD_STAGES) {
+      if (!isChampionsRoundFinalized(status.champions, stage)) continue
+      const scope = matchesForAwardPeriod(matches, season, 'champions', stage)
+      const award = performanceAwardResult(players, scope)
+      add('champions-round-player', 'Champions Player of the Round', award.bestPlayerId, 'champions', scope, award.candidates[0]?.teamId, stage)
+      for (const slot of award.bestXI) add('champions-round-xi', 'Champions Team of the Round', slot.playerId ?? undefined, 'champions', scope, slot.teamId, stage)
+    }
+    if (status.complete) {
+      const award = seasonAwards(season, tournamentTeams, players, matches, states, status)
+      for (const [kind, label, winner] of [['mvp', 'Player of the Season', award.ballon], ['scorer', 'Season Top Scorer', award.goldenBoot], ['assists', 'Season Assist King', award.assistLeader], ['gk', 'Goalkeeper of the Season', award.goalkeeper]] as const) add(`season-${kind}`, label, winner?.playerId, 'all', games, winner?.teamId)
+      for (const slot of award.bestXI) add('season-xi', 'Season Best XI', slot.playerId ?? undefined, 'all', games, slot.teamId)
+    }
+    for (const result of teamResults) {
+      if (!result.champion && !result.runnerUp) continue
+      const scope = competitionMatches(matches, season, result.competition)
+      const ids = new Set(scope.flatMap(match => match.appearances.filter(a => a.teamId === result.teamId && hasPitchAppearance(match, a)).map(a => a.playerId)))
+      const title = result.competition === 'league' ? 'League' : result.competition === 'cup' ? 'Cup' : 'Champions'
+      for (const id of ids) add(result.champion ? 'championship' : 'runner-up', `${title} ${result.champion ? 'Champion' : 'Runner-up'}`, id, result.competition, scope, result.teamId, undefined, result.champion ? 'championship' : 'runner-up')
+    }
+    publishedEvents = [...events.values()]
+    return publishedEvents
   }
-  const value = { events: [...events.values()], teamResults, competitionAwards }
+  const value = { get events() { return buildEvents() }, teamResults, get competitionAwards() { buildEvents(); return competitionAwards } }
   bySeason.set(key, value)
   return value
 }

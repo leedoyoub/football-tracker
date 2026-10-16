@@ -1,3 +1,5 @@
+import { VirtualCardList } from './VirtualCardList'
+import type { DerivedResult } from '../lib/results'
 import { useEffect, useMemo } from 'react'
 import { CompactFilterMenu } from './CompactFilterMenu'
 import { ResultCard } from './ResultCard'
@@ -8,6 +10,7 @@ import { cupStageLabel } from '../lib/cupTable'
 import { competitionIdentityForMatch } from '../engine/competitionContext'
 import type { CompetitionType, CupStage, Match, Team, View } from '../types'
 
+const resultKey = (row: DerivedResult) => row.match.id
 const roundLabels: Record<string, string> = { roundOf16: 'Round of 16', quarterFinal: 'Quarter-finals', semiFinal: 'Semi-finals', final: 'Final', finalReplay: 'Final Replay' }
 
 export function CompetitionMatches({ matches, teams, season, type, filters, onFiltersChange, onNavigate }: { matches: Match[]; teams: Team[]; season: string; type: CompetitionType; filters: MatchFilters; onFiltersChange: (filters: MatchFilters) => void; onNavigate: (view: View) => void }) {
@@ -34,6 +37,6 @@ export function CompetitionMatches({ matches, teams, season, type, filters, onFi
       <CompactFilterMenu value={period ?? 'all'} label={type === 'league' ? 'Matches matchday' : type === 'cup' ? 'Matches stage' : 'Matches round'} allValue="all" allLabel={allPeriods} options={[{ value: 'all', label: allPeriods }, ...periods]} onChange={value => onFiltersChange({ teamId, period: value === 'all' ? null : value })} />
     </div>
     <p className="mb-3 text-[10px] text-zinc-500">{season} · {rows.length} recorded {rows.length === 1 ? 'match' : 'matches'} · newest first</p>
-    <div className="space-y-2">{rows.length ? rows.map(result => <ResultCard key={result.match.id} result={result} teams={teams} showCompetition onMatchNavigate={() => onNavigate({ name: 'match', id: result.match.id })} onTeamNavigate={id => onNavigate({ name: 'team', id })} />) : <p className="rounded-xl bg-zinc-900 p-4 text-sm text-zinc-500">No match results for these filters.</p>}</div>
+    <div className="space-y-2">{rows.length ? <VirtualCardList rows={rows} itemKey={resultKey} estimate={80} measurementOwner={matches} renderRow={result => <ResultCard result={result} teams={teams} showCompetition onMatchNavigate={() => onNavigate({ name: 'match', id: result.match.id })} onTeamNavigate={id => onNavigate({ name: 'team', id })} />} /> : <p className="rounded-xl bg-zinc-900 p-4 text-sm text-zinc-500">No match results for these filters.</p>}</div>
   </section>
 }

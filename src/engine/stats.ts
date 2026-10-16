@@ -279,6 +279,24 @@ function presentMetric(rows: GlobalLeaderboardRow[], metric: LeaderboardMetric) 
   return rows.map(row => ({ ...row, value: value(row) })).sort((a, b) => b.value - a.value)
 }
 
+type RankingAppearanceFacts = ReturnType<typeof computeRankingAppearanceFacts>
+function computeRankingAppearanceFacts(match: Match, appearance: Match['appearances'][number]) {
+  const goalkeeper = playerGoalkeeperFacts(match, appearance)
+  return { goalkeeper, defensive: defensiveMatchFacts(match, appearance, goalkeeper), goals: playerGoalEvents(match, appearance).length, assists: playerAssistEvents(match, appearance).length }
+}
+type AppearanceFactEntry = { revision: number; events: Match['events']; appearances: Match['appearances']; duration: number; halfSot: number | undefined; fullSot: number | undefined; home: string; away: string; team: string | undefined; value: RankingAppearanceFacts }
+const appearanceFactsCache = new WeakMap<Match, WeakMap<Match['appearances'][number], AppearanceFactEntry>>()
+/** Month, competition, career and historical-team scopes reuse the same raw facts. */
+function rankingAppearanceFacts(match: Match, appearance: Match['appearances'][number]): RankingAppearanceFacts {
+  let byAppearance = appearanceFactsCache.get(match)
+  if (!byAppearance) { byAppearance = new WeakMap(); appearanceFactsCache.set(match, byAppearance) }
+  const cached = byAppearance.get(appearance)
+  if (cached && cached.revision === RATING_ENGINE_REVISION && cached.events === match.events && cached.appearances === match.appearances && cached.duration === match.duration && cached.halfSot === match.halftimeOpponentSot && cached.fullSot === match.fulltimeOpponentSot && cached.home === match.homeTeamId && cached.away === match.awayTeamId && cached.team === match.teamId) return cached.value
+  const value = computeRankingAppearanceFacts(match, appearance)
+  byAppearance.set(appearance, { revision: RATING_ENGINE_REVISION, events: match.events, appearances: match.appearances, duration: match.duration, halfSot: match.halftimeOpponentSot, fullSot: match.fulltimeOpponentSot, home: match.homeTeamId, away: match.awayTeamId, team: match.teamId, value })
+  return value
+}
+
 /**
  * One-pass player competition index. Every ranking category and Best XI caller
  * can share the same rows; only sorting is repeated. The optional filters are
@@ -303,7 +321,8 @@ export function buildGlobalRankingData(
     cached.presented.set(_metric, rows)
     return rows
   }
-  const selected = matches.filter(match => (!filters.seasons.length || filters.seasons.includes(match.season)))
+  const selected = !filters.seasons.length || matches.every(match => filters.seasons.includes(match.season))
+    ? matches : matches.filter(match => filters.seasons.includes(match.season))
   const orderedSelected = oldestMatches(selected)
   const opportunityIndex = emptyTeamOpportunityIndex()
   orderedSelected.forEach((match, matchIndex) => appendRecordedTeamOpportunities(opportunityIndex, match, matchIndex))
@@ -312,7 +331,7 @@ export function buildGlobalRankingData(
   const allowedPositionFamilies = new Set(filters.positions.map(positionFamily).filter((family): family is NonNullable<typeof family> => Boolean(family)))
   const playerById = new Map(players.map(player => [player.id, player]))
   const matchesByPlayer = new Map<string, Match[]>()
-  for (const match of selected) {
+  for (const match of orderedSelected) {
     for (const appearance of match.appearances) {
       if (!playerById.has(appearance.playerId) || (filters.teams.length && !filters.teams.includes(appearance.teamId))) continue
       const entries = matchesByPlayer.get(appearance.playerId) ?? []
@@ -337,9 +356,9 @@ export function buildGlobalRankingData(
 
   const rows = players.flatMap(player => {
     if (allowedPositionFamilies.size && !allowedPositionFamilies.has(historicalPositionFamilies?.get(player.id) as NonNullable<ReturnType<typeof positionFamily>>)) return []
-    const playerMatches = oldestMatches(matchesByPlayer.get(player.id) ?? [])
+    const playerMatches = matchesByPlayer.get(player.id) ?? []
     const ratingRows: RatingBreakdown[] = []
-    let starts = 0; let subs = 0; let saves = 0; let cleanSheets = 0; let goalkeeperMinutes = 0; let goalkeeperAppearances = 0; let goalkeeperConceded = 0; let wins = 0; let draws = 0; let losses = 0
+    let starts = 0; let subs = 0; let saves = 0; let cleanSheets = 0; let goalkeeperMinutes = 0; let goalkeeperAppearances = 0; let goalkeeperConceded = 0; let wins = 0; let draws = 0; let losses = 0; let goals = 0; let assists = 0
     const goalkeeperRatings: RatingBreakdown[] = []
     let concededOnPitch = 0; let qualifyingGoalkeeperMinutes = 0; let qualifyingGoalkeeperAppearances = 0; let qualifyingSaves = 0
     const defensive = emptyDefensiveRankingFacts()
@@ -349,12 +368,18 @@ export function buildGlobalRankingData(
       const appearance = match.appearances.find(item => item.playerId === player.id)
       if (!appearance) continue
       const rating = ratingFor(match, player)
-      if (!rating) continue
+      if (!rating) {
+        goals += playerGoalEvents(match, appearance).length
+        assists += playerAssistEvents(match, appearance).length
+        continue
+      }
       ratingRows.push(rating)
       representedTeamIds.add(appearance.teamId)
       if (appearance.role === 'starter') starts++; else subs++
-      const goalkeeper = playerGoalkeeperFacts(match, appearance)
-      addDefensiveRankingFacts(defensive, defensiveMatchFacts(match, appearance, goalkeeper))
+      const facts = rankingAppearanceFacts(match, appearance)
+      goals += facts.goals; assists += facts.assists
+      const goalkeeper = facts.goalkeeper
+      addDefensiveRankingFacts(defensive, facts.defensive)
       const matchSaves = goalkeeper.saves
       saves += matchSaves
       cleanSheets += Number(goalkeeper.cleanSheet)
@@ -372,11 +397,9 @@ export function buildGlobalRankingData(
       if (ours > theirs) { wins++; recentForm.push('W') } else if (ours === theirs) { draws++; recentForm.push('D') } else { losses++; recentForm.push('L') }
     }
     if (!ratingRows.length) return []
-    const goals = playerMatches.reduce((sum, match) => { const appearance = match.appearances.find(item => item.playerId === player.id); return sum + (appearance ? playerGoalEvents(match, appearance).length : 0) }, 0)
-    const assists = playerMatches.reduce((sum, match) => { const appearance = match.appearances.find(item => item.playerId === player.id); return sum + (appearance ? playerAssistEvents(match, appearance).length : 0) }, 0)
     const minutes = ratingRows.reduce((sum, rating) => sum + rating.minutes, 0)
     const avgRating = ratingRows.reduce((sum, rating) => sum + rating.raw, 0) / ratingRows.length
-    const latest = newestMatches(playerMatches).find(match => ratingFor(match, player) !== null)
+    const latest = playerMatches.slice().reverse().find(match => ratingFor(match, player) !== null)
     const stats: PlayerSeasonStats = { playerId: player.id, teamId: player.teamId, season: 'All', matches: ratingRows.length, starts, subs, minutes, goals, assists, avgRating, mom: playerMatches.filter(match => momFor(match) === player.id).length, goodMatches: ratingRows.filter(rating => isGoodRating(rating.raw)).length, saves, wins, draws, losses, recentForm: recentForm.slice(-5).reverse(), ratings: ratingRows }
     const playedGoalkeeper = goalkeeperAppearances > 0
     const per90 = (value: number) => stats.minutes ? value / stats.minutes * 90 : 0

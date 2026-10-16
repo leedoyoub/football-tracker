@@ -63,7 +63,7 @@ export function recordsLeaderboardGroups(input: RecordsInput): RecordsLeaderboar
     let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
     let byScope = byTeams.get(teams); if (!byScope) { byScope = new Map(); byTeams.set(teams, byScope) }
     const key = scopeKey(input), cached = byScope.get(key); if (cached) return cached
-    let groups = category === 'player' ? awardRecordGroups(teams, players, matches, states, scope) : teamHistoryRecordGroups(teams, players, matches, states, scope)
+    let groups = category === 'player' ? awardRecordGroups(teams, players, matches, states, scope, selectedIds) : teamHistoryRecordGroups(teams, players, matches, states, scope)
     if (selectedIds) groups = groups.filter(group => selectedIds.includes(group.id))
     if (byScope.size >= 24) byScope.delete(byScope.keys().next().value!)
     byScope.set(key, groups)

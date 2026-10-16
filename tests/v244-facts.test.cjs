@@ -249,7 +249,10 @@ test('Player Detail team rank recomputes the latest team stint instead of groupi
   assert.deepEqual(all.map(row => row.playerId), ['P', 'Q'])
   assert.deepEqual(team.map(row => row.playerId), ['Q', 'P'])
   assert.equal(scopedMetricRanks(team, players, 'P').team, 2)
-  assert.match(fs.readFileSync(require.resolve('../src/screens/PlayerDetailScreen.tsx'), 'utf8'), /team: scopedMetricRanks\(teamRankingRows\[metric\]/)
+  const shared = require('../src/engine/playerDetailRanks.ts').playerDetailRankingScope(players, games, 'Season 1', 'all')
+  assert.equal(shared.ranksFor('P', 'B').goals.overall, 1)
+  assert.equal(shared.ranksFor('P', 'B').goals.team, 2)
+  assert.match(fs.readFileSync(require.resolve('../src/screens/PlayerDetailScreen.tsx'), 'utf8'), /rankingScope\.ranksFor\(playerId, historicalTeamId\)/)
 })
 
 test('position rank uses the dominant played family in the selected historical scope', () => {
