@@ -46,8 +46,10 @@ export default function App() {
   const { user, loading, startupError, signInWithGoogle, retryStartup } = useAuth()
   const store = useStore()
   const { matches, competitionStates = [] } = store
-  const completedNextSeasons = competitionStates.filter(state => state.kind === 'season-complete').map(state => `Season ${Number(state.season.match(/\d+/)?.[0] ?? 1) + 1}`)
-  const seasons = [...new Set([...seasonsFromMatches(matches), ...competitionStates.map(state => state.season), ...completedNextSeasons])].sort((a, b) => Number(b.match(/\d+/)?.[0] ?? 0) - Number(a.match(/\d+/)?.[0] ?? 0))
+  const seasons = useMemo(() => {
+    const completedNextSeasons = competitionStates.filter(state => state.kind === 'season-complete').map(state => `Season ${Number(state.season.match(/\d+/)?.[0] ?? 1) + 1}`)
+    return [...new Set([...seasonsFromMatches(matches), ...competitionStates.map(state => state.season), ...completedNextSeasons])].sort((a, b) => Number(b.match(/\d+/)?.[0] ?? 0) - Number(a.match(/\d+/)?.[0] ?? 0))
+  }, [matches, competitionStates])
   const [season, setSeason] = useState(seasons[0] ?? 'Season 1')
   const [history, setHistory] = useState<NavigationEntry[]>([createNavigationEntry({ name: 'home' })])
   const [localOnly, setLocalOnly] = useState(loadLocalModePreference)

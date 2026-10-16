@@ -307,6 +307,7 @@ export interface ScreenStateByView {
     bestPlayersCompetition: CompetitionType | 'all'
     bestPlayersMetric: RankSort
     matchesCompetition: CompetitionType | 'all'
+    playersCompetition: CompetitionType | 'all'
   }
   'import-squad': { name: 'import-squad' }
   players: { name: 'players'; search: string; filters: { seasons: string[]; teams: string[]; positions: Position[] } }

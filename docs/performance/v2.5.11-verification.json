@@ -1,0 +1,97 @@
+{
+  "baseSha": "c278609c65660a6aa915aa1b7210461994512992",
+  "version": "2.5.11",
+  "ratingRevision": 13,
+  "date": "2026-10-16",
+  "tests": {
+    "command": "npm.cmd test",
+    "existing": 1025,
+    "added": 25,
+    "total": 1050,
+    "passed": 1050,
+    "failed": 0,
+    "skipped": 0
+  },
+  "focusedFinalDiffRegression": {
+    "command": "node --test tests/v2510-position-scope.test.cjs",
+    "passed": 9
+  },
+  "lint": {
+    "command": "npm.cmd run lint",
+    "errors": 0,
+    "beforeWarnings": 43,
+    "afterWarnings": 43,
+    "newWarnings": []
+  },
+  "build": {
+    "command": "npm.cmd run build",
+    "typescript": "success",
+    "vite": "success",
+    "existingWarning": "chunk larger than 500 kB"
+  },
+  "diffCheck": {
+    "command": "git diff --check",
+    "exitCode": 0
+  },
+  "review": {
+    "rounds": 2,
+    "critical": 0,
+    "important": 0,
+    "scope": "independent full diff plus final deltas"
+  },
+  "browser": {
+    "inventory": {
+      "apps": [],
+      "browsers": []
+    },
+    "commitPaintFpsInputLatency": false,
+    "nativeScrollClamp": false,
+    "pwaDevice": false
+  },
+  "durableData": "No migration; canonical rating/stats/competition/award/timeline/storage sources unchanged; synthetic fixtures only",
+  "changedFiles": [
+    "docs/performance/v2.5.11-quality.json",
+    "docs/performance/v2.5.11-ranking.json",
+    "docs/performance/v2.5.11-verification.json",
+    "docs/releases/v2.5.11-report.md",
+    "docs/superpowers/plans/2026-10-16-v2511-roster-ranking.md",
+    "package-lock.json",
+    "package.json",
+    "src/App.tsx",
+    "src/components/Pitch.tsx",
+    "src/components/VirtualRankingList.tsx",
+    "src/components/ui.tsx",
+    "src/config.ts",
+    "src/lib/competitionOptions.ts",
+    "src/lib/lastRoute.ts",
+    "src/lib/navigation.ts",
+    "src/lib/rankingWindow.ts",
+    "src/screens/GlobalRankingScreen.tsx",
+    "src/screens/PlayerDetailScreen.tsx",
+    "src/screens/TeamDetailScreen.tsx",
+    "src/types.ts",
+    "tests/competition-refinement.test.cjs",
+    "tests/helpers/v2511-baseline.cjs",
+    "tests/v211-refinement.test.cjs",
+    "tests/v219-release.test.cjs",
+    "tests/v221-release.test.cjs",
+    "tests/v2211-navigation.test.cjs",
+    "tests/v2212-refinement.test.cjs",
+    "tests/v2213-release.test.cjs",
+    "tests/v223-safety-release.test.cjs",
+    "tests/v232-rating-rebalance.test.cjs",
+    "tests/v233-team-order-release.test.cjs",
+    "tests/v234-release.test.cjs",
+    "tests/v241-phase2-release.test.cjs",
+    "tests/v243-release.test.cjs",
+    "tests/v246-records.test.cjs",
+    "tests/v2510-position-scope.test.cjs",
+    "tests/v2511-equivalence.test.cjs",
+    "tests/v2511-performance.bench.cjs",
+    "tests/v2511-player-positions.test.cjs",
+    "tests/v2511-quality.bench.cjs",
+    "tests/v2511-ranking-window.test.cjs",
+    "tests/v2511-team-players.test.cjs",
+    "tests/v259-interaction.test.cjs"
+  ]
+}

@@ -46,12 +46,14 @@ test('Player Overview first browser render does not build full seasonal awards o
   })
 }))
 
-test('settled Home and Player Detail retain v2.5.8 markup with the approved Rating Details summary simplification', () => {
+test('settled Home and Player Detail retain v2.5.8 markup except approved Rating Details and Positions Played presentation', () => {
   const store = performanceFixture(1)
   for (const [name, view, extra] of [['HomeScreen', { name: 'home' }, {}], ['PlayerDetailScreen', { name: 'player', id: store.players[9].id }, { playerId: store.players[9].id }]]) {
     const props = { season: 'Season 1', screenState: navigation.defaultScreenState(view), onNavigate: noop, onStateChange: noop, onBack: noop, ...extra }
-    const expected = renderToStaticMarkup(h(baseline, name, store).render(props)).replace(/(<summary class="cursor-pointer text-zinc-400">)Rating Details · [A-Z]+ · \d+&#x27;(<\/summary>)/g, '$1Rating Details$2')
-    assert.equal(renderToStaticMarkup(h(root, name, store).render(props)).replace('Football Tracker \u00b7 v2.5.10', 'Football Tracker \u00b7 v2.5.8'), expected)
+    // This fixture only plays ST. Preserve the complete comparison while applying
+    // the explicitly changed copy and precision; low-share coverage lives in v2511.
+    const expected = renderToStaticMarkup(h(baseline, name, store).render(props)).replace(/(<summary class="cursor-pointer text-zinc-400">)Rating Details · [A-Z]+ · \d+&#x27;(<\/summary>)/g, '$1Rating Details$2').replace('positions under 10% are hidden.', 'all played positions.').replace('100% · ', '100.0% · ')
+    assert.equal(renderToStaticMarkup(h(root, name, store).render(props)).replace('Football Tracker \u00b7 v2.5.11', 'Football Tracker \u00b7 v2.5.8'), expected)
   }
 })
 

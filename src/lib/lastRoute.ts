@@ -175,6 +175,7 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
       bestPlayersCompetition: validScope(saved.bestPlayersCompetition) ? saved.bestPlayersCompetition as typeof base.bestPlayersCompetition : base.bestPlayersCompetition,
       bestPlayersMetric: validMetric(saved.bestPlayersMetric) ? saved.bestPlayersMetric as typeof base.bestPlayersMetric : base.bestPlayersMetric,
       matchesCompetition: validScope(saved.matchesCompetition) ? saved.matchesCompetition as typeof base.matchesCompetition : base.matchesCompetition,
+      playersCompetition: validScope(saved.playersCompetition) ? saved.playersCompetition as typeof base.playersCompetition : base.playersCompetition,
     }
   }
   if (view.name === 'match') return { name: 'match', tab: ['facts', 'lineup', 'ratings'].includes(saved.tab as string) ? saved.tab as ScreenStateByView['match']['tab'] : 'facts' }

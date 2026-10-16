@@ -90,7 +90,7 @@ function AssistIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-2.5 w-2.5 fill-none stroke-current stroke-2"><path d="M4 15.5c2.5-2.8 5.2-4.6 8.1-5.4l3.2.8 3.1 3.1-1.9 2.7-4.1.2-2.2 2.3-4.8-.4L4 15.5Z" /><path d="m12.1 10.1 1.1-3 2.2.5 1.1 3.3M7.4 14.5l1.8 1.1" /></svg>
 }
 
-export function Pitch({ compact = false, slots, players, teams, statsByPlayer, outMinutesByPlayer, substitutionSelection, goalSelection, disabledPlayerIds, badgeMode = 'rating', showPositionBadge = true, showGoalkeeperSaves = false, showAwardTeamCrest = false, motmPlayerId, onSlotClick, onEmptySlotClick, layout = 'tactical', presentation = 'editable', draggable = false, externalDnd = false, onSlotDrop }: { compact?: boolean; slots: Best11Slot[]; players: Player[]; teams?: Team[]; statsByPlayer?: Record<string, { goals: number; assists: number; saves?: number }>; outMinutesByPlayer?: Record<string, number>; substitutionSelection?: Record<string, 'in' | 'out'>; goalSelection?: Record<string, 'scorer' | 'assist' | 'fault'>; disabledPlayerIds?: string[]; badgeMode?: 'rating' | 'position'; showPositionBadge?: boolean; showGoalkeeperSaves?: boolean; showAwardTeamCrest?: boolean; motmPlayerId?: string; onSlotClick?: (slot: Best11Slot) => void; onEmptySlotClick?: (slot: Best11Slot) => void; layout?: 'tactical' | 'free'; presentation?: 'editable' | 'history'; draggable?: boolean; externalDnd?: boolean; onSlotDrop?: (activeSlot: string, targetSlot: string) => void }) {
+export function Pitch({ compact = false, slots, players, teams, statsByPlayer, outMinutesByPlayer, substitutionSelection, goalSelection, disabledPlayerIds, badgeMode = 'rating', showPositionBadge = true, showGoalkeeperSaves = false, showAwardTeamCrest = false, motmPlayerId, onSlotClick, onEmptySlotClick, layout = 'tactical', presentation = 'editable', draggable = false, externalDnd = false, emptyRatingLabel = '--', onSlotDrop }: { compact?: boolean; slots: Best11Slot[]; players: Player[]; teams?: Team[]; statsByPlayer?: Record<string, { goals: number; assists: number; saves?: number }>; outMinutesByPlayer?: Record<string, number>; substitutionSelection?: Record<string, 'in' | 'out'>; goalSelection?: Record<string, 'scorer' | 'assist' | 'fault'>; disabledPlayerIds?: string[]; badgeMode?: 'rating' | 'position'; showPositionBadge?: boolean; showGoalkeeperSaves?: boolean; showAwardTeamCrest?: boolean; motmPlayerId?: string; onSlotClick?: (slot: Best11Slot) => void; onEmptySlotClick?: (slot: Best11Slot) => void; layout?: 'tactical' | 'free'; presentation?: 'editable' | 'history'; draggable?: boolean; externalDnd?: boolean; emptyRatingLabel?: string; onSlotDrop?: (activeSlot: string, targetSlot: string) => void }) {
   const byId = Object.fromEntries(players.map((player) => [player.id, player]))
   const teamById = Object.fromEntries((teams ?? []).map((team) => [team.id, team]))
   const suppressClick = useRef(false)
@@ -122,7 +122,7 @@ export function Pitch({ compact = false, slots, players, teams, statsByPlayer, o
             className="absolute -right-3 -top-3 z-30 shadow-lg"
             size="large"
           >
-            {slot.matches > 0 ? slot.avgRating.toFixed(slot.matches > 1 ? 2 : 1) : '--'}{playerId === motmPlayerId ? ' ★' : ''}
+            {slot.matches > 0 ? slot.avgRating.toFixed(slot.matches > 1 ? 2 : 1) : emptyRatingLabel}{playerId === motmPlayerId ? ' ★' : ''}
           </Badge>
         )}
       </>

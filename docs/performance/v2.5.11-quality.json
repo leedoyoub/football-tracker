@@ -1,0 +1,19 @@
+{
+  "baseSha": "c278609c65660a6aa915aa1b7210461994512992",
+  "node": "v24.19.0",
+  "before": {
+    "file": "index-BmOD3agh.js",
+    "bytes": 937014,
+    "gzipBytes": 262695
+  },
+  "after": {
+    "file": "index-DE2LywSg.js",
+    "bytes": 939549,
+    "gzipBytes": 263551
+  },
+  "lint": {
+    "beforeWarnings": 43,
+    "afterWarnings": 43,
+    "newWarnings": []
+  }
+}

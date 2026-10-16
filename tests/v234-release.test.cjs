@@ -11,12 +11,12 @@ const { APP_VERSION } = require('../src/config.ts')
 const { RATING_ENGINE_REVISION } = require('../src/engine/ratingRevision.ts')
 const { STORAGE_KEY } = require('../src/lib/repository.ts')
 
-test('v2.5.10 release metadata aligns with rating revision 13 and unchanged storage invariants', () => {
+test('v2.5.11 release metadata aligns with rating revision 13 and unchanged storage invariants', () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
   const lockfile = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'))
-  assert.equal(packageJson.version, '2.5.10')
-  assert.equal(lockfile.packages[''].version, '2.5.10')
-  assert.equal(APP_VERSION, '2.5.10')
+  assert.equal(packageJson.version, '2.5.11')
+  assert.equal(lockfile.packages[''].version, '2.5.11')
+  assert.equal(APP_VERSION, '2.5.11')
   assert.equal(RATING_ENGINE_REVISION, 13)
   assert.equal(STORAGE_KEY, 'football-tracker-v1')
 })

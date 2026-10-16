@@ -17,11 +17,13 @@ import { sortPlayersByPosition } from '../lib/positionOrder'
 import { scopedPositionFamilyByPlayer } from '../engine/positionScope'
 import { CompactFilterMenu } from '../components/CompactFilterMenu'
 import { teamForm, teamMomentumDirection } from '../engine/teamForm'
+import { COMPETITION_OPTIONS } from '../lib/competitionOptions'
 import type { CompetitionType, ScreenStateByView, Team, View } from '../types'
 
 export function TeamDetailScreen({ teamId, season, screenState, onStateChange, onNavigate, onBack }: { teamId: string; season: string; screenState: ScreenStateByView['team']; onStateChange: (state: ScreenStateByView['team']) => void; onNavigate: (view: View) => void; onBack: () => void }) {
   const { teams, players, matches, competitionStates = [] } = useStore()
   const { bestPlayersCompetition: bestCompetition, matchesCompetition, tab } = screenState
+  const playersCompetition = screenState.playersCompetition ?? 'all'
   const bestSeason = screenState.bestPlayersSeason ?? season
   const patchState = (patch: Partial<ScreenStateByView['team']>) => onStateChange({ ...screenState, ...patch })
   const setBestSeason = (value: string) => patchState({ bestPlayersSeason: value })
@@ -37,17 +39,20 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
   const analytics = useMemo(() => tab === 'overview' ? buildLeagueHistory(teams, players, matches, activeSeason) : undefined, [tab, teams, players, matches, activeSeason])
   const playerData = useMemo(() => {
     if (tab !== 'players') return undefined
-    const canonicalBest = teamBestEleven(players, matches, teamId, activeSeason)
-    const statsByPlayer = Object.fromEntries(players.filter(player => (player.teamIds ?? [player.teamId]).includes(teamId)).map(player => {
-      const stats = playerSeasonStats(player, players, matches, activeSeason, teamId)
+    const competitionMatches = playersCompetition === 'all' ? matches : matches.filter(match => matchCompetitionType(match) === playersCompetition)
+    const canonicalBest = teamBestEleven(players, competitionMatches, teamId, activeSeason)
+    const historicalStarterIds = new Set(canonicalBest.slots.map(slot => slot.playerId))
+    const allTeamPlayers = sortPlayersByPosition(players.filter(player => (player.teamIds ?? [player.teamId]).includes(teamId)), [], representative)
+    const statsByPlayer = Object.fromEntries(players.filter(player => (player.teamIds ?? [player.teamId]).includes(teamId) || historicalStarterIds.has(player.id)).map(player => {
+      const stats = playerSeasonStats(player, players, matches, activeSeason, teamId, playersCompetition === 'all' ? undefined : playersCompetition)
       return [player.id, { goals: stats.goals, assists: stats.assists, avgRating: stats.avgRating, matches: stats.matches }]
     }))
     const slots = canonicalBest.slots.map(slot => {
       const stats = slot.playerId ? statsByPlayer[slot.playerId] : undefined
-      return stats ? { ...slot, avgRating: stats.avgRating, matches: stats.matches } : { ...slot }
+      return { ...slot, avgRating: stats?.avgRating ?? 0, matches: stats?.matches ?? 0 }
     })
-    return { best: { ...canonicalBest, slots }, statsByPlayer, starterIds: new Set(slots.flatMap(slot => slot.playerId ? [slot.playerId] : [])), allTeamPlayers: sortPlayersByPosition(players.filter(player => (player.teamIds ?? [player.teamId]).includes(teamId)), [], representative) }
-  }, [tab, players, matches, teamId, activeSeason, representative])
+    return { best: { ...canonicalBest, slots }, statsByPlayer, starterIds: new Set(slots.flatMap(slot => slot.playerId ? [slot.playerId] : [])), allTeamPlayers }
+  }, [tab, players, matches, teamId, activeSeason, playersCompetition, representative])
   const matchData = useMemo(() => tab === 'matches' ? derivedResults(matches.filter(match => match.season === activeSeason && (matchesCompetition === 'all' || matchCompetitionType(match) === matchesCompetition) && teamsCreditedWithResult(match).includes(teamId)), teams, teamId) : [], [tab, matches, teams, activeSeason, matchesCompetition, teamId])
   const form = useMemo(() => tab === 'overview' ? teamForm(teamId, players, matches, selectedBestSeason, bestCompetition) : undefined, [tab, teamId, players, matches, selectedBestSeason, bestCompetition])
   if (!team) return <div className="p-6 text-sm text-zinc-400">Team not found.</div>
@@ -65,14 +70,14 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
       <div className="ml-auto"><button type="button" onClick={() => onNavigate({ name: 'new-match', teamId, season: activeSeason })} className="rounded-full bg-emerald-500 px-3 py-2 text-xs font-bold text-black">Log match</button></div>
     </header>
     <SegmentedControl sticky label="Team detail section" value={tab} onChange={setTab} options={[{ value: 'overview', label: 'Overview' }, { value: 'matches', label: 'Matches' }, { value: 'players', label: 'Players' }]} />
-    {tab === 'players' && <section aria-label="Roster management" className="mt-4 mb-5 rounded-xl border border-white/10 bg-zinc-900 p-3"><div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold">Roster management</h2><p className="mt-0.5 text-[11px] text-zinc-400">Import official squad and player photos</p></div><button type="button" onClick={() => onNavigate({ name: 'import-squad', teamId })} className="shrink-0 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300">Import Squad</button></div></section>}
+    {tab === 'players' && <div className="mt-4"><RankingMetricTabs value={playersCompetition} options={COMPETITION_OPTIONS} onChange={playersCompetition => patchState({ playersCompetition })} label="Team players competition" /></div>}
     {tab === 'overview' && overview && analytics && <><div className="mt-4 mb-5 grid grid-cols-4 gap-2 text-center">
       {[['Rank', <span key="rank" className="flex items-center justify-center">{overview.league.rank ? `#${overview.league.rank}` : '—'} <RankDelta value={leagueRow?.movement ?? null} /></span>], ['W-D-L', `${overview.league.wins}-${overview.league.draws}-${overview.league.losses}`], ['GF-GA', `${overview.league.goalsFor}-${overview.league.goalsAgainst}`], ['Pts', overview.league.points]].map(([label, value]) => <div key={String(label)} className="min-w-0 rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{value}</div><div className="text-[9px] uppercase text-zinc-500">{label}</div></div>)}
     </div><div className="mb-2 grid grid-cols-4 gap-2 text-center"><div className="col-span-2 min-w-0 rounded-xl bg-zinc-900 px-2 py-2"><div className="truncate text-sm font-black">{overview.champions.status}</div><div className="text-[9px] uppercase text-zinc-500">Champions</div></div><div className="min-w-0 rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{overview.champions.wins}-{overview.champions.draws}-{overview.champions.losses}</div><div className="text-[9px] uppercase text-zinc-500">W-D-L</div></div><div className="min-w-0 rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{overview.champions.goalsFor}-{overview.champions.goalsAgainst}</div><div className="text-[9px] uppercase text-zinc-500">GF-GA</div></div></div><div className="mb-5 grid grid-cols-4 gap-2 text-center"><div className="col-span-2 min-w-0 rounded-xl bg-zinc-900 px-2 py-2"><div className="truncate text-sm font-black">{overview.cup.status}</div><div className="text-[9px] uppercase text-zinc-500">Cup</div></div><div className="min-w-0 rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{overview.cup.wins}-{overview.cup.draws}-{overview.cup.losses}</div><div className="text-[9px] uppercase text-zinc-500">W-D-L</div></div><div className="min-w-0 rounded-xl bg-zinc-900 px-1 py-2"><div className="text-sm font-black">{overview.cup.goalsFor}-{overview.cup.goalsAgainst}</div><div className="text-[9px] uppercase text-zinc-500">GF-GA</div></div></div></>}
     {tab === 'overview' && <section className="mb-4 mt-5 rounded-2xl bg-zinc-900 p-3" aria-label="Team Analysis scope"><div className="mb-2 text-sm font-semibold">Team Analysis</div><div className="flex items-center gap-2"><CompactFilterMenu value={selectedBestSeason} options={(seasons.length ? seasons : [activeSeason]).map(item => ({ value: item, label: item }))} onChange={setBestSeason} label="Team Analysis season" popupAlign="start" /><CompetitionScopeSelector value={bestCompetition} onChange={setBestCompetition} /></div></section>}
     {tab === 'overview' && form && <CurrentForm form={form} season={selectedBestSeason} />}
     {tab === 'overview' && <TeamBestPlayers team={team} teamId={teamId} selectedSeason={selectedBestSeason} competition={bestCompetition} metric={screenState.bestPlayersMetric as LeaderboardMetric} players={players} matches={matches} onMetric={metric => patchState({ bestPlayersMetric: metric })} onPlayer={id => onNavigate({ name: 'player', id, season: selectedBestSeason, competitionType: bestCompetition })} onViewAll={(metric) => onNavigate({ name: 'global-ranking', season: selectedBestSeason, competitionType: bestCompetition, rankingMetric: metric, teamId })} />}
-    {tab === 'players' && best && <><section className="mt-6"><div className="mb-3 flex items-end justify-between"><div><h2 className="text-lg font-semibold">Latest XI</h2><p className="text-xs text-zinc-400">Kickoff XI · {best.formation ?? 'Saved formation unavailable'}</p></div></div>{best.match && best.slots.length ? <Pitch slots={best.slots} players={players} teams={teams} statsByPlayer={statsByPlayer} showPositionBadge={false} presentation="history" onSlotClick={(slot) => { if (slot.playerId) onNavigate({ name: 'player', id: slot.playerId }) }} /> : <div className="rounded-2xl bg-zinc-900 p-6 text-center text-sm text-zinc-500">No match data yet</div>}</section><section className="mt-6">
+    {tab === 'players' && best && <><section className="mt-6"><div className="mb-3 flex items-end justify-between"><div><h2 className="text-lg font-semibold">Latest XI</h2><p className="text-xs text-zinc-400">Kickoff XI · {best.formation ?? 'Saved formation unavailable'}</p></div></div>{best.match && best.slots.length ? <Pitch emptyRatingLabel="—" slots={best.slots} players={players} teams={teams} statsByPlayer={statsByPlayer} showPositionBadge={false} presentation="history" onSlotClick={(slot) => { if (slot.playerId) onNavigate({ name: 'player', id: slot.playerId, season: activeSeason, competitionType: playersCompetition }) }} /> : <div className="rounded-2xl bg-zinc-900 p-6 text-center text-sm text-zinc-500">No match data yet</div>}</section><section className="mt-6">
       <h2 className="mb-1 text-sm font-semibold">Bench</h2><p className="mb-2 text-[10px] text-zinc-500">Not in Latest XI</p>
       {allTeamPlayers.length > 0 ? (
         <div className="grid grid-cols-4 gap-2">
@@ -81,12 +86,13 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
             return (
               <SubstitutePlayerCard
                 key={player.id}
+                emptyRatingLabel="—"
                 player={player}
                 team={team}
                 rating={stats?.matches === 0 ? undefined : stats?.avgRating}
                 position={representative.get(player.id)}
                 stats={{ goals: stats?.goals ?? 0, assists: stats?.assists ?? 0 }}
-                onClick={() => onNavigate({ name: 'player', id: player.id })}
+                onClick={() => onNavigate({ name: 'player', id: player.id, season: activeSeason, competitionType: playersCompetition })}
               />
             )
           })}
@@ -95,6 +101,8 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
         <p className="rounded-xl bg-zinc-900 p-3 text-xs text-zinc-500">No players in squad.</p>
       )}
     </section></>}
+
+    {tab === 'players' && <section aria-label="Roster management" className="mt-4 mb-5 rounded-xl border border-white/10 bg-zinc-900 p-3"><div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold">Roster management</h2><p className="mt-0.5 text-[11px] text-zinc-400">Import official squad and player photos</p></div><button type="button" onClick={() => onNavigate({ name: 'import-squad', teamId })} className="shrink-0 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300">Import Squad</button></div></section>}
 
     {tab === 'matches' && <section className="mt-4"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-semibold">Matches</h2><CompetitionScopeSelector value={matchesCompetition} onChange={value => setMatchesCompetition(value)} /></div><div className="space-y-2">{matchData.map(result => <ResultCard key={result.match.id} result={result} teams={teams} showCompetition onMatchNavigate={() => onNavigate({ name: 'match', id: result.match.id })} onTeamNavigate={id => onNavigate({ name: 'team', id })} />)}{!matchData.length && <p className="rounded-xl bg-zinc-900 p-3 text-xs text-zinc-500">No matches in this scope.</p>}</div></section>}
   </div>

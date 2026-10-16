@@ -98,14 +98,14 @@ test('No Team uses current membership, season intersection and recorded position
   assert.deepEqual(directory([released], matches, f(['S1'], ['C', '__no-team__'], ['CAM'])), ['p'])
 })
 
-test('Positions Played keeps normalized CAM and 10 percent cutoff in selected competition', () => {
+test('Positions Played keeps normalized CAM and every positive-minute position in selected competition', () => {
   const player = p(); const match = m([{ ...a('p', 'CM', 'LAM'), positionHistory: [{ minute: 45, position: 'CAM', tacticalSlotId: 'RCAM' }, { minute: 85, position: 'ST' }] }])
   const data = derivePlayerScope(player, [player], [match], { season: 'S1', competition: 'league' })
   assert.deepEqual([...data.positionMinutes], [['CAM', 85], ['ST', 5]])
   const h = screenHarness(root, 'screens/PlayerDetailScreen.tsx', 'PlayerDetailScreen', { players: [player], teams, matches: [match], competitionStates: [] })
   const tree = h.render({ playerId: 'p', season: 'S1', screenState: defaultScreenState({ name: 'player', id: 'p' }), onStateChange() {}, onNavigate() {}, onBack() {} })
   const section = nodes(tree, n => n.type === 'section' && nodes(n.props.children, c => c.type === 'h2' && c.props.children === 'Positions Played').length)[0]
-  assert.deepEqual(nodes(section, n => n.type === 'b').map(n => n.props.children), ['CAM'])
+  assert.deepEqual(nodes(section, n => n.type === 'b').map(n => n.props.children), ['CAM', 'ST'])
 })
 
 test('opening a deleted historical player retains access to recorded matches without a fabricated rating', () => {

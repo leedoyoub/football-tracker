@@ -26,13 +26,14 @@ import { careerNextMilestones } from '../engine/nextMilestones'
 import { recordedTeamId } from '../engine/matchPerspective'
 import { CompactFilterMenu } from '../components/CompactFilterMenu'
 import { RankingMetricTabs } from '../components/RankingRow'
+import { COMPETITION_OPTIONS as competitions } from '../lib/competitionOptions'
 import { useStore } from '../store'
 import { currentMembershipPresentation } from '../lib/currentMembershipPresentation'
 import { recentFormLabelColor, scrollTrendToLatest, TREND_POINT_SPACING, trendPlotWidth } from '../lib/trendPlot'
 import type { CompetitionState, CompetitionType, Match, Player, RatingBreakdown, ScreenStateByView, Team, View } from '../types'
 
-const competitions: { value: CompetitionType | 'all'; label: string }[] = [{ value: 'all', label: 'All' }, { value: 'league', label: 'League' }, { value: 'cup', label: 'Cup' }, { value: 'champions', label: 'Champions' }]
 const pct = (number: number) => `${number.toFixed(0)}%`
+const positionShare = (share: number) => share > 0 && Number(share.toFixed(1)) === 0 ? '<0.1%' : `${share.toFixed(1)}%`
 const value = (number: number | null | undefined, digits = 2) => number === null || number === undefined || !Number.isFinite(number) ? '—' : number.toFixed(digits)
 const fieldPositions = new Set(['CB', 'LB', 'RB'])
 const metric = (label: string, content: string | number) => <div key={label} className="rounded-xl bg-black/20 px-2 py-2 text-center"><b className="block text-sm tabular-nums">{content}</b><small className="block text-[9px] uppercase text-zinc-500">{label}</small></div>
@@ -81,7 +82,7 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
   const form = playerForm(data.appearances)
   const rankIn = (metric: 'rating' | 'goals' | 'assists') => ({ ...scopedMetricRanks(rankingRows[metric], players, player.id, scopedFamilies), team: scopedMetricRanks(teamRankingRows[metric], players, player.id).team })
   const ranks = { rating: rankIn('rating'), goals: rankIn('goals'), assists: rankIn('assists') }
-  const positions = [...data.positionMinutes.entries()].map(([position, minutes]) => ({ position, minutes, share: data.minutes ? minutes / data.minutes * 100 : 0 })).filter(row => row.share >= 10).sort((left, right) => right.share - left.share || right.minutes - left.minutes)
+  const positions = [...data.positionMinutes.entries()].map(([position, minutes]) => ({ position, minutes, share: data.minutes ? minutes / data.minutes * 100 : 0 })).filter(row => row.minutes > 0).sort((left, right) => right.minutes - left.minutes)
   return <div className="px-4 pb-8 pt-6">
     <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">Back</button>
     <header className="mb-4 flex items-start gap-3"><PlayerAvatar photoUrl={player.photoUrl || player.image} number={player.number} className="h-14 w-14 text-sm" /><div className="min-w-0 flex-1"><p className="text-xs text-zinc-400"><TeamIdentityAction team={currentTeam} onNavigate={id => onNavigate({ name: 'team', id })} className="inline-flex items-center gap-1">{membership.label}</TeamIdentityAction> · #{player.number} · {dominantPosition}</p><h1 className="break-words text-2xl font-semibold">{playerFullName(player)}</h1><div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => onNavigate({ name: 'edit-player', id: player.id })} className="rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-bold">Edit player</button><button type="button" onClick={() => onNavigate({ name: 'comparison', leftId: player.id, season: selectedSeason, competitionType: competition })} className="rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-bold">Compare</button></div></div></header>
@@ -92,7 +93,7 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
     <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Active Streaks</h2>{activeStreaks.length ? <div className="mt-2 flex flex-wrap gap-2">{activeStreaks.map(row => <span key={row.key} className="rounded-full bg-emerald-500/10 px-2.5 py-1.5 text-[10px] font-bold text-emerald-300">{row.current} straight · {row.label}</span>)}</div> : <p className="mt-2 text-xs text-zinc-500">No active streak.</p>}</section>
     <DeferredAnalysis fallback={<div className="mb-4 h-24 rounded-2xl bg-zinc-900/60" aria-label="Loading player awards and milestones" />}><PlayerHighlights player={player} players={players} teams={teams} matches={matches} competitionStates={competitionStates} selectedSeason={selectedSeason} competition={competition} playerScopedMatches={playerScopedMatches} onNavigate={onNavigate} /></DeferredAnalysis>
     <PositionStats data={data} position={dominantPosition ?? player.position} />
-    <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Positions Played</h2><p className="mt-1 text-[10px] text-zinc-500">Match-position timeline minutes · positions under 10% are hidden.</p>{positions.length ? <div className="mt-3 space-y-2">{positions.map(row => <div key={row.position} className="grid grid-cols-[34px_1fr_auto] items-center gap-2 text-xs"><b>{row.position}</b><span className="h-2 overflow-hidden rounded-full bg-black/30"><span className="block h-full rounded-full bg-emerald-400" style={{ width: `${row.share}%` }} /></span><span className="tabular-nums">{pct(row.share)} · {row.minutes}'</span></div>)}</div> : <p className="mt-2 text-xs text-zinc-500">No position minutes yet.</p>}</section>
+    <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Positions Played</h2><p className="mt-1 text-[10px] text-zinc-500">Match-position timeline minutes · all played positions.</p>{positions.length ? <div className="mt-3 space-y-2">{positions.map(row => <div key={row.position} className="grid grid-cols-[34px_1fr_auto] items-center gap-2 text-xs"><b>{row.position}</b><span className="h-2 overflow-hidden rounded-full bg-black/30"><span className="block h-full rounded-full bg-emerald-400" style={{ width: `${row.share}%` }} /></span><span className="tabular-nums">{positionShare(row.share)} · {row.minutes}'</span></div>)}</div> : <p className="mt-2 text-xs text-zinc-500">No position minutes yet.</p>}</section>
     <StartingPerformance rows={data.startingPerformance} teams={teams} />
     <DeferredMount player={player} players={players} teams={teams} matches={matches} scopedMatches={playerScopedMatches} data={data} displayCacheHit={playerDerivedCacheHit} dominantPosition={dominantPosition ?? player.position} onNavigate={onNavigate} />
   </div>
