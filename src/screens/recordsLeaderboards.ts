@@ -1,6 +1,7 @@
 import { combinationStats } from '../engine/analytics'
 import { oldestMatches } from '../engine/matchChronology'
 import { buildPlayerRecordLeaderboards } from '../engine/playerRecords'
+import { awardRecordGroups, teamHistoryRecordGroups } from '../engine/awardRecords'
 import { RATING_ENGINE_REVISION } from '../engine/ratingRevision'
 import { isPlayerAssistEvent, isPlayerGoalEvent } from '../engine/playerMatchFacts'
 import { orderedEvents, scoringTeamId } from '../engine/timeline'
@@ -10,7 +11,7 @@ import { teamPerspectiveScore } from '../engine/matchPerspective'
 import { buildUnitRecords, type UnitRecord } from '../engine/unitRecords'
 import { playerFullName } from '../components/ui'
 import { formatSignedTwoDecimals } from '../lib/signedNumber'
-import type { CompetitionType, Match, Player, PositionFilterKey, Team } from '../types'
+import type { CompetitionState, CompetitionType, Match, Player, PositionFilterKey, Team } from '../types'
 
 export type RecordsLeaderboardKind = 'player' | 'team' | 'combination'
 export type CombinationConnector = '→' | '↔' | '&' | '+'
@@ -18,7 +19,7 @@ export type CombinationPairPresentation = { playerIds: string[]; connector: Comb
 export type RecordsLeaderboardRow = { id: string; name: string; value: string; numeric: number; detail: string; rank: number; playerIds?: string[]; combinationPair?: CombinationPairPresentation }
 export type RecordsLeaderboardGroup = { id: string; title: string; kind: RecordsLeaderboardKind; rows: RecordsLeaderboardRow[]; applicableFilters: { position: boolean; team: boolean } }
 export type RecordsScope = { seasons: string[]; teamIds: string[]; competition: CompetitionType | 'all'; positionFilter: PositionFilterKey }
-type RecordsInput = { category: RecordsLeaderboardKind; players: Player[]; teams: Team[]; matches: Match[]; scope: RecordsScope; selectedIds?: string[] }
+type RecordsInput = { category: RecordsLeaderboardKind; players: Player[]; teams: Team[]; matches: Match[]; scope: RecordsScope; selectedIds?: string[]; section?: 'performance' | 'awards'; states?: CompetitionState[] }
 
 export const combinationBestUnitOptions = [
   ...([2, 3] as const).map(size => ({ id: `best-unit:attack:${size}:goals`, title: `Best Attack ${size === 2 ? 'Pair' : 'Trio'} · Goals / Match` })),
@@ -30,6 +31,8 @@ export const combinationBestUnitOptions = [
 ]
 
 const recordsCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], Map<string, RecordsLeaderboardGroup[]>>>>()
+const honorCache = new WeakMap<CompetitionState[], WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], Map<string, RecordsLeaderboardGroup[]>>>>>()
+const EMPTY_STATES: CompetitionState[] = []
 const scopeKey = ({ category, scope, selectedIds }: RecordsInput) => JSON.stringify([RATING_ENGINE_REVISION, category, scope.competition, scope.positionFilter, scope.seasons.slice().sort(), scope.teamIds.slice().sort(), selectedIds ?? null])
 
 const rank = (rows: Omit<RecordsLeaderboardRow, 'rank'>[], ascending = false) => { let prior: number | undefined; let priorRank = 0; return rows.slice().sort((a, b) => (ascending ? a.numeric - b.numeric : b.numeric - a.numeric) || a.name.localeCompare(b.name)).map((row, index) => { const next = prior === row.numeric ? priorRank : index + 1; prior = row.numeric; priorRank = next; return { ...row, rank: next } }) }
@@ -53,6 +56,19 @@ export function combinationPairPresentation(leaderboardId: string, playerIds: st
 
 export function recordsLeaderboardGroups(input: RecordsInput): RecordsLeaderboardGroup[] {
   const { category, players, teams, matches, scope, selectedIds } = input
+  if (input.section === 'awards' && category !== 'combination') {
+    const states = input.states ?? EMPTY_STATES
+    let cache = honorCache.get(states); if (!cache) { cache = new WeakMap(); honorCache.set(states, cache) }
+    let byPlayers = cache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); cache.set(matches, byPlayers) }
+    let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
+    let byScope = byTeams.get(teams); if (!byScope) { byScope = new Map(); byTeams.set(teams, byScope) }
+    const key = scopeKey(input), cached = byScope.get(key); if (cached) return cached
+    let groups = category === 'player' ? awardRecordGroups(teams, players, matches, states, scope) : teamHistoryRecordGroups(teams, players, matches, states, scope)
+    if (selectedIds) groups = groups.filter(group => selectedIds.includes(group.id))
+    if (byScope.size >= 24) byScope.delete(byScope.keys().next().value!)
+    byScope.set(key, groups)
+    return groups
+  }
   let byPlayers = recordsCache.get(matches)
   if (!byPlayers) { byPlayers = new WeakMap(); recordsCache.set(matches, byPlayers) }
   let byTeams = byPlayers.get(players)

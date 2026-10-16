@@ -1,3 +1,4 @@
+import { selectMomCandidate } from './momSelection'
 import type { Appearance, Match, MatchEvent, Player, Position, RatingBreakdown } from '../types'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 export { RATING_ENGINE_REVISION } from './ratingRevision.ts'
@@ -7,7 +8,6 @@ import {
   creditedPositionSegments,
   matchPositionAtEvent,
   matchPositionSegments,
-  normalizePositionFamily,
   pitchWindow,
   normalizeMatchTimeline,
   scoringTeamId,
@@ -276,60 +276,20 @@ function matchRatings(match: Match, players: Player[]): MatchRatings {
 export function rateMatch(match: Match, players: Player[]): RatingBreakdown[] {
   return matchRatings(match, players).rows.slice()
 }
-const MOM_POSITION_PRIORITY: Record<Position, number> = {
-  GK: 0, CB: 1, LCB: 1, RCB: 1, LB: 2, LWB: 2, RB: 2, RWB: 2,
-  CDM: 3, LDM: 3, RDM: 3, CM: 4, LCM: 4, RCM: 4, LM: 5, RM: 5,
-  CAM: 6, LW: 7, RW: 7, SS: 8, ST: 9, LST: 9, RST: 9,
-}
-export function momPositionPriority(position?: string): number | undefined {
-  const family = normalizePositionFamily(position)
-  return family ? MOM_POSITION_PRIORITY[family] : undefined
-}
+export { momPositionPriority } from './momSelection'
 function momEventCount(match: Match, playerId: string, key: 'playerId' | 'assistPlayerId'): number {
   const appearance = match.appearances.find(item => item.playerId === playerId)
   return appearance ? match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && !event.ownGoal && event[key] === playerId && isOnPitchAtEvent(match, appearance, event)).length : 0
-}
-function seededTieIndex(matchId: string, playerIds: string[]): number {
-  const seed = `${matchId}:${playerIds.slice().sort().join(',')}`
-  let hash = 2166136261
-  for (let index = 0; index < seed.length; index++) {
-    hash ^= seed.charCodeAt(index)
-    hash = Math.imul(hash, 16777619)
-  }
-  return (hash >>> 0) % playerIds.length
 }
 /** Uses the same effective match position exposed by the authoritative rating breakdown. */
 export function getMatchManOfTheMatch(match: Match, players: Player[]): string | undefined {
   const entry = matchRatings(match, players)
   if (entry.mom?.matchId === match.id) return entry.mom.playerId
-  const candidates = entry.rows.map(rating => ({
-    rating,
-    priority: momPositionPriority(rating.position)!,
+  const playerId = selectMomCandidate(entry.rows.map(rating => ({
+    playerId: rating.playerId, average: rating.raw, position: rating.position, minutes: rating.minutes,
     goals: momEventCount(match, rating.playerId, 'playerId'),
     assists: momEventCount(match, rating.playerId, 'assistPlayerId'),
-  }))
-  const ordered = candidates.sort((left, right) => {
-    const leftRating = left.rating; const rightRating = right.rating
-    if (leftRating.raw !== rightRating.raw) return rightRating.raw - leftRating.raw
-    const positionPriority = left.priority - right.priority
-    if (positionPriority) return positionPriority
-    const goals = right.goals - left.goals
-    if (goals) return goals
-    const assists = right.assists - left.assists
-    if (assists) return assists
-    return rightRating.minutes - leftRating.minutes
-  })
-  const best = ordered[0]
-  if (!best) { entry.mom = { matchId: match.id, playerId: undefined }; return undefined }
-  const tied = ordered.filter(candidate =>
-    candidate.rating.raw === best.rating.raw &&
-    candidate.priority === best.priority &&
-    candidate.goals === best.goals &&
-    candidate.assists === best.assists &&
-    candidate.rating.minutes === best.rating.minutes,
-  )
-  const tiedIds = tied.map(candidate => candidate.rating.playerId).sort()
-  const playerId = tiedIds[seededTieIndex(match.id, tiedIds)]
+  })), match.id)
   entry.mom = { matchId: match.id, playerId }
   return playerId
 }

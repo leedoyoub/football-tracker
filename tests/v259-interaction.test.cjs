@@ -1,3 +1,4 @@
+const { leagueCopy, unchangedPlayerMarkup } = require('./helpers/v2512-policy-comparison.cjs')
 require('./helpers/register-ts.cjs')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -53,7 +54,7 @@ test('settled Home and Player Detail retain v2.5.8 markup except approved Rating
     // This fixture only plays ST. Preserve the complete comparison while applying
     // the explicitly changed copy and precision; low-share coverage lives in v2511.
     const expected = renderToStaticMarkup(h(baseline, name, store).render(props)).replace(/(<summary class="cursor-pointer text-zinc-400">)Rating Details · [A-Z]+ · \d+&#x27;(<\/summary>)/g, '$1Rating Details$2').replace('positions under 10% are hidden.', 'all played positions.').replace('100% · ', '100.0% · ')
-    assert.equal(renderToStaticMarkup(h(root, name, store).render(props)).replace('Football Tracker \u00b7 v2.5.11', 'Football Tracker \u00b7 v2.5.8'), expected)
+    assert.equal(unchangedPlayerMarkup(renderToStaticMarkup(h(root, name, store).render(props))), unchangedPlayerMarkup(expected))
   }
 })
 
@@ -65,7 +66,7 @@ test('narrow milestone projection exactly matches canonical global News for ever
   const original = JSON.stringify(s)
   for (const id of [...s.players.map(p => p.id), 'missing']) assert.deepStrictEqual(news.derivePlayerMilestones(id, s.players, s.teams, s.matches), expected.filter(item => item.playerId === id && item.milestone), id)
   assert.equal(JSON.stringify(s), original)
-  assert.deepStrictEqual(news.deriveNews(s.players, s.teams, s.matches), expected)
+  assert.deepStrictEqual(news.deriveNews(s.players, s.teams, s.matches), leagueCopy(expected))
 })
 
 test('milestones refresh on immutable record edits/deletes and player transfers without changing IDs or scopes', () => {

@@ -288,11 +288,11 @@ test('Biggest Win excludes a larger loss on the same Matchday', () => {
   assert.deepEqual(review.biggestWin, { matchId: 'win', margin: 2 })
 })
 
-test('defender SOT eligibility uses credited defender minutes', () => {
+test('defender SOT includes short credited defender intervals', () => {
   const player = { id: 'P', name: 'P', teamId: 'A', position: 'CM' }
   const match = { ...game('role', 'league', 'A', 'A', 'O', 0, 0), halftimeOpponentSot: 2, fulltimeOpponentSot: 8, appearances: [{ playerId: 'P', teamId: 'A', role: 'starter', position: 'CM', positionHistory: [{ minute: 70, position: 'CB' }] }] }
   const row = buildGlobalRankingData([player], [match], { seasons: ['Season 1'], teams: [], positions: [] }, 'rating')[0]
-  assert.equal(row.sotAllowedAppearances, 0)
+  assert.equal(row.sotAllowedAppearances, 1)
 })
 
 test('CB partnership SOT uses the actual 60–90 overlap in the second half', () => {
@@ -307,15 +307,15 @@ test('Starting PPG cannot use wins from matches where the pair did not start tog
   assert.equal(startingPPG({ startsTogether: 1, startingWins: 1, startingDraws: 0, wins: 3, draws: 0 }), 3)
 })
 
-test('GK qualification keeps short appearance saves out of qualifying rate sample', () => {
+test('GK rates include saves from all valid short appearances', () => {
   const keeper = { id: 'GK', name: 'GK', teamId: 'A', position: 'GK' }
   const full = { ...game('full', 'league', 'A', 'A', 'O', 0, 1), appearances: [{ playerId: 'GK', teamId: 'A', role: 'starter', position: 'GK' }], events: [{ id: 'goal', type: 'goal', minute: 45, teamId: 'O' }, { id: 'save', type: 'save', minute: 20, teamId: 'A', playerId: 'GK', count: 2 }] }
   const short = { ...game('short', 'league', 'A', 'A', 'O', 0, 0), matchDay: 2, appearances: [{ playerId: 'GK', teamId: 'A', role: 'bench', position: 'GK' }], events: [{ id: 'sub', type: 'sub', minute: 60, teamId: 'A', playerOutId: 'old', playerInId: 'GK', position: 'GK' }, { id: 'save9', type: 'save', minute: 70, teamId: 'A', playerId: 'GK', count: 9 }] }
   const row = buildGlobalRankingData([keeper], [full, short], { seasons: ['Season 1'], teams: [], positions: [] }, 'rating')[0]
   assert.equal(row.goalkeeperMinutes, 120)
-  assert.equal(row.qualifyingGoalkeeperMinutes, 90)
-  assert.equal(row.qualifyingGoalkeeperAppearances, 1)
-  assert.equal(row.qualifyingSaves, 2)
+  assert.equal(row.qualifyingGoalkeeperMinutes, 120)
+  assert.equal(row.qualifyingGoalkeeperAppearances, 2)
+  assert.equal(row.qualifyingSaves, 11)
   assert.equal(row.qualifyingConceded, 1)
 })
 

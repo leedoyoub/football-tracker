@@ -1,0 +1,20 @@
+process.env.NODE_ENV = 'production'
+require('./helpers/register-ts.cjs')
+const { performance } = require('node:perf_hooks')
+const { performanceFixture } = require('./helpers/v255-fixture.cjs')
+const { officialSeasonModel, careerAwardEvents } = require('../src/engine/officialAwards.ts')
+const { recordsLeaderboardGroups } = require('../src/screens/recordsLeaderboards.ts')
+const { VirtualRankingList } = require('../src/components/VirtualRankingList.tsx')
+const React = require('react')
+const { renderToStaticMarkup } = require('react-dom/server')
+const s = performanceFixture(2)
+const timed = fn => { const start = performance.now(); const result = fn(); return { ms: performance.now() - start, result } }
+const input = { category: 'player', section: 'awards', ...s, states: s.competitionStates, scope: { seasons: [], teamIds: [], competition: 'all', positionFilter: 'all' } }
+const cold = timed(() => recordsLeaderboardGroups(input))
+const warm = timed(() => { for (let i = 0; i < 100; i++) if (recordsLeaderboardGroups(input) !== cold.result) throw Error('Records cache miss') })
+const career = timed(() => careerAwardEvents(s.teams, s.players, s.matches, s.competitionStates, s.players[0].id))
+const model = officialSeasonModel(s.teams, s.players, s.matches, s.competitionStates, 'Season 2')
+const shared = timed(() => { for (let i = 0; i < 100; i++) if (officialSeasonModel(s.teams, s.players, s.matches, s.competitionStates, 'Season 2') !== model) throw Error('Official model cache miss') })
+const rows = Array.from({ length: 350 }, (_, i) => ({ id: String(i) }))
+const html = renderToStaticMarkup(React.createElement(VirtualRankingList, { rows, renderRow: row => React.createElement('span', {}, row.id) }))
+console.log(JSON.stringify({ method: 'Deterministic 2-season synthetic data, Node CPU and React SSR; not browser FPS.', players: s.players.length, matches: s.matches.length, awardsColdMs: cold.ms, recordsWarm100Ms: warm.ms, careerFromSharedModelsMs: career.ms, modelWarm100Ms: shared.ms, virtualRows: (html.match(/role="listitem"/g) ?? []).length, fullRows: rows.length }, null, 2))

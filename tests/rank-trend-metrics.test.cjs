@@ -48,21 +48,21 @@ test('transfer trend ranks within the actual team at each appearance', () => {
   assert.deepEqual(trend.map(row => row.team), [1, 2])
 })
 
-test('defensive Rank Trend eligibility is recalculated at each historical prefix', () => {
+test('defensive Rank Trend includes brief actual role time at every prefix', () => {
   const players = [player('target', 'CB')]
   const games = [
     match('m1', 1, [appearance('target', 'CB', { minute: 20, position: 'CM' })]),
     match('m2', 2, []),
     match('m3', 3, [appearance('target', 'CB', { minute: 65, position: 'CM' })]),
   ]
-  assert.deepEqual(playerRankTrend('target', players, games, 'S1', 'league', 'sotAllowed').map(row => row.overall), [null, 1])
-  assert.deepEqual(playerRankTrend('target', players, games, 'S1', 'league', 'defenderGaPer90').map(row => row.overall), [null, 1])
+  assert.deepEqual(playerRankTrend('target', players, games, 'S1', 'league', 'sotAllowed').map(row => row.overall), [1, 1])
+  assert.deepEqual(playerRankTrend('target', players, games, 'S1', 'league', 'defenderGaPer90').map(row => row.overall), [1, 1])
 })
 
-test('GK GA/90 trend applies prefix opportunities and keeps actual GK appearances', () => {
+test('GK GA/90 trend includes all actual GK appearances', () => {
   const players = [player('target', 'GK')]
   const games = [match('m1', 1, [appearance('target', 'GK', { minute: 20, position: 'CM' })]), match('m2', 2, []), match('m3', 3, [appearance('target', 'GK', { minute: 65, position: 'CM' })])]
-  assert.deepEqual(playerRankTrend('target', players, games, 'S1', 'league', 'goalkeeperGaPer90').map(row => row.overall), [null, 1])
+  assert.deepEqual(playerRankTrend('target', players, games, 'S1', 'league', 'goalkeeperGaPer90').map(row => row.overall), [1, 1])
 })
 
 test('transfer defensive trend uses prefix stint opportunities and matches final Ranking eligibility', () => {

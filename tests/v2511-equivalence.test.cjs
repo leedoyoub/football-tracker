@@ -29,10 +29,15 @@ for (const season of ['Season 1', 'Season 2']) for (const scope of ['all', 'leag
   }
   assert.equal(JSON.stringify(s), snapshot)
 })
-test('REV13, timeline, canonical competition/ranking/awards and durable data modules remain source identical to v2.5.10', () => {
-  for (const file of ['engine/rating.ts', 'engine/constants.ts', 'engine/timeline.ts', 'engine/stats.ts', 'engine/seasonAnalytics.ts', 'engine/competition.ts', 'engine/awards.ts', 'engine/kickoffLineup.ts', 'lib/repository.ts', 'lib/validation.ts', 'lib/rankingMetrics.ts', 'store.tsx']) {
+test('timeline, competition rules, constants and durable data remain source identical to v2.5.10', () => {
+  for (const file of ['engine/constants.ts', 'engine/timeline.ts', 'engine/seasonAnalytics.ts', 'engine/competition.ts', 'engine/kickoffLineup.ts', 'lib/repository.ts', 'lib/validation.ts', 'lib/rankingMetrics.ts', 'store.tsx']) {
     const normalize = filename => fs.readFileSync(filename, 'utf8').replaceAll('\r\n', '\n')
     assert.equal(normalize(path.join(baseline.root, 'src', file)), normalize(path.join(baseline.directory, 'src', file)), file)
   }
+  // REV13 calculation and all its role/goal/save helpers precede rateMatch.
+  const calculation = filename => fs.readFileSync(filename, 'utf8').replaceAll('\r\n', '\n').split('export function rateMatch')[0].split('export function clampRating')[1]
+  assert(calculation(path.join(baseline.root, 'src/engine/rating.ts')).length > 1000)
+  // The full rating/MOM behavior is also independently compared for every fixture match.
+  assert.equal(calculation(path.join(baseline.root, 'src/engine/rating.ts')), calculation(path.join(baseline.directory, 'src/engine/rating.ts')))
   assert.deepEqual(RANKING_METRICS, require(path.join(baseline.directory, 'src/lib/rankingMetrics.ts')).RANKING_METRICS)
 })

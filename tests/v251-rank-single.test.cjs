@@ -24,7 +24,7 @@ test('Rank Trend displays its canonical rank for one actual appearance', () => {
   }
 })
 
-test('defender Rank Trend shows metric choices and an unqualified appearance as a dash', () => {
+test('defender Rank Trend shows metric choices and a brief appearance as a valid rank', () => {
   const player = { id: 'p', name: 'P', teamId: 'A', position: 'CB', number: 4 }
   const match = { id: 'short', season: 'S1', competitionType: 'league', competitionStage: 'regular', matchDay: 1, date: '2026-01-01', duration: 90, homeTeamId: 'A', awayTeamId: 'B', teamId: 'A', appearances: [{ playerId: 'p', teamId: 'A', role: 'starter', position: 'CB', positionHistory: [{ minute: 20, position: 'CM' }] }], events: [] }
   const storePath = require.resolve('../src/store.tsx')
@@ -36,8 +36,8 @@ test('defender Rank Trend shows metric choices and an unqualified appearance as 
     assert.match(html, /aria-label="Rank Trend metric"/)
     assert.match(html, /Defender GA\/90/)
     assert.match(html, /SOT Allowed\/90/)
-    assert.match(html, /rank history: —/)
-    assert.match(html, />—<\/text>/)
+    assert.match(html, /rank history: #1/)
+    assert.match(html, />#1<\/text>/)
   } finally {
     if (priorStore) require.cache[storePath] = priorStore
     else delete require.cache[storePath]

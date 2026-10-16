@@ -123,7 +123,7 @@ test('monthly, stage, competition, season and historical awards consume the new 
   const matches = [1, 2, 3].map(day => game(`awards-${day}`, day)), states = []
   const competition = require('../src/engine/competition.ts'), original = competition.competitionSeasonStatus
   // Only completion is supplied; rating, eligibility, bonuses and selectors run unchanged.
-  competition.competitionSeasonStatus = () => ({ league: { complete: true, championId: 'A', standings: [{ teamId: 'A', rank: 1 }] }, cup: { championId: 'A' }, champions: { championId: 'A' }, complete: true })
+  competition.competitionSeasonStatus = () => ({ league: { complete: true, championId: 'A', standings: [{ teamId: 'A', rank: 1 }] }, cup: { championId: 'A', stage: 'final', activeTeamIds: ['A', 'B'], eliminatedAtByTeam: {} }, champions: { championId: 'A', rounds: { roundOf16: [], quarterFinal: [], semiFinal: [], final: [] } }, complete: true })
   try {
     withRevision12(() => {
       assert.equal(seasonAwards('S1', teams, players, matches, states).ballon.playerId, 'cam')

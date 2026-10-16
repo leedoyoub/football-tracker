@@ -10,10 +10,10 @@ import { derivePlayerScope, playerAppearanceMatches, playerCareerTimeline, playe
 import { matchCompetitionType, assignmentSnapshotForMatch, formatCompactCompetitionContext } from '../engine/competitionContext'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch, tracePlayerMatchRating } from '../engine/rating'
 import { buildGlobalRankingData, rankGlobalRankingRows, seasonsFromMatches } from '../engine/stats'
-import { buildSeasonAnalytics, scopedMetricRanks } from '../engine/seasonAnalytics'
+import { scopedMetricRanks } from '../engine/seasonAnalytics'
 import { playerStreaks } from '../engine/seasonInsights'
 import { derivePlayerMilestones } from '../engine/news'
-import { playerTeamTitles } from '../engine/historyReadModels'
+import { PlayerCareerAwards } from '../components/PlayerCareerAwards'
 import { scopedPositionFamilyByPlayer } from '../engine/positionScope'
 import { positionFamily } from '../engine/positionScope'
 import { latestAppearanceTeamId } from '../engine/playerDetailScope'
@@ -99,13 +99,10 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
   </div>
 }
 
-function PlayerHighlights({ player, players, teams, matches, competitionStates, selectedSeason, competition, playerScopedMatches, onNavigate }: { player: Player; players: Player[]; teams: Team[]; matches: Match[]; competitionStates: CompetitionState[]; selectedSeason: string; competition: CompetitionType | 'all'; playerScopedMatches: Match[]; onNavigate: (view: View) => void }) {
-  const leagueAnalytics = useMemo(() => competition === 'all' || competition === 'league' ? buildSeasonAnalytics(teams, players, matches, selectedSeason) : undefined, [competition, teams, players, matches, selectedSeason])
-  const monthlyAwards = leagueAnalytics ? [...leagueAnalytics.monthlyAwards.values()].flatMap(award => [award.playerOfMonth?.playerId === player.id ? 'Player of the Month' : null, award.bestXI.some(slot => slot.playerId === player.id) ? 'Monthly Best XI' : null].filter((item): item is string => Boolean(item))) : []
-  const awards = [...monthlyAwards, ...playerTeamTitles(teams, players, matches, competitionStates, player.id, selectedSeason, competition)]
+function PlayerHighlights({ player, players, teams, matches, competitionStates, playerScopedMatches, onNavigate }: { player: Player; players: Player[]; teams: Team[]; matches: Match[]; competitionStates: CompetitionState[]; selectedSeason: string; competition: CompetitionType | 'all'; playerScopedMatches: Match[]; onNavigate: (view: View) => void }) {
   const scopedMatchIds = new Set(playerScopedMatches.map(match => match.id))
   const milestones = derivePlayerMilestones(player.id, players, teams, matches).filter(item => item.playerId === player.id && item.milestone && item.matchId && scopedMatchIds.has(item.matchId)).slice(0, 3)
-  return <><section className="mb-4 rounded-2xl bg-zinc-900 p-3"><div><h2 className="text-sm font-semibold">Awards {awards.length}</h2><p className="text-[10px] text-zinc-500">Season awards and titles in {selectedSeason}</p></div>{awards.length ? <div className="mt-2 space-y-1">{awards.slice().reverse().map((award, index) => <p key={`${award}:${index}`} className="rounded-lg bg-black/20 px-2 py-1.5 text-xs">{award}</p>)}</div> : <p className="mt-2 text-xs text-zinc-500">No completed awards or team titles yet.</p>}</section>
+  return <><PlayerCareerAwards playerId={player.id} players={players} teams={teams} matches={matches} states={competitionStates} />
     {milestones.length > 0 && <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Recent Milestones</h2><div className="mt-2 space-y-1">{milestones.map(item => <button key={item.id} type="button" onClick={() => item.matchId && onNavigate({ name: 'match', id: item.matchId })} className="block w-full rounded-lg bg-black/20 px-2 py-1.5 text-left text-xs">{item.title.replace(/^.*? · /, '')}</button>)}</div></section>}</>
 }
 

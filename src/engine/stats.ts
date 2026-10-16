@@ -362,7 +362,7 @@ export function buildGlobalRankingData(
       if (goalkeeper.appearances) goalkeeperRatings.push(rating)
       const window = pitchWindow(match, appearance)
       const isGoalkeeper = matchPositionSegments(match, appearance).some(segment => goalkeeperPosition(segment.position))
-      if (window && isGoalkeeper && goalkeeper.minutes >= 60) {
+      if (window && isGoalkeeper && goalkeeper.appearances) {
         qualifyingGoalkeeperMinutes += goalkeeper.minutes
         qualifyingGoalkeeperAppearances++
         qualifyingSaves += matchSaves
@@ -376,7 +376,7 @@ export function buildGlobalRankingData(
     const assists = playerMatches.reduce((sum, match) => { const appearance = match.appearances.find(item => item.playerId === player.id); return sum + (appearance ? playerAssistEvents(match, appearance).length : 0) }, 0)
     const minutes = ratingRows.reduce((sum, rating) => sum + rating.minutes, 0)
     const avgRating = ratingRows.reduce((sum, rating) => sum + rating.raw, 0) / ratingRows.length
-    const latest = newestMatches(playerMatches)[0]
+    const latest = newestMatches(playerMatches).find(match => ratingFor(match, player) !== null)
     const stats: PlayerSeasonStats = { playerId: player.id, teamId: player.teamId, season: 'All', matches: ratingRows.length, starts, subs, minutes, goals, assists, avgRating, mom: playerMatches.filter(match => momFor(match) === player.id).length, goodMatches: ratingRows.filter(rating => isGoodRating(rating.raw)).length, saves, wins, draws, losses, recentForm: recentForm.slice(-5).reverse(), ratings: ratingRows }
     const playedGoalkeeper = goalkeeperAppearances > 0
     const per90 = (value: number) => stats.minutes ? value / stats.minutes * 90 : 0

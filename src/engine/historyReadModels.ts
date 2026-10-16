@@ -1,7 +1,8 @@
+import { officialAwardsForSeason, officialSeasonModel } from './officialAwards'
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
 import { currentStaticTeams } from '../data/teams'
 import { competitionSeasonStatus } from './competition'
-import { awardsForCompetition, seasonAwards } from './awards'
+import type { awardsForCompetition, seasonAwards } from './awards'
 import { buildGlobalRankingData, rankGlobalRankingRows } from './stats'
 import { monthlyAwardForBlock, type MonthlyAwards } from './seasonAnalytics'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
@@ -29,12 +30,9 @@ export type HistoryAwards = {
 type TimelineCache = WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], Map<string, HistoryTimeline>>>>>
 type AwardsCache = WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], Map<string, HistoryAwards[]>>>>>
 type MonthlyCache = WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], Map<string, MonthlyAwards | undefined>>>>
-type TeamTitleReadModel = { championIds: Record<CompetitionType, string | undefined>; memberIdsByTeam: Map<string, Set<string>> }
-type TeamTitleCache = WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], Map<string, TeamTitleReadModel>>>>>
 let timelineCache: TimelineCache = new WeakMap()
 let awardsCache: AwardsCache = new WeakMap()
 let monthlyCache: MonthlyCache = new WeakMap()
-let teamTitleCache: TeamTitleCache = new WeakMap()
 const diagnostics = { timelineBuilds: 0, awardBuilds: 0, monthlyBuilds: 0 }
 
 function seasons(matches: Match[], states: CompetitionState[]) {
@@ -72,7 +70,7 @@ export function historyTimelineForSeason(teams: Team[], players: Player[], match
   const assister = rankGlobalRankingRows(rows, players, 'assists')[0]
   const mom = rankGlobalRankingRows(rows, players, 'mom')[0]
   const rating = rankGlobalRankingRows(rows, players, 'rating')[0]
-  const xi = seasonAwards(season, tournamentTeams, players, matches, states).bestXI.flatMap(slot => slot.playerId ? [slot.playerId] : [])
+  const xi = officialAwardsForSeason(teams, players, matches, states, season).filter(event => event.kind === 'season-xi').map(event => event.playerId)
   const result: HistoryTimeline = { season, league: status.league.championId, cup: status.cup.championId, champions: status.champions.championId, scorer: scorer ? { playerId: scorer.playerId, goals: scorer.goals } : undefined, assists: assister ? { playerId: assister.playerId, assists: assister.assists } : undefined, rating: rating ? { playerId: rating.playerId, avgRating: rating.avgRating } : undefined, mom: mom ? { playerId: mom.playerId, mom: mom.mom } : undefined, bestXI: xi }
   cached.set(key, result)
   return result
@@ -82,13 +80,12 @@ export function historyAwardsForSeason(teams: Team[], players: Player[], matches
   const cached = stateMap(awardsCache, matches, players, teams, states)
   const key = `${RATING_ENGINE_REVISION}:${season}:${scope}`; const current = cached.get(key); if (current) return current
   diagnostics.awardBuilds++
-  const tournamentTeams = currentStaticTeams(teams)
+  const model = officialSeasonModel(teams, players, matches, states, season)
   const types = scope === 'all' ? ['league', 'cup', 'champions'] as CompetitionType[] : [scope]
-  const seasonal = seasonAwards(season, tournamentTeams, players, matches, states)
   const result = types.map(competition => {
-    const award = awardsForCompetition(competition, season, tournamentTeams, players, matches, states)
+    const award = model.competitionAwards[competition]
     const published = award.complete ? award : undefined
-    return { season, competition, player: published?.mvp, goalkeeper: published?.goalkeeper, goldenGlove: competition === 'league' && seasonal.complete ? seasonal.goldenGlove : undefined }
+    return { season, competition, player: published?.mvp, goalkeeper: published?.goalkeeper, goldenGlove: undefined }
   })
   cached.set(key, result)
   return result
@@ -96,29 +93,8 @@ export function historyAwardsForSeason(teams: Team[], players: Player[], matches
 
 /** Historical team titles are derived from canonical champions plus recorded season membership. */
 export function playerTeamTitles(teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], playerId: string, season: string, scope: CompetitionType | 'all' = 'all'): string[] {
-  const cached = stateMap(teamTitleCache, matches, players, teams, states)
-  const key = `${RATING_ENGINE_REVISION}:${season}`
-  let model = cached.get(key)
-  if (!model) {
-    const tournamentTeams = currentStaticTeams(teams)
-    const draw = states.find(state => state.kind === 'champions-draw' && state.season === season)
-    const status = competitionSeasonStatus(tournamentTeams, matches, season, players, draw)
-    const memberIdsByTeam = new Map<string, Set<string>>()
-    for (const match of matches) {
-      if (match.season !== season) continue
-      for (const appearance of match.appearances) {
-        const members = memberIdsByTeam.get(appearance.teamId) ?? new Set<string>()
-        members.add(appearance.playerId); memberIdsByTeam.set(appearance.teamId, members)
-      }
-    }
-    model = { championIds: { league: status.league.championId, cup: status.cup.championId, champions: status.champions.championId }, memberIdsByTeam }
-    cached.set(key, model)
-  }
-  const label: Record<CompetitionType, string> = { league: 'League', cup: 'Cup', champions: 'Champions' }
-  return (scope === 'all' ? ['league', 'cup', 'champions'] as CompetitionType[] : [scope]).flatMap(type => {
-    const championId = model!.championIds[type]
-    return championId && model!.memberIdsByTeam.get(championId)?.has(playerId) ? [`${season} ${label[type]}`] : []
-  })
+  return officialAwardsForSeason(teams, players, matches, states, season).filter(event => event.playerId === playerId && event.category === 'championship' && (scope === 'all' || event.competition === scope)).map(event => `${season} ${event.competition === 'league' ? 'League' : event.competition === 'cup' ? 'Cup' : 'Champions'}`)
+
 }
 
 export function historyMonthlyAward(teams: Team[], players: Player[], matches: Match[], season: string, block: number) {
@@ -132,7 +108,7 @@ export function historyMonthlyAward(teams: Team[], players: Player[], matches: M
 }
 
 export function clearHistoryReadModelCache() {
-  timelineCache = new WeakMap(); awardsCache = new WeakMap(); monthlyCache = new WeakMap(); teamTitleCache = new WeakMap()
+  timelineCache = new WeakMap(); awardsCache = new WeakMap(); monthlyCache = new WeakMap()
   diagnostics.timelineBuilds = 0; diagnostics.awardBuilds = 0; diagnostics.monthlyBuilds = 0
 }
 

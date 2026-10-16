@@ -34,10 +34,11 @@ test('current-team identity cannot create a false historical title and incomplet
   assert.deepEqual(playerTeamTitles(teams, [player], [appearanceForOtherTeam], [draw], player.id, season), [])
 })
 
-test('Player Detail combines derived team titles with existing Awards and selected-season count', () => {
+test('Player Detail delegates career awards to the shared finalized model', () => {
   const detail = fs.readFileSync(require.resolve('../src/screens/PlayerDetailScreen.tsx'), 'utf8')
-  assert(detail.includes('playerTeamTitles'))
-  assert(detail.includes('const awards ='))
-  assert(detail.includes('Awards {awards.length}'))
+  assert(detail.includes('<PlayerCareerAwards'))
+  const career = fs.readFileSync(require.resolve('../src/components/PlayerCareerAwards.tsx'), 'utf8')
+  assert(career.includes('careerAwardEvents'))
+  assert(career.includes('Runner-up Finishes'))
   assert.equal(detail.includes('awards.slice(-3)'), false)
 })

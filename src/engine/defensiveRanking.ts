@@ -35,7 +35,7 @@ export function defensiveMatchFacts(match: Match, appearance: Appearance, goalke
   facts.defenderMinutes = defenderSegments.reduce((sum, segment) => sum + segment.exit - segment.enter, 0)
   facts.goalkeeperMinutes = goalkeeper.minutes
   facts.goalkeeperConceded = goalkeeper.conceded
-  if (facts.defenderMinutes >= 60) {
+  if (facts.defenderMinutes > 0) {
     facts.qualifyingDefenderMinutes = facts.defenderMinutes
     facts.sotAllowedAppearances = 1
     facts.sotAllowedTotal = defenderSegments.reduce((sum, segment) => sum + opponentSotExposureForPositionSegment(match, appearance, segment.position, segment.enter, segment.exit), 0)
@@ -140,5 +140,5 @@ export function defensiveRankingValue(metric: DefensiveRankingMetric, facts: Def
   if (metric === 'sotAllowed') return facts.sotAllowedAppearances && facts.qualifyingDefenderMinutes ? facts.sotAllowedTotal / facts.qualifyingDefenderMinutes * 90 : null
   const minutes = metric === 'defenderGaPer90' ? facts.defenderMinutes : facts.goalkeeperMinutes
   const conceded = metric === 'defenderGaPer90' ? facts.defenderConceded : facts.goalkeeperConceded
-  return minutes > 0 && facts.availableTeamMinutes > 0 && minutes >= facts.availableTeamMinutes * .3 ? conceded / minutes * 90 : null
+  return minutes > 0 ? conceded / minutes * 90 : null
 }

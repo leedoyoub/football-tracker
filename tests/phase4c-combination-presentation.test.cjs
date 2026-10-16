@@ -67,6 +67,6 @@ test('combination leaderboard values, Top 3 cap, and View All full rows remain s
   const preview = fs.readFileSync('src/screens/RecordsScreen.tsx', 'utf8')
   const full = fs.readFileSync('src/screens/RecordsLeaderboardScreen.tsx', 'utf8')
   assert.match(preview, /rows\.slice\(0, 3\)/)
-  assert.match(full, /group\.rows\.map/)
+  assert.match(full, /VirtualRankingList rows=\{group\.rows\}/)
   assert.match(full, /#\{row\.rank\}/)
 })

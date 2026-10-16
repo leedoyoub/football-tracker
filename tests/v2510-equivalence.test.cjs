@@ -1,3 +1,4 @@
+const { assertPolicyEquivalence } = require('./helpers/v2512-policy-comparison.cjs')
 require('./helpers/register-ts.cjs')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -21,7 +22,7 @@ const s = performanceFixture()
 function equal(file, fn, ...args) {
   const actual = current(file)[fn](...args)
   const original = before(file)[fn](...args)
-  assert.deepStrictEqual(actual, original, `${file}:${fn}`)
+  assertPolicyEquivalence(actual, original, file, fn)
 }
 
 test('realistic benchmark history is accepted by the unchanged durable-state validator', () => {

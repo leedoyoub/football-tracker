@@ -281,6 +281,8 @@ export interface ScreenStateByView {
     combinationPlayers?: 2 | 3 | 4
     combinationMetric?: 'starts' | 'minutes' | 'ppg'
     bestUnitId?: string
+    recordsMode?: 'performance' | 'awards'
+    awardMetricId?: string
     historyPanel: string | null
     historySeason: string | null
     historyBlock: number | null

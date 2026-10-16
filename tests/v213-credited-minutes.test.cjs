@@ -62,7 +62,7 @@ test('a stoppage-only substitute is a rated appearance, unlike an unused substit
   assert.equal(buildGlobalRankingData([p], [match], filters, 'goals/90')[0].value, 0)
 })
 
-test('historical global minutes, per-90 values, and the 60-minute qualifier use credited time', () => {
+test('historical global minutes, per-90 values, use credited time without a minimum', () => {
   const p = player('p')
   const first = game('first', [appearance(p)], [goal('g1', 94, { playerId: 'p' })])
   const second = game('second', [appearance(p, 'bench')], [sub(60, 'p'), goal('g2', 95, { assistPlayerId: 'p' })])
@@ -73,7 +73,7 @@ test('historical global minutes, per-90 values, and the 60-minute qualifier use 
   near(buildGlobalRankingData([p], [first, second], filters, 'g+a/90')[0].value, 1.5)
   const short = game('short', [appearance(p, 'bench')], [sub(35, 'p')])
   const shortRow = buildGlobalRankingData([p], [short], filters, 'sotAllowed')[0]
-  assert.equal(shortRow.minutes, 55); assert.equal(shortRow.sotAllowedAppearances, 0)
+  assert.equal(shortRow.minutes, 55); assert.equal(shortRow.sotAllowedAppearances, 1)
 })
 
 test('stoppage saves and concessions remain real events, but SOT shares cap at 90', () => {

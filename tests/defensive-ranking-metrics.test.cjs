@@ -19,16 +19,16 @@ test('shared ranking surfaces show defensive rates to two decimal places', () =>
   assert.equal(formatRankingMetricValue('goalkeeperGaPer90', 0.844), '0.84')
 })
 
-test('SOT Allowed/90 uses qualifying defender minutes, canonical manual exposure and position aliases', () => {
+test('SOT Allowed/90 uses all actual defender minutes, canonical manual exposure and position aliases', () => {
   const cb = player('cb', 'LCB'), wing = player('wing', 'LWB'), cdm = player('cdm', 'CDM'), keeper = player('gk', 'GK')
   const first = match('m1', 1, [appearance(cb, { minute: 30, position: 'CM' }), appearance(wing), appearance(cdm), appearance(keeper)], [], { halftimeOpponentSot: 2, fulltimeOpponentSot: 4 })
   const second = match('m2', 2, [appearance(cb, { minute: 60, position: 'CM' }), appearance(wing), appearance(cdm), appearance(keeper)], [], { halftimeOpponentSot: 2, fulltimeOpponentSot: 4 })
   const rows = rankGlobalRankingRows(buildGlobalRankingData([cb, wing, cdm, keeper], [first, second], filters, 'rating'), [cb, wing, cdm, keeper], 'sotAllowed')
   assert.deepEqual(rows.map(row => row.playerId).sort(), ['cb', 'wing'])
-  assert.equal(rows.find(row => row.playerId === 'cb').sotAllowedAppearances, 1)
-  assert(Math.abs(rows.find(row => row.playerId === 'cb').sotAllowedTotal - 8 / 3) < 1e-9)
+  assert.equal(rows.find(row => row.playerId === 'cb').sotAllowedAppearances, 2)
+  assert(Math.abs(rows.find(row => row.playerId === 'cb').sotAllowedTotal - 4) < 1e-9)
   assert(Math.abs(rows.find(row => row.playerId === 'cb').value - 4) < 1e-9)
-  assert.equal(defensiveMatchFacts(first, first.appearances[0]).qualifyingDefenderMinutes, 0)
+  assert.equal(defensiveMatchFacts(first, first.appearances[0]).qualifyingDefenderMinutes, 30)
   assert.equal(defensiveMatchFacts(second, second.appearances[0]).qualifyingDefenderMinutes, 60)
 })
 
@@ -44,7 +44,7 @@ test('defender and GK GA/90 use actual role at goal time and all credited minute
   assert.equal(rankGlobalRankingRows(rows, [cb, gk], 'goalkeeperGaPer90')[0].value, 3 / 180 * 90)
 })
 
-test('30 percent threshold includes equality and historical team opportunities without current roster fallback', () => {
+test('GA/90 has no participation threshold and retains historical team opportunities', () => {
   const cb = player('cb', 'CB', 'B')
   const a1 = match('a1', 1, [appearance({ ...cb, teamId: 'A' })])
   const a2 = match('a2', 2, [], [])
@@ -53,7 +53,7 @@ test('30 percent threshold includes equality and historical team opportunities w
   assert.equal(rows[0].availableTeamMinutes, 270)
   assert.equal(rankGlobalRankingRows(rows, [cb], 'defenderGaPer90').length, 1)
   assert.equal(teamOpportunityMinutes([a1, a2, a3], new Set(['A'])), 270)
-  assert.equal(defensiveRankingValue('defenderGaPer90', { ...rows[0], defenderMinutes: 80, availableTeamMinutes: 270 }), null)
+  assert.equal(defensiveRankingValue('defenderGaPer90', { ...rows[0], defenderMinutes: 80, availableTeamMinutes: 270 }), 0)
   assert.equal(defensiveRankingValue('defenderGaPer90', { ...rows[0], defenderMinutes: 81, availableTeamMinutes: 270 }), 0)
 })
 

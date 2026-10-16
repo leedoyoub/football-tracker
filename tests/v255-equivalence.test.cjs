@@ -1,3 +1,4 @@
+const { assertPolicyEquivalence } = require('./helpers/v2512-policy-comparison.cjs')
 require('./helpers/register-ts.cjs')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -37,7 +38,7 @@ function equal(file, fn, ...args) {
       return standings.seasonStandings([team], recent, season)[0]
     }).sort(standings.compareStandings).map((row, index) => ({ ...row, rank: index + 1 }))
     assert.deepStrictEqual(actualForm, expected, 'v2.5.8 Form matches the independent five-game baseline projection')
-  } else assert.deepStrictEqual(actual, original, `${file}:${fn}`)
+  } else assertPolicyEquivalence(actual, original, file, fn)
 }
 
 test('realistic benchmark history is accepted by the unchanged durable-state validator', () => {

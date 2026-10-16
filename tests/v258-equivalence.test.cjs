@@ -1,3 +1,4 @@
+const { assertPolicyEquivalence } = require('./helpers/v2512-policy-comparison.cjs')
 require('./helpers/register-ts.cjs')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -16,7 +17,7 @@ fs.symlinkSync(path.join(root, 'node_modules'), path.join(baseline, 'node_module
 after(() => fs.rmSync(baseline, { recursive: true, force: true }))
 const before = file => require(path.join(baseline, 'src', file))
 const current = file => require(path.join(root, 'src', file))
-function equal(file, name, ...args) { assert.deepStrictEqual(current(file)[name](...args), before(file)[name](...args), `${file}:${name}`) }
+function equal(file, name, ...args) { assertPolicyEquivalence(current(file)[name](...args), before(file)[name](...args), file, name) }
 const s = performanceFixture()
 
 test('v2.5.7 equivalence: every saved rating/MOM and team score/ownership remains exact', () => {

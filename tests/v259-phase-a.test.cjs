@@ -1,3 +1,4 @@
+const { leagueCopy } = require('./helpers/v2512-policy-comparison.cjs')
 require('./helpers/register-ts.cjs')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -144,11 +145,11 @@ test('Season Highlight monthly/review do not generate News and kind changes reta
   spy(require('../src/engine/news.ts'), 'majorNewsEvents', calls => {
     for (const kind of ['monthly', 'review']) {
       const p = { ...props, kind }
-      assert.equal(renderToStaticMarkup(h.render(p)), renderToStaticMarkup(harness('SeasonHighlightScreen', store, baseline).render(p)))
+      assert.equal(renderToStaticMarkup(h.render(p)), leagueCopy(renderToStaticMarkup(harness('SeasonHighlightScreen', store, baseline).render(p))))
       assert.equal(calls(), 0)
     }
     const p = { ...props, kind: 'news' }
-    assert.equal(renderToStaticMarkup(h.render(p)), renderToStaticMarkup(harness('SeasonHighlightScreen', store, baseline).render(p)))
+    assert.equal(renderToStaticMarkup(h.render(p)), leagueCopy(renderToStaticMarkup(harness('SeasonHighlightScreen', store, baseline).render(p))))
     assert.equal(calls(), 1)
   })
 })

@@ -162,6 +162,8 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
       combinationPlayers: [2, 3, 4].includes(saved.combinationPlayers as number) ? saved.combinationPlayers as typeof base.combinationPlayers : base.combinationPlayers,
       combinationMetric: ['starts', 'minutes', 'ppg'].includes(saved.combinationMetric as string) ? saved.combinationMetric as typeof base.combinationMetric : base.combinationMetric,
       bestUnitId: typeof saved.bestUnitId === 'string' && saved.bestUnitId.startsWith('best-unit:') ? saved.bestUnitId : base.bestUnitId,
+      recordsMode: saved.recordsMode === 'awards' ? 'awards' : 'performance',
+      awardMetricId: typeof saved.awardMetricId === 'string' && /^(awards-|history-)/.test(saved.awardMetricId) ? saved.awardMetricId : undefined,
       historyPanel: saved.historyPanel === 'timeline' || saved.historyPanel === 'awards' ? saved.historyPanel : null,
       historySeason: validSeason(saved.historySeason) ? saved.historySeason as string : null,
       historyBlock: Number.isInteger(saved.historyBlock) && (saved.historyBlock as number) >= 1 && (saved.historyBlock as number) <= 10 ? saved.historyBlock as number : null,

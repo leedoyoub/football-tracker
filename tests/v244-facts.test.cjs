@@ -319,7 +319,9 @@ test('Golden Glove counts a clean GK interval even when the player later concede
   const game = match('mixed-award', '2026-01-01', [row], [goal('opponent', 'X', 'B', 70)])
   const teams = [{ id: 'A', name: 'A' }, { id: 'B', name: 'B' }]
   assert.equal(derivePlayerScope(keeper, [keeper], [game]).cleanSheets, 1)
-  assert.equal(seasonAwards('Season 1', teams, [keeper], [game], []).goldenGlove.value, 1)
+  const award = require('../src/engine/awards.ts').awardsForCompetition('league', 'Season 1', teams, [keeper], [game], [], { league: { complete: false, standings: [] } })
+  assert.equal(award.goalkeeper.label, 'League Golden Glove')
+  assert.equal(award.goalkeeper.value, 1)
 })
 
 test('Match Changes contribution ordinals omit invalid legacy player goals', () => {
