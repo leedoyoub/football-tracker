@@ -107,7 +107,8 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
     const season = validSeason ? saved.season as string : null
     const competition = competitionTypes.includes(saved.competition as typeof competitionTypes[number]) ? saved.competition as typeof competitionTypes[number] : 'all'
     const scoped = state.matches.filter(match => (!season || match.season === season) && (competition === 'all' || matchCompetitionType(match) === competition))
-    const family = (scoped.every(match => Array.isArray(match.appearances)) ? scopedPositionFamilyByPlayer(state.players, scoped, {}).get(view.id) : undefined) ?? state.players.find(player => player.id === view.id)?.position
+    const player = state.players.find(player => player.id === view.id)
+    const family = (player && scoped.every(match => Array.isArray(match.appearances)) ? scopedPositionFamilyByPlayer([player], scoped, {}).get(view.id) : undefined) ?? player?.position
     const rankTrendMetric = rankTrendMetricOptions(family).find(option => option.value === saved.rankTrendMetric)?.value ?? 'rating'
     return { name: 'player', season, competition, rankTrendMetric }
   }

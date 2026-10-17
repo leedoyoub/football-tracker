@@ -115,7 +115,7 @@ test('Team Matches uses shared ResultCard, keeps scope/order, and sends the orig
   const h = componentHarness('src/screens/TeamDetailScreen.tsx', 'TeamDetailScreen')
   let state = { ...navigation.defaultScreenState({ name: 'team', id: 'B' }), tab: 'matches' }
   const opened = []
-  const render = () => h.render({ teamId: 'B', season: 'S1', screenState: state, onStateChange: value => { state = value }, onNavigate: view => opened.push(view), onBack() {} })
+  const render = () => require('./helpers/card-list-tree.cjs').expandCardLists(h.render({ teamId: 'B', season: 'S1', screenState: state, onStateChange: value => { state = value }, onNavigate: view => opened.push(view), onBack() {} }))
   let tree = render()
   const rows = nodes(tree, n => n.type?.name === 'ResultCard')
   assert.deepEqual(rows.map(n => [n.props.result.match.id, n.props.result.teamId, n.props.result.outcome]), [['cup', 'B', 'L'], ['league', 'B', 'L']])

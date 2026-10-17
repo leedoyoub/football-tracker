@@ -23,7 +23,7 @@ test('v2.2.9 canonical context parts provide full two-line Champions wording', (
 
 test('Team Detail match rows reuse the shared card with canonical metadata and a fixed right-side score', () => {
   const team = source('../src/screens/TeamDetailScreen.tsx')
-  const rows = team.slice(team.indexOf('{matchData.map'), team.indexOf('{!matchData.length'))
+  const rows = team.slice(team.indexOf('const renderResult'), team.indexOf('return <div className="px-4'))
   assert(rows.includes('<ResultCard') && rows.includes('showCompetition'))
   assert(rows.includes("name: 'match', id: result.match.id"))
   const card = source('../src/components/ResultCard.tsx')

@@ -168,22 +168,32 @@ export function goalPartnerships(players: Player[], matches: Match[], filter: An
 }
 
 export function onPitchStats(players: Player[], matches: Match[], filter: AnalyticsFilter): OnPitchStats[] {
-  return players.flatMap(player => {
-    const totals = new Map<string, OnPitchStats>()
-    for (const match of matches.filter(match => isScoped(match, filter))) for (const teamId of teamIds(match)) {
+  const known = new Set(players.map(player => player.id))
+  const totals = new Map<string, Map<string, OnPitchStats>>()
+  for (const match of matches) {
+    if (!isScoped(match, filter)) continue
+    for (const teamId of teamIds(match)) {
       if (filter.teamId && teamId !== filter.teamId) continue
-      const appearance = match.appearances.find(item => item.playerId === player.id && item.teamId === teamId)!
-      if (!appearance || !hasPitchAppearance(match, appearance)) continue
-      const intervals = teamIntervals(match, player.id, teamId)
-      const row = totals.get(teamId) ?? { playerId: player.id, teamId, minutes: 0, goalsFor: 0, goalsAgainst: 0, plusMinus: 0 }; row.minutes += minutes(intervals)
-      for (const event of match.events) if (event.type === 'goal' && isOnPitchAtEvent(match, appearance, event)) {
-        if (scoringTeam(event, match) === teamId) row.goalsFor++
-        else row.goalsAgainst++
+      const seen = new Set<string>()
+      for (const appearance of match.appearances) {
+        const id = appearance.playerId
+        if (appearance.teamId !== teamId || !known.has(id) || seen.has(id)) continue
+        seen.add(id)
+        if (!hasPitchAppearance(match, appearance)) continue
+        const byTeam = totals.get(id) ?? new Map<string, OnPitchStats>()
+        const row = byTeam.get(teamId) ?? { playerId: id, teamId, minutes: 0, goalsFor: 0, goalsAgainst: 0, plusMinus: 0 }
+        row.minutes += creditedPositionSegments(match, appearance).reduce((sum, segment) => sum + segment.exit - segment.enter, 0)
+        for (const event of match.events) if (event.type === 'goal' && isOnPitchAtEvent(match, appearance, event)) {
+          if (scoringTeam(event, match) === teamId) row.goalsFor++
+          else row.goalsAgainst++
+        }
+        row.plusMinus = row.goalsFor - row.goalsAgainst
+        byTeam.set(teamId, row); totals.set(id, byTeam)
       }
-      row.plusMinus = row.goalsFor - row.goalsAgainst; totals.set(teamId, row)
     }
-    return [...totals.values()]
-  })
+  }
+  // Public row order remains catalog order, then first-seen team order.
+  return players.flatMap(player => [...(totals.get(player.id)?.values() ?? [])].map(row => ({ ...row })))
 }
 
 export type PlayerChemistry = {

@@ -137,7 +137,7 @@ export type SeasonAward = { id: string; title: string; playerIds: string[]; deta
 export type SeasonRecap = { season: string; complete: boolean; matchDays: number; awards: SeasonAward[]; bestXI: ReturnType<typeof seasonAwards>['bestXI'] }
 export function isSeasonComplete(_matches: Match[], season: string, states: CompetitionState[] = []) { return states.some(state => state.kind === 'season-complete' && state.season === season) }
 
-export function seasonRecap(players: Player[], matches: Match[], season: string, states: CompetitionState[] = [], teams: Team[] = []): SeasonRecap {
+export function seasonRecap(players: Player[], matches: Match[], season: string, states: CompetitionState[] = [], teams: Team[] = [], xiLeaders?: StartingXILeaders): SeasonRecap {
   const stats = players.map(player => ({ player, stats: playerSeasonStats(player, players, matches, season) })).filter(row => row.stats.matches > 0)
   const pick = (rows: typeof stats, value: (row: typeof stats[number]) => number) => rows.slice().sort((a, b) => value(b) - value(a) || b.stats.minutes - a.stats.minutes)[0]
   const awardFor = (id: string, title: string, row: typeof stats[number] | undefined, detail: (row: typeof stats[number]) => string): SeasonAward | undefined => row && { id, title, playerIds: [row.player.id], detail: detail(row) }
@@ -145,8 +145,9 @@ export function seasonRecap(players: Player[], matches: Match[], season: string,
   const partnership = goalPartnerships(players, matches, filter)[0]
   const combination = (kind: Parameters<typeof combinationStats>[3]) => combinationStats(players, matches, filter, kind).find(row => row.eligible)
   const comboAward = (id: string, title: string, kind: Parameters<typeof combinationStats>[3], detail: (row: ReturnType<typeof combinationStats>[number]) => string): SeasonAward | undefined => { const row = combination(kind); return row ? { id, title, playerIds: row.playerIds, detail: detail(row) } : undefined }
-  const bestSub = pick(stats.filter(row => starterSubstituteSplits(row.player, matches, filter).substitute.apps >= 3), row => starterSubstituteSplits(row.player, matches, filter).substitute.averageRating)
-  const xi = startingXILeaders(players, matches, season).mostUsed
+  const splits = new Map(stats.map(row => [row.player.id, starterSubstituteSplits(row.player, matches, filter)]))
+  const bestSub = pick(stats.filter(row => splits.get(row.player.id)!.substitute.apps >= 3), row => splits.get(row.player.id)!.substitute.averageRating)
+  const xi = (xiLeaders ?? startingXILeaders(players, matches, season)).mostUsed
   const official = seasonAwards(season, teams, players, matches, states)
   const bestXI = official.bestXI
   const officialAward = (id: string, title: string, winner: { playerId: string; value: number } | undefined, detail: (value: number) => string): SeasonAward | undefined => winner && { id, title, playerIds: [winner.playerId], detail: detail(winner.value) }
@@ -162,7 +163,7 @@ export function seasonRecap(players: Player[], matches: Match[], season: string,
     comboAward('midfield', 'Best Midfield Trio', 'midfield', row => `${row.averageRating.toFixed(2)} average rating`),
     comboAward('cb', 'Best CB Pair', 'cb', row => `${(row.goalsAgainst / row.togetherMinutes * 90).toFixed(2)} GA/90`),
     comboAward('back-four', 'Best Back Four', 'backFour', row => `${row.cleanSheets} clean sheets`),
-    awardFor('substitute', 'Best Substitute', bestSub, row => `${starterSubstituteSplits(row.player, matches, filter).substitute.averageRating.toFixed(2)} as a substitute`),
+    awardFor('substitute', 'Best Substitute', bestSub, row => `${splits.get(row.player.id)!.substitute.averageRating.toFixed(2)} as a substitute`),
     xi && { id: 'most-used-xi', title: 'Most Used XI', playerIds: xi.playerIds, detail: `${xi.matches} matches · ${(xi.winRate * 100).toFixed(0)}% wins` },
   ].filter((award): award is SeasonAward => Boolean(award))
   return { season, complete: isSeasonComplete(matches, season, states), matchDays: new Set(matches.filter(match => match.season === season && matchCompetitionType(match) === 'league').map(match => competitionIdentityForMatch(match).matchDay)).size, awards, bestXI }

@@ -25,7 +25,9 @@ function screenHarness(root, file, name, store, overrides = {}) {
     return [hooks[i], next => { const value = typeof next === 'function' ? next(hooks[i]) : next; if (!Object.is(value, hooks[i])) stateChanges++; hooks[i] = value }]
   }, useEffect: fn => { effects.push(fn) }, useLayoutEffect: fn => { effects.push(fn) } }
   const filename = path.join(root, 'src', file)
-  const compiled = new Module(filename, module)
+  // A parent would retain every temporary module (and its fixture Store) in
+  // module.children, contaminating repeated cold benchmarks with retained data.
+  const compiled = new Module(filename)
   compiled.filename = filename; compiled.paths = Module._nodeModulePaths(path.dirname(filename))
   const original = compiled.require.bind(compiled)
   compiled.require = request => request === 'react' ? react : request === '../store' ? { useStore: () => store } : request in overrides ? overrides[request] : original(request)
@@ -50,7 +52,7 @@ function nodes(node, predicate) {
 }
 function sourceModule(root, file, overrides = {}) {
   const filename = path.join(root, 'src', file)
-  const compiled = new Module(filename, module)
+  const compiled = new Module(filename)
   compiled.filename = filename; compiled.paths = Module._nodeModulePaths(path.dirname(filename))
   const original = compiled.require.bind(compiled)
   compiled.require = request => request in overrides ? overrides[request] : original(request)

@@ -31,7 +31,15 @@ for (const season of ['Season 1', 'Season 2']) for (const scope of ['all', 'leag
 })
 test('timeline, competition rules, constants and durable data remain source identical to v2.5.10', () => {
   for (const file of ['engine/constants.ts', 'engine/timeline.ts', 'engine/seasonAnalytics.ts', 'engine/competition.ts', 'engine/kickoffLineup.ts', 'lib/repository.ts', 'lib/validation.ts', 'lib/rankingMetrics.ts', 'store.tsx']) {
-    const normalize = filename => fs.readFileSync(filename, 'utf8').replaceAll('\r\n', '\n')
+    // v2.5.14 adds a latest-only projection and optional resolved models to the
+    // Team Detail read model. Keep the canonical history/tournament engines
+    // byte-identical; new read-model output is deep-compared in v2514-team.
+    const normalize = filename => {
+      let source = fs.readFileSync(filename, 'utf8').replaceAll('\r\n', '\n')
+      if (file === 'engine/seasonAnalytics.ts') source = source.replace(/\/\*\* Team Detail needs only day N versus day N-1[\s\S]*?(?=export function buildSeasonAnalytics)/, '')
+      if (file === 'engine/competition.ts') source = source.split('/** Canonical compact competition data shared by Team Detail consumers. */')[0]
+      return source
+    }
     assert.equal(normalize(path.join(baseline.root, 'src', file)), normalize(path.join(baseline.directory, 'src', file)), file)
   }
   // REV13 calculation and all its role/goal/save helpers precede rateMatch.

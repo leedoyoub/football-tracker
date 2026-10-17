@@ -123,6 +123,34 @@ export function playerSeasonStats(
   return aggregatePlayerStats(player, allPlayers, seasonMatches)
 }
 
+/** Team Players' four displayed facts, using the same first-appearance/event/rating
+ * rules as playerSeasonStats, but selecting the match scope only once. */
+export function teamPlayerSeasonStats(players: Player[], matches: Match[], season: string, teamId: string, competitionType?: CompetitionType) {
+  type Facts = { goals: number; assists: number; avgRating: number; matches: number }
+  const byId = new Map(players.map(player => [player.id, player]))
+  const totals = new Map<string, Facts & { ratingTotal: number }>()
+  for (const match of oldestMatches(matches.filter(match => match.season === season && (!competitionType || matchCompetitionType(match) === competitionType)))) {
+    const first = new Map<string, Match['appearances'][number]>()
+    const eligible = new Set<string>()
+    for (const appearance of match.appearances) {
+      if (!first.has(appearance.playerId)) first.set(appearance.playerId, appearance)
+      if (appearance.teamId === teamId) eligible.add(appearance.playerId)
+    }
+    for (const id of eligible) {
+      const player = byId.get(id)
+      if (!player) continue
+      const appearance = first.get(id)!
+      const row = totals.get(id) ?? { goals: 0, assists: 0, avgRating: 0, matches: 0, ratingTotal: 0 }
+      row.goals += playerGoalEvents(match, appearance).length
+      row.assists += playerAssistEvents(match, appearance).length
+      const rating = ratePlayerMatch(match, player)
+      if (rating) { row.matches++; row.ratingTotal += rating.raw }
+      totals.set(id, row)
+    }
+  }
+  return new Map<string, Facts>([...totals].map(([id, row]) => [id, { goals: row.goals, assists: row.assists, matches: row.matches, avgRating: row.matches ? row.ratingTotal / row.matches : 0 }]))
+}
+
 export function teamSeasonStats(
   teamId: string,
   matches: Match[],

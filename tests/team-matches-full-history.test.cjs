@@ -36,7 +36,7 @@ function renderTeam(competition = 'all', season = 'S1', tab = 'matches') {
     screenState: { ...navigation.defaultScreenState({ name: 'team', id: 'A' }), tab, matchesCompetition: competition },
     onStateChange() {}, onNavigate() {}, onBack() {},
   })
-  const cards = node => Array.isArray(node) ? node.flatMap(cards) : node && typeof node === 'object' ? [...(node.type?.name === 'ResultCard' ? [node] : []), ...cards(node.props?.children)] : []
+  const cards = node => Array.isArray(node) ? node.flatMap(cards) : node && typeof node === 'object' ? [...(node.type?.name === 'ResultCard' ? [node] : []), ...(node.type?.name === 'VirtualCardList' ? node.props.rows.flatMap((row, index) => cards(node.props.renderRow(row, index))) : []), ...cards(node.props?.children)] : []
   return { html: renderToStaticMarkup(tree), matchIds: cards(tree).map(card => card.props.result.match.id) }
 }
 

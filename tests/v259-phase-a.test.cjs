@@ -136,7 +136,15 @@ test('Team Overview uses only light League history with exact baseline rank/move
   const p = { ...props, teamId: id, screenState: navigation.defaultScreenState({ name: 'team', id }) }
   const expected = renderToStaticMarkup(harness('TeamDetailScreen', store, baseline).render(p))
   spy(require('../src/engine/seasonAnalytics.ts'), 'buildSeasonAnalytics', calls => {
-    assert.equal(renderToStaticMarkup(harness('TeamDetailScreen', store).render(p)), expected)
+    const actual = renderToStaticMarkup(harness('TeamDetailScreen', store).render(p))
+    // Only the v2.5.14 progress presentation changed. Rejoin its explicit lines
+    // to compare every original value and all unrelated markup exactly.
+    const originalProgress = html => html.replace(/<div class="text-sm font-black \[overflow-wrap:normal\]">((?:<span class="block">.*?<\/span>)+)<\/div>/g, (_, content) => {
+      const lines = [...content.matchAll(/<span class="block">(.*?)<\/span>/g)].map(match => match[1])
+      const status = lines.length === 1 ? lines[0] : lines[1] === 'Eliminated' ? `Eliminated · ${lines[0]}` : `${lines[0]} (${lines[1]})`
+      return `<div class="truncate text-sm font-black">${status}</div>`
+    })
+    assert.equal(originalProgress(actual), expected)
     assert.equal(calls(), 0)
   })
 })
@@ -150,7 +158,7 @@ test('Season Highlight monthly/review do not generate News and kind changes reta
       assert.equal(calls(), 0)
     }
     const p = { ...props, kind: 'news' }
-    assert.equal(renderToStaticMarkup(h.render(p)), leagueCopy(renderToStaticMarkup(harness('SeasonHighlightScreen', store, baseline).render(p))))
+    assert.equal(renderToStaticMarkup(expandCardLists(h.render(p))), leagueCopy(renderToStaticMarkup(harness('SeasonHighlightScreen', store, baseline).render(p))))
     assert.equal(calls(), 1)
   })
 })

@@ -17,7 +17,7 @@ const series = (teamIds, stage, required = 3) => teamIds.flatMap(([left, right],
 
 test('v2.1.9 Team Detail summary uses canonical League data in the required order', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/TeamDetailScreen.tsx'), 'utf8')
-  assert(source.includes('teamCompetitionOverview(teamId, teams, matches, activeSeason, players, competitionStates)'))
+  assert(source.includes('teamCompetitionOverview(teamId, teams, matches, activeSeason, players, competitionStates, { league, cup, champions })'))
   assert(source.includes("['Rank'"))
   assert(source.indexOf("['Rank'") < source.indexOf("['W-D-L'") && source.indexOf("['W-D-L'") < source.indexOf("['GF-GA'") && source.indexOf("['GF-GA'") < source.indexOf("['Pts'"))
   assert(!source.includes("['Matches', recent.length]"))
@@ -66,8 +66,8 @@ test('Home keeps stable source arrays for ranking and reuses News for immutable 
 })
 
 test('v2.2.1 version is consistent and rating revision advances once', () => {
-  assert.equal(APP_VERSION, '2.5.13')
-  assert.equal(require('../package.json').version, '2.5.13')
-  assert.equal(require('../package-lock.json').version, '2.5.13')
+  assert.equal(APP_VERSION, '2.5.14')
+  assert.equal(require('../package.json').version, '2.5.14')
+  assert.equal(require('../package-lock.json').version, '2.5.14')
   assert.equal(RATING_ENGINE_REVISION, 13)
 })

@@ -1,0 +1,111 @@
+{
+  "baseSha": "8bbc388a43cda8b6527fbd4215e2ac18036bcd6c",
+  "method": "Selected final revalidation and unchanged broad-matrix paths, as disclosed in release document",
+  "rows": [
+    {
+      "label": "Team Detail Overview",
+      "before": 698.3489999999983,
+      "after": 347.21999999999935,
+      "note": "Data-cache cold hook CPU",
+      "source": "final revalidation"
+    },
+    {
+      "label": "Team Detail Players",
+      "before": 131.7496000000101,
+      "after": 131.2219999999943,
+      "note": "Cold difference is noise; warm remount improves below",
+      "source": "matrix"
+    },
+    {
+      "label": "Team Detail Matches",
+      "before": 115.93050000000221,
+      "after": 1.9808999999986554,
+      "note": "Short original DOM; long SSR separately below",
+      "source": "final revalidation"
+    },
+    {
+      "label": "Match Changes",
+      "before": 988.9414999999863,
+      "after": 862.4174999999814,
+      "note": "Entire index, including all IDs/order",
+      "source": "matrix"
+    },
+    {
+      "label": "Season Recap (locked)",
+      "before": 2825.411899999992,
+      "after": 0.13860000000568107,
+      "note": "Locked UI does no heavy work",
+      "source": "matrix"
+    },
+    {
+      "label": "Player Comparison",
+      "before": 7.481999999999971,
+      "after": 1.1150999999990745,
+      "note": "SSR; cold hook CPU has no established gain",
+      "source": "final revalidation"
+    },
+    {
+      "label": "Chemistry",
+      "before": 368.4933000000001,
+      "after": 64.72389999998268,
+      "note": "Canonical on-pitch calculation",
+      "source": "matrix"
+    },
+    {
+      "label": "Records Combination",
+      "before": 271.6152000000002,
+      "after": 273.5291000000143,
+      "note": "Requested attack 2/3/4 units; unchanged",
+      "source": "matrix"
+    },
+    {
+      "label": "Home Latest Changes",
+      "before": 3275.9530999999843,
+      "after": 3249.638099999982,
+      "note": "Cold event engine unchanged; no improvement claim",
+      "source": "matrix"
+    },
+    {
+      "label": "Season Highlight News",
+      "before": 2.0929999999934807,
+      "after": 0.7415000000037253,
+      "note": "SSR; cold event generation unchanged",
+      "source": "matrix"
+    },
+    {
+      "label": "Startup Player restore",
+      "before": 53.178899999998976,
+      "after": 2.7269000000087544,
+      "note": "Restored role scope only",
+      "source": "matrix"
+    },
+    {
+      "label": "League History",
+      "before": 525.8777999999875,
+      "after": 512.3908999999985,
+      "note": "Unchanged full History; no improvement claim",
+      "source": "matrix"
+    },
+    {
+      "label": "Latest Changes list",
+      "before": 14.643500000005588,
+      "after": 1.6634999999951106,
+      "note": "SSR, unchanged event generation",
+      "source": "matrix"
+    },
+    {
+      "label": "Team Matches >40",
+      "before": 4.425900000002002,
+      "after": 1.0865999999987253,
+      "note": "SSR for 72 cards, same renderer",
+      "source": "matrix"
+    },
+    {
+      "label": "Season Recap (complete)",
+      "before": 2758.0733,
+      "after": 2721.1128000000026,
+      "note": "No established cold improvement",
+      "source": "matrix"
+    }
+  ]
+}

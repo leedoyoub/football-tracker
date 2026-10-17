@@ -14,11 +14,11 @@ export function rankingWindow(count: number, rowHeight: number, offset: number, 
 }
 
 /** Observe the existing app scroll surface; there is no nested scroll container. */
-export function observeRankingViewport(list: HTMLElement, count: number, onWindow: (range: RankingWindow) => void) {
-  const viewport = list.closest<HTMLElement>('.app-content')
+export function observeRankingViewport(list: HTMLElement, count: number, onWindow: (range: RankingWindow) => void, options?: { viewport: HTMLElement; rowHeight: number }) {
+  const viewport = options?.viewport ?? list.closest<HTMLElement>('.app-content')
   if (!viewport) return () => {}
   let frame: number | undefined
-  let rowHeight = RANKING_ROW_ESTIMATE
+  let rowHeight = options?.rowHeight ?? RANKING_ROW_ESTIMATE
   const read = () => {
     frame = undefined
     const offset = viewport.getBoundingClientRect().top + viewport.clientTop - list.getBoundingClientRect().top

@@ -644,10 +644,10 @@ function teamCompetitionRecord(teamId: string, teams: Team[], matches: Match[], 
 }
 
 /** Canonical compact competition data shared by Team Detail consumers. */
-export function teamCompetitionOverview(teamId: string, teams: Team[], matches: Match[], season: string, players: Player[], states: CompetitionState[] = []): TeamCompetitionOverview {
+export function teamCompetitionOverview(teamId: string, teams: Team[], matches: Match[], season: string, players: Player[], states: CompetitionState[] = [], models?: { league: ReturnType<typeof leagueCompetition>; cup: ReturnType<typeof cupCompetition>; champions: ReturnType<typeof championsCompetition> }): TeamCompetitionOverview {
   const draw = states.find(state => state.id === `champions:${season}` && state.kind === 'champions-draw')
-  const league = leagueCompetition(teams, matches, season, players).standings.find(row => row.teamId === teamId) ?? emptyStanding(teamId)
-  const cup = cupCompetition(teams, matches, season, players)
+  const league = (models?.league ?? leagueCompetition(teams, matches, season, players)).standings.find(row => row.teamId === teamId) ?? emptyStanding(teamId)
+  const cup = models?.cup ?? cupCompetition(teams, matches, season, players)
   const cupGoals = teamCompetitionGoals(teamId, matches, season, 'cup')
   const cupRecord = teamCompetitionRecord(teamId, teams, matches, season, 'cup')
   const cupPlayed = competitionMatches(matches, season, 'cup').some(match => hasPlayed(match, teamId))
@@ -655,7 +655,7 @@ export function teamCompetitionOverview(teamId: string, teams: Team[], matches: 
     : cup.eliminatedAtByTeam[teamId] ? `Eliminated · Stage ${cup.eliminatedAtByTeam[teamId]}`
       : cupPlayed ? cupStageLabel(cup.stage) : 'Not Started'
 
-  const champions = championsCompetition(draw, matches, season, players)
+  const champions = models?.champions ?? championsCompetition(draw, matches, season, players)
   const championsGoals = teamCompetitionGoals(teamId, matches, season, 'champions')
   const championsRecord = teamCompetitionRecord(teamId, teams, matches, season, 'champions')
   let championsStatus = 'Not Started'

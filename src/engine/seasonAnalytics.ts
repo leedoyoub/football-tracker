@@ -252,6 +252,27 @@ export function buildLeagueHistory(teams: Team[], players: Player[], matches: Ma
   return result
 }
 
+/** Team Detail needs only day N versus day N-1. Reuse full History if already built. */
+const latestStandingsCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], Map<string, RankedStanding[]>>>>()
+export function latestLeagueStandings(teams: Team[], players: Player[], matches: Match[], season: string): RankedStanding[] {
+  const key = `${RATING_ENGINE_REVISION}:${season}`
+  const existing = historyCache.get(matches)?.get(players)?.get(teams)?.get(key)
+  if (existing) return existing.leagueSnapshots.get(existing.currentMatchDay)?.standings ?? []
+  let byPlayers = latestStandingsCache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); latestStandingsCache.set(matches, byPlayers) }
+  let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
+  let bySeason = byTeams.get(teams); if (!bySeason) { bySeason = new Map(); byTeams.set(teams, bySeason) }
+  const cached = bySeason.get(key); if (cached) return cached
+  const games = competitionMatches(matches, season, 'league')
+  const day = Math.max(0, ...games.map(leagueDay).filter(value => Number.isInteger(value) && value >= 1 && value <= LEAGUE_MATCHES_PER_TEAM))
+  if (!day) return []
+  const current = leagueCompetition(teams, games.filter(match => leagueDay(match) <= day), season, players).standings
+  const previous = day > 1 ? leagueCompetition(teams, games.filter(match => leagueDay(match) <= day - 1), season, players).standings : undefined
+  const result = standingsWithMovement(current, previous)
+  if (bySeason.size >= 32) bySeason.delete(bySeason.keys().next().value!)
+  bySeason.set(key, result)
+  return result
+}
+
 export function buildSeasonAnalytics(teams: Team[], players: Player[], matches: Match[], season: string): SeasonAnalytics {
   let byPlayers = cache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); cache.set(matches, byPlayers) }
   let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }

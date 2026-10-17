@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { onPitchStats } from '../engine/analytics'
 import { matchScore } from '../engine/rating'
 import { derivePlayerScope } from '../engine/playerDerived'
@@ -14,6 +14,8 @@ import { playerFullName } from '../components/ui'
 import { useStore } from '../store'
 import { currentMembershipPresentation } from '../lib/currentMembershipPresentation'
 import type { CompetitionType, Match, Player, ScreenStateByView, View } from '../types'
+
+import { observeRankingViewport, rankingWindow } from '../lib/rankingWindow'
 
 type Direction = 'higher' | 'lower' | 'neutral'
 type Summary = { rating: number; last5: number; goals: number; assists: number; combined: number; minutes: number; mom: number; goodMatches: number; streak: string; streakValue: number; overallRank: number | null; positionRank: number | null; teamRank: number | null; starts: number; subs: number; goals90: number; assists90: number; combined90: number; plusMinus: number; wins: number; draws: number; losses: number }
@@ -40,7 +42,11 @@ export function ComparisonScreen({ season, screenState, onStateChange, onNavigat
   const scoped = useMemo(() => matches.filter(match => match.season === season && (competition === 'all' || matchCompetitionType(match) === competition)), [matches, season, competition])
   const representative = useMemo(() => scopedPositionFamilyByPlayer(players, scoped, { teams: teamId ? [teamId] : [], fallback: 'none' }), [players, scoped, teamId])
   const rankingIndex = useMemo(() => buildGlobalRankingData(players, scoped, { seasons: [season], teams: teamId ? [teamId] : [], positions: [] }, 'rating'), [players, scoped, season, teamId]); const ranking = useMemo(() => rankGlobalRankingRows(rankingIndex, players, 'rating'), [rankingIndex, players])
-  const summaries = useMemo(() => new Map([left, right].filter((player): player is Player => Boolean(player)).map(player => [player.id, summary(player, players, scoped, filter, ranking)])), [left, right, players, scoped, filter, ranking])
+  const rankFamilies = useMemo(() => scopedPositionFamilyByPlayer(players, scoped, { teams: teamId ? [teamId] : [] }), [players, scoped, teamId])
+  const summaries = useMemo(() => {
+    const teamRankings = new Map<string, ReturnType<typeof rankGlobalRankingRows>>()
+    return new Map([left, right].filter((player): player is Player => Boolean(player)).map(player => [player.id, summary(player, players, scoped, filter, ranking, rankFamilies, teamRankings)]))
+  }, [left, right, players, scoped, filter, ranking, rankFamilies])
   const chooseLeft = (id: string) => patchState({ leftId: id, ...(id && id === rightId ? { rightId: '' } : {}) })
   const chooseRight = (id: string) => patchState({ rightId: id, ...(id && id === leftId ? { leftId: '' } : {}) })
   return <div className="px-4 pb-8 pt-6"><button type="button" onClick={() => onNavigate({ name: 'competition', season, competitionType: competition === 'all' ? 'league' : competition })} className="mb-3 text-xs font-semibold text-emerald-400">Rankings</button><h1 className="text-2xl font-semibold">Player Comparison</h1><p className="mb-4 text-xs text-zinc-400">{season} · values are visually emphasized only where the metric has a meaningful direction</p><div className="mb-3 grid grid-cols-2 gap-2"><CompactFilterMenu value={competition} options={[{ value: 'all', label: 'All competitions' }, { value: 'league', label: 'League' }, { value: 'cup', label: 'Cup' }, { value: 'champions', label: 'Champions' }]} onChange={value => setCompetition(value as CompetitionType | 'all')} label="Comparison competition filter" allValue="all" allLabel="All competitions" allAccessibilityLabel="All competitions" /><TeamFilter value={teamId || null} teams={teams} onChange={value => setTeamId(value ?? '')} label="Comparison team filter" /></div><div className="mb-4 grid grid-cols-2 gap-2"><PlayerSelect label="Left player" value={leftId} players={players} teams={teams} representative={representative} excludedId={rightId} onChange={chooseLeft} /><PlayerSelect label="Right player" value={rightId} players={players} teams={teams} representative={representative} excludedId={leftId} onChange={chooseRight} /></div><div className="overflow-hidden rounded-xl bg-zinc-900"><div className="grid grid-cols-[1fr_auto_1fr] gap-2 border-b border-white/10 px-3 py-3 text-center text-xs font-bold"><span className="truncate">{left ? playerFullName(left) : 'Select player'}</span><span className="text-zinc-600">vs</span><span className="truncate">{right ? playerFullName(right) : 'Select player'}</span></div>{METRICS.map(metric => { const leftSummary = left ? summaries.get(left.id) : undefined; const rightSummary = right ? summaries.get(right.id) : undefined; const leftValue = leftSummary ? metric.value(leftSummary) : null; const rightValue = rightSummary ? metric.value(rightSummary) : null; return <div key={metric.label} className="grid grid-cols-[1fr_auto_1fr] gap-2 border-b border-white/[.06] px-3 py-2 text-center text-xs last:border-0"><ComparisonValue metric={metric} value={leftValue} other={rightValue} text={leftSummary ? metric.display(leftValue, leftSummary) : '—'} /><span className="text-zinc-500">{metric.label}</span><ComparisonValue metric={metric} value={rightValue} other={leftValue} text={rightSummary ? metric.display(rightValue, rightSummary) : '—'} /></div>})}</div></div>
@@ -51,10 +57,19 @@ function PlayerSelect({ label, value, players, teams, representative, excludedId
   const normalize = (text: string) => text.toLocaleLowerCase().replace(/\s+/g, '')
   const needle = normalize(query)
   const candidates = useMemo(() => players.filter(player => player.id !== excludedId && (!needle || normalize(`${playerFullName(player)} ${player.displayName ?? ''}`).includes(needle))), [players, excludedId, needle])
+  const viewport = useRef<HTMLDivElement>(null), list = useRef<HTMLDivElement>(null)
+  const [range, setRange] = useState(() => rankingWindow(candidates.length, 42, 0, 128))
+  const virtual = candidates.length > 40
+  useLayoutEffect(() => {
+    if (!virtual || !list.current || !viewport.current) return
+    return observeRankingViewport(list.current, candidates.length, next => setRange(previous => previous.start === next.start && previous.end === next.end && previous.rowHeight === next.rowHeight ? previous : next), { viewport: viewport.current, rowHeight: 42 })
+  }, [candidates, virtual])
+  const start = virtual ? Math.min(range.start, Math.max(0, candidates.length - 1)) : 0
+  const end = virtual ? Math.min(candidates.length, Math.max(start + 1, range.end)) : candidates.length
   const teamName = (player: Player) => currentMembershipPresentation(player, [], teams).label
-  return <section aria-label={label} className="rounded-xl bg-zinc-900 p-2"><label className="block text-[10px] text-zinc-400">{label}<input aria-label={`${label} search`} value={query} onChange={event => setQuery(event.target.value)} placeholder="Search player" className="mt-1 w-full rounded-lg bg-black/30 px-2 py-1.5 text-xs text-white" /></label><div className="mt-1 max-h-32 overflow-y-auto">{value && <button type="button" onClick={() => onChange('')} className="w-full rounded-lg px-1 py-1 text-left text-[10px] text-zinc-400">Clear selection</button>}{candidates.map(player => <button key={player.id} type="button" onClick={() => onChange(player.id)} className={`block w-full rounded-lg px-1 py-1.5 text-left ${player.id === value ? 'bg-emerald-500/15' : ''}`}><b className="block truncate text-xs">{playerFullName(player)}</b><span className="block truncate text-[10px] text-zinc-400">{teamName(player)} · {representative.get(player.id) ?? player.position}</span></button>)}{!candidates.length && <p className="px-1 py-2 text-[10px] text-zinc-500">No matching player.</p>}</div></section>
+  return <section aria-label={label} className="rounded-xl bg-zinc-900 p-2"><label className="block text-[10px] text-zinc-400">{label}<input aria-label={`${label} search`} value={query} onChange={event => setQuery(event.target.value)} placeholder="Search player" className="mt-1 w-full rounded-lg bg-black/30 px-2 py-1.5 text-xs text-white" /></label><div ref={viewport} className="mt-1 max-h-32 overflow-y-auto">{value && <button type="button" onClick={() => onChange('')} className="w-full rounded-lg px-1 py-1 text-left text-[10px] text-zinc-400">Clear selection</button>}<div ref={list} style={{ overflowAnchor: 'none' }}>{virtual && <div aria-hidden="true" style={{ height: start * range.rowHeight }} />}{candidates.slice(start, end).map(player => <button key={player.id} data-virtual-row={player.id} type="button" onClick={() => onChange(player.id)} className={`block w-full rounded-lg px-1 py-1.5 text-left ${player.id === value ? 'bg-emerald-500/15' : ''}`}><b className="block truncate text-xs">{playerFullName(player)}</b><span className="block truncate text-[10px] text-zinc-400">{teamName(player)} · {representative.get(player.id) ?? player.position}</span></button>)}{virtual && <div aria-hidden="true" style={{ height: (candidates.length - end) * range.rowHeight }} />}</div>{!candidates.length && <p className="px-1 py-2 text-[10px] text-zinc-500">No matching player.</p>}</div></section>
 }
-function summary(player: Player, allPlayers: Player[], matches: Match[], filter: { season: string; competition: CompetitionType | 'all'; teamId?: string }, ranking: ReturnType<typeof rankGlobalRankingRows>): Summary {
+function summary(player: Player, allPlayers: Player[], matches: Match[], filter: { season: string; competition: CompetitionType | 'all'; teamId?: string }, ranking: ReturnType<typeof rankGlobalRankingRows>, families: Map<string, string>, teamRankings: Map<string, ReturnType<typeof rankGlobalRankingRows>>): Summary {
   const data = derivePlayerScope(player, allPlayers, matches, { season: filter.season, competition: filter.competition, teamIds: filter.teamId ? [filter.teamId] : undefined })
   const scoped = data.appearances.map(row => row.match)
   const onPitch = onPitchStats([player], scoped, filter).reduce((total, row) => total + row.plusMinus, 0)
@@ -68,12 +83,15 @@ function summary(player: Player, allPlayers: Player[], matches: Match[], filter:
   const recent = data.appearances.slice(-5)
   const last5 = recent.length ? recent.reduce((sum, row) => sum + row.rating.raw, 0) / recent.length : 0
   const active = playerStreaks(player, scoped).filter(row => row.current > 1).sort((a, b) => b.current - a.current)[0]
-  const families = scopedPositionFamilyByPlayer(allPlayers, matches, { teams: filter.teamId ? [filter.teamId] : [] })
   const ranks = scopedMetricRanks(ranking, allPlayers, player.id, families)
   const historicalTeamId = filter.teamId ?? data.appearances[data.appearances.length - 1]?.appearance.teamId
-  const teamRanking = historicalTeamId && !filter.teamId
-    ? rankGlobalRankingRows(buildGlobalRankingData(allPlayers, matches, { seasons: [filter.season], teams: [historicalTeamId], positions: [] }, 'rating'), allPlayers, 'rating')
-    : ranking
+  let teamRanking = historicalTeamId ? teamRankings.get(historicalTeamId) : undefined
+  if (!teamRanking) {
+    teamRanking = historicalTeamId && !filter.teamId
+      ? rankGlobalRankingRows(buildGlobalRankingData(allPlayers, matches, { seasons: [filter.season], teams: [historicalTeamId], positions: [] }, 'rating'), allPlayers, 'rating')
+      : ranking
+    if (historicalTeamId) teamRankings.set(historicalTeamId, teamRanking)
+  }
   const teamRank = scopedMetricRanks(teamRanking, allPlayers, player.id).team
   const { goals, assists, minutes } = data
   return { rating: data.averageRating, last5, goals, assists, combined: goals + assists, minutes, mom: data.mom, goodMatches: data.goodMatches, streak: active ? `${active.current} straight · ${active.label}` : 'No active streak', streakValue: active?.current ?? 0, overallRank: ranks.overall, positionRank: ranks.position, teamRank, starts: data.starts, subs: data.subs, goals90: minutes ? goals / minutes * 90 : 0, assists90: minutes ? assists / minutes * 90 : 0, combined90: minutes ? (goals + assists) / minutes * 90 : 0, plusMinus: onPitch, wins, draws, losses }

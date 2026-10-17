@@ -18,13 +18,13 @@ const match = (id, date, competitionType, events, season = 'Season 1') => ({
   appearances: [...new Set(events.flatMap(event => [event.playerId, event.assistPlayerId]).filter(Boolean))].map(playerId => ({ playerId, teamId: 'A', role: 'starter', position: 'ST', matchPosition: 'ST' })),
 })
 
-test('v2.5.13 release metadata uses rating revision 13', () => {
+test('v2.5.14 release metadata uses rating revision 13', () => {
   const packageJson = require('../package.json')
   const lockfile = require('../package-lock.json')
-  assert.equal(packageJson.version, '2.5.13')
-  assert.equal(lockfile.version, '2.5.13')
-  assert.equal(lockfile.packages[''].version, '2.5.13')
-  assert.equal(APP_VERSION, '2.5.13')
+  assert.equal(packageJson.version, '2.5.14')
+  assert.equal(lockfile.version, '2.5.14')
+  assert.equal(lockfile.packages[''].version, '2.5.14')
+  assert.equal(APP_VERSION, '2.5.14')
   assert.equal(RATING_ENGINE_REVISION, 13)
 })
 
@@ -123,7 +123,7 @@ test('Team Detail guards tab-specific heavy derivations behind the active tab', 
   const team = fs.readFileSync(require.resolve('../src/screens/TeamDetailScreen.tsx'), 'utf8')
   assert.match(team, /if \(tab !== 'players'\) return undefined[\s\S]*?teamBestEleven/)
   assert.match(team, /tab === 'matches' \? derivedResults/)
-  assert.match(team, /tab === 'overview' \? buildLeagueHistory/)
+  assert.match(team, /tab === 'overview' \? latestLeagueStandings/)
   assert.doesNotMatch(team, /best\.slots\.forEach\(/)
 })
 
