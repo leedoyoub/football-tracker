@@ -9,6 +9,7 @@ import { newestMatches } from './matchChronology'
 import { selectMomCandidate } from './momSelection'
 import { ratePlayerMatch } from './rating'
 import { AWARD_POLICY_REVISION } from './awardPolicy'
+import { arrayItemRevision } from './arrayItemRevision'
 
 export { AWARD_433, awardPositionFamily, isAwardEligible } from './awardRules'
 
@@ -309,10 +310,11 @@ export function seasonAwards(season: string, teams: Team[], players: Player[], m
   if (!byStates) { byStates = new WeakMap(); byMatches.set(matches, byStates) }
   let bySeason = byStates.get(states)
   if (!bySeason) { bySeason = new Map(); byStates.set(states, bySeason) }
-  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${season}`
+  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}:${season}`
   const existing = bySeason.get(key)
   if (existing?.revision === RATING_ENGINE_REVISION) return existing.value
   const value = computeSeasonAwards(season, teams, players, matches, states, model)
+  if (bySeason.size >= 32) bySeason.delete(bySeason.keys().next().value!)
   bySeason.set(key, { revision: RATING_ENGINE_REVISION, value })
   return value
 }

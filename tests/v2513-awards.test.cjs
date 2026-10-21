@@ -15,7 +15,7 @@ test('team history does not calculate player awards and selected groups do not b
     assert.equal(calls, 0)
     const groups = awardRecordGroups(s.teams, s.players, s.matches, s.competitionStates, scope, ['awards-total'])
     assert.deepEqual(groups.map(g => g.id), ['awards-total'])
-    assert.equal(calls, 3)
+    assert.equal(calls, 1, 'only the completed league publishes awards; unfinished Cup/Champions are deferred')
   } finally { awards.awardsForCompetition = prior }
 })
 test('optimized official events, candidates and record filters equal independent v2.5.12 objects', () => {

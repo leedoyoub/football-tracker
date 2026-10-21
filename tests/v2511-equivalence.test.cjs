@@ -36,6 +36,13 @@ test('timeline, competition rules, constants and durable data remain source iden
     // byte-identical; new read-model output is deep-compared in v2514-team.
     const normalize = filename => {
       let source = fs.readFileSync(filename, 'utf8').replaceAll('\r\n', '\n')
+      // v2.6.3 changes cache invalidation only; keep the computations below
+      // byte-identical. Public replacement behavior is covered in v263 tests.
+      source = source.replace("import { arrayItemRevision } from './arrayItemRevision'\n", '')
+      if (file === 'engine/seasonAnalytics.ts') source = source
+        .replaceAll('${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${season}', '${RATING_ENGINE_REVISION}:${season}')
+        .replaceAll('  if (bySeason.size >= 32) bySeason.delete(bySeason.keys().next().value!)\n', '')
+      if (file === 'engine/competition.ts') source = source.replace(/const scopedCompetitionMatches[\s\S]*?(?=export function competitionStageMatches)/, '')
       if (file === 'engine/seasonAnalytics.ts') source = source.replace(/\/\*\* Team Detail needs only day N versus day N-1[\s\S]*?(?=export function buildSeasonAnalytics)/, '')
       if (file === 'engine/competition.ts') source = source.split('/** Canonical compact competition data shared by Team Detail consumers. */')[0]
       if (file === 'engine/competition.ts') {

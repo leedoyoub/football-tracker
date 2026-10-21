@@ -10,6 +10,7 @@ import { scopedPositionFamilyByPlayer, type PositionFamily } from './positionSco
 import { competitionIdentityForMatch } from './competitionContext'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { AWARD_POLICY_REVISION } from './awardPolicy'
+import { arrayItemRevision } from './arrayItemRevision'
 
 export { AWARD_POLICY_REVISION } from './awardPolicy'
 export const ROUND_AWARD_STAGES = ['roundOf16', 'quarterFinal', 'semiFinal'] as const
@@ -38,12 +39,13 @@ export function officialSeasonModel(teams: Team[], players: Player[], matches: M
   let byMatches = byPlayers.get(players); if (!byMatches) { byMatches = new WeakMap(); byPlayers.set(players, byMatches) }
   let byStates = byMatches.get(matches); if (!byStates) { byStates = new WeakMap(); byMatches.set(matches, byStates) }
   let bySeason = byStates.get(states); if (!bySeason) { bySeason = new Map(); byStates.set(states, bySeason) }
-  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${season}`
+  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}:${season}`
   const cached = bySeason.get(key); if (cached) return cached
   const tournamentTeams = currentStaticTeams(teams)
   const status = competitionSeasonStatus(tournamentTeams, matches, season, players, states.find(state => state.kind === 'champions-draw' && state.season === season))
   const teamResults: TeamSeasonResult[] = []
   const competitionAwards = {} as Record<CompetitionType, CompetitionAwards>
+  const competitionAward = (competition: CompetitionType) => competitionAwards[competition] ??= awardsForCompetition(competition, season, tournamentTeams, players, matches, states, status)
   const games = matches.filter(match => match.season === season)
   for (const row of status.league.complete ? status.league.standings : []) teamResults.push({ season, competition: 'league', teamId: row.teamId, champion: row.rank === 1, runnerUp: row.rank === 2, finalAppearance: false, finish: row.rank, finishLabel: `#${row.rank}`, points: row.points, wins: row.wins, goalDifference: row.goalDifference })
   const historicalTeamIds = new Set([...tournamentTeams.map(team => team.id), ...teams.map(team => team.id), ...(states.find(state => state.kind === 'champions-draw' && state.season === season)?.teamIds ?? [])])
@@ -83,9 +85,10 @@ export function officialSeasonModel(teams: Team[], players: Player[], matches: M
       for (const slot of award.bestXI) add('monthly-xi', 'Team of the Month', slot.playerId ?? undefined, 'league', scope, slot.teamId, block)
     }
     for (const competition of ['league', 'cup', 'champions'] as const) {
+      const complete = competition === 'league' ? status.league.complete : competition === 'cup' ? Boolean(status.cup.championId) : Boolean(status.champions.championId)
+      if (!complete) continue
       const scope = competitionMatches(matches, season, competition)
-      const award = awardsForCompetition(competition, season, tournamentTeams, players, matches, states, status)
-      competitionAwards[competition] = award
+      const award = competitionAward(competition)
       if (award.complete) {
         const title = competition === 'league' ? 'League' : competition === 'cup' ? 'Cup' : 'Champions'
         const publish = (kind: string, label: string, winner?: AwardWinner) => add(`${competition}-${kind}`, label, winner?.playerId, competition, scope, winner?.teamId)
@@ -124,7 +127,8 @@ export function officialSeasonModel(teams: Team[], players: Player[], matches: M
     publishedEvents = [...events.values()]
     return publishedEvents
   }
-  const value = { status, get events() { return buildEvents() }, teamResults, get competitionAwards() { buildEvents(); return competitionAwards } }
+  const value = { status, get events() { return buildEvents() }, teamResults, get competitionAwards() { buildEvents(); for (const competition of ['league', 'cup', 'champions'] as const) competitionAward(competition); return competitionAwards } }
+  if (bySeason.size >= 32) bySeason.delete(bySeason.keys().next().value!)
   bySeason.set(key, value)
   return value
 }

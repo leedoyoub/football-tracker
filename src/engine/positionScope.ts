@@ -4,6 +4,7 @@ import { awardPositionFamily, type AwardPositionFamily } from './awardRules'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 
 export type PositionFamily = 'ST' | 'SS' | 'LW' | 'RW' | 'CAM' | 'LM' | 'RM' | 'CM' | 'CDM' | 'LB' | 'CB' | 'RB' | 'GK'
+export type TeamHistoryPositionGroup = 'GK' | 'DEF' | 'MID' | 'FW'
 export type { PositionFilterKey } from '../types'
 export type PositionScope = { seasons?: string[]; teams?: string[]; fallback?: 'career' | 'none' }
 
@@ -102,6 +103,31 @@ export function scopedAwardFamilyByPlayer(players: Player[], matches: Match[], s
     }
     const family = dominant(minutes, AWARD_ORDER)
     if (family) result.set(playerId, family)
+  }
+  return result
+}
+
+/** Team History alone combines all defensive roles; official award families stay unchanged. */
+export function teamHistoryPositionGroup(position?: string): TeamHistoryPositionGroup | undefined {
+  const family = positionFamily(position)
+  if (family === 'GK') return 'GK'
+  if (family === 'CB' || family === 'LB' || family === 'RB') return 'DEF'
+  if (family && ['CDM', 'CM', 'CAM', 'LM', 'RM'].includes(family)) return 'MID'
+  if (family && ['ST', 'SS', 'LW', 'RW'].includes(family)) return 'FW'
+}
+
+/** Sum credited minutes across each broad group before choosing a representative role.
+ * Tied totals use GK, DEF, MID, FW order; no current/career-position fallback applies. */
+export function scopedTeamHistoryGroupByPlayer(players: Player[], matches: Match[], scope: PositionScope): Map<string, TeamHistoryPositionGroup> {
+  const result = new Map<string, TeamHistoryPositionGroup>()
+  for (const [playerId, positions] of positionMinutesByPlayer(players, matches, scope)) {
+    const minutes = new Map<TeamHistoryPositionGroup, number>()
+    for (const [position, value] of positions) {
+      const group = teamHistoryPositionGroup(position)
+      if (group && value > 0) minutes.set(group, (minutes.get(group) ?? 0) + value)
+    }
+    const group = dominant(minutes, ['GK', 'DEF', 'MID', 'FW'])
+    if (group) result.set(playerId, group)
   }
   return result
 }

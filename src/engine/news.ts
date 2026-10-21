@@ -4,6 +4,7 @@ import { currentStaticTeams } from '../data/teams'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import { AWARD_POLICY_REVISION } from './awardPolicy'
+import { arrayItemRevision } from './arrayItemRevision'
 import type { CompetitionState, CompetitionType, EventSurface, Match, MatchChangePayload, Player, Team } from '../types'
 import { newestMatches, oldestMatches } from './matchChronology'
 import { buildSeasonAnalytics, rankingMovement } from './seasonAnalytics'
@@ -25,7 +26,7 @@ type Streak = { scoring: number; contribution: number }
 type TeamRun = { wins: number; unbeaten: number; cleanSheets: number; seasonGoals: number; seasonCleanSheets: number }
 
 const EMPTY_STATES: CompetitionState[] = []
-type NewsCacheEntry = { revision: number; awardRevision: number; items?: NewsItem[]; playerMilestones: Map<string, NewsItem[]> }
+type NewsCacheEntry = { revision: number; awardRevision: number; sourceRevision: string; items?: NewsItem[]; playerMilestones: Map<string, NewsItem[]> }
 const newsCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], NewsCacheEntry>>>>()
 
 /** The sole News chronology rule: newest date, newest anchored Match, then ID. */
@@ -392,7 +393,8 @@ function newsEntry(players: Player[], teams: Team[], matches: Match[], states: C
   let byStates = byTeams.get(teams)
   if (!byStates) { byStates = new WeakMap(); byTeams.set(teams, byStates) }
   let cached = byStates.get(states)
-  if (!cached || cached.revision !== RATING_ENGINE_REVISION || cached.awardRevision !== AWARD_POLICY_REVISION) { cached = { revision: RATING_ENGINE_REVISION, awardRevision: AWARD_POLICY_REVISION, playerMilestones: new Map() }; byStates.set(states, cached) }
+  const sourceRevision = `${arrayItemRevision(players)}:${arrayItemRevision(teams)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}`
+  if (!cached || cached.revision !== RATING_ENGINE_REVISION || cached.awardRevision !== AWARD_POLICY_REVISION || cached.sourceRevision !== sourceRevision) { cached = { revision: RATING_ENGINE_REVISION, awardRevision: AWARD_POLICY_REVISION, sourceRevision, playerMilestones: new Map() }; byStates.set(states, cached) }
   return cached
 }
 

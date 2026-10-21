@@ -68,6 +68,12 @@ export function TeamHistory({ teamId, season, teams, players, matches, states, s
       const expanded = expandedRecords.includes(group.metric)
       return <section key={group.metric} className="overflow-hidden rounded-xl bg-zinc-900"><h3 className="px-3 pt-3 text-sm font-semibold">{group.label}</h3><div className="mt-2">{expanded ? <VirtualRankingList rows={group.rows} renderRow={renderRecord} /> : group.rows.slice(0, 3).map(row => <div key={row.playerId} className="border-b border-white/5 last:border-0">{renderRecord(row)}</div>)}{!group.rows.length && <p className="p-3 text-xs text-zinc-500">No recorded appearances in this scope.</p>}</div>{group.rows.length > 3 && <button type="button" aria-expanded={expanded} onClick={() => onStateChange({ historyExpandedRecords: expanded ? [] : [group.metric] })} className="secondary-view-all m-3 w-[calc(100%-1.5rem)]">{expanded ? 'Show Top 3' : 'View All'}</button>}</section>
     })}</div>}
-    {menu === 'best-xi' && bestXI && <><p className="mb-3 text-[11px] leading-relaxed text-zinc-400">Team season selection · 4-3-3 · Minimum {bestXI.minimumAppearances} of {bestXI.teamMatches} recorded team matches (40%). Derived from this team's performances in the selected season and competition.</p><AwardBestXI title={`${selectedSeason} · Team Best XI`} result={bestXI} players={players} teams={teams} onPlayerOpen={id => openPlayer(id)} />{!bestXI.bestXI.some(slot => slot.playerId) && <p className="text-xs text-zinc-500">No qualifying players in this scope yet.</p>}</>}
+    {menu === 'best-xi' && bestXI && <>
+      <p className="mb-3 text-[11px] leading-relaxed text-zinc-400">{selectedSeason} · {competition === 'all' ? 'All competitions' : competitionLabel[competition]}<br />
+        {bestXI.formation && <>Most-used formation: {bestXI.formation.label} · {bestXI.formation.matches} matches<br /></>}
+        Minimum {bestXI.minimumAppearances} of {bestXI.teamMatches} recorded team matches (40%).</p>
+      {bestXI.formation ? <AwardBestXI title={`Team Best XI · ${bestXI.formation.label}`} result={bestXI} players={players} teams={teams} showEmptySlots presentation="team-history" onPlayerOpen={id => openPlayer(id)} /> : <p className="rounded-xl bg-zinc-900 p-4 text-xs text-zinc-400">No valid saved kickoff formation in this scope.</p>}
+      {bestXI.formation && !bestXI.bestXI.some(slot => slot.playerId) && <p className="text-xs text-zinc-500">No qualifying players in this scope yet.</p>}
+    </>}
   </section>
 }

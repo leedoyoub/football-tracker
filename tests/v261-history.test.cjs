@@ -12,7 +12,7 @@ function fixture() {
     { id: 'other', name: 'Other', teamId: 'B', position: 'CB' },
   ]
   const matches = Array.from({ length: 5 }, (_, i) => ({
-    id: `A:${i}`, season: 'Season 1', matchDay: i + 1, date: `2026-01-0${i + 1}`, duration: 90,
+    id: `A:${i}`, season: 'Season 1', matchDay: i + 1, date: `2026-01-0${i + 1}`, duration: 90, formation: '4-3-3',
     teamId: 'A', homeTeamId: 'A', awayTeamId: 'opponent', competitionType: i === 4 ? 'cup' : 'league', competitionStage: i === 4 ? 'stage1' : 'regular',
     appearances: [
       { playerId: 'gk', teamId: 'A', role: 'starter', position: 'GK', matchPosition: 'GK' },
@@ -55,7 +55,7 @@ test('team season XI uses actual roles, ceil 40% team games, vacancies and no du
   assert.equal(result.teamMatches, 5); assert.equal(result.minimumAppearances, 2)
   assert.equal(result.bestXI.length, 11)
   assert.equal(result.bestXI[0].playerId, 'gk')
-  assert(result.bestXI.some(slot => slot.playerId === 'released' && ['LCM', 'CM', 'RCM'].includes(slot.slot)))
+  assert(result.bestXI.some(slot => slot.playerId === 'released' && slot.displayPosition === 'MID'))
   assert(!result.bestXI.some(slot => ['rare', 'other', 'bench'].includes(slot.playerId)))
   const selected = result.bestXI.flatMap(slot => slot.playerId ? [slot.playerId] : [])
   assert.equal(selected.length, new Set(selected).size)
@@ -64,7 +64,7 @@ test('team season XI uses actual roles, ceil 40% team games, vacancies and no du
   const boundary = { id: 'boundary', name: 'Boundary', teamId: 'B', position: 'ST' }
   const changed = matches.map((match, index) => index < 2 ? { ...match, appearances: [...match.appearances, { playerId: boundary.id, teamId: 'A', role: 'starter', position: 'RB' }] } : match)
   const atBoundary = history.teamHistoryBestXI([...players, boundary], changed, { teamId: 'A', season: 'Season 1', competition: 'all' })
-  assert.equal(atBoundary.bestXI.find(slot => slot.slot === 'RB').playerId, boundary.id)
+  assert(atBoundary.bestXI.some(slot => slot.displayPosition === 'DEF' && slot.playerId === boundary.id))
 })
 
 test('early season History shows progress without provisional championships or individual honors', () => {

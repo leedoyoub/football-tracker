@@ -8,6 +8,7 @@ import { newestMatches } from './matchChronology'
 import { getMatchManOfTheMatch, ratePlayerMatch } from './rating'
 import { recordedTeamId, teamPerspectiveScore, teamsCreditedWithResult } from './matchPerspective'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
+import { arrayItemRevision } from './arrayItemRevision'
 import { compareStandings, type Standing } from './standings'
 import type { LeaderboardMetric } from './stats'
 import { performanceAwardResult } from './awards'
@@ -232,7 +233,7 @@ export function buildLeagueHistory(teams: Team[], players: Player[], matches: Ma
   let byPlayers = historyCache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); historyCache.set(matches, byPlayers) }
   let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
   let bySeason = byTeams.get(teams); if (!bySeason) { bySeason = new Map(); byTeams.set(teams, bySeason) }
-  const key = `${RATING_ENGINE_REVISION}:${season}`
+  const key = `${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${season}`
   const existing = bySeason.get(key); if (existing) return existing
   const leagueMatches = competitionMatches(matches, season, 'league')
   const currentMatchDay = Math.max(0, ...leagueMatches.map(leagueDay).filter(day => Number.isInteger(day) && day >= 1 && day <= LEAGUE_MATCHES_PER_TEAM))
@@ -248,6 +249,7 @@ export function buildLeagueHistory(teams: Team[], players: Player[], matches: Ma
   const completedSnapshots = [...leagueSnapshots.values()].filter(snapshot => snapshot.complete)
   const latestCompletedMatchDay = completedSnapshots[completedSnapshots.length - 1]?.matchDay ?? 0
   const result = { season, leagueMatches, currentMatchDay, latestCompletedMatchDay, leagueSnapshots }
+  if (bySeason.size >= 32) bySeason.delete(bySeason.keys().next().value!)
   bySeason.set(key, result)
   return result
 }
@@ -255,7 +257,7 @@ export function buildLeagueHistory(teams: Team[], players: Player[], matches: Ma
 /** Team Detail needs only day N versus day N-1. Reuse full History if already built. */
 const latestStandingsCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], Map<string, RankedStanding[]>>>>()
 export function latestLeagueStandings(teams: Team[], players: Player[], matches: Match[], season: string): RankedStanding[] {
-  const key = `${RATING_ENGINE_REVISION}:${season}`
+  const key = `${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${season}`
   const existing = historyCache.get(matches)?.get(players)?.get(teams)?.get(key)
   if (existing) return existing.leagueSnapshots.get(existing.currentMatchDay)?.standings ?? []
   let byPlayers = latestStandingsCache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); latestStandingsCache.set(matches, byPlayers) }
@@ -277,7 +279,7 @@ export function buildSeasonAnalytics(teams: Team[], players: Player[], matches: 
   let byPlayers = cache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); cache.set(matches, byPlayers) }
   let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
   let bySeason = byTeams.get(teams); if (!bySeason) { bySeason = new Map(); byTeams.set(teams, bySeason) }
-  const key = `${RATING_ENGINE_REVISION}:${season}`
+  const key = `${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${season}`
   const existing = bySeason.get(key); if (existing) return existing
   const { leagueMatches, currentMatchDay, leagueSnapshots, latestCompletedMatchDay } = buildLeagueHistory(teams, players, matches, season)
   const playerSnapshots = buildPlayerSnapshots(players, leagueMatches)
@@ -298,6 +300,7 @@ export function buildSeasonAnalytics(teams: Team[], players: Player[], matches: 
     formTable: leagueFormTable(teams, leagueMatches), monthlyAwards, activeMonthlyAwards, latestMonthlyAwards,
     latestReview: latestCompletedMatchDay ? buildReview(latestCompletedMatchDay, leagueSnapshots, playerSnapshots) : undefined,
   }
+  if (bySeason.size >= 32) bySeason.delete(bySeason.keys().next().value!)
   bySeason.set(key, result)
   return result
 }

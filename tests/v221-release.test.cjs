@@ -33,7 +33,7 @@ function game(day, options = {}) {
 }
 
 test('v2.6.1 metadata and the revision-13 position table are exact', () => {
-  assert.equal(APP_VERSION, '2.6.2'); assert.equal(require('../package.json').version, '2.6.2'); assert.equal(RATING_ENGINE_REVISION, 13)
+  assert.equal(APP_VERSION, '2.6.3'); assert.equal(require('../package.json').version, '2.6.3'); assert.equal(RATING_ENGINE_REVISION, 13)
   const expected = {
     LB: [.04, 1], LWB: [.04, 1], RB: [.04, 1], RWB: [.04, 1],
     CDM: [.06, .80], LDM: [.06, .80], RDM: [.06, .80],

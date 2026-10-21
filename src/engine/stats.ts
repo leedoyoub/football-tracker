@@ -12,6 +12,7 @@ import type {
 } from '../types'
 import { hasPitchAppearance, ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, pitchWindow, matchPositionSegments } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
+import { arrayItemRevision } from './arrayItemRevision'
 import { kickoffLineupForMatch } from './kickoffLineup'
 import { newestMatches, oldestMatches } from './matchChronology'
 import { positionFamily, scopedAwardFamilyByPlayer, scopedPositionFamilyByPlayer, type PositionFamily } from './positionScope'
@@ -293,8 +294,8 @@ export type GlobalLeaderboardRow = PlayerSeasonStats & {
 const defenderRankingPosition = (position: Position) => ['CB', 'LB', 'RB'].includes(positionFamily(position) ?? '')
 const goalkeeperPosition = (position: Position) => position === 'GK'
 
-/** Derived-only cache. A new store match/player array naturally invalidates
- * it, so lookup never serializes or hashes raw Match/Event payloads. */
+/** Derived-only cache. Store array identities and legacy item-reference
+ * revisions invalidate it without serializing or hashing Match payloads. */
 type CompetitionStatsCacheEntry = { rows: GlobalLeaderboardRow[]; presented: Map<LeaderboardMetric, GlobalLeaderboardRow[]> }
 let competitionStatsCache = new WeakMap<Match[], WeakMap<Player[], Map<string, CompetitionStatsCacheEntry>>>()
 
@@ -336,7 +337,8 @@ export function buildGlobalRankingData(
   filters: { seasons: string[], teams: string[], positions: (Position | PositionFamily)[] },
   _metric: LeaderboardMetric,
 ): GlobalLeaderboardRow[] {
-  const cacheKey = `${RATING_ENGINE_REVISION}|${filters.seasons.slice().sort().join(',')}|${filters.teams.slice().sort().join(',')}|${filters.positions.slice().sort().join(',')}`
+  const sourceKey = `${RATING_ENGINE_REVISION}:${arrayItemRevision(matches)}:${arrayItemRevision(players)}|${filters.seasons.slice().sort().join(',')}|${filters.teams.slice().sort().join(',')}|`
+  const cacheKey = sourceKey + filters.positions.slice().sort().join(',')
   let byPlayers = competitionStatsCache.get(matches)
   if (!byPlayers) { byPlayers = new WeakMap(); competitionStatsCache.set(matches, byPlayers) }
   let byFilter = byPlayers.get(players)
@@ -349,6 +351,17 @@ export function buildGlobalRankingData(
     cached.presented.set(_metric, rows)
     return rows
   }
+  // Position changes only select rows from the same historical statistics.
+  // Keep rating arrays and defensive samples shared with the unfiltered scope.
+  const allowedPositionFamilies = new Set(filters.positions.map(positionFamily).filter((family): family is NonNullable<typeof family> => Boolean(family)))
+  const unfiltered = allowedPositionFamilies.size ? byFilter.get(sourceKey) : undefined
+  if (unfiltered) {
+    const selected = unfiltered.rows.filter(row => row.scopedPositionFamily && allowedPositionFamilies.has(row.scopedPositionFamily))
+    const rows = presentMetric(selected, _metric)
+    if (byFilter.size >= 64) byFilter.delete(byFilter.keys().next().value!)
+    byFilter.set(cacheKey, { rows: selected, presented: new Map([[_metric, rows]]) })
+    return rows
+  }
   const selected = !filters.seasons.length || matches.every(match => filters.seasons.includes(match.season))
     ? matches : matches.filter(match => filters.seasons.includes(match.season))
   const orderedSelected = oldestMatches(selected)
@@ -356,7 +369,6 @@ export function buildGlobalRankingData(
   orderedSelected.forEach((match, matchIndex) => appendRecordedTeamOpportunities(opportunityIndex, match, matchIndex))
   const appearancesByPlayer = teamAppearanceHistory(orderedSelected)
   const historicalPositionFamilies = scopedPositionFamilyByPlayer(players, selected, { teams: filters.teams })
-  const allowedPositionFamilies = new Set(filters.positions.map(positionFamily).filter((family): family is NonNullable<typeof family> => Boolean(family)))
   const playerById = new Map(players.map(player => [player.id, player]))
   const matchesByPlayer = new Map<string, Match[]>()
   for (const match of orderedSelected) {
@@ -383,7 +395,7 @@ export function buildGlobalRankingData(
   }
 
   const rows = players.flatMap(player => {
-    if (allowedPositionFamilies.size && !allowedPositionFamilies.has(historicalPositionFamilies?.get(player.id) as NonNullable<ReturnType<typeof positionFamily>>)) return []
+    if (allowedPositionFamilies.size && !allowedPositionFamilies.has(historicalPositionFamilies.get(player.id)!)) return []
     const playerMatches = matchesByPlayer.get(player.id) ?? []
     const ratingRows: RatingBreakdown[] = []
     let starts = 0; let subs = 0; let saves = 0; let cleanSheets = 0; let goalkeeperMinutes = 0; let goalkeeperAppearances = 0; let goalkeeperConceded = 0; let wins = 0; let draws = 0; let losses = 0; let goals = 0; let assists = 0
@@ -442,7 +454,7 @@ export function buildGlobalRankingData(
 }
 
 /** Re-sorts an already-derived player index without recalculating any ratings. */
-const rankedRowsCache = new WeakMap<GlobalLeaderboardRow[], WeakMap<Player[], Map<LeaderboardMetric, GlobalLeaderboardRow[]>>>()
+const rankedRowsCache = new WeakMap<GlobalLeaderboardRow[], WeakMap<Player[], { revision: string; metrics: Map<LeaderboardMetric, GlobalLeaderboardRow[]> }>>()
 export type CoreLeaderboardRow = Pick<GlobalLeaderboardRow, 'playerId' | 'avgRating' | 'goals' | 'assists' | 'mom'>
 const CORE_LEADERBOARD_METRICS = new Set<LeaderboardMetric>(['rating', 'goals', 'assists', 'g+a', 'mom'])
 export function coreLeaderboardMetricValue(row: CoreLeaderboardRow, metric: Extract<LeaderboardMetric, 'rating' | 'goals' | 'assists' | 'g+a' | 'mom'>) { return metric === 'rating' ? row.avgRating : metric === 'goals' ? row.goals : metric === 'assists' ? row.assists : metric === 'g+a' ? row.goals + row.assists : row.mom }
@@ -450,9 +462,10 @@ export function compareCoreLeaderboardRows(left: CoreLeaderboardRow, right: Core
 export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Player[], metric: LeaderboardMetric): GlobalLeaderboardRow[] {
   let byPlayers = rankedRowsCache.get(rows)
   if (!byPlayers) { byPlayers = new WeakMap(); rankedRowsCache.set(rows, byPlayers) }
-  let byMetric = byPlayers.get(players)
-  if (!byMetric) { byMetric = new Map(); byPlayers.set(players, byMetric) }
-  const cached = byMetric.get(metric)
+  const revision = `${arrayItemRevision(rows)}:${arrayItemRevision(players)}`
+  let entry = byPlayers.get(players)
+  if (!entry || entry.revision !== revision) { entry = { revision, metrics: new Map() }; byPlayers.set(players, entry) }
+  const cached = entry.metrics.get(metric)
   if (cached) return cached
   const playerById = new Map(players.map(player => [player.id, player]))
   const valueFor = (row: GlobalLeaderboardRow) => {
@@ -482,7 +495,7 @@ export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Pla
     const value = valueFor(row)
     return Number.isFinite(value) ? [{ ...row, value }] : []
   }).sort((a, b) => CORE_LEADERBOARD_METRICS.has(metric) ? compareCoreLeaderboardRows(a, b, metric as Extract<LeaderboardMetric, 'rating' | 'goals' | 'assists' | 'g+a' | 'mom'>) : (metric === 'sotAllowed' || metric === 'defenderGaPer90' || metric === 'goalkeeperGaPer90' || metric === 'goalsConceded' ? a.value - b.value : b.value - a.value) || b.avgRating - a.avgRating || a.playerId.localeCompare(b.playerId))
-  byMetric.set(metric, ranked)
+  entry.metrics.set(metric, ranked)
   return ranked
 }
 

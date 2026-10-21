@@ -1,7 +1,9 @@
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
-import { awardCandidatesForScope, awardPresentationFromCandidates } from './awards'
+import { selectTeamHistoryBestXI } from './teamHistorySelection'
+import { teamHistoryLayout } from './teamHistoryLayout'
+import { arrayItemRevision } from './arrayItemRevision'
 import { matchCompetitionType, teamCompetitionOverview } from './competition'
-import { isRecordedForTeam, teamsCreditedWithResult } from './matchPerspective'
+import { teamsCreditedWithResult } from './matchPerspective'
 import { officialAwardSeasons, officialSeasonModel, type OfficialAwardEvent, type TeamSeasonResult } from './officialAwards'
 import { scopedIndividualAwardEvents } from './teamAwardRecords'
 import { buildGlobalRankingData } from './stats'
@@ -43,7 +45,7 @@ const scopeCache = new WeakMap<Match[], WeakMap<Player[], Map<string, unknown>>>
 function cachedScope<T>(players: Player[], matches: Match[], scope: TeamHistoryScope, menu: string, compute: () => T): T {
   let byPlayers = scopeCache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); scopeCache.set(matches, byPlayers) }
   let entries = byPlayers.get(players); if (!entries) { entries = new Map(); byPlayers.set(players, entries) }
-  const key = JSON.stringify([menu, RATING_ENGINE_REVISION, AWARD_POLICY_REVISION, scope.teamId, scope.season, scope.competition])
+  const key = JSON.stringify([menu, RATING_ENGINE_REVISION, AWARD_POLICY_REVISION, arrayItemRevision(players), arrayItemRevision(matches), scope.teamId, scope.season, scope.competition])
   if (entries.has(key)) return entries.get(key) as T
   const result = compute(); if (entries.size >= 48) entries.delete(entries.keys().next().value!)
   entries.set(key, result); return result
@@ -66,9 +68,9 @@ export function teamHistoryRecords(players: Player[], matches: Match[], scope: T
 /** A team-only, season-derived selection; this projection never publishes award events. */
 export function teamHistoryBestXI(players: Player[], matches: Match[], scope: TeamHistoryScope & { season: string }) {
   return cachedScope(players, matches, scope, 'best-xi', () => {
-    const games = scopeMatches(matches, scope).filter(match => isRecordedForTeam(match, scope.teamId))
-    const candidates = awardCandidatesForScope(players, games).filter(candidate => candidate.teamId === scope.teamId)
-    return { ...awardPresentationFromCandidates(candidates), teamMatches: games.length, minimumAppearances: Math.ceil(games.length * .4) }
+    const games = scopeMatches(matches, scope)
+    const result = selectTeamHistoryBestXI(players, games, scope.teamId)
+    return { ...result, bestXI: teamHistoryLayout(result.bestXI) }
   })
 }
 
@@ -99,7 +101,7 @@ export function teamHistoryHonors(teams: Team[], players: Player[], matches: Mat
   let byMatches = byPlayers.get(players); if (!byMatches) { byMatches = new WeakMap(); byPlayers.set(players, byMatches) }
   let byStates = byMatches.get(matches); if (!byStates) { byStates = new WeakMap(); byMatches.set(matches, byStates) }
   let byScope = byStates.get(states); if (!byScope) { byScope = new Map(); byStates.set(states, byScope) }
-  const key = JSON.stringify([teamId, competition, AWARD_POLICY_REVISION, RATING_ENGINE_REVISION])
+  const key = JSON.stringify([teamId, competition, AWARD_POLICY_REVISION, RATING_ENGINE_REVISION, arrayItemRevision(teams), arrayItemRevision(players), arrayItemRevision(matches), arrayItemRevision(states)])
   const cached = byScope.get(key); if (cached) return cached
   const result = buildTeamHonors(teams, players, matches, states, teamId, competition)
   if (byScope.size >= 48) byScope.delete(byScope.keys().next().value!)

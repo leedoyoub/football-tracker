@@ -6,22 +6,24 @@ import { firstMissingLeagueSlot, hasCompleteLeagueSlots, leagueSlotCounts } from
 import type { ChampionsStage, CompetitionStage, CompetitionState, CompetitionType, CupStage, Match, Player, Team } from '../types'
 import { competitionIdentityForMatch, matchCompetitionStage, matchCompetitionType, normalizeMatchCompetitionIdentity } from './competitionContext'
 import { teamsCreditedWithResult, teamPerspectiveScore } from './matchPerspective'
+import { arrayItemRevision } from './arrayItemRevision'
 
 export const CUP_STAGES: CupStage[] = ['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'stage6', 'stage7']
 export const CHAMPIONS_ROUNDS: Exclude<ChampionsStage, 'finalReplay'>[] = ['roundOf16', 'quarterFinal', 'semiFinal', 'final']
 
 export { matchCompetitionType } from './competitionContext'
 
-const scopedCompetitionMatches = new WeakMap<Match[], Map<string, { length: number; rows: Match[] }>>()
+const scopedCompetitionMatches = new WeakMap<Match[], { revision: number; scopes: Map<string, Match[]> }>()
 /** The initial selection is indexed by source-array identity and scope. This
- * makes a return to an unchanged competition an O(1) lookup. */
+ * validates item replacements before reusing an unchanged competition. */
 export function competitionMatches(matches: Match[], season: string, type: CompetitionType): Match[] {
+  const revision = arrayItemRevision(matches)
   let index = scopedCompetitionMatches.get(matches)
-  if (!index) { index = new Map(); scopedCompetitionMatches.set(matches, index) }
-  const key = `${season}:${type}`; const cached = index.get(key)
-  if (cached && cached.length === matches.length) return cached.rows
+  if (!index || index.revision !== revision) { index = { revision, scopes: new Map() }; scopedCompetitionMatches.set(matches, index) }
+  const key = `${season}:${type}`; const cached = index.scopes.get(key)
+  if (cached) return cached
   const selected = matches.filter(match => match.season === season && matchCompetitionType(match) === type)
-  index.set(key, { length: matches.length, rows: selected })
+  index.scopes.set(key, selected)
   return selected
 }
 

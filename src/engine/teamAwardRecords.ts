@@ -1,6 +1,7 @@
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
 import { AWARD_POLICY_REVISION, officialAwardSeasons, officialSeasonModel, type OfficialAwardEvent } from './officialAwards'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
+import { arrayItemRevision } from './arrayItemRevision'
 import type { RecordsLeaderboardGroup, RecordsLeaderboardRow } from '../screens/recordsLeaderboards'
 
 type AwardScope = { seasons: string[]; competition: CompetitionType | 'all'; teamIds: string[] }
@@ -13,7 +14,7 @@ export function scopedIndividualAwardEvents(teams: Team[], players: Player[], ma
   let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
   let byStates = byTeams.get(teams); if (!byStates) { byStates = new WeakMap(); byTeams.set(teams, byStates) }
   let byScope = byStates.get(states); if (!byScope) { byScope = new Map(); byStates.set(states, byScope) }
-  const key = JSON.stringify([AWARD_POLICY_REVISION, RATING_ENGINE_REVISION, sortedIds(scope.seasons), scope.competition, sortedIds(scope.teamIds)])
+  const key = JSON.stringify([AWARD_POLICY_REVISION, RATING_ENGINE_REVISION, arrayItemRevision(teams), arrayItemRevision(players), arrayItemRevision(matches), arrayItemRevision(states), sortedIds(scope.seasons), scope.competition, sortedIds(scope.teamIds)])
   const cached = byScope.get(key); if (cached) return cached
   const events = new Map<string, OfficialAwardEvent>()
   for (const season of officialAwardSeasons(matches, states)) {
