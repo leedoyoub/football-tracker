@@ -585,9 +585,7 @@ export function compactTeamCompetitionProgress(teamId: string, status: Competiti
     : cup.runnerUpId === teamId ? 'Out F'
       : cup.eliminatedAtByTeam[teamId] ? `Out S${cup.eliminatedAtByTeam[teamId]}`
         : !cup.stageMatches.length && !cup.eliminatedTeamIds.length ? 'NS'
-          : cup.stage === 'finalReplay' ? 'FR'
-            : cup.stage === 'final' ? 'F'
-              : `S${cup.stage.replace('stage', '')}`
+          : `${cup.stage === 'finalReplay' ? 'FR' : cup.stage === 'final' ? 'F' : `S${cup.stage.replace('stage', '')}`} ${Number(cup.stageMatches.some(match => hasPlayed(match, teamId)))}/1`
 
   const champions = status.champions
   const isDrawnTeam = champions.rounds.roundOf16.some(pairing => pairing.teamIds.includes(teamId))
@@ -595,18 +593,24 @@ export function compactTeamCompetitionProgress(teamId: string, status: Competiti
   if (champions.drawn && isDrawnTeam) {
     if (champions.championId === teamId) championsLabel = 'Champ'
     else {
-      const loss = (Object.entries(champions.rounds) as [Exclude<ChampionsStage, 'finalReplay'>, ChampionsPairing[]][])
-        .find(([, pairings]) => pairings.some(pairing => pairing.teamIds.includes(teamId) && pairing.winnerId && pairing.winnerId !== teamId))
-      if (loss) championsLabel = `Out ${compactChampionsStage(loss[0])}`
-      else {
-        const stage = champions.currentStage === 'finalReplay' ? 'final' : champions.currentStage
+      // Each team's latest actual pairing can resolve before the whole round.
+      // Project advancement here without creating a bracket or unlocking a game.
+      for (const stage of [...CHAMPIONS_ROUNDS].reverse()) {
         const pairing = champions.rounds[stage].find(item => item.teamIds.includes(teamId))
-        if (pairing) {
+        if (!pairing) continue
+        const resolved = pairing.winnerId && !pairing.integrityError && !pairing.tied
+        if (resolved && pairing.winnerId !== teamId) championsLabel = `Out ${compactChampionsStage(stage)}`
+        else if (resolved && stage !== 'final') {
+          const next = CHAMPIONS_ROUNDS[CHAMPIONS_ROUNDS.indexOf(stage) + 1]
+          championsLabel = `${compactChampionsStage(next)} 0/${next === 'final' ? 2 : 3}`
+        } else if (stage === 'final' && champions.currentStage === 'finalReplay') {
+          championsLabel = `FR ${Number((pairing.replayMatches ?? []).some(match => hasPlayed(match, teamId)))}/1`
+        } else {
           const ownGames = pairing.teamGames?.[teamId] ?? pairing.matches.filter(match => match.teamId === teamId || (!match.teamId && hasPlayed(match, teamId)))
           const completed = Math.min(ownGames.length, pairing.requiredMatches)
-          const gameNumber = completed >= pairing.requiredMatches ? pairing.requiredMatches : completed + 1
-          championsLabel = `${compactChampionsStage(stage)} ${gameNumber}/${pairing.requiredMatches}`
+          championsLabel = `${compactChampionsStage(stage)} ${completed}/${pairing.requiredMatches}`
         }
+        break
       }
     }
   }

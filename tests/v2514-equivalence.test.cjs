@@ -22,6 +22,8 @@ test('unmodified rating, official XI policy, competition, durability and scroll 
   // Their preserved behavior is checked by v261-equivalence and navigation tests.
   for (const file of ['engine/rating.ts', 'engine/ratingRevision.ts', 'engine/timeline.ts', 'engine/constants.ts', 'engine/awardRules.ts', 'engine/competitionSelectors.ts', 'engine/standings.ts', 'engine/competitionContext.ts', 'engine/competitionRevision.ts', 'engine/unitRecords.ts', 'store.tsx', 'lib/repository.ts', 'lib/validation.ts', 'lib/scrollCheckpoint.ts', 'lib/cardWindow.ts', 'screens/TeamsScreen.tsx']) {
     const read = root => fs.readFileSync(path.join(root, 'src', file), 'utf8').replaceAll('\r\n', '\n')
+      // v2.6.2 permits progress values to wrap inside the same-sized cards.
+      .replaceAll('<dd className="min-w-0 text-right font-bold text-zinc-100">', '<dd className="font-bold text-zinc-100">')
     assert.equal(read(b.root), read(b.directory), file)
   }
 })

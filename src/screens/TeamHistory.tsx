@@ -5,6 +5,7 @@ import { RankingMetricTabs, RankingRow } from '../components/RankingRow'
 import { VirtualRankingList } from '../components/VirtualRankingList'
 import { COMPETITION_OPTIONS } from '../lib/competitionOptions'
 import { historicalPlayerLabel } from '../lib/historicalPlayerDisplay'
+import { playerFullName } from '../components/ui'
 import { officialAwardSeasons } from '../engine/officialAwards'
 import { teamAwardMomentLabel, teamHistoryBestXI, teamHistoryHonors, teamHistoryRecords, type TeamHistoryRecordRow } from '../engine/teamHistory'
 import type { CompetitionState, Match, Player, ScreenStateByView, Team, View } from '../types'
@@ -29,6 +30,7 @@ export function TeamHistory({ teamId, season, teams, players, matches, states, s
   const records = useMemo(() => menu === 'records' ? teamHistoryRecords(players, matches, { teamId, competition, season: recordsMode === 'all-time' ? null : selectedSeason }) : [], [menu, players, matches, teamId, competition, recordsMode, selectedSeason])
   const bestXI = useMemo(() => menu === 'best-xi' ? teamHistoryBestXI(players, matches, { teamId, competition, season: selectedSeason }) : undefined, [menu, players, matches, teamId, competition, selectedSeason])
   const byId = useMemo(() => new Map(players.map(player => [player.id, player])), [players])
+  const honorName = (id: string) => byId.get(id)?.name?.trim() || playerFullName(byId.get(id)).trim() || historicalPlayerLabel(id, byId.get(id))
   const team = teams.find(item => item.id === teamId)
   const openPlayer = (id: string, awardSeason?: string) => onNavigate({ name: 'player', id, season: awardSeason ?? selectedSeason, competitionType: competition })
   const renderRecord = (row: TeamHistoryRecordRow) => <RankingRow rank={row.rank} player={byId.get(row.playerId)} team={team} positionLabel={row.position} value={String(row.value)} onClick={() => openPlayer(row.playerId)} />
@@ -56,7 +58,7 @@ export function TeamHistory({ teamId, season, teams, players, matches, states, s
             <button type="button" className="flex min-h-11 w-full items-center justify-between gap-3 py-2 text-left text-xs font-semibold" aria-expanded={expanded} onClick={() => toggle(key)}><span>{kind.label}</span><span className="shrink-0 text-emerald-300">{kind.count} {expanded ? '−' : '+'}</span></button>
             {expanded && <div className="space-y-2 pb-3">{kind.players.map(player => {
               const playerKey = `${key}:player:${player.playerId}`, momentsOpen = disclosures.includes(playerKey)
-              return <div key={player.playerId} className="rounded-lg bg-black/20 p-2"><div className="flex items-center justify-between gap-2"><button type="button" className="min-w-0 py-1 text-left text-xs font-semibold text-zinc-200 [overflow-wrap:anywhere]" onClick={() => openPlayer(player.playerId, player.events[0]?.season)}>{historicalPlayerLabel(player.playerId, byId.get(player.playerId))}</button><button type="button" className="shrink-0 rounded-lg px-2 py-2 text-[10px] font-bold text-emerald-300" aria-label={`${kind.label} award moments for ${historicalPlayerLabel(player.playerId, byId.get(player.playerId))}`} aria-expanded={momentsOpen} onClick={() => toggle(playerKey)}>{player.count} {momentsOpen ? '−' : '+'}</button></div>{momentsOpen && <div className="flex flex-wrap gap-1">{player.events.map(event => <span key={event.id} className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-semibold text-zinc-400">{teamAwardMomentLabel(event)}</span>)}</div>}</div>
+              return <div key={player.playerId} className="rounded-lg bg-black/20 p-2"><div className="flex items-center justify-between gap-2"><button type="button" className="min-w-0 py-1 text-left text-xs font-semibold text-zinc-200 [overflow-wrap:anywhere]" onClick={() => openPlayer(player.playerId, player.events[0]?.season)}>{honorName(player.playerId)}</button><button type="button" className="shrink-0 rounded-lg px-2 py-2 text-[10px] font-bold text-emerald-300" aria-label={`${kind.label} award moments for ${honorName(player.playerId)}`} aria-expanded={momentsOpen} onClick={() => toggle(playerKey)}>{player.count} {momentsOpen ? '−' : '+'}</button></div>{momentsOpen && <div className="flex flex-wrap gap-1">{player.events.map(event => <span key={event.id} className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-semibold text-zinc-400">{teamAwardMomentLabel(event)}</span>)}</div>}</div>
             })}</div>}
           </div>
         })}{!honors.individual.length && <p className="text-xs text-zinc-500">No official individual honors in this scope yet.</p>}</div>}

@@ -14,9 +14,9 @@ function TeamGridCard({ team, progress, showProgress, onNavigate }: { team: Team
     {showProgress && progress ? <div className="w-full">
       <div className="text-center text-[11px] font-black tracking-wide text-emerald-300 sm:text-xs">{team.abbreviation}</div>
       <dl className="mt-1 space-y-1 border-t border-white/10 pt-1 text-[9px] leading-tight sm:text-[10px]">
-        <div className="flex items-center justify-between gap-1"><dt className="text-zinc-400">League</dt><dd className="font-bold text-zinc-100">{progress.league}</dd></div>
-        <div className="flex items-center justify-between gap-1"><dt className="text-zinc-400">Cup</dt><dd className="font-bold text-zinc-100">{progress.cup}</dd></div>
-        <div className="flex items-center justify-between gap-1"><dt className="text-zinc-400">UCL</dt><dd className="font-bold text-zinc-100">{progress.champions}</dd></div>
+        <div className="flex items-center justify-between gap-1"><dt className="text-zinc-400">League</dt><dd className="min-w-0 text-right font-bold text-zinc-100">{progress.league}</dd></div>
+        <div className="flex items-center justify-between gap-1"><dt className="text-zinc-400">Cup</dt><dd className="min-w-0 text-right font-bold text-zinc-100">{progress.cup}</dd></div>
+        <div className="flex items-center justify-between gap-1"><dt className="text-zinc-400">UCL</dt><dd className="min-w-0 text-right font-bold text-zinc-100">{progress.champions}</dd></div>
       </dl>
     </div> : <>
       <TeamIcon team={team} className="mb-1 h-8 w-8 text-[8px] sm:h-10 sm:w-10" />

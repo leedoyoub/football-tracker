@@ -1,12 +1,14 @@
 # Football Tracker
 
-Football Tracker v2.6.1 tracks saved football matches, player performances, competitions and historical honors. It uses React, TypeScript and Vite, with local IndexedDB storage and offline PWA support.
+Football Tracker v2.6.2 tracks saved football matches, player performances, competitions and historical honors. It uses React, TypeScript and Vite, with local IndexedDB storage and offline PWA support.
 
-[Open the app](https://leedoyoub.github.io/football-tracker/) · [v2.6.1 release notes](docs/v2.6.1-release.md)
+[Open the app](https://leedoyoub.github.io/football-tracker/) · [v2.6.2 release notes](docs/v2.6.2-release.md)
 
 In v2.6.1, Team Detail adds **History → Honors / Records / Best XI**. Official top scorers, assist leaders and League Golden Glove winners share awards when their primary totals tie. Team honors and individual awards retain the team recorded at the time of the award.
 
 Run `npm.cmd test`, `npm.cmd run lint` and `npm.cmd run build` on Windows (`npm` works in shells without the PowerShell script restriction). For local development use `npm.cmd run dev`. Main pushes trigger the GitHub Pages deployment workflow.
+
+v2.6.2 shows full recipient names in Team History and completed Cup/Champions match counts in Teams Progress, with immediate display of officially resolved Champions ties.
 
 ## Development template notes
 

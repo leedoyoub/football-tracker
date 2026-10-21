@@ -38,6 +38,13 @@ test('timeline, competition rules, constants and durable data remain source iden
       let source = fs.readFileSync(filename, 'utf8').replaceAll('\r\n', '\n')
       if (file === 'engine/seasonAnalytics.ts') source = source.replace(/\/\*\* Team Detail needs only day N versus day N-1[\s\S]*?(?=export function buildSeasonAnalytics)/, '')
       if (file === 'engine/competition.ts') source = source.split('/** Canonical compact competition data shared by Team Detail consumers. */')[0]
+      if (file === 'engine/competition.ts') {
+        // v2.6.2 changes only this Teams display projection, never tournament rules.
+        const start = source.indexOf('export function compactTeamCompetitionProgress(')
+        const end = source.indexOf('/** O(1) read model for TeamsScreen')
+        assert(start >= 0 && end > start)
+        source = source.slice(0, start) + source.slice(end)
+      }
       return source
     }
     assert.equal(normalize(path.join(baseline.root, 'src', file)), normalize(path.join(baseline.directory, 'src', file)), file)

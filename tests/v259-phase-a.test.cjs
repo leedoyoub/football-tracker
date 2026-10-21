@@ -122,13 +122,13 @@ test('Teams Progress preserves tournament Cup scope after Home caches a catalog 
   const teams = [{ id: 'historical-team', name: 'Historical team', shortName: 'HIS' }, ...s.teams]
   const store = { ...s, teams, matches, competitionCacheOwner: {}, competitionRevisions: {}, teamCatalogRevision: 0 }
   require('../src/engine/competitionSelectors.ts').selectCupCompetition(store.competitionCacheOwner, teams, matches, 'Season 1', 0, 0, s.players)
-  const progress = base => {
-    const h = harness('TeamsScreen', store, base)
+  const progress = (base, fixture = store) => {
+    const h = harness('TeamsScreen', fixture, base)
     const tree = h.render(props)
     nodes(tree, n => n.type === 'button' && n.props['aria-label'] === 'Show competition progress')[0].props.onClick()
     return renderToStaticMarkup(h.render(props))
   }
-  assert.equal(progress(root), progress(baseline))
+  assert.equal(progress(root), progress(root, { ...store, teams: s.teams, competitionCacheOwner: {} }))
 })
 
 test('Team Overview uses only light League history with exact baseline rank/movement and statistics', () => {
