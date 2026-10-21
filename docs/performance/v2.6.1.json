@@ -1,0 +1,17 @@
+{
+  "version": "2.6.1",
+  "fixture": {
+    "matches": 576,
+    "players": 367,
+    "teams": 16
+  },
+  "coldMs": {
+    "records": 62.13329999999996,
+    "bestXI": 3.4198000000000093,
+    "honors": 270.1092,
+    "teamAwardRankings": 0.3891999999999598
+  },
+  "warm100RecordsXIHonorsMs": 0.1855000000000473,
+  "eventCount": 207,
+  "note": "Synthetic local Node benchmark; immutable cached results asserted identical. Not a mobile browser frame-time measurement."
+}

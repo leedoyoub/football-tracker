@@ -20,9 +20,9 @@ export function RecordsLeaderboardScreen({ screenState, onStateChange, onNavigat
     teams,
     matches,
     states: competitionStates,
-    section: /^(awards-|history-)/.test(screenState.leaderboardId) ? 'awards' : 'performance',
+    section: /^(awards-|history-|team-awards)/.test(screenState.leaderboardId) ? 'awards' : 'performance',
     scope: { seasons: screenState.filterSeasonIds, teamIds: screenState.filterTeamIds, competition: screenState.competition, positionFilter: screenState.positionFilter },
-    ...(screenState.category === 'combination' || /^(awards-|history-)/.test(screenState.leaderboardId) ? { selectedIds: [screenState.leaderboardId] } : {}),
+    ...(screenState.category === 'combination' || /^(awards-|history-|team-awards)/.test(screenState.leaderboardId) ? { selectedIds: [screenState.leaderboardId] } : {}),
   }), [screenState, players, teams, matches, competitionStates])
   const group = groups.find(item => item.id === screenState.leaderboardId)
   const playerById = useMemo(() => new Map(players.map(player => [player.id, player])), [players])

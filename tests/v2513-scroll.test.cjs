@@ -4,12 +4,12 @@ const { defaultScreenState } = require('../src/lib/navigation.ts')
 const core = require('../src/components/scrollToTop.ts')
 const { screenHarness, nodes } = require('./helpers/v259-harness.cjs')
 const path = require('node:path')
-test('new scroll controls cover exactly the six requested route families', () => {
-  for (const name of ['player', 'records', 'records-leaderboard', 'results', 'players']) assert.equal(core.hasPageScrollToTop({ name }, defaultScreenState({ name })), true, name)
-  for (const name of ['home', 'teams', 'team', 'match', 'new-match', 'chemistry', 'comparison', 'global-ranking', 'award-race']) assert.equal(core.hasPageScrollToTop({ name }, defaultScreenState({ name })), false, name)
+test('page scroll controls cover existing and v2.6.1 approved routes', () => {
+  for (const name of ['home', 'latest-changes', 'chemistry', 'player', 'records', 'records-leaderboard', 'results', 'players']) assert.equal(core.hasPageScrollToTop({ name }, defaultScreenState({ name })), true, name)
+  for (const name of ['teams', 'match', 'new-match', 'comparison', 'global-ranking', 'award-race']) assert.equal(core.hasPageScrollToTop({ name }, defaultScreenState({ name })), false, name)
   for (const competitionType of ['league', 'cup', 'champions']) for (const menu of ['players', 'table', 'bracket', 'matches', 'history']) {
     const state = { ...defaultScreenState({ name: 'competition' }), competitionType, [`${competitionType}Menu`]: menu }
-    assert.equal(core.hasPageScrollToTop({ name: 'competition' }, state), menu === 'matches')
+    assert.equal(core.hasPageScrollToTop({ name: 'competition' }, state), menu === 'matches' || menu === 'players' || competitionType === 'league' && menu === 'history')
   }
 })
 test('native app-content distance observer toggles at 500, handles short lists and disposes', () => {

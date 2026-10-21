@@ -3,6 +3,7 @@ const { test, after } = require('node:test'), assert = require('node:assert/stri
 const { baselineSource } = require('./helpers/v2514-baseline.cjs')
 const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const { screenHarness, sourceModule } = require('./helpers/v259-harness.cjs')
+const { assertRecapAwardPolicy } = require('./helpers/v261-award-policy-comparison.cjs')
 const b = baselineSource(); after(b.cleanup); const root = path.resolve(__dirname, '..')
 test('Match Changes skips the unused catalog instead of reading each player for each match', () => {
   const s = performanceFixture(1); let reads = 0
@@ -27,7 +28,7 @@ test('locked Recap renders without calling statistics or XI calculators', () => 
 test('completed Recap shares one Starting XI result and equals baseline awards', () => {
   const s = performanceFixture(1), actual = require('../src/engine/seasonInsights.ts'), old = require(path.join(b.directory, 'src/engine/seasonInsights.ts'))
   s.competitionStates.push({ id: 'complete', kind: 'season-complete', season: 'Season 1' })
-  assert.deepEqual(actual.seasonRecap(s.players, s.matches, 'Season 1', s.competitionStates, s.teams), old.seasonRecap(s.players, s.matches, 'Season 1', s.competitionStates, s.teams))
+  assertRecapAwardPolicy(actual.seasonRecap(s.players, s.matches, 'Season 1', s.competitionStates, s.teams), old.seasonRecap(s.players, s.matches, 'Season 1', s.competitionStates, s.teams), s.players, s.matches, 'Season 1')
   let shared
   const h = screenHarness(root, 'screens/SeasonRecapScreen.tsx', 'SeasonRecapScreen', s, { '../engine/seasonInsights': { ...actual, startingXILeaders: (...args) => shared = actual.startingXILeaders(...args), seasonRecap: (...args) => { assert.equal(args[5], shared); assert(shared); return actual.seasonRecap(...args) } } })
   h.render({ season: 'Season 1', onNavigate() {}, onBack() {} })

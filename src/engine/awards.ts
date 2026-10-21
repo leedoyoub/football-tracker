@@ -8,11 +8,12 @@ import { isRecordedForTeam } from './matchPerspective'
 import { newestMatches } from './matchChronology'
 import { selectMomCandidate } from './momSelection'
 import { ratePlayerMatch } from './rating'
+import { AWARD_POLICY_REVISION } from './awardPolicy'
 
 export { AWARD_433, awardPositionFamily, isAwardEligible } from './awardRules'
 
 export type AwardWinner = { playerId: string; value: number; label: string; awardScore?: number; teamId?: string }
-export type CompetitionAwards = { complete: boolean; championId?: string; scorer?: AwardWinner; assists?: AwardWinner; mvp?: AwardWinner; goalkeeper?: AwardWinner; bestXI?: Best11Slot[]; candidates?: AwardCandidate[] }
+export type CompetitionAwards = { complete: boolean; championId?: string; scorers: AwardWinner[]; assistLeaders: AwardWinner[]; goalkeepers: AwardWinner[]; scorer?: AwardWinner; assists?: AwardWinner; mvp?: AwardWinner; goalkeeper?: AwardWinner; bestXI?: Best11Slot[]; candidates?: AwardCandidate[] }
 export type CompetitionAwardModels = Partial<Pick<CompetitionSeasonStatus, 'league' | 'cup' | 'champions'>>
 export type CanonicalAwardResult = {
   scopeLabel: string
@@ -24,6 +25,7 @@ export type CanonicalAwardResult = {
   anchorMatch: Match
   complete?: boolean
   candidates?: AwardCandidate[]
+  individualAwards?: Pick<CompetitionAwards, 'scorers' | 'assistLeaders' | 'goalkeepers'>
 }
 
 /** One competition-aware source for Team/Best XI wording. */
@@ -48,15 +50,18 @@ export function competitionAwardResult(type: CompetitionType, season: string, te
   const playerLabel = type === 'league' ? 'Player of the League' : type === 'cup' ? 'Player of the Cup' : 'Player of the Tournament'
   const selected = official.bestXI.flatMap(slot => slot.playerId ? [official.candidates?.find(candidate => candidate.playerId === slot.playerId && candidate.teamId === slot.teamId)] : [])
   const statsByPlayer = Object.fromEntries(selected.flatMap(candidate => candidate ? [[candidate.playerId, { goals: candidate.goals, assists: candidate.assists, avgRating: candidate.average }]] : []))
-  return { scopeLabel: season, playerLabel, teamLabel: competitionAwardLabel(type), bestPlayerId: official.mvp.playerId, bestXI: official.bestXI, statsByPlayer, anchorMatch, complete: official.complete, candidates: official.candidates }
+  return { scopeLabel: season, playerLabel, teamLabel: competitionAwardLabel(type), bestPlayerId: official.mvp.playerId, bestXI: official.bestXI, statsByPlayer, anchorMatch, complete: official.complete, candidates: official.candidates, individualAwards: { scorers: official.scorers, assistLeaders: official.assistLeaders, goalkeepers: official.goalkeepers } }
 }
 
 const rawAverage = (row: GlobalLeaderboardRow) => row.ratings.length ? row.ratings.reduce((sum, rating) => sum + rating.raw, 0) / row.ratings.length : 0
 const appearances = (row: GlobalLeaderboardRow) => row.ratings.length
 const ordered = (rows: GlobalLeaderboardRow[], measure: (row: GlobalLeaderboardRow) => number) => rows.slice().sort((a, b) => measure(b) - measure(a) || rawAverage(b) - rawAverage(a) || b.minutes - a.minutes || a.playerId.localeCompare(b.playerId))
-const winner = (rows: GlobalLeaderboardRow[], measure: (row: GlobalLeaderboardRow) => number, label: string): AwardWinner | undefined => {
-  const row = ordered(rows, measure)[0]
-  return row ? { playerId: row.playerId, value: measure(row), label, teamId: row.historicalTeamId ?? row.teamId } : undefined
+export const sharedStatAwardWinners = (rows: GlobalLeaderboardRow[], measure: (row: GlobalLeaderboardRow) => number, label: string): AwardWinner[] => {
+  const ranked = ordered(rows, measure)
+  const maximum = ranked[0] && measure(ranked[0])
+  const seen = new Set<string>()
+  return ranked.filter(row => measure(row) === maximum && !seen.has(row.playerId) && Boolean(seen.add(row.playerId)))
+    .map(row => ({ playerId: row.playerId, value: measure(row), label, teamId: row.historicalTeamId ?? row.teamId }))
 }
 
 export function leaguePositionBonus(rank: number): number {
@@ -196,16 +201,21 @@ function goalkeeperWinner(rows: { row: GlobalLeaderboardRow; score: number }[], 
   return best ? { playerId: best.row.playerId, value: goalkeeperAverage(best.row), awardScore: best.score, label, teamId: teamIdFor(best.row) } : undefined
 }
 
-function leagueGoldenGlove(stats: GlobalLeaderboardRow[], games: Match[]): AwardWinner | undefined {
-  const best = stats.filter(row => row.playedGoalkeeper).slice().sort((a, b) =>
+function leagueGoldenGloves(stats: GlobalLeaderboardRow[], games: Match[]): AwardWinner[] {
+  // Retain the legacy presentation order while every maximum receives the award.
+  const ranked = stats.filter(row => row.playedGoalkeeper).slice().sort((a, b) =>
     goalkeeperCleanSheets(b) - goalkeeperCleanSheets(a) ||
     goalkeeperCleanSheets(b) / Math.max(1, b.goalkeeperAppearances ?? 0) - goalkeeperCleanSheets(a) / Math.max(1, a.goalkeeperAppearances ?? 0) ||
     goalkeeperSavePercentage(b) - goalkeeperSavePercentage(a) ||
     goalkeeperGoalsAgainstPer90(a) - goalkeeperGoalsAgainstPer90(b) ||
-    goalkeeperSavesPer90(b) - goalkeeperSavesPer90(a) || goalkeeperMinutes(b) - goalkeeperMinutes(a) || a.playerId.localeCompare(b.playerId))[0]
-  const lastGkMatchId = best?.goalkeeperRatings?.[best.goalkeeperRatings.length - 1]?.matchId
-  const teamId = games.find(match => match.id === lastGkMatchId)?.appearances.find(a => a.playerId === best?.playerId)?.teamId
-  return best ? { playerId: best.playerId, value: goalkeeperCleanSheets(best), label: 'League Golden Glove', teamId } : undefined
+    goalkeeperSavesPer90(b) - goalkeeperSavesPer90(a) || goalkeeperMinutes(b) - goalkeeperMinutes(a) || a.playerId.localeCompare(b.playerId))
+  const maximum = ranked[0] && goalkeeperCleanSheets(ranked[0])
+  const seen = new Set<string>()
+  return ranked.filter(row => goalkeeperCleanSheets(row) === maximum && !seen.has(row.playerId) && Boolean(seen.add(row.playerId))).map(row => {
+    const lastGkMatchId = row.goalkeeperRatings?.[row.goalkeeperRatings.length - 1]?.matchId
+    const teamId = games.find(match => match.id === lastGkMatchId)?.appearances.find(a => a.playerId === row.playerId)?.teamId
+    return { playerId: row.playerId, value: goalkeeperCleanSheets(row), label: 'League Golden Glove', teamId }
+  })
 }
 
 export function awardsForCompetition(type: CompetitionType, season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], models?: CompetitionAwardModels): CompetitionAwards {
@@ -246,7 +256,11 @@ export function awardsForCompetition(type: CompetitionType, season: string, team
   const goalkeeperLabel = type === 'league' ? 'League Golden Glove' : type === 'cup' ? 'Goalkeeper of the Cup' : 'Goalkeeper of the Tournament'
   const goalkeeperEligible = eligible.filter(candidate => isAwardEligible(candidate.row.goalkeeperAppearances ?? 0, games.filter(match => isRecordedForTeam(match, teamIdFor(candidate.row))).length)).map(candidate => ({ ...candidate, score: ratingAwardScore(goalkeeperAverage(candidate.row), bonusFor(teamIdFor(candidate.row)), goalkeeperMinutes(candidate.row), games.filter(match => isRecordedForTeam(match, teamIdFor(candidate.row))).length) }))
   const presentation = awardPresentationFromCandidates(scored.map(item => item.candidate))
-  return { complete, championId, scorer: winner(stats, row => row.goals, 'Goals'), assists: winner(stats, row => row.assists, 'Assists'), mvp, goalkeeper: type === 'league' ? leagueGoldenGlove(stats, games) : goalkeeperWinner(goalkeeperEligible, goalkeeperLabel), ...presentation, candidates: scored.map(item => item.candidate) }
+  const scorers = sharedStatAwardWinners(stats, row => row.goals, 'Goals')
+  const assistLeaders = sharedStatAwardWinners(stats, row => row.assists, 'Assists')
+  const goalkeeper = type === 'league' ? undefined : goalkeeperWinner(goalkeeperEligible, goalkeeperLabel)
+  const goalkeepers = type === 'league' ? leagueGoldenGloves(stats, games) : goalkeeper ? [goalkeeper] : []
+  return { complete, championId, scorers, assistLeaders, goalkeepers, scorer: scorers[0], assists: assistLeaders[0], mvp, goalkeeper: goalkeepers[0], ...presentation, candidates: scored.map(item => item.candidate) }
 }
 
 function computeSeasonAwards(season: string, teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], model?: CompetitionSeasonStatus) {
@@ -276,7 +290,9 @@ function computeSeasonAwards(season: string, teams: Team[], players: Player[], m
   const ballon = best ? { playerId: best.playerId, value: best.average, awardScore: best.selectionScore, label: 'Avg Rating', teamId: best.teamId } : undefined
   const goalkeeper = goalkeeperWinner(scored.filter(({ row }) => isAwardEligible(row.goalkeeperAppearances ?? 0, games.filter(match => isRecordedForTeam(match, teamIdFor(row))).length)).map(({ row }) => ({ row, score: goalkeeperAverage(row) + bonusFor(teamIdFor(row)) })), 'Goalkeeper of the Season')
   const presentation = awardPresentationFromCandidates(scored.map(item => item.candidate))
-  return { complete, goldenBoot: winner(stats, row => row.goals, 'Goals'), assistLeader: winner(stats, row => row.assists, 'Assists'), ballon, ...presentation, candidates: scored.map(item => item.candidate), goalkeeper, goldenGlove: goalkeeper }
+  const goldenBootWinners = sharedStatAwardWinners(stats, row => row.goals, 'Goals')
+  const assistLeaderWinners = sharedStatAwardWinners(stats, row => row.assists, 'Assists')
+  return { complete, goldenBootWinners, assistLeaderWinners, goldenBoot: goldenBootWinners[0], assistLeader: assistLeaderWinners[0], ballon, ...presentation, candidates: scored.map(item => item.candidate), goalkeeper, goldenGlove: goalkeeper }
 }
 
 type SeasonAwardResult = ReturnType<typeof computeSeasonAwards>
@@ -293,7 +309,7 @@ export function seasonAwards(season: string, teams: Team[], players: Player[], m
   if (!byStates) { byStates = new WeakMap(); byMatches.set(matches, byStates) }
   let bySeason = byStates.get(states)
   if (!bySeason) { bySeason = new Map(); byStates.set(states, bySeason) }
-  const key = `${RATING_ENGINE_REVISION}:${season}`
+  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${season}`
   const existing = bySeason.get(key)
   if (existing?.revision === RATING_ENGINE_REVISION) return existing.value
   const value = computeSeasonAwards(season, teams, players, matches, states, model)

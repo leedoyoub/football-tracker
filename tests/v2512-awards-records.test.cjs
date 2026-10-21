@@ -215,11 +215,12 @@ test('completed integrated awards retain Season labels and never appear in a sin
   assert.throws(() => assertPolicyEquivalence({ label: 'Player of the League' }, { label: 'Player of the Season' }, 'integrated', 'label'), /unchanged policy fields/)
 })
 
-test('League clean-sheet ratio breaks ties while Cup and Champions GK awards retain forty-percent eligibility', () => {
+test('League clean-sheet ratio orders the legacy projection while co-winners share the maximum; Cup and Champions retain forty-percent eligibility', () => {
   const a = player('regular-gk'), b = player('brief-gk', 'GK', 'B')
   const matches = [game('clean-a', [app(a)]), game('conceded-a', [app(a)], { events: [{ id: 'against', type: 'goal', minute: 10, teamId: 'B' }] }), game('clean-b', [app(b)])]
   const league = awardsForCompetition('league', 'S1', teams, [a, b], matches, [], { league: { complete: false, standings: [] } })
   assert.equal(league.goalkeeper.playerId, b.id)
+  assert.deepEqual(league.goalkeepers.map(winner => winner.playerId).sort(), [a.id, b.id].sort())
   for (const type of ['cup', 'champions']) {
     const games = matches.map(m => ({ ...m, competitionType: type, competitionStage: type === 'cup' ? 'stage1' : 'roundOf16' }))
     const model = type === 'cup' ? { cup: { activeTeamIds: ['A', 'B'], eliminatedAtByTeam: {}, stage: 'stage1' } } : { champions: { currentStage: 'roundOf16', rounds: { roundOf16: [{ teamIds: ['A', 'B'] }], quarterFinal: [], semiFinal: [], final: [] } } }

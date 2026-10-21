@@ -19,14 +19,18 @@ function leagueCopy(value, markup = typeof value === 'string') {
 }
 function assertPolicyEquivalence(actual, original, file, fn) {
   const a = leagueCopy(actual), b = leagueCopy(original)
+  if (file === 'engine/awards.ts' && fn === 'competitionAwardResult' && a) delete a.individualAwards
   if (file === 'engine/awards.ts' && fn === 'seasonAwards') {
     for (const value of [a, b]) { delete value.goldenGlove; delete value.goalkeeper }
+    // v2.6.1 adds joint-recipient arrays; legacy projections and all selection
+    // values below remain exactly equivalent. Dedicated v261 tests assert ties.
+    delete a.goldenBootWinners; delete a.assistLeaderWinners
   }
   assert.deepStrictEqual(a, b, `${file}:${fn}: unchanged policy fields`)
 }
 function unchangedPlayerMarkup(markup) {
   return leagueCopy(markup)
-    .replace(/Football Tracker · v2\.5\.\d+/g, 'Football Tracker · VERSION')
+    .replace(/Football Tracker · v\d+\.\d+\.\d+/g, 'Football Tracker · VERSION')
     .replace(/<section aria-label="Career awards"[^]*?<\/section>/, '')
     .replace(/<section class="mb-4 rounded-2xl bg-zinc-900 p-3"><div><h2 class="text-sm font-semibold">Awards [^]*?<\/section>/, '')
 }

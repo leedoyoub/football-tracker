@@ -151,10 +151,11 @@ export function seasonRecap(players: Player[], matches: Match[], season: string,
   const official = seasonAwards(season, teams, players, matches, states)
   const bestXI = official.bestXI
   const officialAward = (id: string, title: string, winner: { playerId: string; value: number } | undefined, detail: (value: number) => string): SeasonAward | undefined => winner && { id, title, playerIds: [winner.playerId], detail: detail(winner.value) }
+  const sharedAward = (id: string, title: string, winners: { playerId: string; value: number }[], detail: (value: number) => string): SeasonAward | undefined => winners.length ? { id, title, playerIds: winners.map(winner => winner.playerId), detail: detail(winners[0].value) } : undefined
   const awards = [
     officialAward('player', 'Player of the Season', official.ballon, value => `${value.toFixed(2)} average rating`),
-    officialAward('scorer', 'Top Scorer', official.goldenBoot, value => `${value} goals`),
-    officialAward('assists', 'Assist King', official.assistLeader, value => `${value} assists`),
+    sharedAward('scorer', 'Top Scorer', official.goldenBootWinners, value => `${value} goals`),
+    sharedAward('assists', 'Assist King', official.assistLeaderWinners, value => `${value} assists`),
     awardFor('mom', 'Most MOM', pick(stats, row => row.stats.mom), row => `${row.stats.mom} Player of the Match awards`),
     { id: 'best-xi', title: 'Best XI', playerIds: bestXI.flatMap(slot => slot.playerId ? [slot.playerId] : []), detail: 'Season average rating · 4-3-3' },
     partnership && { id: 'goal-partnership', title: 'Best Goal Partnership', playerIds: [partnership.assisterId, partnership.scorerId], detail: `${partnership.assistedGoals} assisted goals` },

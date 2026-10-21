@@ -165,6 +165,7 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
       bestUnitId: typeof saved.bestUnitId === 'string' && saved.bestUnitId.startsWith('best-unit:') ? saved.bestUnitId : base.bestUnitId,
       recordsMode: saved.recordsMode === 'awards' ? 'awards' : 'performance',
       awardMetricId: typeof saved.awardMetricId === 'string' && /^(awards-|history-)/.test(saved.awardMetricId) ? saved.awardMetricId : undefined,
+      teamAwardKindsOpen: saved.teamAwardKindsOpen === true,
       historyPanel: saved.historyPanel === 'timeline' || saved.historyPanel === 'awards' ? saved.historyPanel : null,
       historySeason: validSeason(saved.historySeason) ? saved.historySeason as string : null,
       historyBlock: Number.isInteger(saved.historyBlock) && (saved.historyBlock as number) >= 1 && (saved.historyBlock as number) <= 10 ? saved.historyBlock as number : null,
@@ -173,12 +174,18 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
   if (view.name === 'team') {
     const base = fallback as ScreenStateByView['team']
     return { ...base,
-      tab: ['overview', 'matches', 'players'].includes(saved.tab as string) ? saved.tab as typeof base.tab : base.tab,
+      tab: ['overview', 'matches', 'players', 'history'].includes(saved.tab as string) ? saved.tab as typeof base.tab : base.tab,
       bestPlayersSeason: validSeason(saved.bestPlayersSeason) ? saved.bestPlayersSeason as string : null,
       bestPlayersCompetition: validScope(saved.bestPlayersCompetition) ? saved.bestPlayersCompetition as typeof base.bestPlayersCompetition : base.bestPlayersCompetition,
       bestPlayersMetric: validMetric(saved.bestPlayersMetric) ? saved.bestPlayersMetric as typeof base.bestPlayersMetric : base.bestPlayersMetric,
       matchesCompetition: validScope(saved.matchesCompetition) ? saved.matchesCompetition as typeof base.matchesCompetition : base.matchesCompetition,
       playersCompetition: validScope(saved.playersCompetition) ? saved.playersCompetition as typeof base.playersCompetition : base.playersCompetition,
+      historyCompetition: validScope(saved.historyCompetition) ? saved.historyCompetition as typeof base.historyCompetition : base.historyCompetition,
+      historyMenu: ['honors', 'records', 'best-xi'].includes(saved.historyMenu as string) ? saved.historyMenu as typeof base.historyMenu : base.historyMenu,
+      historySeason: validSeason(saved.historySeason) ? saved.historySeason as string : null,
+      historyRecordsMode: saved.historyRecordsMode === 'all-time' ? 'all-time' : 'season',
+      historyExpandedRecords: Array.isArray(saved.historyExpandedRecords) ? [...new Set(saved.historyExpandedRecords.filter((key: unknown) => ['goals', 'assists', 'appearances', 'cleanSheets'].includes(key as string)))] as NonNullable<typeof base.historyExpandedRecords> : [],
+      historyDisclosures: Array.isArray(saved.historyDisclosures) ? [...new Set(saved.historyDisclosures.filter((key: unknown) => typeof key === 'string' && key.length <= 500))] as string[] : [],
     }
   }
   if (view.name === 'match') return { name: 'match', tab: ['facts', 'lineup', 'ratings'].includes(saved.tab as string) ? saved.tab as ScreenStateByView['match']['tab'] : 'facts' }

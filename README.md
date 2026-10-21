@@ -1,4 +1,14 @@
-# React + TypeScript + Vite
+# Football Tracker
+
+Football Tracker v2.6.1 tracks saved football matches, player performances, competitions and historical honors. It uses React, TypeScript and Vite, with local IndexedDB storage and offline PWA support.
+
+[Open the app](https://leedoyoub.github.io/football-tracker/) · [v2.6.1 release notes](docs/v2.6.1-release.md)
+
+In v2.6.1, Team Detail adds **History → Honors / Records / Best XI**. Official top scorers, assist leaders and League Golden Glove winners share awards when their primary totals tie. Team honors and individual awards retain the team recorded at the time of the award.
+
+Run `npm.cmd test`, `npm.cmd run lint` and `npm.cmd run build` on Windows (`npm` works in shells without the PowerShell script restriction). For local development use `npm.cmd run dev`. Main pushes trigger the GitHub Pages deployment workflow.
+
+## Development template notes
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 

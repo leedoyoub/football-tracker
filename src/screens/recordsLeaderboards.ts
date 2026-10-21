@@ -2,6 +2,8 @@ import { combinationStats } from '../engine/analytics'
 import { oldestMatches } from '../engine/matchChronology'
 import { buildPlayerRecordLeaderboards } from '../engine/playerRecords'
 import { awardRecordGroups, teamHistoryRecordGroups } from '../engine/awardRecords'
+import { scopedIndividualAwardEvents, teamIndividualAwardRecordGroups } from '../engine/teamAwardRecords'
+import { AWARD_POLICY_REVISION } from '../engine/officialAwards'
 import { RATING_ENGINE_REVISION } from '../engine/ratingRevision'
 import { isPlayerAssistEvent, isPlayerGoalEvent } from '../engine/playerMatchFacts'
 import { orderedEvents, scoringTeamId } from '../engine/timeline'
@@ -62,8 +64,11 @@ export function recordsLeaderboardGroups(input: RecordsInput): RecordsLeaderboar
     let byPlayers = cache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); cache.set(matches, byPlayers) }
     let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
     let byScope = byTeams.get(teams); if (!byScope) { byScope = new Map(); byTeams.set(teams, byScope) }
-    const key = scopeKey(input), cached = byScope.get(key); if (cached) return cached
-    let groups = category === 'player' ? awardRecordGroups(teams, players, matches, states, scope, selectedIds) : teamHistoryRecordGroups(teams, players, matches, states, scope)
+    const key = `${AWARD_POLICY_REVISION}:${scopeKey(input)}`, cached = byScope.get(key); if (cached) return cached
+    let groups = category === 'player' ? awardRecordGroups(teams, players, matches, states, scope, selectedIds) : [
+      ...(!selectedIds || selectedIds.some(id => id.startsWith('history-')) ? teamHistoryRecordGroups(teams, players, matches, states, scope) : []),
+      ...(!selectedIds || selectedIds.some(id => id.startsWith('team-awards')) ? teamIndividualAwardRecordGroups(scopedIndividualAwardEvents(teams, players, matches, states, scope), teams, selectedIds) : []),
+    ]
     if (selectedIds) groups = groups.filter(group => selectedIds.includes(group.id))
     if (byScope.size >= 24) byScope.delete(byScope.keys().next().value!)
     byScope.set(key, groups)

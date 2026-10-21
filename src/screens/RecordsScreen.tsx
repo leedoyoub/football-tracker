@@ -49,6 +49,20 @@ function RecordsRankingPreviews({ category, players, teams, matches, states, fil
   const card = (group: RecordsLeaderboardGroup) => <section key={group.id} className="mb-5"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-semibold">{group.title}</h2>{group.rows.length > 3 && <button type="button" onClick={() => onNavigate({ name: 'records-leaderboard', category, leaderboardId: group.id, competition, positionFilter, seasonIds: filters.seasons, teamIds: filters.teams })} className="secondary-view-all">View All</button>}</div><div className="overflow-hidden rounded-xl bg-zinc-900">{group.rows.slice(0, 3).map(row => <div key={row.id} className="grid min-h-11 grid-cols-[28px_1fr_auto] items-center gap-2 border-b border-white/5 px-3 text-xs last:border-0"><b className="text-zinc-500">#{row.rank}</b><RecordIdentity row={row} playerById={playerById} teamById={teamById} onNavigate={onNavigate} /><b className="text-emerald-300">{row.value}</b></div>)}</div></section>
   if (category !== 'combination') {
     const awards = screenState.recordsMode === 'awards'
+    if (category === 'team' && awards) {
+      const history = groups.filter(group => group.id.startsWith('history-'))
+      const individual = groups.find(group => group.id === 'team-awards-individual')
+      const kinds = groups.filter(group => group.id.startsWith('team-awards:'))
+      const open = screenState.teamAwardKindsOpen ?? false
+      return <section aria-label="Records leaderboard previews">
+        <div className="mb-4"><SegmentedControl label="Records view" value="awards" onChange={value => onSelectionChange({ recordsMode: value as 'performance' | 'awards' })} options={[{ value: 'performance', label: 'Performance' }, { value: 'awards', label: 'Honors & History' }]} /></div>
+        {([{ title: 'Championships', start: 0, end: 4 }, { title: 'Runner-ups & Finals', start: 4, end: 11 }, { title: 'Best Season Records', start: 11, end: 17 }]).map(category => <div key={category.title} className="mb-6"><h2 className="mb-3 text-base font-semibold">{category.title}</h2>{history.slice(category.start, category.end).map(card)}</div>)}
+        <h2 className="mb-3 text-base font-semibold">Individual Awards</h2>
+        {individual && card(individual)}
+        <button type="button" aria-expanded={open} aria-controls="team-award-kinds" onClick={() => onSelectionChange({ teamAwardKindsOpen: !open })} className="mb-3 flex min-h-11 w-full items-center justify-between rounded-xl bg-zinc-900 px-3 text-left text-xs font-semibold"><span>By award type <span className="text-zinc-500">({kinds.length})</span></span><span className="text-emerald-300">{open ? 'Hide −' : 'Show +'}</span></button>
+        {open && <div id="team-award-kinds">{kinds.map(card)}{!kinds.length && <p className="py-3 text-xs text-zinc-500">No finalized individual awards in this scope.</p>}</div>}
+      </section>
+    }
     const primary = category === 'player' ? groups.slice(0, 8) : groups.filter(g => ['history-titles', 'history-runner-ups', 'history-finals'].includes(g.id))
     const details = groups.filter(g => !primary.includes(g))
     const selected = details.find(g => g.id === screenState.awardMetricId) ?? details[0]

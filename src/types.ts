@@ -283,6 +283,7 @@ export interface ScreenStateByView {
     bestUnitId?: string
     recordsMode?: 'performance' | 'awards'
     awardMetricId?: string
+    teamAwardKindsOpen?: boolean
     historyPanel: string | null
     historySeason: string | null
     historyBlock: number | null
@@ -304,12 +305,18 @@ export interface ScreenStateByView {
   teams: { name: 'teams' }
   team: {
     name: 'team'
-    tab: 'overview' | 'matches' | 'players'
+    tab: 'overview' | 'matches' | 'players' | 'history'
     bestPlayersSeason: string | null
     bestPlayersCompetition: CompetitionType | 'all'
     bestPlayersMetric: RankSort
     matchesCompetition: CompetitionType | 'all'
     playersCompetition: CompetitionType | 'all'
+    historyCompetition?: CompetitionType | 'all'
+    historyMenu?: 'honors' | 'records' | 'best-xi'
+    historySeason?: string | null
+    historyRecordsMode?: 'season' | 'all-time'
+    historyExpandedRecords?: ('goals' | 'assists' | 'appearances' | 'cleanSheets')[]
+    historyDisclosures?: string[]
   }
   'import-squad': { name: 'import-squad' }
   players: { name: 'players'; search: string; filters: { seasons: string[]; teams: string[]; positions: Position[] } }

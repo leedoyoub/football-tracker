@@ -225,12 +225,12 @@ test('personal rolling five uses raw ratings in chronological appearances and sk
   assert.equal(playerPersonalRecords(p, [p], games.slice().reverse()).bestFiveAverage, expected)
 })
 
-test('v2.5.14 version, rating revision 13 and Champions entity navigation', () => {
+test('v2.6.1 version, rating revision 13 and Champions entity navigation', () => {
   const source = file => fs.readFileSync(require.resolve(`../${file}`), 'utf8')
-  assert.equal(require('../src/config.ts').APP_VERSION, '2.5.14')
+  assert.equal(require('../src/config.ts').APP_VERSION, '2.6.1')
   assert.equal(require('../src/engine/ratingRevision.ts').RATING_ENGINE_REVISION, 13)
-  assert.equal(require('../package.json').version, '2.5.14')
-  assert.equal(require('../package-lock.json').version, '2.5.14')
+  assert.equal(require('../package.json').version, '2.6.1')
+  assert.equal(require('../package-lock.json').version, '2.6.1')
   const champions = source('src/screens/CompetitionScreen.tsx')
   assert.match(champions, /<ChampionsBracket[^>]*onNavigate=\{onNavigate\}/)
   assert.match(champions, /TeamIdentityAction team=\{teams\[id\]\}/)

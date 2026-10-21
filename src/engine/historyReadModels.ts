@@ -1,11 +1,10 @@
 import { officialAwardsForSeason, officialSeasonModel } from './officialAwards'
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
-import { currentStaticTeams } from '../data/teams'
-import { competitionSeasonStatus } from './competition'
-import type { awardsForCompetition, seasonAwards } from './awards'
+import { sharedStatAwardWinners, type seasonAwards, type awardsForCompetition } from './awards'
 import { buildGlobalRankingData, rankGlobalRankingRows } from './stats'
 import { monthlyAwardForBlock, type MonthlyAwards } from './seasonAnalytics'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
+import { AWARD_POLICY_REVISION } from './awardPolicy'
 
 export type HistoryTimeline = {
   season: string
@@ -14,6 +13,8 @@ export type HistoryTimeline = {
   champions?: string
   scorer?: { playerId: string; goals: number }
   assists?: { playerId: string; assists: number }
+  scorers: { playerId: string; goals: number }[]
+  assistLeaders: { playerId: string; assists: number }[]
   rating?: { playerId: string; avgRating: number }
   mom?: { playerId: string; mom: number }
   bestXI: string[]
@@ -24,6 +25,7 @@ export type HistoryAwards = {
   competition: CompetitionType
   player?: ReturnType<typeof awardsForCompetition>['mvp']
   goalkeeper?: ReturnType<typeof awardsForCompetition>['goalkeeper']
+  goalkeepers: ReturnType<typeof awardsForCompetition>['goalkeepers']
   goldenGlove?: ReturnType<typeof seasonAwards>['goldenGlove']
 }
 
@@ -59,33 +61,32 @@ export function historySeasons(matches: Match[], states: CompetitionState[]) { r
 
 export function historyTimelineForSeason(teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], season: string): HistoryTimeline {
   const cached = stateMap(timelineCache, matches, players, teams, states)
-  const key = `${RATING_ENGINE_REVISION}:${season}`
+  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${season}`
   const current = cached.get(key); if (current) return current
   diagnostics.timelineBuilds++
-  const tournamentTeams = currentStaticTeams(teams)
-  const draw = states.find(state => state.kind === 'champions-draw' && state.season === season)
-  const status = competitionSeasonStatus(tournamentTeams, matches, season, players, draw)
+  const model = officialSeasonModel(teams, players, matches, states, season)
+  const status = model.status
   const rows = buildGlobalRankingData(players, matches, { seasons: [season], teams: [], positions: [] }, 'rating')
-  const scorer = rankGlobalRankingRows(rows, players, 'goals')[0]
-  const assister = rankGlobalRankingRows(rows, players, 'assists')[0]
+  const scorers = sharedStatAwardWinners(rows, row => row.goals, 'Goals').map(winner => ({ playerId: winner.playerId, goals: winner.value }))
+  const assistLeaders = sharedStatAwardWinners(rows, row => row.assists, 'Assists').map(winner => ({ playerId: winner.playerId, assists: winner.value }))
   const mom = rankGlobalRankingRows(rows, players, 'mom')[0]
   const rating = rankGlobalRankingRows(rows, players, 'rating')[0]
-  const xi = officialAwardsForSeason(teams, players, matches, states, season).filter(event => event.kind === 'season-xi').map(event => event.playerId)
-  const result: HistoryTimeline = { season, league: status.league.championId, cup: status.cup.championId, champions: status.champions.championId, scorer: scorer ? { playerId: scorer.playerId, goals: scorer.goals } : undefined, assists: assister ? { playerId: assister.playerId, assists: assister.assists } : undefined, rating: rating ? { playerId: rating.playerId, avgRating: rating.avgRating } : undefined, mom: mom ? { playerId: mom.playerId, mom: mom.mom } : undefined, bestXI: xi }
+  const xi = model.events.filter(event => event.kind === 'season-xi').map(event => event.playerId)
+  const result: HistoryTimeline = { season, league: status.league.championId, cup: status.cup.championId, champions: status.champions.championId, scorers, assistLeaders, scorer: scorers[0], assists: assistLeaders[0], rating: rating ? { playerId: rating.playerId, avgRating: rating.avgRating } : undefined, mom: mom ? { playerId: mom.playerId, mom: mom.mom } : undefined, bestXI: xi }
   cached.set(key, result)
   return result
 }
 
 export function historyAwardsForSeason(teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], season: string, scope: CompetitionType | 'all'): HistoryAwards[] {
   const cached = stateMap(awardsCache, matches, players, teams, states)
-  const key = `${RATING_ENGINE_REVISION}:${season}:${scope}`; const current = cached.get(key); if (current) return current
+  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${season}:${scope}`; const current = cached.get(key); if (current) return current
   diagnostics.awardBuilds++
   const model = officialSeasonModel(teams, players, matches, states, season)
   const types = scope === 'all' ? ['league', 'cup', 'champions'] as CompetitionType[] : [scope]
   const result = types.map(competition => {
     const award = model.competitionAwards[competition]
     const published = award.complete ? award : undefined
-    return { season, competition, player: published?.mvp, goalkeeper: published?.goalkeeper, goldenGlove: undefined }
+    return { season, competition, player: published?.mvp, goalkeeper: published?.goalkeeper, goalkeepers: published?.goalkeepers ?? [], goldenGlove: undefined }
   })
   cached.set(key, result)
   return result
@@ -99,7 +100,7 @@ export function playerTeamTitles(teams: Team[], players: Player[], matches: Matc
 
 export function historyMonthlyAward(teams: Team[], players: Player[], matches: Match[], season: string, block: number) {
   const cached = monthlyMap(matches, players, teams)
-  const key = `${RATING_ENGINE_REVISION}:${season}:${block}`
+  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${season}:${block}`
   if (cached.has(key)) return cached.get(key)
   diagnostics.monthlyBuilds++
   const result = monthlyAwardForBlock(teams, players, matches, season, block)

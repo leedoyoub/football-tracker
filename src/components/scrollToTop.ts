@@ -1,18 +1,25 @@
-import type { ScreenState, ScreenStateByView, View } from '../types'
+import type { ScreenState, View } from '../types'
 import { competitionMenu } from '../lib/competitionScreenState'
 
 /** Existing ranking/race controls keep their original screen-owned behavior. */
 export function hasPageScrollToTop(view: View, state: ScreenState): boolean {
-  if (['player', 'records', 'records-leaderboard', 'results', 'players'].includes(view.name)) return true
-  return view.name === 'competition' && state.name === 'competition' && competitionMenu(state) === 'matches'
+  if (['home', 'latest-changes', 'chemistry', 'player', 'records', 'records-leaderboard', 'results', 'players'].includes(view.name)) return true
+  if (view.name === 'team' && state.name === 'team') return ['overview', 'matches', 'history'].includes(state.tab)
+  if (view.name !== 'competition' || state.name !== 'competition') return false
+  const menu = competitionMenu(state)
+  return menu === 'matches' || menu === 'players' || state.competitionType === 'league' && menu === 'history'
 }
 
 export function pageScrollScopeKey(view: View, state: ScreenState): string {
-  const competition = state.name === 'competition' ? `${state.competitionType}:${competitionMenu(state as ScreenStateByView['competition'])}` : ''
-  return `${view.name}:${'id' in view ? view.id : ''}:${competition}`
+  const competition = state.name === 'competition' ? `${state.competitionType}:${competitionMenu(state)}` : ''
+  const team = state.name === 'team' ? [state.tab, state.matchesCompetition,
+    'historyMenu' in state ? state.historyMenu : 'honors',
+    'historyCompetition' in state ? state.historyCompetition : 'all',
+  ].join(':') : ''
+  return `${view.name}:${'id' in view ? view.id : ''}:${competition}:${team}`
 }
 
-type DistanceSurface = Pick<HTMLElement, 'scrollTop' | 'scrollHeight' | 'clientHeight' | 'addEventListener' | 'removeEventListener'>
+type DistanceSurface = Pick<HTMLElement, 'scrollTop' | 'scrollHeight' | 'clientHeight' | 'addEventListener' | 'removeEventListener'> & Partial<Pick<HTMLElement, 'children'>>
 /** One cheap comparison per native scroll; React updates only at visibility edges. */
 export function observeScrollDistance(surface: DistanceSurface, threshold: number, onVisible: (visible: boolean) => void) {
   let previous: boolean | undefined
@@ -24,7 +31,19 @@ export function observeScrollDistance(surface: DistanceSurface, threshold: numbe
   surface.addEventListener('scroll', update, { passive: true })
   const resize = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(update)
   resize?.observe(surface as HTMLElement)
-  return () => { surface.removeEventListener('scroll', update); resize?.disconnect() }
+  // The viewport stays fixed while filters, disclosures and loaded images change
+  // its content height. Observe the route roots as well as the viewport itself.
+  const observed = new Set<Element>()
+  const refreshContent = () => {
+    const children = new Set(Array.from(surface.children ?? []))
+    for (const child of observed) if (!children.has(child)) { resize?.unobserve(child); observed.delete(child) }
+    for (const child of children) if (!observed.has(child)) { resize?.observe(child); observed.add(child) }
+    update()
+  }
+  refreshContent()
+  const mutation = typeof MutationObserver === 'undefined' ? undefined : new MutationObserver(refreshContent)
+  mutation?.observe(surface as HTMLElement, { childList: true, subtree: true, attributes: true, characterData: true })
+  return () => { surface.removeEventListener('scroll', update); resize?.disconnect(); mutation?.disconnect() }
 }
 
 type Observer = { observe: (target: Element) => void; disconnect: () => void }

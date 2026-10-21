@@ -9,8 +9,9 @@ import { newestMatches } from './matchChronology'
 import { scopedPositionFamilyByPlayer, type PositionFamily } from './positionScope'
 import { competitionIdentityForMatch } from './competitionContext'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
+import { AWARD_POLICY_REVISION } from './awardPolicy'
 
-export const AWARD_POLICY_REVISION = 1
+export { AWARD_POLICY_REVISION } from './awardPolicy'
 export const ROUND_AWARD_STAGES = ['roundOf16', 'quarterFinal', 'semiFinal'] as const
 export const ROUND_AWARD_LABELS = { roundOf16: 'Round of 16', quarterFinal: 'Quarter-finals', semiFinal: 'Semi-finals' } as const
 export type OfficialAwardEvent = {
@@ -22,7 +23,7 @@ export type TeamSeasonResult = {
   season: string; competition: CompetitionType; teamId: string; champion: boolean; runnerUp: boolean
   finalAppearance: boolean; finish: number; finishLabel: string; points?: number; wins?: number; goalDifference?: number
 }
-export type OfficialSeasonModel = { events: OfficialAwardEvent[]; teamResults: TeamSeasonResult[]; competitionAwards: Record<CompetitionType, CompetitionAwards> }
+export type OfficialSeasonModel = { readonly status: ReturnType<typeof competitionSeasonStatus>; events: OfficialAwardEvent[]; teamResults: TeamSeasonResult[]; competitionAwards: Record<CompetitionType, CompetitionAwards> }
 const cache = new WeakMap<Team[], WeakMap<Player[], WeakMap<Match[], WeakMap<CompetitionState[], Map<string, OfficialSeasonModel>>>>>()
 
 /** A pairing winner alone is insufficient if other required series are missing. */
@@ -89,9 +90,9 @@ export function officialSeasonModel(teams: Team[], players: Player[], matches: M
         const title = competition === 'league' ? 'League' : competition === 'cup' ? 'Cup' : 'Champions'
         const publish = (kind: string, label: string, winner?: AwardWinner) => add(`${competition}-${kind}`, label, winner?.playerId, competition, scope, winner?.teamId)
         publish('mvp', competition === 'league' ? 'Player of the League' : competition === 'cup' ? 'Player of the Cup' : 'Player of the Tournament', award.mvp)
-        publish('scorer', `${title} Top Scorer`, award.scorer)
-        publish('assists', `${title} Assist King`, award.assists)
-        publish('gk', award.goalkeeper?.label ?? '', award.goalkeeper)
+        for (const winner of award.scorers) publish('scorer', `${title} Top Scorer`, winner)
+        for (const winner of award.assistLeaders) publish('assists', `${title} Assist King`, winner)
+        for (const winner of award.goalkeepers) publish('gk', winner.label, winner)
         for (const slot of award.bestXI ?? []) add(`${competition}-xi`, `${title} Best XI`, slot.playerId ?? undefined, competition, scope, slot.teamId)
       }
       if (competition !== 'league' && award.complete) {
@@ -108,7 +109,9 @@ export function officialSeasonModel(teams: Team[], players: Player[], matches: M
     }
     if (status.complete) {
       const award = seasonAwards(season, tournamentTeams, players, matches, states, status)
-      for (const [kind, label, winner] of [['mvp', 'Player of the Season', award.ballon], ['scorer', 'Season Top Scorer', award.goldenBoot], ['assists', 'Season Assist King', award.assistLeader], ['gk', 'Goalkeeper of the Season', award.goalkeeper]] as const) add(`season-${kind}`, label, winner?.playerId, 'all', games, winner?.teamId)
+      for (const [kind, label, winners] of [['mvp', 'Player of the Season', award.ballon ? [award.ballon] : []], ['scorer', 'Season Top Scorer', award.goldenBootWinners], ['assists', 'Season Assist King', award.assistLeaderWinners], ['gk', 'Goalkeeper of the Season', award.goalkeeper ? [award.goalkeeper] : []]] as const) {
+        for (const winner of winners) add(`season-${kind}`, label, winner.playerId, 'all', games, winner.teamId)
+      }
       for (const slot of award.bestXI) add('season-xi', 'Season Best XI', slot.playerId ?? undefined, 'all', games, slot.teamId)
     }
     for (const result of teamResults) {
@@ -121,7 +124,7 @@ export function officialSeasonModel(teams: Team[], players: Player[], matches: M
     publishedEvents = [...events.values()]
     return publishedEvents
   }
-  const value = { get events() { return buildEvents() }, teamResults, get competitionAwards() { buildEvents(); return competitionAwards } }
+  const value = { status, get events() { return buildEvents() }, teamResults, get competitionAwards() { buildEvents(); return competitionAwards } }
   bySeason.set(key, value)
   return value
 }
@@ -132,5 +135,5 @@ export function careerAwardEvents(teams: Team[], players: Player[], matches: Mat
 function periodOrder(event: OfficialAwardEvent) { return typeof event.period === 'number' ? event.period : event.period ? ROUND_AWARD_STAGES.indexOf(event.period) + 1 : 20 }
 export function awardEventDetail(event: OfficialAwardEvent, teams: Team[]): string {
   const season = `Season ${event.season.match(/\d+/)?.[0] ?? event.season}`
-  return typeof event.period === 'number' ? `${season}-${event.period}` : event.period ? `${season} · ${ROUND_AWARD_LABELS[event.period]}` : `${season} · ${teams.find(team => team.id === event.teamId)?.name ?? event.teamId}`
+  return event.kind === 'cup-final' || event.kind === 'champions-final' ? `${season} · Final` : typeof event.period === 'number' ? `${season}-${event.period}` : event.period ? `${season} · ${ROUND_AWARD_LABELS[event.period]}` : `${season} · ${teams.find(team => team.id === event.teamId)?.name ?? event.teamId}`
 }
