@@ -79,7 +79,7 @@ test('Cup finals and replays show per-team completion until canonical winner res
 })
 
 test('Individual Honors names prefer full saved name while counts, disclosures and player links persist', () => {
-  const ps = [{ id: 'p', name: '  Cristiano Ronaldo dos Santos Aveiro  ', fullName: 'Other full name', displayName: 'Ronaldo', teamId: '' }, { id: 'fallback', name: '', fullName: 'Full fallback', displayName: 'Short' }]
+  const ps = [{ id: 'p', name: 'Ronaldo', fullName: '  Cristiano Ronaldo dos Santos Aveiro  ', displayName: 'Ronaldo', teamId: '' }, { id: 'fallback', name: '', fullName: 'Full fallback', displayName: 'Short' }]
   const events = ps.map(p => ({ id: p.id, kind: 'monthly-player', label: 'Player of the Month', playerId: p.id, teamId: 'T0', season: 'S1', period: 2, finalized: true, category: 'individual' }))
   const h = screenHarness(path.resolve(__dirname, '..'), 'screens/TeamHistory.tsx', 'TeamHistory', {}, { '../engine/teamHistory': { ...require('../src/engine/teamHistory.ts'), teamHistoryHonors: () => ({ seasonHistory: [], championships: 0, runnerUps: 0, finals: 0, individual: require('../src/engine/teamHistory.ts').groupTeamIndividualHonors(events) }) } })
   const destinations = [], patches = []

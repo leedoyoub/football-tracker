@@ -52,7 +52,7 @@ export function deriveLatestChanges(players: Player[], teams: Team[], matches: M
   const key = `${AWARD_POLICY_REVISION}:${arrayItemRevision(players)}:${arrayItemRevision(teams)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}:${season ?? ''}`
   const cached = bySeason.get(key)
   if (cached?.revision === RATING_ENGINE_REVISION) return cached.value
-  const value = prepared(deriveFootballEvents(players, teams, matches, states, { includeAllRanking: true }), matches, season)
+  const value = prepared(deriveFootballEvents(players, teams, matches, states, { includeAllRanking: true, includeMatchPerformance: false }), matches, season)
   if (bySeason.size >= 32) bySeason.delete(bySeason.keys().next().value!)
   bySeason.set(key, { revision: RATING_ENGINE_REVISION, value })
   return value

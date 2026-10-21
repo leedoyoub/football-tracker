@@ -13,16 +13,16 @@ const loadLayout = () => {
 const slotsFor = (def, mid, fw) => [['GK', 1], ['DEF', def], ['MID', mid], ['FW', fw]].flatMap(([group, count]) => Array.from({ length: count }, (_, index) => ({ slot: `${group}-${index + 1}`, displayPosition: group, position: { GK: 'GK', DEF: 'CB', MID: 'CM', FW: 'ST' }[group], playerId: `${group}-${index + 1}`, teamId: 'T', matches: 4, avgRating: 7.1 })))
 const row = (slots, group) => slots.filter(slot => slot.displayPosition === group)
 
-test('team history layouts preserve existing one-to-four spacing and result metadata', () => {
+test('team history layouts preserve result metadata with fixed-pitch optimized spacing', () => {
   const layout = loadLayout()
   for (const [def, mid, fw] of [[4, 3, 3], [4, 4, 2], [3, 4, 3], [3, 3, 4]]) {
     const input = slotsFor(def, mid, fw), before = JSON.stringify(input), output = layout(input)
     assert.equal(JSON.stringify(input), before, 'saved/cached selection is not mutated')
     assert.deepEqual(output.map(({ x: _x, y: _y, ...slot }) => slot), input)
-    assert.deepEqual(row(output, 'GK').map(s => [s.x, s.y]), [[50, 88]])
-    const spacing = count => ({ 1: [50], 2: [35, 65], 3: [20, 50, 80], 4: [13, 38, 62, 87] })[count]
+    assert.deepEqual(row(output, 'GK').map(s => [s.x, s.y]), [[50, 89]])
+    const spacing = count => ({ 1: [50], 2: [35, 65], 3: [17.5, 50, 82.5], 4: [12.25, 37.42, 62.58, 87.75] })[count]
     for (const [group, count, y] of [['DEF', def, 69], ['MID', mid, 46], ['FW', fw, 22]]) {
-      assert.deepEqual(row(output, group).map(s => s.x), group === 'MID' && count === 3 ? [25, 50, 75] : spacing(count))
+      assert.deepEqual(row(output, group).map(s => s.x), spacing(count))
       assert.ok(row(output, group).every(s => s.y === y))
     }
   }
@@ -43,24 +43,24 @@ test('3-5-2 and 4-5-1 use upper odd/lower even zigzags with vacant slots retaini
   }
 })
 
-test('five-plus team pitches leave full card and badge bounds clear at 264px mobile width', () => {
-  const layout = loadLayout(), width = 264, height = width * 5 / 3
+test('five-plus team pitches keep fixed3:4 and full standard card bounds clear at264px', () => {
+  const layout = loadLayout(), width = 262, height = 264 * 4 / 3 - 2
   for (const shape of [[3, 5, 2], [4, 5, 1], [5, 4, 1], [1, 1, 8], [0, 9, 1], [0, 10, 0]]) {
     const slots = layout(slotsFor(...shape))
-    // Conservative shared Pitch card envelope:40px avatar,18px badge at-12px,
+    // Team-only card envelope:40px avatar,18px badge at-4px,
     // goals/assists row and16px name. Check whole cards, not just center points.
     // Names/stats are capped to the shared23% card width; top-right badge
     // extends32px from the center and the team crest extends24px to the left.
     const leftExtent = Math.max(24, width * .23 / 2)
-    const bounds = slots.map(slot => ({ left: slot.x * width / 100 - leftExtent, right: slot.x * width / 100 + 32, top: slot.y * height / 100 - 44, bottom: slot.y * height / 100 + 32 }))
+    const bounds = slots.map(slot => ({ left: slot.x * width / 100 - leftExtent, right: slot.x * width / 100 + 32, top: slot.y * height / 100 - 36, bottom: slot.y * height / 100 + 32 }))
     for (const box of bounds) assert.ok(box.left >= 0 && box.right <= width && box.top >= 0 && box.bottom <= height)
     for (let i = 0; i < bounds.length; i++) for (let j = i + 1; j < bounds.length; j++) {
       const a = bounds[i], b = bounds[j]
       assert.ok(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top, `cards ${slots[i].slot}/${slots[j].slot} do not overlap in ${shape}`)
     }
     const html = renderToStaticMarkup(React.createElement(Pitch, { slots, players: [], presentation: 'team-history', statsByPlayer: Object.fromEntries(slots.map(slot => [slot.playerId, { goals: 2, assists: 2 }])) }))
-    assert.match(html, /aspect-\[3\/5\]/)
-    assert.match(html, /w-16 max-w-full grid-cols-2/)
+    assert.match(html, /aspect-\[3\/4\]/)
+    assert.match(html, /width:max-content;min-width:min\(4rem, 100%\)/)
   }
   const normal = renderToStaticMarkup(React.createElement(Pitch, { slots: layout(slotsFor(4, 3, 3)), players: [], presentation: 'team-history' }))
   assert.match(normal, /aspect-\[3\/4\]/)
@@ -75,9 +75,9 @@ test('six-to-eight player groups use separated rows within mobile pitch bounds',
     const output = layout(slotsFor(counts.DEF, counts.MID, counts.FW)), crowded = row(output, group)
     assert.equal(output.length, 11)
     assert.equal(new Set(crowded.map(s => s.y)).size, 2)
-    assert.ok(output.every(s => s.x >= 13 && s.x <= 87 && s.y >= 14 && s.y <= 88))
+    assert.ok(output.every(s => s.x >= 12.25 && s.x <= 87.75 && s.y >= 10.5 && s.y <= 88.5))
     const lines = [...new Set(output.map(s => s.y))].sort((a, b) => a - b)
-    assert.ok(lines.every((y, i) => !i || y - lines[i - 1] >= 17), 'rows leave room for icons, ratings and names')
+    assert.ok(lines.every((y, i) => !i || y - lines[i - 1] >= 19.5 - 1e-9), 'rows leave room for icons, ratings and names')
     for (const [upper, lower] of [['FW', 'MID'], ['MID', 'DEF'], ['DEF', 'GK']]) assert.ok(Math.max(...row(output, upper).map(s => s.y)) < Math.min(...row(output, lower).map(s => s.y)))
   }
 })

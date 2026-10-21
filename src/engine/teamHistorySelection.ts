@@ -54,7 +54,7 @@ export function mostUsedTeamHistoryFormation(games: Match[], teamId: string): Te
 /** Team-only display projection. Shared cumulative scoring and eligibility remain official;
  * only the formation quotas and grouping differ from the official AWARD_433 selector. */
 export function selectTeamHistoryBestXI(players: Player[], games: Match[], teamId: string) {
-  const teamGames = games.filter(match => isRecordedForTeam(match, teamId))
+  const teamGames = games.every(match => isRecordedForTeam(match, teamId)) ? games : games.filter(match => isRecordedForTeam(match, teamId))
   const teamMatches = teamGames.length, minimumAppearances = Math.ceil(teamMatches * .4)
   const formation = mostUsedTeamHistoryFormation(teamGames, teamId)
   const statsByPlayer: Record<string, { goals: number; assists: number; avgRating?: number }> = {}

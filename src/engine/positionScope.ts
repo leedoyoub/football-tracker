@@ -42,7 +42,7 @@ export function dominantPositionFamily(minutes: Map<PositionFamily, number>): Po
   return dominant(minutes, FAMILY_ORDER)
 }
 
-function positionMinutesByPlayer(players: Player[], matches: Match[], scope: PositionScope) {
+export function positionMinutesByPlayer(players: Player[], matches: Match[], scope: PositionScope): ReadonlyMap<string, ReadonlyMap<Position, number>> {
   let entry = minuteCache.get(matches)
   // Legacy callers can replace/delete items in the same collection. Preserve
   // that behavior while avoiding a second traversal of appearance timelines.

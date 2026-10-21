@@ -12,6 +12,7 @@ import { hasPitchAppearance, isOnPitchAtEvent, matchPositionSegments } from './t
 import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts } from './playerMatchFacts'
 import { teamsCreditedWithResult, teamPerspectiveScore } from './matchPerspective'
 import { positionFamily } from './positionScope'
+import { knockoutNewsCheckpoints } from './newsCheckpoints'
 
 export type NewsKind = 'player' | 'match' | 'team'
 export type NewsImportance = 'major' | 'medium' | 'minor'
@@ -116,13 +117,13 @@ function addAttackingMilestones(add: (item: NewsDraft) => void, player: Player, 
  * rerenders, hydration, sync and reopening an old match naturally idempotent.
  */
 function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[], targetPlayerId?: string): NewsItem[] {
-  const playerById = new Map<string, Player>()
+  const playerById = new Map<string, { player: Player; order: number }[]>()
   const teamById = new Map<string, Team>()
   const drawsBySeason = new Map<string, CompetitionState>()
-  for (const player of players) if (!playerById.has(player.id)) playerById.set(player.id, player)
+  players.forEach((player, order) => { const entries = playerById.get(player.id) ?? []; entries.push({ player, order }); playerById.set(player.id, entries) })
   for (const team of teams) if (!teamById.has(team.id)) teamById.set(team.id, team)
   for (const state of states) if (state.kind === 'champions-draw' && !drawsBySeason.has(state.season)) drawsBySeason.set(state.season, state)
-  const playerName = (_players: Player[], id?: string) => { const player = playerById.get(id ?? ''); return player?.displayName ?? player?.name ?? 'Player' }
+  const playerName = (_players: Player[], id?: string) => { const player = playerById.get(id ?? '')?.[0]?.player; return player?.displayName ?? player?.name ?? 'Player' }
   const teamName = (_teams: Team[], id?: string) => teamById.get(id ?? '')?.name ?? 'Team'
   const scoreText = (match: Match, _teams: Team[]) => { const score = matchScore(match); return `${teamName(teams, match.homeTeamId)} ${score.home}-${score.away} ${teamName(teams, match.awayTeamId)} · ${competitionName(matchCompetitionType(match))}` }
   const items = new Map<string, NewsItem>()
@@ -135,13 +136,23 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
   const teamRuns = new Map<string, TeamRun>()
   const chronological = ordered(matches)
   const analyticsBySeason = new Map((targetPlayerId === undefined ? [...new Set(matches.map(match => match.season))] : []).map(seasonName => [seasonName, buildSeasonAnalytics(teams, players, matches, seasonName)]))
-  const milestonePlayers = targetPlayerId === undefined ? players : players.filter(player => player.id === targetPlayerId)
   const chronologicalPrefixBySeason = new Map<string, Match[]>()
+  const checkpoints = knockoutNewsCheckpoints(teams, players, { cupCompetition, championsCompetition })
   // Track canonical snapshot and knockout transitions for News.
   const teamLeads = new Map<string, boolean>()
   const cupStatus = new Map<string, string[]>()
 
   for (const match of chronological) {
+    // The first saved appearance remains authoritative for duplicate IDs. Keep
+    // duplicate roster entries and their original order, including cumulative
+    // milestone behavior in historical imports with duplicate players.
+    const appearances = new Map<string, Match['appearances'][number]>()
+    for (const appearance of match.appearances) if (!appearances.has(appearance.playerId)) appearances.set(appearance.playerId, appearance)
+    const participants = [...appearances.values()].flatMap(appearance => {
+      if ((targetPlayerId !== undefined && appearance.playerId !== targetPlayerId) || !playerById.has(appearance.playerId) || !hasPitchAppearance(match, appearance)) return []
+      return playerById.get(appearance.playerId)!
+    }).sort((left, right) => left.order - right.order)
+    if (targetPlayerId !== undefined && !participants.length) continue
     const seasonPrefix = chronologicalPrefixBySeason.get(match.season) ?? []
     seasonPrefix.push(match)
     chronologicalPrefixBySeason.set(match.season, seasonPrefix)
@@ -152,7 +163,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
     if (targetPlayerId === undefined && (type === 'cup' || type === 'champions')) {
         const matchesUpToDate = seasonPrefix
         if (type === 'cup') {
-            const cup = cupCompetition(teams, matchesUpToDate, match.season, players)
+            const cup = checkpoints.cup(match, matchesUpToDate)
             const prevActive = cupStatus.get(match.season) || teams.map(t => t.id)
             const currentActive = cup.activeTeamIds
             
@@ -179,7 +190,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
         if (type === 'champions') {
             const draw = drawsBySeason.get(match.season)
             if (draw) {
-                const champions = championsCompetition(draw, matchesUpToDate, match.season, players)
+                const champions = checkpoints.champions(match, matchesUpToDate, draw)
                 const prevActive = cupStatus.get(match.season + 'champions') || draw.teamIds
                 
                 // Elimination check
@@ -239,9 +250,8 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
     }
     // ...
     const momId = getMatchManOfTheMatch(match, players)
-    for (const player of milestonePlayers) {
-      if (!didAppear(match, player.id)) continue
-      const appearance = match.appearances.find(item => item.playerId === player.id)!
+    for (const { player } of participants) {
+      const appearance = appearances.get(player.id)!
       const goalkeeper = playerGoalkeeperFacts(match, appearance)
       const performance = { goals: playerGoalEvents(match, appearance).length, assists: playerAssistEvents(match, appearance).length, saves: goalkeeper.saves }
       const isGoalkeeper = Boolean(goalkeeper.appearances)
@@ -427,13 +437,13 @@ function surfaceFor(item: NewsItem): EventSurface {
 }
 
 /** Canonical, non-persistent event model consumed by News and Match Changes. */
-export function deriveFootballEvents(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES, options: { includeAllRanking?: boolean } = {}): DerivedFootballEvent[] {
+export function deriveFootballEvents(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES, options: { includeAllRanking?: boolean; includeMatchPerformance?: boolean } = {}): DerivedFootballEvent[] {
   const derived = deriveNews(players, teams, matches, states)
     // The participant-only transition index owns detailed ranking movement.
     // Snapshot stories enter this model solely for an explicit core-metric #1.
     .filter(item => options.includeAllRanking || !item.id.startsWith('rank:') || item.surface === 'news')
     .map(item => ({ ...item, surface: surfaceFor(item), matchChange: item.matchChange ?? { kind: item.id.startsWith('rank:') ? 'ranking' : item.id.startsWith('record:') ? 'record' : item.id.startsWith('rare:') ? 'performance' : item.id.startsWith('award:') || item.id.startsWith('title:') ? 'competition' : 'milestone', label: item.title } }))
-  const contributions: DerivedFootballEvent[] = ordered(matches).flatMap(match => {
+  const contributions: DerivedFootballEvent[] = options.includeMatchPerformance === false ? [] : ordered(matches).flatMap(match => {
     const byPlayer = new Map<string, { goals: number; assists: number }>()
     const add = (playerId: string, key: 'goals' | 'assists') => { const row = byPlayer.get(playerId) ?? { goals: 0, assists: 0 }; row[key]++; byPlayer.set(playerId, row) }
     for (const appearance of match.appearances) {

@@ -1,0 +1,7553 @@
+{
+  "browser": "chrome.exe",
+  "stylesheet": "index-D3VRXN3d.css",
+  "method": "Chromium headless actual app SSR + built CSS; bounding rectangles and elementFromPoint for each icon/rating/crest/name/GA/click center; not a physical touch-device test",
+  "testedCases": 208,
+  "regularCases": 104,
+  "regularErrors": 0,
+  "extremeCasesWithOverlap": [
+    {
+      "width": 264,
+      "shape": "4-4-2",
+      "scenario": "three-digit",
+      "collisions": 7,
+      "hitFailures": 0,
+      "first": {
+        "type": "neighbor",
+        "first": 5,
+        "second": 6,
+        "kinds": [
+          "ga",
+          "click"
+        ],
+        "overlapWidth": 1.90625,
+        "overlapHeight": 14
+      }
+    },
+    {
+      "width": 264,
+      "shape": "4-4-2",
+      "scenario": "four-digit",
+      "collisions": 17,
+      "hitFailures": 2,
+      "first": {
+        "type": "neighbor",
+        "first": 5,
+        "second": 6,
+        "kinds": [
+          "click",
+          "ga"
+        ],
+        "overlapWidth": 2.734375,
+        "overlapHeight": 14
+      }
+    },
+    {
+      "width": 264,
+      "shape": "4-5-1",
+      "scenario": "three-digit",
+      "collisions": 7,
+      "hitFailures": 0,
+      "first": {
+        "type": "neighbor",
+        "first": 1,
+        "second": 2,
+        "kinds": [
+          "ga",
+          "click"
+        ],
+        "overlapWidth": 1.90625,
+        "overlapHeight": 14
+      }
+    },
+    {
+      "width": 264,
+      "shape": "4-5-1",
+      "scenario": "four-digit",
+      "collisions": 17,
+      "hitFailures": 2,
+      "first": {
+        "type": "neighbor",
+        "first": 1,
+        "second": 2,
+        "kinds": [
+          "click",
+          "ga"
+        ],
+        "overlapWidth": 2.734375,
+        "overlapHeight": 14
+      }
+    },
+    {
+      "width": 264,
+      "shape": "5-4-1",
+      "scenario": "three-digit",
+      "collisions": 7,
+      "hitFailures": 0,
+      "first": {
+        "type": "neighbor",
+        "first": 6,
+        "second": 7,
+        "kinds": [
+          "ga",
+          "click"
+        ],
+        "overlapWidth": 1.90625,
+        "overlapHeight": 14
+      }
+    },
+    {
+      "width": 264,
+      "shape": "5-4-1",
+      "scenario": "four-digit",
+      "collisions": 17,
+      "hitFailures": 2,
+      "first": {
+        "type": "neighbor",
+        "first": 6,
+        "second": 7,
+        "kinds": [
+          "click",
+          "ga"
+        ],
+        "overlapWidth": 2.734375,
+        "overlapHeight": 14
+      }
+    },
+    {
+      "width": 264,
+      "shape": "1-7-2",
+      "scenario": "three-digit",
+      "collisions": 7,
+      "hitFailures": 0,
+      "first": {
+        "type": "neighbor",
+        "first": 2,
+        "second": 4,
+        "kinds": [
+          "ga",
+          "click"
+        ],
+        "overlapWidth": 1.90625,
+        "overlapHeight": 14
+      }
+    },
+    {
+      "width": 264,
+      "shape": "1-7-2",
+      "scenario": "four-digit",
+      "collisions": 17,
+      "hitFailures": 2,
+      "first": {
+        "type": "neighbor",
+        "first": 2,
+        "second": 4,
+        "kinds": [
+          "click",
+          "ga"
+        ],
+        "overlapWidth": 2.734375,
+        "overlapHeight": 14
+      }
+    },
+    {
+      "width": 264,
+      "shape": "1-1-8",
+      "scenario": "three-digit",
+      "collisions": 14,
+      "hitFailures": 0,
+      "first": {
+        "type": "neighbor",
+        "first": 3,
+        "second": 5,
+        "kinds": [
+          "ga",
+          "click"
+        ],
+        "overlapWidth": 1.90625,
+        "overlapHeight": 14
+      }
+    },
+    {
+      "width": 264,
+      "shape": "1-1-8",
+      "scenario": "four-digit",
+      "collisions": 34,
+      "hitFailures": 4,
+      "first": {
+        "type": "neighbor",
+        "first": 3,
+        "second": 5,
+        "kinds": [
+          "click",
+          "ga"
+        ],
+        "overlapWidth": 2.734375,
+        "overlapHeight": 14
+      }
+    }
+  ],
+  "results": [
+    {
+      "shape": "4-3-3",
+      "width": 264,
+      "scenario": "standard",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": [],
+      "sizes": [
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 112,
+            "top": 280.5,
+            "right": 152,
+            "bottom": 320.5,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 139,
+            "top": 276.5,
+            "right": 164,
+            "bottom": 294.5,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 108,
+            "top": 276.5,
+            "right": 124,
+            "bottom": 292.5,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 101.875,
+            "top": 316.5,
+            "right": 131.15625,
+            "bottom": 330.5,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 132.84375,
+            "top": 316.5,
+            "right": 162.125,
+            "bottom": 330.5,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 101.875,
+            "top": 328.5,
+            "right": 162.125,
+            "bottom": 344.5,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 13.09375,
+            "top": 210.5,
+            "right": 53.09375,
+            "bottom": 250.5,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00 ★",
+          "width": 35.453125,
+          "height": 18,
+          "box": {
+            "left": 29.640625,
+            "top": 206.5,
+            "right": 65.09375,
+            "bottom": 224.5,
+            "width": 35.453125,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 9.09375,
+            "top": 206.5,
+            "right": 25.09375,
+            "bottom": 222.5,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 2.96875,
+            "top": 246.5,
+            "right": 32.25,
+            "bottom": 260.5,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 33.9375,
+            "top": 246.5,
+            "right": 63.21875,
+            "bottom": 260.5,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 2.96875,
+            "top": 258.5,
+            "right": 63.21875,
+            "bottom": 274.5,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 79.03125,
+            "top": 210.5,
+            "right": 119.03125,
+            "bottom": 250.5,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 106.03125,
+            "top": 206.5,
+            "right": 131.03125,
+            "bottom": 224.5,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 75.03125,
+            "top": 206.5,
+            "right": 91.03125,
+            "bottom": 222.5,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 68.90625,
+            "top": 246.5,
+            "right": 98.1875,
+            "bottom": 260.5,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 99.875,
+            "top": 246.5,
+            "right": 129.15625,
+            "bottom": 260.5,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 68.90625,
+            "top": 258.5,
+            "right": 129.15625,
+            "bottom": 274.5,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 144.953125,
+            "top": 210.5,
+            "right": 184.953125,
+            "bottom": 250.5,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 171.953125,
+            "top": 206.5,
+            "right": 196.953125,
+            "bottom": 224.5,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 140.953125,
+            "top": 206.5,
+            "right": 156.953125,
+            "bottom": 222.5,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 134.828125,
+            "top": 246.5,
+            "right": 164.109375,
+            "bottom": 260.5,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 165.796875,
+            "top": 246.5,
+            "right": 195.078125,
+            "bottom": 260.5,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 134.828125,
+            "top": 258.5,
+            "right": 195.078125,
+            "bottom": 274.5,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 210.890625,
+            "top": 210.5,
+            "right": 250.890625,
+            "bottom": 250.5,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 237.890625,
+            "top": 206.5,
+            "right": 262.890625,
+            "bottom": 224.5,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 206.890625,
+            "top": 206.5,
+            "right": 222.890625,
+            "bottom": 222.5,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 200.765625,
+            "top": 246.5,
+            "right": 230.046875,
+            "bottom": 260.5,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 231.734375,
+            "top": 246.5,
+            "right": 261.015625,
+            "bottom": 260.5,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 200.765625,
+            "top": 258.5,
+            "right": 261.015625,
+            "bottom": 274.5,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 26.84375,
+            "top": 130,
+            "right": 66.84375,
+            "bottom": 170,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 53.84375,
+            "top": 126,
+            "right": 78.84375,
+            "bottom": 144,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 22.84375,
+            "top": 126,
+            "right": 38.84375,
+            "bottom": 142,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 16.71875,
+            "top": 166,
+            "right": 46,
+            "bottom": 180,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 47.6875,
+            "top": 166,
+            "right": 76.96875,
+            "bottom": 180,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 16.71875,
+            "top": 178,
+            "right": 76.96875,
+            "bottom": 194,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 112,
+            "top": 130,
+            "right": 152,
+            "bottom": 170,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 139,
+            "top": 126,
+            "right": 164,
+            "bottom": 144,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 108,
+            "top": 126,
+            "right": 124,
+            "bottom": 142,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 101.875,
+            "top": 166,
+            "right": 131.15625,
+            "bottom": 180,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 132.84375,
+            "top": 166,
+            "right": 162.125,
+            "bottom": 180,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 101.875,
+            "top": 178,
+            "right": 162.125,
+            "bottom": 194,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 197.140625,
+            "top": 130,
+            "right": 237.140625,
+            "bottom": 170,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 224.140625,
+            "top": 126,
+            "right": 249.140625,
+            "bottom": 144,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 193.140625,
+            "top": 126,
+            "right": 209.140625,
+            "bottom": 142,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 187.015625,
+            "top": 166,
+            "right": 216.296875,
+            "bottom": 180,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 217.984375,
+            "top": 166,
+            "right": 247.265625,
+            "bottom": 180,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 187.015625,
+            "top": 178,
+            "right": 247.265625,
+            "bottom": 194,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 26.84375,
+            "top": 46,
+            "right": 66.84375,
+            "bottom": 86,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 53.84375,
+            "top": 42,
+            "right": 78.84375,
+            "bottom": 60,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 22.84375,
+            "top": 42,
+            "right": 38.84375,
+            "bottom": 58,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 16.71875,
+            "top": 82,
+            "right": 46,
+            "bottom": 96,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 47.6875,
+            "top": 82,
+            "right": 76.96875,
+            "bottom": 96,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 16.71875,
+            "top": 94,
+            "right": 76.96875,
+            "bottom": 110,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 112,
+            "top": 46,
+            "right": 152,
+            "bottom": 86,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 139,
+            "top": 42,
+            "right": 164,
+            "bottom": 60,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 108,
+            "top": 42,
+            "right": 124,
+            "bottom": 58,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 101.875,
+            "top": 82,
+            "right": 131.15625,
+            "bottom": 96,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 132.84375,
+            "top": 82,
+            "right": 162.125,
+            "bottom": 96,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 101.875,
+            "top": 94,
+            "right": 162.125,
+            "bottom": 110,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 197.140625,
+            "top": 46,
+            "right": 237.140625,
+            "bottom": 86,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 224.140625,
+            "top": 42,
+            "right": 249.140625,
+            "bottom": 60,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 193.140625,
+            "top": 42,
+            "right": 209.140625,
+            "bottom": 58,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 187.015625,
+            "top": 82,
+            "right": 216.296875,
+            "bottom": 96,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "99",
+          "width": 29.28125,
+          "height": 14,
+          "box": {
+            "left": 217.984375,
+            "top": 82,
+            "right": 247.265625,
+            "bottom": 96,
+            "width": 29.28125,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 187.015625,
+            "top": 94,
+            "right": 247.265625,
+            "bottom": 110,
+            "width": 60.25,
+            "height": 16
+          }
+        }
+      ]
+    },
+    {
+      "shape": "4-3-3",
+      "width": 264,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-3-3",
+      "width": 264,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": [],
+      "sizes": [
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 112,
+            "top": 278.75,
+            "right": 152,
+            "bottom": 318.75,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 139,
+            "top": 274.75,
+            "right": 164,
+            "bottom": 292.75,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 108,
+            "top": 274.75,
+            "right": 124,
+            "bottom": 290.75,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 98.078125,
+            "top": 314.75,
+            "right": 132,
+            "bottom": 328.75,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 132,
+            "top": 314.75,
+            "right": 165.921875,
+            "bottom": 328.75,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 101.875,
+            "top": 326.75,
+            "right": 162.125,
+            "bottom": 342.75,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 72.6875,
+            "top": 142.25,
+            "right": 112.6875,
+            "bottom": 182.25,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00 ★",
+          "width": 35.453125,
+          "height": 18,
+          "box": {
+            "left": 89.234375,
+            "top": 138.25,
+            "right": 124.6875,
+            "bottom": 156.25,
+            "width": 35.453125,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 68.6875,
+            "top": 138.25,
+            "right": 84.6875,
+            "bottom": 154.25,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 58.765625,
+            "top": 178.25,
+            "right": 92.6875,
+            "bottom": 192.25,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 92.6875,
+            "top": 178.25,
+            "right": 126.609375,
+            "bottom": 192.25,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 62.5625,
+            "top": 190.25,
+            "right": 122.8125,
+            "bottom": 206.25,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 72.6875,
+            "top": 210.5,
+            "right": 112.6875,
+            "bottom": 250.5,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 99.6875,
+            "top": 206.5,
+            "right": 124.6875,
+            "bottom": 224.5,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 68.6875,
+            "top": 206.5,
+            "right": 84.6875,
+            "bottom": 222.5,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 58.765625,
+            "top": 246.5,
+            "right": 92.6875,
+            "bottom": 260.5,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 92.6875,
+            "top": 246.5,
+            "right": 126.609375,
+            "bottom": 260.5,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 62.5625,
+            "top": 258.5,
+            "right": 122.8125,
+            "bottom": 274.5,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 151.296875,
+            "top": 142.25,
+            "right": 191.296875,
+            "bottom": 182.25,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 178.296875,
+            "top": 138.25,
+            "right": 203.296875,
+            "bottom": 156.25,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 147.296875,
+            "top": 138.25,
+            "right": 163.296875,
+            "bottom": 154.25,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 137.375,
+            "top": 178.25,
+            "right": 171.296875,
+            "bottom": 192.25,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 171.296875,
+            "top": 178.25,
+            "right": 205.21875,
+            "bottom": 192.25,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 141.171875,
+            "top": 190.25,
+            "right": 201.421875,
+            "bottom": 206.25,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 151.296875,
+            "top": 210.5,
+            "right": 191.296875,
+            "bottom": 250.5,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 178.296875,
+            "top": 206.5,
+            "right": 203.296875,
+            "bottom": 224.5,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 147.296875,
+            "top": 206.5,
+            "right": 163.296875,
+            "bottom": 222.5,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 137.375,
+            "top": 246.5,
+            "right": 171.296875,
+            "bottom": 260.5,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 171.296875,
+            "top": 246.5,
+            "right": 205.21875,
+            "bottom": 260.5,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 141.171875,
+            "top": 258.5,
+            "right": 201.421875,
+            "bottom": 274.5,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 26.84375,
+            "top": 74,
+            "right": 66.84375,
+            "bottom": 114,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 53.84375,
+            "top": 70,
+            "right": 78.84375,
+            "bottom": 88,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 22.84375,
+            "top": 70,
+            "right": 38.84375,
+            "bottom": 86,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 12.921875,
+            "top": 110,
+            "right": 46.84375,
+            "bottom": 124,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 46.84375,
+            "top": 110,
+            "right": 80.765625,
+            "bottom": 124,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 16.71875,
+            "top": 122,
+            "right": 76.96875,
+            "bottom": 138,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 112,
+            "top": 74,
+            "right": 152,
+            "bottom": 114,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 139,
+            "top": 70,
+            "right": 164,
+            "bottom": 88,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 108,
+            "top": 70,
+            "right": 124,
+            "bottom": 86,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 98.078125,
+            "top": 110,
+            "right": 132,
+            "bottom": 124,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 132,
+            "top": 110,
+            "right": 165.921875,
+            "bottom": 124,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 101.875,
+            "top": 122,
+            "right": 162.125,
+            "bottom": 138,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 197.140625,
+            "top": 74,
+            "right": 237.140625,
+            "bottom": 114,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 224.140625,
+            "top": 70,
+            "right": 249.140625,
+            "bottom": 88,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 193.140625,
+            "top": 70,
+            "right": 209.140625,
+            "bottom": 86,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 183.21875,
+            "top": 110,
+            "right": 217.140625,
+            "bottom": 124,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 217.140625,
+            "top": 110,
+            "right": 251.0625,
+            "bottom": 124,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 187.015625,
+            "top": 122,
+            "right": 247.265625,
+            "bottom": 138,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 26.84375,
+            "top": 5.75,
+            "right": 66.84375,
+            "bottom": 45.75,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 53.84375,
+            "top": 1.75,
+            "right": 78.84375,
+            "bottom": 19.75,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 22.84375,
+            "top": 1.75,
+            "right": 38.84375,
+            "bottom": 17.75,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 12.921875,
+            "top": 41.75,
+            "right": 46.84375,
+            "bottom": 55.75,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 46.84375,
+            "top": 41.75,
+            "right": 80.765625,
+            "bottom": 55.75,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 16.71875,
+            "top": 53.75,
+            "right": 76.96875,
+            "bottom": 69.75,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 112,
+            "top": 5.75,
+            "right": 152,
+            "bottom": 45.75,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 139,
+            "top": 1.75,
+            "right": 164,
+            "bottom": 19.75,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 108,
+            "top": 1.75,
+            "right": 124,
+            "bottom": 17.75,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 98.078125,
+            "top": 41.75,
+            "right": 132,
+            "bottom": 55.75,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 132,
+            "top": 41.75,
+            "right": 165.921875,
+            "bottom": 55.75,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 101.875,
+            "top": 53.75,
+            "right": 162.125,
+            "bottom": 69.75,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 197.140625,
+            "top": 5.75,
+            "right": 237.140625,
+            "bottom": 45.75,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 224.140625,
+            "top": 1.75,
+            "right": 249.140625,
+            "bottom": 19.75,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 193.140625,
+            "top": 1.75,
+            "right": 209.140625,
+            "bottom": 17.75,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 183.21875,
+            "top": 41.75,
+            "right": 217.140625,
+            "bottom": 55.75,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "999",
+          "width": 33.921875,
+          "height": 14,
+          "box": {
+            "left": 217.140625,
+            "top": 41.75,
+            "right": 251.0625,
+            "bottom": 55.75,
+            "width": 33.921875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 187.015625,
+            "top": 53.75,
+            "right": 247.265625,
+            "bottom": 69.75,
+            "width": 60.25,
+            "height": 16
+          }
+        }
+      ]
+    },
+    {
+      "shape": "4-3-3",
+      "width": 264,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-4-2",
+      "width": 264,
+      "scenario": "standard",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-4-2",
+      "width": 264,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-4-2",
+      "width": 264,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [
+        {
+          "type": "neighbor",
+          "first": 5,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 5,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 5.703125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 5,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 7,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 1.921875,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 8,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 8,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 5.703125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 8,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 2
+        }
+      ],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-4-2",
+      "width": 264,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [
+        {
+          "type": "neighbor",
+          "first": 5,
+          "second": 6,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 5,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 5,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "icon"
+          ],
+          "overlapWidth": 1.03125,
+          "overlapHeight": 4
+        },
+        {
+          "type": "neighbor",
+          "first": 5,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 19.578125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 5,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 5,
+          "second": 6,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 7,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 7,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 7,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 11.171875,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 7,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 7,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 8,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 8,
+          "kinds": [
+            "icon",
+            "ga"
+          ],
+          "overlapWidth": 1.03125,
+          "overlapHeight": 4
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 8,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 8,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 19.578125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 8,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 8,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 2
+        }
+      ],
+      "hitErrors": [
+        {
+          "index": 5,
+          "kind": "ga",
+          "text": "9999",
+          "hit": "A Very Long Player Name"
+        },
+        {
+          "index": 7,
+          "kind": "ga",
+          "text": "9999",
+          "hit": "A Very Long Player Name"
+        }
+      ]
+    },
+    {
+      "shape": "3-5-2",
+      "width": 264,
+      "scenario": "standard",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-5-2",
+      "width": 264,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-5-2",
+      "width": 264,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-5-2",
+      "width": 264,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-5-1",
+      "width": 264,
+      "scenario": "standard",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-5-1",
+      "width": 264,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-5-1",
+      "width": 264,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [
+        {
+          "type": "neighbor",
+          "first": 1,
+          "second": 2,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 1,
+          "second": 2,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 5.703125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 1,
+          "second": 2,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 2,
+          "second": 3,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 1.921875,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 4,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 4,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 5.703125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 4,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 2
+        }
+      ],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-5-1",
+      "width": 264,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [
+        {
+          "type": "neighbor",
+          "first": 1,
+          "second": 2,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 1,
+          "second": 2,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 1,
+          "second": 2,
+          "kinds": [
+            "ga",
+            "icon"
+          ],
+          "overlapWidth": 1.03125,
+          "overlapHeight": 4
+        },
+        {
+          "type": "neighbor",
+          "first": 1,
+          "second": 2,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 19.578125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 1,
+          "second": 2,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 1,
+          "second": 2,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 2,
+          "second": 3,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 2,
+          "second": 3,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 2,
+          "second": 3,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 11.171875,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 2,
+          "second": 3,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 2,
+          "second": 3,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 4,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 4,
+          "kinds": [
+            "icon",
+            "ga"
+          ],
+          "overlapWidth": 1.03125,
+          "overlapHeight": 4
+        },
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 4,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 4,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 19.578125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 4,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 4,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 2
+        }
+      ],
+      "hitErrors": [
+        {
+          "index": 1,
+          "kind": "ga",
+          "text": "9999",
+          "hit": "A Very Long Player Name"
+        },
+        {
+          "index": 3,
+          "kind": "ga",
+          "text": "9999",
+          "hit": "A Very Long Player Name"
+        }
+      ],
+      "sizes": [
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 112,
+            "top": 278.75,
+            "right": 152,
+            "bottom": 318.75,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 139,
+            "top": 274.75,
+            "right": 164,
+            "bottom": 292.75,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 108,
+            "top": 274.75,
+            "right": 124,
+            "bottom": 290.75,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 93.453125,
+            "top": 314.75,
+            "right": 132,
+            "bottom": 328.75,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 132,
+            "top": 314.75,
+            "right": 170.546875,
+            "bottom": 328.75,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 101.875,
+            "top": 326.75,
+            "right": 162.125,
+            "bottom": 342.75,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 13.09375,
+            "top": 210.5,
+            "right": 53.09375,
+            "bottom": 250.5,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00 ★",
+          "width": 35.453125,
+          "height": 18,
+          "box": {
+            "left": 29.640625,
+            "top": 206.5,
+            "right": 65.09375,
+            "bottom": 224.5,
+            "width": 35.453125,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 9.09375,
+            "top": 206.5,
+            "right": 25.09375,
+            "bottom": 222.5,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 2.96875,
+            "top": 246.5,
+            "right": 41.515625,
+            "bottom": 260.5,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 41.515625,
+            "top": 246.5,
+            "right": 80.0625,
+            "bottom": 260.5,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 2.96875,
+            "top": 258.5,
+            "right": 63.21875,
+            "bottom": 274.5,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 79.03125,
+            "top": 210.5,
+            "right": 119.03125,
+            "bottom": 250.5,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 106.03125,
+            "top": 206.5,
+            "right": 131.03125,
+            "bottom": 224.5,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 75.03125,
+            "top": 206.5,
+            "right": 91.03125,
+            "bottom": 222.5,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 60.484375,
+            "top": 246.5,
+            "right": 99.03125,
+            "bottom": 260.5,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 99.03125,
+            "top": 246.5,
+            "right": 137.578125,
+            "bottom": 260.5,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 68.90625,
+            "top": 258.5,
+            "right": 129.15625,
+            "bottom": 274.5,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 144.953125,
+            "top": 210.5,
+            "right": 184.953125,
+            "bottom": 250.5,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 171.953125,
+            "top": 206.5,
+            "right": 196.953125,
+            "bottom": 224.5,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 140.953125,
+            "top": 206.5,
+            "right": 156.953125,
+            "bottom": 222.5,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 126.40625,
+            "top": 246.5,
+            "right": 164.953125,
+            "bottom": 260.5,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 164.953125,
+            "top": 246.5,
+            "right": 203.5,
+            "bottom": 260.5,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 134.828125,
+            "top": 258.5,
+            "right": 195.078125,
+            "bottom": 274.5,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 210.890625,
+            "top": 210.5,
+            "right": 250.890625,
+            "bottom": 250.5,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 237.890625,
+            "top": 206.5,
+            "right": 262.890625,
+            "bottom": 224.5,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 206.890625,
+            "top": 206.5,
+            "right": 222.890625,
+            "bottom": 222.5,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 183.921875,
+            "top": 246.5,
+            "right": 222.46875,
+            "bottom": 260.5,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 222.46875,
+            "top": 246.5,
+            "right": 261.015625,
+            "bottom": 260.5,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 200.765625,
+            "top": 258.5,
+            "right": 261.015625,
+            "bottom": 274.5,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 15.046875,
+            "top": 74,
+            "right": 55.046875,
+            "bottom": 114,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 42.046875,
+            "top": 70,
+            "right": 67.046875,
+            "bottom": 88,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 11.046875,
+            "top": 70,
+            "right": 27.046875,
+            "bottom": 86,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 4.921875,
+            "top": 110,
+            "right": 43.46875,
+            "bottom": 124,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 43.46875,
+            "top": 110,
+            "right": 82.015625,
+            "bottom": 124,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 4.921875,
+            "top": 122,
+            "right": 65.171875,
+            "bottom": 138,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 70.078125,
+            "top": 142.25,
+            "right": 110.078125,
+            "bottom": 182.25,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 97.078125,
+            "top": 138.25,
+            "right": 122.078125,
+            "bottom": 156.25,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 66.078125,
+            "top": 138.25,
+            "right": 82.078125,
+            "bottom": 154.25,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 51.53125,
+            "top": 178.25,
+            "right": 90.078125,
+            "bottom": 192.25,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 90.078125,
+            "top": 178.25,
+            "right": 128.625,
+            "bottom": 192.25,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 59.953125,
+            "top": 190.25,
+            "right": 120.203125,
+            "bottom": 206.25,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 112,
+            "top": 74,
+            "right": 152,
+            "bottom": 114,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 139,
+            "top": 70,
+            "right": 164,
+            "bottom": 88,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 108,
+            "top": 70,
+            "right": 124,
+            "bottom": 86,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 93.453125,
+            "top": 110,
+            "right": 132,
+            "bottom": 124,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 132,
+            "top": 110,
+            "right": 170.546875,
+            "bottom": 124,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 101.875,
+            "top": 122,
+            "right": 162.125,
+            "bottom": 138,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 153.90625,
+            "top": 142.25,
+            "right": 193.90625,
+            "bottom": 182.25,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 180.90625,
+            "top": 138.25,
+            "right": 205.90625,
+            "bottom": 156.25,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 149.90625,
+            "top": 138.25,
+            "right": 165.90625,
+            "bottom": 154.25,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 135.359375,
+            "top": 178.25,
+            "right": 173.90625,
+            "bottom": 192.25,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 173.90625,
+            "top": 178.25,
+            "right": 212.453125,
+            "bottom": 192.25,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 143.78125,
+            "top": 190.25,
+            "right": 204.03125,
+            "bottom": 206.25,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 208.9375,
+            "top": 74,
+            "right": 248.9375,
+            "bottom": 114,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 235.9375,
+            "top": 70,
+            "right": 260.9375,
+            "bottom": 88,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 204.9375,
+            "top": 70,
+            "right": 220.9375,
+            "bottom": 86,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 181.96875,
+            "top": 110,
+            "right": 220.515625,
+            "bottom": 124,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 220.515625,
+            "top": 110,
+            "right": 259.0625,
+            "bottom": 124,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 198.8125,
+            "top": 122,
+            "right": 259.0625,
+            "bottom": 138,
+            "width": 60.25,
+            "height": 16
+          }
+        },
+        {
+          "kind": "icon",
+          "text": "99",
+          "width": 40,
+          "height": 40,
+          "box": {
+            "left": 112,
+            "top": 5.75,
+            "right": 152,
+            "bottom": 45.75,
+            "width": 40,
+            "height": 40
+          }
+        },
+        {
+          "kind": "rating",
+          "text": "10.00",
+          "width": 25,
+          "height": 18,
+          "box": {
+            "left": 139,
+            "top": 1.75,
+            "right": 164,
+            "bottom": 19.75,
+            "width": 25,
+            "height": 18
+          }
+        },
+        {
+          "kind": "crest",
+          "text": "",
+          "width": 16,
+          "height": 16,
+          "box": {
+            "left": 108,
+            "top": 1.75,
+            "right": 124,
+            "bottom": 17.75,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 93.453125,
+            "top": 41.75,
+            "right": 132,
+            "bottom": 55.75,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "ga",
+          "text": "9999",
+          "width": 38.546875,
+          "height": 14,
+          "box": {
+            "left": 132,
+            "top": 41.75,
+            "right": 170.546875,
+            "bottom": 55.75,
+            "width": 38.546875,
+            "height": 14
+          }
+        },
+        {
+          "kind": "name",
+          "text": "99 A Very Long Player Name",
+          "width": 60.25,
+          "height": 16,
+          "box": {
+            "left": 101.875,
+            "top": 53.75,
+            "right": 162.125,
+            "bottom": 69.75,
+            "width": 60.25,
+            "height": 16
+          }
+        }
+      ]
+    },
+    {
+      "shape": "5-4-1",
+      "width": 264,
+      "scenario": "standard",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-4-1",
+      "width": 264,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-4-1",
+      "width": 264,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 7,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 7,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 5.703125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 7,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 8,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 1.921875,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 9,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 9,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 5.703125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 9,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 2
+        }
+      ],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-4-1",
+      "width": 264,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 7,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 7,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 7,
+          "kinds": [
+            "ga",
+            "icon"
+          ],
+          "overlapWidth": 1.03125,
+          "overlapHeight": 4
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 7,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 19.578125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 7,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 7,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 8,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 8,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 8,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 11.171875,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 8,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 8,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 9,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 9,
+          "kinds": [
+            "icon",
+            "ga"
+          ],
+          "overlapWidth": 1.03125,
+          "overlapHeight": 4
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 9,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 9,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 19.578125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 9,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 9,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 2
+        }
+      ],
+      "hitErrors": [
+        {
+          "index": 6,
+          "kind": "ga",
+          "text": "9999",
+          "hit": "A Very Long Player Name"
+        },
+        {
+          "index": 8,
+          "kind": "ga",
+          "text": "9999",
+          "hit": "A Very Long Player Name"
+        }
+      ]
+    },
+    {
+      "shape": "5-3-2",
+      "width": 264,
+      "scenario": "standard",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-3-2",
+      "width": 264,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-3-2",
+      "width": 264,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-3-2",
+      "width": 264,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-4-3",
+      "width": 264,
+      "scenario": "standard",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-4-3",
+      "width": 264,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-4-3",
+      "width": 264,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-4-3",
+      "width": 264,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "2-6-2",
+      "width": 264,
+      "scenario": "standard",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "2-6-2",
+      "width": 264,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "2-6-2",
+      "width": 264,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "2-6-2",
+      "width": 264,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-7-2",
+      "width": 264,
+      "scenario": "standard",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-7-2",
+      "width": 264,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-7-2",
+      "width": 264,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [
+        {
+          "type": "neighbor",
+          "first": 2,
+          "second": 4,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 2,
+          "second": 4,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 5.703125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 2,
+          "second": 4,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 4,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 1.921875,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 8,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 8,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 5.703125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 8,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 2
+        }
+      ],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-7-2",
+      "width": 264,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [
+        {
+          "type": "neighbor",
+          "first": 2,
+          "second": 4,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 2,
+          "second": 4,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 2,
+          "second": 4,
+          "kinds": [
+            "ga",
+            "icon"
+          ],
+          "overlapWidth": 1.03125,
+          "overlapHeight": 4
+        },
+        {
+          "type": "neighbor",
+          "first": 2,
+          "second": 4,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 19.578125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 2,
+          "second": 4,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 2,
+          "second": 4,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 4,
+          "second": 6,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 4,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 4,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 11.171875,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 4,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 4,
+          "second": 6,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 8,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 8,
+          "kinds": [
+            "icon",
+            "ga"
+          ],
+          "overlapWidth": 1.03125,
+          "overlapHeight": 4
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 8,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 8,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 19.578125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 8,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 8,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 2
+        }
+      ],
+      "hitErrors": [
+        {
+          "index": 2,
+          "kind": "ga",
+          "text": "9999",
+          "hit": "A Very Long Player Name"
+        },
+        {
+          "index": 6,
+          "kind": "ga",
+          "text": "9999",
+          "hit": "A Very Long Player Name"
+        }
+      ]
+    },
+    {
+      "shape": "1-1-8",
+      "width": 264,
+      "scenario": "standard",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-1-8",
+      "width": 264,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-1-8",
+      "width": 264,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 5,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 5,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 5.703125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 5,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 4,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 4,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 5.703125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 4,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 5,
+          "second": 7,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 1.921875,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 8,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 1.921875,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 9,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 9,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 5.703125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 9,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 10,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 10,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 5.703125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 10,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 1.90625,
+          "overlapHeight": 2
+        }
+      ],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-1-8",
+      "width": 264,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 5,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 5,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 5,
+          "kinds": [
+            "ga",
+            "icon"
+          ],
+          "overlapWidth": 1.03125,
+          "overlapHeight": 4
+        },
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 5,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 19.578125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 5,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 3,
+          "second": 5,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 4,
+          "second": 6,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 4,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 4,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "icon"
+          ],
+          "overlapWidth": 1.03125,
+          "overlapHeight": 4
+        },
+        {
+          "type": "neighbor",
+          "first": 4,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 19.578125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 4,
+          "second": 6,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 4,
+          "second": 6,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 5,
+          "second": 7,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 5,
+          "second": 7,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 5,
+          "second": 7,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 11.171875,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 5,
+          "second": 7,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 5,
+          "second": 7,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 8,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 8,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 8,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 11.171875,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 8,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 6,
+          "second": 8,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 2.75,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 9,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 9,
+          "kinds": [
+            "icon",
+            "ga"
+          ],
+          "overlapWidth": 1.03125,
+          "overlapHeight": 4
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 9,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 9,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 19.578125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 9,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 7,
+          "second": 9,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 10,
+          "kinds": [
+            "click",
+            "ga"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 10,
+          "kinds": [
+            "icon",
+            "ga"
+          ],
+          "overlapWidth": 1.03125,
+          "overlapHeight": 4
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 10,
+          "kinds": [
+            "ga",
+            "click"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 10,
+          "kinds": [
+            "ga",
+            "ga"
+          ],
+          "overlapWidth": 19.578125,
+          "overlapHeight": 14
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 10,
+          "kinds": [
+            "ga",
+            "name"
+          ],
+          "overlapWidth": 2.734375,
+          "overlapHeight": 2
+        },
+        {
+          "type": "neighbor",
+          "first": 8,
+          "second": 10,
+          "kinds": [
+            "name",
+            "ga"
+          ],
+          "overlapWidth": 11.15625,
+          "overlapHeight": 2
+        }
+      ],
+      "hitErrors": [
+        {
+          "index": 3,
+          "kind": "ga",
+          "text": "9999",
+          "hit": "A Very Long Player Name"
+        },
+        {
+          "index": 4,
+          "kind": "ga",
+          "text": "9999",
+          "hit": "A Very Long Player Name"
+        },
+        {
+          "index": 7,
+          "kind": "ga",
+          "text": "9999",
+          "hit": "A Very Long Player Name"
+        },
+        {
+          "index": 8,
+          "kind": "ga",
+          "text": "9999",
+          "hit": "A Very Long Player Name"
+        }
+      ]
+    },
+    {
+      "shape": "0-9-1",
+      "width": 264,
+      "scenario": "standard",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-9-1",
+      "width": 264,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-9-1",
+      "width": 264,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-9-1",
+      "width": 264,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-10-0",
+      "width": 264,
+      "scenario": "standard",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-10-0",
+      "width": 264,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-10-0",
+      "width": 264,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-10-0",
+      "width": 264,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-5-0",
+      "width": 264,
+      "scenario": "standard",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-5-0",
+      "width": 264,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-5-0",
+      "width": 264,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-5-0",
+      "width": 264,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 264,
+        "height": 352,
+        "innerWidth": 262,
+        "innerHeight": 350
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-3-3",
+      "width": 320,
+      "scenario": "standard",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-3-3",
+      "width": 320,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-3-3",
+      "width": 320,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-3-3",
+      "width": 320,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-4-2",
+      "width": 320,
+      "scenario": "standard",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-4-2",
+      "width": 320,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-4-2",
+      "width": 320,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-4-2",
+      "width": 320,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-5-2",
+      "width": 320,
+      "scenario": "standard",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-5-2",
+      "width": 320,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-5-2",
+      "width": 320,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-5-2",
+      "width": 320,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-5-1",
+      "width": 320,
+      "scenario": "standard",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-5-1",
+      "width": 320,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-5-1",
+      "width": 320,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-5-1",
+      "width": 320,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-4-1",
+      "width": 320,
+      "scenario": "standard",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-4-1",
+      "width": 320,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-4-1",
+      "width": 320,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-4-1",
+      "width": 320,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-3-2",
+      "width": 320,
+      "scenario": "standard",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-3-2",
+      "width": 320,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-3-2",
+      "width": 320,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-3-2",
+      "width": 320,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-4-3",
+      "width": 320,
+      "scenario": "standard",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-4-3",
+      "width": 320,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-4-3",
+      "width": 320,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-4-3",
+      "width": 320,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "2-6-2",
+      "width": 320,
+      "scenario": "standard",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "2-6-2",
+      "width": 320,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "2-6-2",
+      "width": 320,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "2-6-2",
+      "width": 320,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-7-2",
+      "width": 320,
+      "scenario": "standard",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-7-2",
+      "width": 320,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-7-2",
+      "width": 320,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-7-2",
+      "width": 320,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-1-8",
+      "width": 320,
+      "scenario": "standard",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-1-8",
+      "width": 320,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-1-8",
+      "width": 320,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-1-8",
+      "width": 320,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-9-1",
+      "width": 320,
+      "scenario": "standard",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-9-1",
+      "width": 320,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-9-1",
+      "width": 320,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-9-1",
+      "width": 320,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-10-0",
+      "width": 320,
+      "scenario": "standard",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-10-0",
+      "width": 320,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-10-0",
+      "width": 320,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-10-0",
+      "width": 320,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-5-0",
+      "width": 320,
+      "scenario": "standard",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-5-0",
+      "width": 320,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-5-0",
+      "width": 320,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-5-0",
+      "width": 320,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 320,
+        "height": 426.65625,
+        "innerWidth": 318,
+        "innerHeight": 424.65625
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-3-3",
+      "width": 375,
+      "scenario": "standard",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-3-3",
+      "width": 375,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-3-3",
+      "width": 375,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-3-3",
+      "width": 375,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-4-2",
+      "width": 375,
+      "scenario": "standard",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-4-2",
+      "width": 375,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-4-2",
+      "width": 375,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-4-2",
+      "width": 375,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-5-2",
+      "width": 375,
+      "scenario": "standard",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-5-2",
+      "width": 375,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-5-2",
+      "width": 375,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-5-2",
+      "width": 375,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-5-1",
+      "width": 375,
+      "scenario": "standard",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-5-1",
+      "width": 375,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-5-1",
+      "width": 375,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-5-1",
+      "width": 375,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-4-1",
+      "width": 375,
+      "scenario": "standard",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-4-1",
+      "width": 375,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-4-1",
+      "width": 375,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-4-1",
+      "width": 375,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-3-2",
+      "width": 375,
+      "scenario": "standard",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-3-2",
+      "width": 375,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-3-2",
+      "width": 375,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-3-2",
+      "width": 375,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-4-3",
+      "width": 375,
+      "scenario": "standard",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-4-3",
+      "width": 375,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-4-3",
+      "width": 375,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-4-3",
+      "width": 375,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "2-6-2",
+      "width": 375,
+      "scenario": "standard",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "2-6-2",
+      "width": 375,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "2-6-2",
+      "width": 375,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "2-6-2",
+      "width": 375,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-7-2",
+      "width": 375,
+      "scenario": "standard",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-7-2",
+      "width": 375,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-7-2",
+      "width": 375,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-7-2",
+      "width": 375,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-1-8",
+      "width": 375,
+      "scenario": "standard",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-1-8",
+      "width": 375,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-1-8",
+      "width": 375,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-1-8",
+      "width": 375,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-9-1",
+      "width": 375,
+      "scenario": "standard",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-9-1",
+      "width": 375,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-9-1",
+      "width": 375,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-9-1",
+      "width": 375,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-10-0",
+      "width": 375,
+      "scenario": "standard",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-10-0",
+      "width": 375,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-10-0",
+      "width": 375,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-10-0",
+      "width": 375,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-5-0",
+      "width": 375,
+      "scenario": "standard",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-5-0",
+      "width": 375,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-5-0",
+      "width": 375,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-5-0",
+      "width": 375,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 375,
+        "height": 500,
+        "innerWidth": 373,
+        "innerHeight": 498
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-3-3",
+      "width": 390,
+      "scenario": "standard",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-3-3",
+      "width": 390,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-3-3",
+      "width": 390,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-3-3",
+      "width": 390,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-4-2",
+      "width": 390,
+      "scenario": "standard",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-4-2",
+      "width": 390,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-4-2",
+      "width": 390,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-4-2",
+      "width": 390,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-5-2",
+      "width": 390,
+      "scenario": "standard",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-5-2",
+      "width": 390,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-5-2",
+      "width": 390,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-5-2",
+      "width": 390,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-5-1",
+      "width": 390,
+      "scenario": "standard",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-5-1",
+      "width": 390,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-5-1",
+      "width": 390,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "4-5-1",
+      "width": 390,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-4-1",
+      "width": 390,
+      "scenario": "standard",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-4-1",
+      "width": 390,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-4-1",
+      "width": 390,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-4-1",
+      "width": 390,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-3-2",
+      "width": 390,
+      "scenario": "standard",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-3-2",
+      "width": 390,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-3-2",
+      "width": 390,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-3-2",
+      "width": 390,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-4-3",
+      "width": 390,
+      "scenario": "standard",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-4-3",
+      "width": 390,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-4-3",
+      "width": 390,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "3-4-3",
+      "width": 390,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "2-6-2",
+      "width": 390,
+      "scenario": "standard",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "2-6-2",
+      "width": 390,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "2-6-2",
+      "width": 390,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "2-6-2",
+      "width": 390,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-7-2",
+      "width": 390,
+      "scenario": "standard",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-7-2",
+      "width": 390,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-7-2",
+      "width": 390,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-7-2",
+      "width": 390,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-1-8",
+      "width": 390,
+      "scenario": "standard",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-1-8",
+      "width": 390,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-1-8",
+      "width": 390,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "1-1-8",
+      "width": 390,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-9-1",
+      "width": 390,
+      "scenario": "standard",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-9-1",
+      "width": 390,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-9-1",
+      "width": 390,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-9-1",
+      "width": 390,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-10-0",
+      "width": 390,
+      "scenario": "standard",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-10-0",
+      "width": 390,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-10-0",
+      "width": 390,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "0-10-0",
+      "width": 390,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-5-0",
+      "width": 390,
+      "scenario": "standard",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-5-0",
+      "width": 390,
+      "scenario": "vacant-retired",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-5-0",
+      "width": 390,
+      "scenario": "three-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    },
+    {
+      "shape": "5-5-0",
+      "width": 390,
+      "scenario": "four-digit",
+      "pitch": {
+        "width": 390,
+        "height": 520,
+        "innerWidth": 388,
+        "innerHeight": 518
+      },
+      "cardCount": 11,
+      "errors": [],
+      "hitErrors": []
+    }
+  ]
+}

@@ -1,9 +1,10 @@
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
 import { selectTeamHistoryBestXI } from './teamHistorySelection'
 import { teamHistoryLayout } from './teamHistoryLayout'
+import { placeTeamHistoryPlayers } from './teamHistoryPlacement'
 import { arrayItemRevision } from './arrayItemRevision'
 import { matchCompetitionType, teamCompetitionOverview } from './competition'
-import { teamsCreditedWithResult } from './matchPerspective'
+import { isRecordedForTeam, teamsCreditedWithResult } from './matchPerspective'
 import { officialAwardSeasons, officialSeasonModel, type OfficialAwardEvent, type TeamSeasonResult } from './officialAwards'
 import { scopedIndividualAwardEvents } from './teamAwardRecords'
 import { buildGlobalRankingData } from './stats'
@@ -68,9 +69,9 @@ export function teamHistoryRecords(players: Player[], matches: Match[], scope: T
 /** A team-only, season-derived selection; this projection never publishes award events. */
 export function teamHistoryBestXI(players: Player[], matches: Match[], scope: TeamHistoryScope & { season: string }) {
   return cachedScope(players, matches, scope, 'best-xi', () => {
-    const games = scopeMatches(matches, scope)
+    const games = scopeMatches(matches, scope).filter(match => isRecordedForTeam(match, scope.teamId))
     const result = selectTeamHistoryBestXI(players, games, scope.teamId)
-    return { ...result, bestXI: teamHistoryLayout(result.bestXI) }
+    return { ...result, bestXI: teamHistoryLayout(placeTeamHistoryPlayers(result.bestXI, players, games, scope.teamId), result.statsByPlayer) }
   })
 }
 

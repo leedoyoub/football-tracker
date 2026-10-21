@@ -1,7 +1,7 @@
 import type { Best11Slot, CompetitionType, Match, Player, Position, Team } from '../types'
 import { isGoodRating } from './constants'
 import { playerAssistEvents, playerGoalEvents } from './playerMatchFacts'
-import { competitionMatches, leagueCompetition, matchCompetitionType } from './competition'
+import { competitionMatches, createStageRankingContext, leagueCompetition, matchCompetitionType } from './competition'
 import { LEAGUE_MATCHES_PER_TEAM } from './leagueFormat'
 import { leagueSlotTeamIds } from './leagueSlots'
 import { newestMatches } from './matchChronology'
@@ -238,10 +238,11 @@ export function buildLeagueHistory(teams: Team[], players: Player[], matches: Ma
   const leagueMatches = competitionMatches(matches, season, 'league')
   const currentMatchDay = Math.max(0, ...leagueMatches.map(leagueDay).filter(day => Number.isInteger(day) && day >= 1 && day <= LEAGUE_MATCHES_PER_TEAM))
   const leagueSnapshots = new Map<number, LeagueSnapshot>()
+  const rankingContext = createStageRankingContext(players)
   let previous: Standing[] | undefined
   for (let day = 1; day <= currentMatchDay; day++) {
     const through = leagueMatches.filter(match => leagueDay(match) <= day)
-    const standings = leagueCompetition(teams, through, season, players).standings
+    const standings = leagueCompetition(teams, through, season, players, rankingContext).standings
     const ranked = standingsWithMovement(standings, previous)
     leagueSnapshots.set(day, { matchDay: day, complete: isLeagueMatchdayComplete(teams, leagueMatches, season, day), matches: leagueMatches.filter(match => leagueDay(match) === day), standings: ranked })
     previous = standings

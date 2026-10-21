@@ -1,0 +1,215 @@
+{
+  "baseSha": "e97d391fc763f5f146cc116e25fb2aad60189fd9",
+  "node": "v24.19.0",
+  "cpu": "Intel(R) Core(TM) Ultra 7 256V",
+  "samples": 5,
+  "method": "Paired alternating baseline/current queries on independent deterministic 1- and 3-season fixtures; isolated process per operation; GC outside timed regions. CPU derivation only, excludes browser rendering/paint. SHA256 of every cold/filter/edit/delete result must match baseline. Immutable edit/delete follows Store flow; same-array replacement correctness is separately tested.",
+  "stages": {
+    "cold": "first query",
+    "warm": "unchanged query",
+    "filter": "league and CB selection plus goals metric for rankings; no-op for operations without filters",
+    "edit": "replace latest first-team league match with last event removed using a new array",
+    "delete": "remove the edited match using a new array"
+  },
+  "bestXICaveat": "Both versions seed saved kickoff formation 4-2-3-1. Only XI coordinates and slot presentation order may change; all selected slot/player facts, scores, formation and eligibility are compared. Maps are hashed as ordered entries. Browser rendering is excluded.",
+  "scales": {
+    "1": {
+      "news": {
+        "equivalentToBaseline": true,
+        "fixture": {
+          "seasons": 1,
+          "matches": 576,
+          "players": 367,
+          "teams": 16
+        },
+        "before": {
+          "cold": 773.0517,
+          "warm": 19.395800000000236,
+          "filter": 24.646299999999428,
+          "edit": 523.6346000000003,
+          "delete": 316.52909999999974,
+          "samplesMs": [
+            {
+              "cold": 630.7451000000001,
+              "warm": 17.234500000000025,
+              "filter": 14.880200000000059,
+              "edit": 350.74160000000006,
+              "delete": 297.6994999999997
+            },
+            {
+              "cold": 801.2972,
+              "warm": 23.845400000000154,
+              "filter": 26.375500000000102,
+              "edit": 531.6542,
+              "delete": 457.58920000000035
+            },
+            {
+              "cold": 807.0598999999993,
+              "warm": 19.395800000000236,
+              "filter": 24.646299999999428,
+              "edit": 523.6346000000003,
+              "delete": 447.96199999999953
+            },
+            {
+              "cold": 773.0517,
+              "warm": 24.74279999999999,
+              "filter": 25.224700000000666,
+              "edit": 571.4886999999999,
+              "delete": 316.52909999999974
+            },
+            {
+              "cold": 467.78050000000076,
+              "warm": 13.901700000000346,
+              "filter": 12.456599999999526,
+              "edit": 351.1877000000004,
+              "delete": 298.4118000000017
+            }
+          ]
+        },
+        "after": {
+          "cold": 602.2401999999984,
+          "warm": 18.562200000000303,
+          "filter": 24.46389999999883,
+          "edit": 408.8522000000012,
+          "delete": 354.3692000000001,
+          "samplesMs": [
+            {
+              "cold": 492.59569999999985,
+              "warm": 15.870800000000145,
+              "filter": 17.26630000000023,
+              "edit": 355.6767,
+              "delete": 366.4602
+            },
+            {
+              "cold": 611.2088000000003,
+              "warm": 16.46270000000004,
+              "filter": 17.724699999999757,
+              "edit": 329.3841999999995,
+              "delete": 354.3692000000001
+            },
+            {
+              "cold": 645.6736000000001,
+              "warm": 21.590100000001257,
+              "filter": 24.46389999999883,
+              "edit": 434.7949000000008,
+              "delete": 334.53869999999915
+            },
+            {
+              "cold": 602.2401999999984,
+              "warm": 28.07600000000093,
+              "filter": 30.788300000000163,
+              "edit": 441.09220000000096,
+              "delete": 339.0402000000013
+            },
+            {
+              "cold": 600.1090999999997,
+              "warm": 18.562200000000303,
+              "filter": 27.418299999999363,
+              "edit": 408.8522000000012,
+              "delete": 366.992400000001
+            }
+          ]
+        }
+      }
+    },
+    "3": {
+      "news": {
+        "equivalentToBaseline": true,
+        "fixture": {
+          "seasons": 3,
+          "matches": 1728,
+          "players": 367,
+          "teams": 16
+        },
+        "before": {
+          "cold": 2125.779999999999,
+          "warm": 70.0257000000056,
+          "filter": 60.84370000000126,
+          "edit": 1655.4735,
+          "delete": 1687.3141999999934,
+          "samplesMs": [
+            {
+              "cold": 2111.1785999999993,
+              "warm": 80.79299999999785,
+              "filter": 60.84370000000126,
+              "edit": 1655.4735,
+              "delete": 1521.3012999999992
+            },
+            {
+              "cold": 1882.9219000000012,
+              "warm": 87.48739999999816,
+              "filter": 96.76080000000366,
+              "edit": 1620.4902000000002,
+              "delete": 1820.4890999999989
+            },
+            {
+              "cold": 2125.779999999999,
+              "warm": 70.0257000000056,
+              "filter": 62.47819999999774,
+              "edit": 1665.403099999996,
+              "delete": 1464.5730999999942
+            },
+            {
+              "cold": 2266.878700000001,
+              "warm": 66.37930000000051,
+              "filter": 59.18579999999929,
+              "edit": 1900.7503999999972,
+              "delete": 1934.3894999999975
+            },
+            {
+              "cold": 2495.775799999996,
+              "warm": 54.14850000000297,
+              "filter": 43.54040000000532,
+              "edit": 1500.0786999999982,
+              "delete": 1687.3141999999934
+            }
+          ]
+        },
+        "after": {
+          "cold": 1886.0169000000024,
+          "warm": 72.93020000000251,
+          "filter": 71.78009999999995,
+          "edit": 1332.3161000000036,
+          "delete": 1317.1339000000007,
+          "samplesMs": [
+            {
+              "cold": 1886.0169000000024,
+              "warm": 66.00079999999798,
+              "filter": 60.31499999999869,
+              "edit": 1290.8271999999997,
+              "delete": 1341.8572999999997
+            },
+            {
+              "cold": 1777.3113999999987,
+              "warm": 72.93020000000251,
+              "filter": 71.78009999999995,
+              "edit": 1285.7845000000016,
+              "delete": 1216.4161999999997
+            },
+            {
+              "cold": 1577.7275000000009,
+              "warm": 88.93069999999716,
+              "filter": 78.45420000000013,
+              "edit": 1332.3161000000036,
+              "delete": 1317.1339000000007
+            },
+            {
+              "cold": 2035.748099999997,
+              "warm": 52.63319999999658,
+              "filter": 57.522799999998824,
+              "edit": 1431.2159000000029,
+              "delete": 1115.3102999999974
+            },
+            {
+              "cold": 1971.7623000000021,
+              "warm": 89.77550000000338,
+              "filter": 72.98750000000291,
+              "edit": 1408.8947000000044,
+              "delete": 1395.397100000002
+            }
+          ]
+        }
+      }
+    }
+  }
+}

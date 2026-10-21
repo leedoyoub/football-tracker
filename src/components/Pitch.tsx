@@ -102,8 +102,7 @@ export function Pitch({ compact = false, slots, players, teams, statsByPlayer, o
     return closest ? [{ id: closest.id }] : []
   }
   const endDrag = (event: DragEndEvent) => { const active = String(event.active.id).replace('player:', ''); const target = String(event.over?.id ?? '').replace('target:', ''); if (event.over && active !== target) onSlotDrop?.(active, target); window.setTimeout(() => { suppressClick.current = false }, 0) }
-  const tallTeamPitch = presentation === 'team-history' && ['DEF', 'MID', 'FW'].some(group => slots.filter(slot => slot.displayPosition === group).length >= 5)
-  const content = <div className={`relative mx-auto w-full overflow-hidden rounded-lg border border-emerald-700/50 pitch-grass ${compact ? 'aspect-square' : tallTeamPitch ? 'aspect-[3/5]' : 'aspect-[3/4]'}`}><div className="pointer-events-none absolute inset-2 border border-white/40"><div className="absolute left-1/2 top-0 h-14 w-24 -translate-x-1/2 border border-t-0 border-white/40" /><div className="absolute bottom-0 left-1/2 h-14 w-24 -translate-x-1/2 border border-b-0 border-white/40" /><div className="absolute left-0 right-0 top-1/2 border-t border-white/40" /><div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/40" /></div>{slots.map((slot) => {
+  const content = <div className={`relative mx-auto w-full overflow-hidden rounded-lg border border-emerald-700/50 pitch-grass ${compact ? 'aspect-square' : 'aspect-[3/4]'}`}><div className="pointer-events-none absolute inset-2 border border-white/40"><div className="absolute left-1/2 top-0 h-14 w-24 -translate-x-1/2 border border-t-0 border-white/40" /><div className="absolute bottom-0 left-1/2 h-14 w-24 -translate-x-1/2 border border-b-0 border-white/40" /><div className="absolute left-0 right-0 top-1/2 border-t border-white/40" /><div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/40" /></div>{slots.map((slot) => {
     const tactical = grid[slot.slot]
     // Saved historical coordinates can be normalized (0..1) or percentages.
     // Do not use `||`: zero is a valid edge coordinate.
@@ -120,7 +119,7 @@ export function Pitch({ compact = false, slots, players, teams, statsByPlayer, o
         {badgeMode === 'rating' && (
           <Badge
             colorClass={playerId === motmPlayerId ? 'bg-blue-500 text-white' : ratingColor(slot.avgRating)}
-            className="absolute -right-3 -top-3 z-30 shadow-lg"
+            className={`absolute -right-3 ${presentation === 'team-history' ? '-top-1' : '-top-3'} z-30 shadow-lg`}
             size="large"
           >
             {slot.matches > 0 ? slot.avgRating.toFixed(slot.matches > 1 ? 2 : 1) : emptyRatingLabel}{playerId === motmPlayerId ? ' ★' : ''}
@@ -145,7 +144,7 @@ export function Pitch({ compact = false, slots, players, teams, statsByPlayer, o
         </PitchSlotDrop> : <PlayerIcon player={player} team={representativeTeam} position={showPositionBadge ? displayPosition : undefined} badges={badges} className="h-10 w-10 text-[11px]" />}
         {showAwardTeamCrest && representativeTeam && <span data-award-team-crest="top-left" className="pointer-events-none absolute -left-1 -top-1 z-20"><TeamIcon team={representativeTeam} showAbbreviation={false} className="h-4 w-4 border-white/30" /></span>}
         </div>
-        {((stats?.goals ?? 0) > 0 || (stats?.assists ?? 0) > 0 || (showGoalkeeperSaves && matchPosition === 'GK')) && <div className={`relative z-10 -mt-1 grid h-3.5 w-16 ${presentation === 'team-history' ? 'max-w-full ' : ''}grid-cols-2 items-center text-[8px] font-bold leading-none text-white`}>
+        {((stats?.goals ?? 0) > 0 || (stats?.assists ?? 0) > 0 || (showGoalkeeperSaves && matchPosition === 'GK')) && <div className="relative z-10 -mt-1 grid h-3.5 w-16 grid-cols-2 items-center text-[8px] font-bold leading-none text-white" style={presentation === 'team-history' ? { width: 'max-content', minWidth: 'min(4rem, 100%)', gridTemplateColumns: 'auto auto', alignSelf: point.x <= 13 ? 'flex-start' : point.x >= 87 ? 'flex-end' : 'center' } : undefined}>
           <span className="justify-self-start">{(stats?.assists ?? 0) > 0 && <span className="flex items-center gap-0.5 rounded-full bg-black/80 px-1 py-0.5"><AssistIcon />{stats?.assists}</span>}</span>
           <span className="justify-self-end">{(stats?.goals ?? 0) > 0 ? <span className="flex items-center gap-0.5 rounded-full bg-black/80 px-1 py-0.5"><GoalIcon />{stats?.goals}</span> : showGoalkeeperSaves && matchPosition === 'GK' ? <span className="rounded-full bg-black/80 px-1 py-0.5">🧤 {stats?.saves ?? 0}</span> : null}</span>
         </div>}

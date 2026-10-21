@@ -43,6 +43,20 @@ test('timeline, competition rules, constants and durable data remain source iden
         .replaceAll('${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${season}', '${RATING_ENGINE_REVISION}:${season}')
         .replaceAll('  if (bySeason.size >= 32) bySeason.delete(bySeason.keys().next().value!)\n', '')
       if (file === 'engine/competition.ts') source = source.replace(/const scopedCompetitionMatches[\s\S]*?(?=export function competitionStageMatches)/, '')
+      // v2.6.4 adds caller-owned prefix facts. Strip only that optional path;
+      // the original default calculations and all tournament rules still match.
+      // v264-analytics-baseline separately compares complete ordered snapshots.
+      if (file === 'engine/seasonAnalytics.ts') source = source
+        .replace('competitionMatches, createStageRankingContext, leagueCompetition', 'competitionMatches, leagueCompetition')
+        .replace('  const rankingContext = createStageRankingContext(players)\n', '')
+        .replaceAll(', rankingContext)', ')')
+      if (file === 'engine/competition.ts') source = source
+        .replace(/type TeamRatingValue[\s\S]*?(?=function averageTeamRatings)/, '')
+        .replace(/    if \(context\?\.players === players\) \{[\s\S]*?      continue\n    \}\n/, '')
+        .replace('    const teamsByPlayer = appearanceTeamsByPlayer(match)\n', '    const teamsByPlayer = new Map<string, Set<string>>()\n    for (const appearance of match.appearances) {\n      const teams = teamsByPlayer.get(appearance.playerId) ?? new Set<string>()\n      teams.add(appearance.teamId); teamsByPlayer.set(appearance.playerId, teams)\n    }\n')
+        .replace(/    if \(context\) \{[\s\S]*?      return total \+ value\n    \}\n/, '')
+        .replaceAll(', context?: StageRankingContext', '')
+        .replaceAll(', context)', ')')
       if (file === 'engine/seasonAnalytics.ts') source = source.replace(/\/\*\* Team Detail needs only day N versus day N-1[\s\S]*?(?=export function buildSeasonAnalytics)/, '')
       if (file === 'engine/competition.ts') source = source.split('/** Canonical compact competition data shared by Team Detail consumers. */')[0]
       if (file === 'engine/competition.ts') {

@@ -30,7 +30,7 @@ export function TeamHistory({ teamId, season, teams, players, matches, states, s
   const records = useMemo(() => menu === 'records' ? teamHistoryRecords(players, matches, { teamId, competition, season: recordsMode === 'all-time' ? null : selectedSeason }) : [], [menu, players, matches, teamId, competition, recordsMode, selectedSeason])
   const bestXI = useMemo(() => menu === 'best-xi' ? teamHistoryBestXI(players, matches, { teamId, competition, season: selectedSeason }) : undefined, [menu, players, matches, teamId, competition, selectedSeason])
   const byId = useMemo(() => new Map(players.map(player => [player.id, player])), [players])
-  const honorName = (id: string) => byId.get(id)?.name?.trim() || playerFullName(byId.get(id)).trim() || historicalPlayerLabel(id, byId.get(id))
+  const honorName = (id: string) => playerFullName(byId.get(id)).trim() || historicalPlayerLabel(id, byId.get(id)).trim() || historicalPlayerLabel(id)
   const team = teams.find(item => item.id === teamId)
   const openPlayer = (id: string, awardSeason?: string) => onNavigate({ name: 'player', id, season: awardSeason ?? selectedSeason, competitionType: competition })
   const renderRecord = (row: TeamHistoryRecordRow) => <RankingRow rank={row.rank} player={byId.get(row.playerId)} team={team} positionLabel={row.position} value={String(row.value)} onClick={() => openPlayer(row.playerId)} />

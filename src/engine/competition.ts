@@ -61,9 +61,9 @@ export function reconcileChampionsPairingIds(matches: Match[], states: Competiti
   return changed ? repaired : matches
 }
 
-export function leagueCompetition(teams: Team[], matches: Match[], season: string, players: Player[] = []) {
+export function leagueCompetition(teams: Team[], matches: Match[], season: string, players: Player[] = [], context?: StageRankingContext) {
   const games = competitionMatches(matches, season, 'league')
-  const standings = stageRanking(teams.map(team => team.id), games, season, players, `${season}:league`)
+  const standings = stageRanking(teams.map(team => team.id), games, season, players, `${season}:league`, context)
   const slots = leagueSlotCounts(games, season)
   const matchdayProgress = teams.length ? Math.min(...teams.map(team => firstMissingLeagueSlot(slots.get(team.id)))) : 1
   const complete = teams.length > 0 && teams.every(team => hasCompleteLeagueSlots(slots.get(team.id)))
@@ -101,14 +101,49 @@ function averageTeamRating(teamId: string, games: Match[], players: Player[]): n
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
 }
 
-function averageTeamRatings(games: Match[], players: Player[]): Map<string, number> {
+type TeamRatingValue = { teamId: string; raw: number }
+/** Caller-owned scratch facts for a single synchronous sequence of prefix tables.
+ * Never retain this context across source edits; ordinary competition calls do
+ * not create or retain it. Standings and every tie-break remain canonical. */
+export type StageRankingContext = {
+  players: Player[]
+  ratingsByMatch: WeakMap<Match, TeamRatingValue[]>
+  shotsByMatch: WeakMap<Match, Map<string, number | undefined>>
+}
+
+export function createStageRankingContext(players: Player[]): StageRankingContext {
+  return { players, ratingsByMatch: new WeakMap(), shotsByMatch: new WeakMap() }
+}
+
+function appearanceTeamsByPlayer(match: Match): Map<string, Set<string>> {
+  const teamsByPlayer = new Map<string, Set<string>>()
+  for (const appearance of match.appearances) {
+    const teams = teamsByPlayer.get(appearance.playerId) ?? new Set<string>()
+    teams.add(appearance.teamId); teamsByPlayer.set(appearance.playerId, teams)
+  }
+  return teamsByPlayer
+}
+
+function averageTeamRatings(games: Match[], players: Player[], context?: StageRankingContext): Map<string, number> {
   const totals = new Map<string, { sum: number; count: number }>()
   for (const match of games) {
-    const teamsByPlayer = new Map<string, Set<string>>()
-    for (const appearance of match.appearances) {
-      const teams = teamsByPlayer.get(appearance.playerId) ?? new Set<string>()
-      teams.add(appearance.teamId); teamsByPlayer.set(appearance.playerId, teams)
+    if (context?.players === players) {
+      let values = context.ratingsByMatch.get(match)
+      if (!values) {
+        values = []
+        const teamsByPlayer = appearanceTeamsByPlayer(match)
+        for (const rating of rateMatch(match, players)) for (const teamId of teamsByPlayer.get(rating.playerId) ?? []) values.push({ teamId, raw: rating.raw })
+        context.ratingsByMatch.set(match, values)
+      }
+      // Replay individual values, never grouped sums: floating additions must
+      // retain saved-match and roster order even for unsorted legacy histories.
+      for (const { teamId, raw } of values) {
+        const total = totals.get(teamId) ?? { sum: 0, count: 0 }
+        total.sum += raw; total.count++; totals.set(teamId, total)
+      }
+      continue
     }
+    const teamsByPlayer = appearanceTeamsByPlayer(match)
     // For each team, additions follow exactly the prior flatMap/reduce order:
     // saved game order, then roster order. Do not group/sort matches by day.
     for (const rating of rateMatch(match, players)) for (const teamId of teamsByPlayer.get(rating.playerId) ?? []) {
@@ -119,8 +154,16 @@ function averageTeamRatings(games: Match[], players: Player[]): Map<string, numb
   return new Map([...totals].map(([teamId, total]) => [teamId, total.sum / total.count]))
 }
 
-function allowedShots(teamId: string, games: Match[]): number {
+function allowedShots(teamId: string, games: Match[], context?: StageRankingContext): number {
   return games.reduce((total, match) => {
+    if (context) {
+      let byTeam = context.shotsByMatch.get(match)
+      if (!byTeam) { byTeam = new Map(teamsCreditedWithResult(match).map(id => [id, undefined])); context.shotsByMatch.set(match, byTeam) }
+      if (!byTeam.has(teamId)) return total
+      let value = byTeam.get(teamId)
+      if (value === undefined) { value = opponentSot(match, teamId); byTeam.set(teamId, value) }
+      return total + value
+    }
     if (!hasPlayed(match, teamId)) return total
     return total + opponentSot(match, teamId)
   }, 0)
@@ -134,10 +177,10 @@ function stableDrawValue(seed: string, id: string): number {
   return [...`${seed}|${id}`].reduce((value, character) => Math.imul(value ^ character.charCodeAt(0), 16777619), 2166136261) >>> 0
 }
 
-export function stageRanking(teamIds: string[], games: Match[], season: string, players: Player[], drawSeed: string): StageMetric[] {
+export function stageRanking(teamIds: string[], games: Match[], season: string, players: Player[], drawSeed: string, context?: StageRankingContext): StageMetric[] {
   const basic = seasonStandings(teamIds.map(id => ({ id } as Team)), games, season)
-  const averages = averageTeamRatings(games, players)
-  const metrics = new Map<string, StandingTieMetrics>(basic.map(row => [row.teamId, { averageRating: averages.get(row.teamId) ?? 0, opponentShotsOnTarget: allowedShots(row.teamId, games) }]))
+  const averages = averageTeamRatings(games, players, context)
+  const metrics = new Map<string, StandingTieMetrics>(basic.map(row => [row.teamId, { averageRating: averages.get(row.teamId) ?? 0, opponentShotsOnTarget: allowedShots(row.teamId, games, context) }]))
   return basic.map(row => ({ ...row, ...(metrics.get(row.teamId) ?? { averageRating: 0, opponentShotsOnTarget: 0 }) }))
     .sort((a, b) => compareStandings(a, b, metrics) || stableDrawValue(drawSeed, a.teamId) - stableDrawValue(drawSeed, b.teamId))
     .map((row, index) => ({ ...row, rank: index + 1 }))
