@@ -8,6 +8,7 @@ const { execFileSync } = require('node:child_process')
 const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const current = require('../src/engine/seasonAnalytics.ts')
 const currentOfficial = require('../src/engine/officialAwards.ts')
+const { assertOfficialAwardPolicy } = require('./helpers/v261-award-policy-comparison.cjs')
 const root = path.resolve(__dirname, '..')
 const temporaryRoot = path.resolve(os.tmpdir())
 const directory = fs.mkdtempSync(path.join(temporaryRoot, 'football-v264-analytics-baseline-'))
@@ -48,10 +49,10 @@ function compare(fixture, season, label, official = false) {
     assert.deepEqual(current.monthlyAwardForBlock(...args, block), baseline.monthlyAwardForBlock(...args, block), `${label}: finalized monthly block ${block}`)
     assert.deepEqual(current.monthlyAwardForStartedBlock(...args, block), baseline.monthlyAwardForStartedBlock(...args, block), `${label}: started monthly block ${block}`)
   }
-  if (official) assert.deepEqual(currentOfficial.officialSeasonModel(teams, players, matches, competitionStates, season).events, baselineOfficial.officialSeasonModel(teams, players, matches, competitionStates, season).events, `${label}: official event IDs, order, winners and historical teams`)
+  if (official) assertOfficialAwardPolicy(currentOfficial.officialSeasonModel(teams, players, matches, competitionStates, season), baselineOfficial.officialSeasonModel(teams, players, matches, competitionStates, season), players, matches, season, teams, competitionStates)
 }
 
-test('complete three-season analytics and official events match v2.6.3 structurally', () => {
+test('complete three-season analytics match v2.6.3 and official events migrate only approved award fields', () => {
   const fixture = performanceFixture(3)
   for (const season of ['Season 1', 'Season 2', 'Season 3']) compare(fixture, season, season, true)
 })

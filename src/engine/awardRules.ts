@@ -44,6 +44,9 @@ export type AwardCandidate = {
   goals: number
   assists: number
   selectionScore: number
+  /** Derived official eligibility denominator; never persisted with a match. */
+  availableMinutes?: number
+  teamPerformanceBonus?: number
 }
 
 export type AwardCandidateMode = 'cumulative' | 'recent' | 'monthly'

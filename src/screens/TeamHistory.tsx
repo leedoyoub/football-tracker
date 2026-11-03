@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { AwardBestXI } from '../components/AwardBestXI'
+import { Pitch } from '../components/Pitch'
 import { CompactFilterMenu } from '../components/CompactFilterMenu'
 import { RankingMetricTabs, RankingRow } from '../components/RankingRow'
 import { VirtualRankingList } from '../components/VirtualRankingList'
@@ -71,9 +71,9 @@ export function TeamHistory({ teamId, season, teams, players, matches, states, s
     {menu === 'best-xi' && bestXI && <>
       <p className="mb-3 text-[11px] leading-relaxed text-zinc-400">{selectedSeason} · {competition === 'all' ? 'All competitions' : competitionLabel[competition]}<br />
         {bestXI.formation && <>Most-used formation: {bestXI.formation.label} · {bestXI.formation.matches} matches<br /></>}
-        Minimum {bestXI.minimumAppearances} of {bestXI.teamMatches} recorded team matches (40%).</p>
-      {bestXI.formation ? <AwardBestXI title={`Team Best XI · ${bestXI.formation.label}`} result={bestXI} players={players} teams={teams} showEmptySlots presentation="team-history" onPlayerOpen={id => openPlayer(id)} /> : <p className="rounded-xl bg-zinc-900 p-4 text-xs text-zinc-400">No valid saved kickoff formation in this scope.</p>}
-      {bestXI.formation && !bestXI.bestXI.some(slot => slot.playerId) && <p className="text-xs text-zinc-500">No qualifying players in this scope yet.</p>}
+        Minimum {bestXI.minimumMinutes} of {bestXI.availableTeamMinutes} recorded team minutes (30%).</p>
+      {bestXI.formation && bestXI.bestXI.length ? <section className="mt-6"><div className="mb-3"><h2 className="text-lg font-semibold">Team Best XI</h2><p className="text-xs text-zinc-400">{bestXI.formation.label}</p></div><Pitch emptyRatingLabel="—" slots={bestXI.bestXI} players={players} teams={teams} statsByPlayer={bestXI.statsByPlayer} showPositionBadge={false} presentation="history" showEmptySlots onSlotClick={slot => { if (slot.playerId) openPlayer(slot.playerId) }} /></section> : <p className="rounded-2xl bg-zinc-900 p-6 text-center text-sm text-zinc-500">No valid saved kickoff formation in this scope.</p>}
+      {bestXI.bestXI.length > 0 && !bestXI.bestXI.some(slot => slot.playerId) && <p className="text-xs text-zinc-500">No qualifying players in this scope yet.</p>}
     </>}
   </section>
 }

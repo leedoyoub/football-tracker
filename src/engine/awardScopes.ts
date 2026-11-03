@@ -2,6 +2,32 @@ import type { ChampionsStage, CupStage, Match } from '../types'
 import { CHAMPIONS_ROUNDS, CUP_STAGES, competitionMatches } from './competition'
 import { competitionIdentityForMatch, matchCompetitionStage } from './competitionContext'
 import { monthlyBlockRange } from './seasonAnalytics'
+import type { AwardScope } from './awards'
+import { arrayItemRevision } from './arrayItemRevision'
+
+const scopedMatchesCache = new WeakMap<Match[], Map<string, Match[]>>()
+
+export function matchesForAwardScope(matches: Match[], season: string, scope: AwardScope | 'all'): Match[] {
+  let cache = scopedMatchesCache.get(matches)
+  if (!cache) { cache = new Map(); scopedMatchesCache.set(matches, cache) }
+  const normalizedScope = scope === 'all' ? 'season' : scope
+  const key = JSON.stringify([arrayItemRevision(matches), season, normalizedScope])
+  const cached = cache.get(key)
+  if (cached) return cached
+  let result: Match[]
+  if (normalizedScope === 'season') result = matches.filter(match => match.season === season)
+  else if (normalizedScope !== 'first-half' && normalizedScope !== 'second-half') result = competitionMatches(matches, season, normalizedScope)
+  else {
+    const first = normalizedScope === 'first-half' ? 1 : 16
+    result = competitionMatches(matches, season, 'league').filter(match => {
+      const day = competitionIdentityForMatch(match).matchDay
+      return day >= first && day < first + 15
+    })
+  }
+  if (cache.size >= 48) cache.delete(cache.keys().next().value!)
+  cache.set(key, result)
+  return result
+}
 
 /** Available presentation periods are derived from recorded canonical matches,
  * never from bracket progress or a persisted UI selection. */

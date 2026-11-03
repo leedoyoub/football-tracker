@@ -5,6 +5,7 @@ const { execFileSync } = require('node:child_process')
 const { sourceModule } = require('./helpers/v259-harness.cjs')
 const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const { teams, game, cupFixture } = require('./helpers/v258-fixture.cjs')
+const { assertNewsPolicy, assertLatestPolicy } = require('./helpers/v265-award-policy-comparison.cjs')
 const root = path.resolve(__dirname, '..')
 const competition = require('../src/engine/competition.ts')
 const rating = require('../src/engine/rating.ts')
@@ -22,9 +23,9 @@ function baseline(file, overrides = {}) {
 const oldNews = baseline('news'), oldLatest = baseline('latestChanges', { './news': oldNews })
 function equivalent(s, label) {
   const args = [s.players, s.teams, s.matches, s.competitionStates ?? []]
-  assert.deepEqual(news.deriveNews(...args), oldNews.deriveNews(...args), `${label}: News`)
-  assert.deepEqual(news.deriveFootballEvents(...args), oldNews.deriveFootballEvents(...args), `${label}: Match Changes`)
-  assert.deepEqual(latest.deriveLatestChanges(...args), oldLatest.deriveLatestChanges(...args), `${label}: Latest Changes`)
+  assertNewsPolicy(news.deriveNews(...args), oldNews.deriveNews(...args), args)
+  assertNewsPolicy(news.deriveFootballEvents(...args), oldNews.deriveFootballEvents(...args), args, 'deriveFootballEvents')
+  assertLatestPolicy(latest.deriveLatestChanges(...args), oldLatest.deriveLatestChanges(...args), args)
   for (const id of [...new Set([0, 9, 15, 60].map(index => s.players[index]?.id).filter(Boolean)), 'deleted-player']) {
     // A fresh module also exercises the dedicated path before the full-feed cache exists.
     const isolated = sourceModule(root, 'engine/news.ts')
@@ -90,7 +91,13 @@ test('participant iteration preserves duplicate roster, first appearance, transf
 
 test('News avoids repeated appearance searches for players absent from each match', () => {
   const searches = {}
-  for (const [side, api] of [['before', oldNews], ['after', news]]) {
+  // Count the participant traversal in isolation. Half-scope evaluation is new
+  // v265 work with its own correctness/performance coverage, and no half award
+  // can finalize in this one-day prefix. Both feeds must still be identical.
+  const awards = require('../src/engine/awards.ts')
+  const participantNews = sourceModule(root, 'engine/news.ts', { './awards': { ...awards, awardResultForScope: () => undefined } })
+  let expected
+  for (const [side, api] of [['before', oldNews], ['after', participantNews]]) {
     const s = performanceFixture(1); s.matches = s.matches.slice(0, 16)
     let count = 0
     for (const match of s.matches) {
@@ -99,16 +106,18 @@ test('News avoids repeated appearance searches for players absent from each matc
     }
     const result = api.deriveNews(s.players, s.teams, s.matches, s.competitionStates)
     assert.ok(result.length > 0)
+    if (expected) assert.deepEqual(result, expected, 'isolating unavailable half awards preserves the entire prefix feed')
+    expected = result
     searches[side] = count
   }
   assert.ok(searches.after < searches.before / 2, JSON.stringify(searches))
 })
 
-test('one and three season canonical feeds remain identical including season filters', () => {
+test('one and three season feeds preserve ordinary articles and publish canonical finalized awards with season filters', () => {
   for (const count of [1, 3]) {
     const s = performanceFixture(count), args = [s.players, s.teams, s.matches, s.competitionStates]
-    assert.deepEqual(news.deriveNews(...args), oldNews.deriveNews(...args))
-    assert.deepEqual(latest.deriveLatestChanges(...args, `Season ${count}`), oldLatest.deriveLatestChanges(...args, `Season ${count}`))
+    assertNewsPolicy(news.deriveNews(...args), oldNews.deriveNews(...args), args)
+    assertLatestPolicy(latest.deriveLatestChanges(...args, `Season ${count}`), oldLatest.deriveLatestChanges(...args, `Season ${count}`), [...args, `Season ${count}`])
   }
 })
 

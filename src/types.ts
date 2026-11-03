@@ -212,13 +212,13 @@ export type View =
   | { name: 'latest-changes'; season?: string }
   | { name: 'competition'; season?: string; competitionType?: CompetitionType; rankingMetric?: 'rating' | 'goals' | 'assists' | 'mom' }
   | { name: 'global-ranking'; season?: string; competitionType?: CompetitionType | 'all'; rankingMetric?: RankSort; teamId?: string }
-  | { name: 'award-race'; season?: string; competitionType?: CompetitionType | 'all' }
+  | { name: 'award-race'; season?: string; competitionType?: CompetitionType | 'all'; awardScope?: 'first-half' | 'second-half' }
   | { name: 'results' }
   | { name: 'records' }
   | { name: 'records-leaderboard'; category: Extract<RecordsCategory, 'player' | 'team' | 'combination'>; leaderboardId: string; competition?: CompetitionType | 'all'; positionFilter?: PositionFilterKey; seasonIds?: string[]; teamIds?: string[] }
   | { name: 'standings' }
   | { name: 'season-recap'; season: string }
-  | { name: 'season-highlight'; season: string; kind: 'monthly' | 'review' | 'news' }
+  | { name: 'season-highlight'; season: string; kind: 'awards' | 'monthly' | 'review' | 'news' }
   | { name: 'chemistry' }
   | { name: 'comparison'; leftId?: string; rightId?: string; season?: string; competitionType?: CompetitionType | 'all' }
   | { name: 'teams' }
@@ -259,6 +259,7 @@ export interface ScreenStateByView {
     matchFilters: Record<CompetitionType, { teamId: string | null; period: string | null }>
     rankingMetric: RankSort
     bestXiMode: 'period' | 'competition'
+    leagueAwardScope: 'first-half' | 'second-half' | 'league'
     monthlyAwardBlock: number | null
     cupAwardStage: CupStage | null
     championsAwardRound: Exclude<ChampionsStage, 'finalReplay'> | null
@@ -268,7 +269,7 @@ export interface ScreenStateByView {
     historyPlotScrollLeft: number | null
   }
   'global-ranking': { name: 'global-ranking'; metric: RankSort; scope: CompetitionType | 'all'; positionFilter: PositionFilterKey; teamId: string | null }
-  'award-race': { name: 'award-race'; season: string | null; scope: CompetitionType | 'all'; positionFilter: PositionFilterKey; teamId: string | null }
+  'award-race': { name: 'award-race'; season: string | null; scope: CompetitionType | 'all'; awardScope?: 'first-half' | 'second-half'; positionFilter: PositionFilterKey; teamId: string | null }
   results: { name: 'results' }
   records: {
     name: 'records'
@@ -286,6 +287,7 @@ export interface ScreenStateByView {
     teamAwardKindsOpen?: boolean
     historyPanel: string | null
     historySeason: string | null
+    historyAwardScope: 'first-half' | 'second-half' | 'league' | 'cup' | 'champions' | 'season'
     historyBlock: number | null
   }
   'records-leaderboard': {

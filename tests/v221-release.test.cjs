@@ -33,7 +33,7 @@ function game(day, options = {}) {
 }
 
 test('v2.6.1 metadata and the revision-13 position table are exact', () => {
-  assert.equal(APP_VERSION, '2.6.4'); assert.equal(require('../package.json').version, '2.6.4'); assert.equal(RATING_ENGINE_REVISION, 13)
+  assert.equal(APP_VERSION, '2.6.5'); assert.equal(require('../package.json').version, '2.6.5'); assert.equal(RATING_ENGINE_REVISION, 13)
   const expected = {
     LB: [.04, 1], LWB: [.04, 1], RB: [.04, 1], RWB: [.04, 1],
     CDM: [.06, .80], LDM: [.06, .80], RDM: [.06, .80],
@@ -90,12 +90,12 @@ test('all award Best XIs share strict 4-3-3 families including tactical aliases'
   assert(xi.every(slot => slot.playerId)); assert.equal(new Set(xi.map(slot => slot.playerId)).size, 11)
 })
 
-test('League, Champions and Cup award bonuses are exact direct selection values', () => {
-  assert.deepEqual(Array.from({ length: 16 }, (_, index) => leaguePositionBonus(index + 1)), [.20, .08, .035, .025, .015, .015, .015, .015, 0, 0, 0, 0, 0, 0, 0, 0])
-  assert.deepEqual(['roundOf16', 'quarterFinal', 'semiFinal', 'runnerUp', 'champion'].map(championsProgressBonus), [0, .020, .035, .08, .20])
-  assert.deepEqual(['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'stage6', 'stage7', 'runnerUp', 'champion'].map(cupProgressBonus), [0, 0, 0, .015, .025, .030, .035, .08, .20])
+test('League, Champions and Cup award bases scale by regulation-minute participation', () => {
+  assert.deepEqual(Array.from({ length: 16 }, (_, index) => leaguePositionBonus(index + 1)), [.3, .21, .15, .105, .09, .075, .0675, .06, .0525, .045, .0375, .03, .0225, .015, .0075, 0])
+  assert.deepEqual(['roundOf16', 'quarterFinal', 'semiFinal', 'runnerUp', 'champion'].map(championsProgressBonus), [0, .06, .12, .21, .30])
+  assert.deepEqual(['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'stage6', 'stage7', 'runnerUp', 'champion'].map(cupProgressBonus), [0, 0, 0, 0, .06, .06, .12, .21, .30])
   assert.equal(participationRatio(450, 10), .5); assert.equal(participationRatio(1000, 10), 1)
-  assert(Math.abs(ratingAwardScore(7.4, .20, 450, 10) - 7.6) < 1e-10)
+  assert(Math.abs(ratingAwardScore(7.4, .30, 450, 10) - 7.55) < 1e-10)
 })
 
 test('rank movement is snapshot-to-snapshot and neutral without a prior rank', () => {
@@ -145,7 +145,7 @@ test('mobile screen hierarchy, compare mode, cached snapshots and navigation mem
   const playerDetail = fs.readFileSync(require.resolve('../src/screens/PlayerDetailScreen.tsx'), 'utf8')
   const matchDetail = fs.readFileSync(require.resolve('../src/screens/MatchDetailScreen.tsx'), 'utf8')
   for (const token of ['screenState.leaderMetric', 'Global Ranking', 'Latest Changes', 'slice(0, 10)', 'slice(0, 4)', 'seasonMatches']) assert(home.includes(token), token)
-  for (const token of ['screenState.competitionType', 'screenState.rankingMetric', "label: 'Players'", "label: 'Table'", "label: 'Form'", 'Last 5 League matches only', "label: 'History'", "label: 'Matches'", 'Team of the Month', 'Best XI view']) assert(competition.includes(token), token)
+  for (const token of ['screenState.competitionType', 'screenState.rankingMetric', "label: 'Players'", "label: 'Table'", "label: 'Form'", 'Last 5 League matches only', "label: 'History'", "label: 'Matches'", 'First Half', 'Second Half', 'Best XI view']) assert(competition.includes(token), token)
   for (const token of ['screenState.bestPlayersMetric', "label: 'Overview'", "label: 'Matches'", "label: 'Players'", 'Roster management', 'Latest XI', 'Bench', 'RANKING_METRICS']) assert(team.includes(token), token)
   for (const token of ['RankedMetric', 'Overall rank', 'Position-family rank', 'Team rank', 'Season avg', 'Last 5 avg', 'Active Streaks', 'Awards']) assert(playerDetail.includes(token), token)
   for (const token of ['Match Facts', 'Lineup', 'Ratings', 'What Changed', 'Top 3 Ratings']) assert(matchDetail.includes(token), token)

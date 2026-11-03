@@ -1,7 +1,5 @@
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
 import { selectTeamHistoryBestXI } from './teamHistorySelection'
-import { teamHistoryLayout } from './teamHistoryLayout'
-import { placeTeamHistoryPlayers } from './teamHistoryPlacement'
 import { arrayItemRevision } from './arrayItemRevision'
 import { matchCompetitionType, teamCompetitionOverview } from './competition'
 import { isRecordedForTeam, teamsCreditedWithResult } from './matchPerspective'
@@ -70,8 +68,7 @@ export function teamHistoryRecords(players: Player[], matches: Match[], scope: T
 export function teamHistoryBestXI(players: Player[], matches: Match[], scope: TeamHistoryScope & { season: string }) {
   return cachedScope(players, matches, scope, 'best-xi', () => {
     const games = scopeMatches(matches, scope).filter(match => isRecordedForTeam(match, scope.teamId))
-    const result = selectTeamHistoryBestXI(players, games, scope.teamId)
-    return { ...result, bestXI: teamHistoryLayout(placeTeamHistoryPlayers(result.bestXI, players, games, scope.teamId), result.statsByPlayer) }
+    return selectTeamHistoryBestXI(players, games, scope.teamId)
   })
 }
 

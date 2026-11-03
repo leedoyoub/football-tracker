@@ -55,7 +55,7 @@ test('side minutes preserve historical team, substitute intervals and same-array
  assert.deepEqual(place(slots,players,games,'A').map(s=>s.playerId),['central','sub','left','last'])
 })
 
-test('scoped History placement changes coordinates only, preserving the v2.6.3 selected eleven',()=>{
+test('scoped History retains exact tactical roles and preserves historical team selection facts',()=>{
  const {selectTeamHistoryBestXI}=require('../src/engine/teamHistorySelection.ts')
  const roles=['GK','CB','CB','LB','RB','CM','CM','LM','RM','ST','ST'],players=roles.map((_,i)=>player(`p${i}`))
  const games=Array.from({length:3},(_,i)=>game(`a${i}`,roles.map((role,j)=>[`p${j}`,role])))
@@ -65,7 +65,6 @@ test('scoped History placement changes coordinates only, preserving the v2.6.3 s
  const facts=s=>s.map(({x:_x,y:_y,...rest})=>rest).sort((a,b)=>a.slot.localeCompare(b.slot))
  assert.deepEqual(facts(result.bestXI),facts(baseline.bestXI));assert.equal(result.minimumAppearances,baseline.minimumAppearances)
  assert.deepEqual(result.statsByPlayer,baseline.statsByPlayer);assert.equal(result.bestPlayerId,baseline.bestPlayerId)
- const defenders=result.bestXI.filter(s=>s.displayPosition==='DEF').sort((a,b)=>a.x-b.x),mids=result.bestXI.filter(s=>s.displayPosition==='MID').sort((a,b)=>a.x-b.x)
- assert.equal(defenders[0].playerId,'p3');assert.equal(defenders.at(-1).playerId,'p4')
- assert.equal(mids[0].playerId,'p7');assert.equal(mids.at(-1).playerId,'p8')
+ assert.equal(result.bestXI.find(s=>s.slot==='LB').playerId,'p3');assert.equal(result.bestXI.find(s=>s.slot==='RB').playerId,'p4')
+ assert.equal(result.bestXI.find(s=>s.slot==='LM').playerId,'p7');assert.equal(result.bestXI.find(s=>s.slot==='RM').playerId,'p8')
 })

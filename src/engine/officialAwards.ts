@@ -1,13 +1,11 @@
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
 import { currentStaticTeams } from '../data/teams'
-import { awardsForCompetition, finalPlayerAward, performanceAwardResult, seasonAwards, type AwardWinner, type CompetitionAwards } from './awards'
+import { awardsForCompetition, awardResultForScope, isLeagueHalfFinalized, seasonAwards, type AwardWinner, type CompetitionAwards } from './awards'
 import { competitionMatches, competitionSeasonStatus, type ChampionsCompetition } from './competition'
-import { matchesForAwardPeriod } from './awardScopes'
-import { monthlyAwardForBlock } from './seasonAnalytics'
 import { hasPitchAppearance } from './timeline'
 import { newestMatches } from './matchChronology'
 import { scopedPositionFamilyByPlayer, type PositionFamily } from './positionScope'
-import { competitionIdentityForMatch } from './competitionContext'
+import { matchesForAwardScope } from './awardScopes'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { AWARD_POLICY_REVISION } from './awardPolicy'
 import { arrayItemRevision } from './arrayItemRevision'
@@ -77,12 +75,15 @@ export function officialSeasonModel(teams: Team[], players: Player[], matches: M
       const id = JSON.stringify([season, competition, kind, period ?? '', playerId, category === 'individual' ? '' : historicalTeam])
       events.set(id, { id, kind, label, playerId, teamId: historicalTeam, season, competition, period, category, position, finalized: true })
     }
-    for (let block = 1; block <= 10; block++) {
-      const award = monthlyAwardForBlock(tournamentTeams, players, matches, season, block)
-      if (!award?.finalized) continue
-      const scope = competitionMatches(matches, season, 'league').filter(match => { const day = competitionIdentityForMatch(match).matchDay; return day >= (block - 1) * 3 + 1 && day <= block * 3 })
-      add('monthly-player', 'Player of the Month', award.playerOfMonth?.playerId, 'league', scope, award.playerOfMonth?.teamId, block)
-      for (const slot of award.bestXI) add('monthly-xi', 'Team of the Month', slot.playerId ?? undefined, 'league', scope, slot.teamId, block)
+    for (const half of ['first-half', 'second-half'] as const) {
+      const start = half === 'first-half' ? 1 : 16
+      const scope = matchesForAwardScope(matches, season, half)
+      // Check the cheap whole-league slot gate before evaluating candidates.
+      if (!isLeagueHalfFinalized(tournamentTeams, scope, season, start)) continue
+      const award = awardResultForScope(half, season, tournamentTeams, players, matches, states)
+      if (!award?.complete) continue
+      add(`${half}-mvp`, award.playerLabel, award.bestPlayerId, 'league', scope, award.candidates?.find(candidate => candidate.playerId === award.bestPlayerId)?.teamId)
+      for (const slot of award.bestXI) add(`${half}-xi`, award.teamLabel, slot.playerId ?? undefined, 'league', scope, slot.teamId)
     }
     for (const competition of ['league', 'cup', 'champions'] as const) {
       const complete = competition === 'league' ? status.league.complete : competition === 'cup' ? Boolean(status.cup.championId) : Boolean(status.champions.championId)
@@ -98,17 +99,6 @@ export function officialSeasonModel(teams: Team[], players: Player[], matches: M
         for (const winner of award.goalkeepers) publish('gk', winner.label, winner)
         for (const slot of award.bestXI ?? []) add(`${competition}-xi`, `${title} Best XI`, slot.playerId ?? undefined, competition, scope, slot.teamId)
       }
-      if (competition !== 'league' && award.complete) {
-        const finals = matchesForAwardPeriod(matches, season, competition, 'final')
-        add(`${competition}-final`, `${competition === 'cup' ? 'Cup' : 'Champions'} Player of the Final`, finalPlayerAward(players, finals)?.playerId, competition, finals)
-      }
-    }
-    for (const stage of ROUND_AWARD_STAGES) {
-      if (!isChampionsRoundFinalized(status.champions, stage)) continue
-      const scope = matchesForAwardPeriod(matches, season, 'champions', stage)
-      const award = performanceAwardResult(players, scope)
-      add('champions-round-player', 'Champions Player of the Round', award.bestPlayerId, 'champions', scope, award.candidates[0]?.teamId, stage)
-      for (const slot of award.bestXI) add('champions-round-xi', 'Champions Team of the Round', slot.playerId ?? undefined, 'champions', scope, slot.teamId, stage)
     }
     if (status.complete) {
       const award = seasonAwards(season, tournamentTeams, players, matches, states, status)
@@ -139,5 +129,6 @@ export function careerAwardEvents(teams: Team[], players: Player[], matches: Mat
 function periodOrder(event: OfficialAwardEvent) { return typeof event.period === 'number' ? event.period : event.period ? ROUND_AWARD_STAGES.indexOf(event.period) + 1 : 20 }
 export function awardEventDetail(event: OfficialAwardEvent, teams: Team[]): string {
   const season = `Season ${event.season.match(/\d+/)?.[0] ?? event.season}`
+  if (event.kind.startsWith('first-half-') || event.kind.startsWith('second-half-')) return `${season} · ${event.kind.startsWith('first-half-') ? 'First Half' : 'Second Half'} · ${teams.find(team => team.id === event.teamId)?.name ?? event.teamId}`
   return event.kind === 'cup-final' || event.kind === 'champions-final' ? `${season} · Final` : typeof event.period === 'number' ? `${season}-${event.period}` : event.period ? `${season} · ${ROUND_AWARD_LABELS[event.period]}` : `${season} · ${teams.find(team => team.id === event.teamId)?.name ?? event.teamId}`
 }

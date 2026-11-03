@@ -1,4 +1,5 @@
 const { leagueCopy, unchangedPlayerMarkup } = require('./helpers/v2512-policy-comparison.cjs')
+const { assertNewsPolicy, assertSelection } = require('./helpers/v265-award-policy-comparison.cjs')
 require('./helpers/register-ts.cjs')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -47,14 +48,28 @@ test('Player Overview first browser render does not build full seasonal awards o
   })
 }))
 
-test('settled Home and Player Detail retain v2.5.8 markup except approved Rating Details and Positions Played presentation', () => {
+test('settled Home and Player Detail retain v2.5.8 markup around canonical award data and approved player presentation', () => {
   const store = performanceFixture(1)
   for (const [name, view, extra] of [['HomeScreen', { name: 'home' }, {}], ['PlayerDetailScreen', { name: 'player', id: store.players[9].id }, { playerId: store.players[9].id }]]) {
     const props = { season: 'Season 1', screenState: navigation.defaultScreenState(view), onNavigate: noop, onStateChange: noop, onBack: noop, ...extra }
     // This fixture only plays ST. Preserve the complete comparison while applying
     // the explicitly changed copy and precision; low-share coverage lives in v2511.
-    const expected = renderToStaticMarkup(h(baseline, name, store).render(props)).replace(/(<summary class="cursor-pointer text-zinc-400">)Rating Details · [A-Z]+ · \d+&#x27;(<\/summary>)/g, '$1Rating Details$2').replace('positions under 10% are hidden.', 'all played positions.').replace('100% · ', '100.0% · ')
-    assert.equal(unchangedPlayerMarkup(renderToStaticMarkup(h(root, name, store).render(props))), unchangedPlayerMarkup(expected))
+    // Supply the intentionally reformulated data to the archived Home renderer;
+    // every surrounding element and all unrelated Player Detail markup stay
+    // byte-for-byte equal. Complete non-award feeds are compared separately.
+    const originalHarness = name === 'HomeScreen' ? screenHarness(baseline, 'screens/HomeScreen.tsx', name, store, {
+      '../engine/awards': require('../src/engine/awards.ts'),
+      '../engine/latestChanges': require('../src/engine/latestChanges.ts'),
+    }) : h(baseline, name, store)
+    if (name === 'HomeScreen') assertSelection(require('../src/engine/awards.ts').seasonAwards('Season 1', store.teams, store.players, store.matches, store.competitionStates), 'season', 'Season 1', store.teams, store.players, store.matches, store.competitionStates)
+    const expected = renderToStaticMarkup(originalHarness.render(props)).replace(/(<summary class="cursor-pointer text-zinc-400">)Rating Details · [A-Z]+ · \d+&#x27;(<\/summary>)/g, '$1Rating Details$2').replace('positions under 10% are hidden.', 'all played positions.').replace('100% · ', '100.0% · ').replace('official 40% eligibility', 'minimum 50% playing time')
+    const actual = unchangedPlayerMarkup(renderToStaticMarkup(h(root, name, store).render(props)))
+    const original = unchangedPlayerMarkup(expected)
+    if (actual !== original) {
+      let offset = 0
+      while (actual[offset] === original[offset]) offset++
+      assert.fail(`${name}: markup differs at ${offset}; actual ${actual.slice(offset, offset + 160)}; expected ${original.slice(offset, offset + 160)}`)
+    }
   }
 })
 
@@ -66,7 +81,7 @@ test('narrow milestone projection exactly matches canonical global News for ever
   const original = JSON.stringify(s)
   for (const id of [...s.players.map(p => p.id), 'missing']) assert.deepStrictEqual(news.derivePlayerMilestones(id, s.players, s.teams, s.matches), expected.filter(item => item.playerId === id && item.milestone), id)
   assert.equal(JSON.stringify(s), original)
-  assert.deepStrictEqual(news.deriveNews(s.players, s.teams, s.matches), leagueCopy(expected))
+  assertNewsPolicy(news.deriveNews(s.players, s.teams, s.matches), leagueCopy(expected), [s.players, s.teams, s.matches])
 })
 
 test('milestones refresh on immutable record edits/deletes and player transfers without changing IDs or scopes', () => {

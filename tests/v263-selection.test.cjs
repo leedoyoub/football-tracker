@@ -3,7 +3,6 @@ const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { normalizeTeamHistoryFormation, mostUsedTeamHistoryFormation, selectTeamHistoryBestXI } = require('../src/engine/teamHistorySelection.ts')
 const { scopedTeamHistoryGroupByPlayer } = require('../src/engine/positionScope.ts')
-const { awardCandidatesForScope } = require('../src/engine/awards.ts')
 const { kickoffFromAssignments } = require('../src/engine/kickoffLineup.ts')
 
 const player = (id, position = 'ST') => ({ id, name: id, teamId: 'elsewhere', position })
@@ -13,17 +12,17 @@ function game(id, formation = '3-5-2', appearances = []) {
 }
 const shape = (label, defenders, midfielders, forwards) => ({ label, defenders, midfielders, forwards })
 
-test('Team History merges every middle formation line before counting frequency', () => {
-  for (const [raw, expected] of [['4-3-3', '4-3-3'], ['4-1-2-3', '4-3-3'], ['4-2-1-3', '4-3-3'], ['4-2-2-2', '4-4-2'], ['4-2-3-1', '4-5-1'], ['4-1-4-1', '4-5-1'], ['3-2-3-2', '3-5-2'], ['3-4-1-2', '3-5-2']]) {
-    assert.equal(normalizeTeamHistoryFormation(raw).label, expected)
+test('Team History preserves every saved tactical formation line before counting frequency', () => {
+  for (const raw of ['4-3-3', '4-1-2-3', '4-2-1-3', '4-2-2-2', '4-2-3-1', '4-1-4-1', '3-2-3-2', '3-4-1-2']) {
+    assert.equal(normalizeTeamHistoryFormation(raw).label, raw)
   }
   const games = ['4-1-2-3', '4-2-1-3', '4-3-3', '4-4-2', '4-4-2'].map((formation, index) => game(index + 1, formation))
-  assert.deepEqual(mostUsedTeamHistoryFormation(games, 'A'), { ...shape('4-3-3', 4, 3, 3), matches: 3 })
+  assert.deepEqual(mostUsedTeamHistoryFormation(games, 'A'), { ...shape('4-4-2', 4, 4, 2), matches: 2 })
 })
 
 test('invalid and absent saved formations do not fabricate a most-used shape', () => {
   for (const value of [undefined, null, '', '4-3', '4-3-4', '4.5-3-2.5', '-4-4-2', '4--4-2', 'garbage', '4-NaN-2']) assert.equal(normalizeTeamHistoryFormation(value), null)
-  assert.equal(normalizeTeamHistoryFormation(' 4-2-3-1 ').label, '4-5-1')
+  assert.equal(normalizeTeamHistoryFormation(' 4-2-3-1 ').label, '4-2-3-1')
   assert.equal(mostUsedTeamHistoryFormation([game(1, undefined), game(2, 'invalid')].map(match => ({ ...match, formation: '' })), 'A'), null)
   assert.equal(mostUsedTeamHistoryFormation([], 'A'), null)
 })
@@ -39,7 +38,7 @@ test('formation belongs to recorded roster owner and never follows end-of-match 
   const own = game(1, '4-2-3-1', [appearance('mover', 'ST', { positionHistory: [{ minute: 10, position: 'CB' }] })])
   const opponent = { ...game(2, '3-5-2'), teamId: 'B' }
   const legacyOpponent = { ...game(3, '3-5-2'), teamId: undefined, homeTeamId: 'B', awayTeamId: 'A' }
-  assert.deepEqual(mostUsedTeamHistoryFormation([own, opponent, legacyOpponent], 'A'), { ...shape('4-5-1', 4, 5, 1), matches: 1 })
+  assert.deepEqual(mostUsedTeamHistoryFormation([own, opponent, legacyOpponent], 'A'), { ...shape('4-2-3-1', 4, 5, 1), matches: 1 })
 })
 
 test('complete explicit kickoff snapshots safely recover missing numeric metadata, never guessed appearances', () => {
@@ -79,30 +78,30 @@ test('broad minutes honor substitutes, regulation cap, team attribution and ever
   assert.equal(scoped.get('sub'), 'MID'); assert.equal(scoped.has('zero'), false)
 })
 
-for (const [formation, counts] of [['3-5-2', [1, 3, 5, 2]], ['4-4-2', [1, 4, 4, 2]], ['4-5-1', [1, 4, 5, 1]]]) test(`${formation} selects broad quotas using unchanged cumulative score order`, () => {
-  const roles = ['GK', ...Array(5).fill('CB'), ...Array(6).fill('RAM'), ...Array(4).fill('ST')]
+for (const [formation, roles] of [
+  ['3-5-2', ['GK', 'CB', 'CB', 'CB', 'LM', 'CM', 'CM', 'CM', 'RM', 'ST', 'ST']],
+  ['4-4-2', ['GK', 'LB', 'CB', 'CB', 'RB', 'LM', 'CM', 'CM', 'RM', 'ST', 'ST']],
+  ['4-2-3-1', ['GK', 'LB', 'CB', 'CB', 'RB', 'CDM', 'CDM', 'CAM', 'CAM', 'CAM', 'ST']],
+]) test(`${formation} selects exact tactical roles from historical appearances`, () => {
   const players = roles.map((role, index) => player(`p${index}`, 'GK'))
   const games = Array.from({ length: 3 }, (_, i) => game(i + 1, formation, roles.map((role, index) => appearance(players[index].id, role))))
   const before = JSON.stringify({ players, games })
   const result = selectTeamHistoryBestXI(players, games, 'A')
-  assert.deepEqual(['GK', 'DEF', 'MID', 'FW'].map(group => result.bestXI.filter(slot => slot.displayPosition === group).length), counts)
-  assert.equal(result.bestXI.length, 11); assert.equal(result.minimumAppearances, 2)
+  assert.equal(result.bestXI.length, 11); assert.equal(result.minimumMinutes, 81)
   assert.equal(new Set(result.bestXI.map(slot => slot.playerId)).size, 11)
   assert(result.bestXI.every(slot => slot.teamId === 'A'))
-  const candidates = awardCandidatesForScope(players, games).filter(candidate => candidate.teamId === 'A')
-  const groups = scopedTeamHistoryGroupByPlayer(players, games, { teams: ['A'] })
-  for (const group of ['GK', 'DEF', 'MID', 'FW']) assert.deepEqual(result.bestXI.filter(slot => slot.displayPosition === group).map(slot => slot.playerId), candidates.filter(candidate => groups.get(candidate.playerId) === group).slice(0, counts[['GK', 'DEF', 'MID', 'FW'].indexOf(group)]).map(candidate => candidate.playerId))
-  assert.equal(result.bestPlayerId, candidates[0].playerId)
+  assert.deepEqual(result.bestXI.map(slot => slot.playerId).sort(), players.map(player => player.id).sort())
+  assert(result.bestXI.some(slot => slot.playerId === result.bestPlayerId))
   assert.equal(JSON.stringify({ players, games }), before, 'read-only projection never migrates saved data')
 })
 
-test('40 percent eligibility preserves historical transfers/releases, vacancies, and empty states', () => {
+test('30 percent team-minute eligibility preserves historical transfers/releases, vacancies, and empty states', () => {
   const players = [player('released', 'ST'), player('boundary', 'GK'), player('rare', 'ST'), player('foreign', 'CB')]
   players[0].teamId = ''
-  const games = Array.from({ length: 5 }, (_, i) => game(i + 1, '3-5-2', [appearance('released', 'GK'), appearance('boundary', 'RAM', { role: i < 2 ? 'starter' : 'bench' }), appearance('rare', 'ST', { role: i === 0 ? 'starter' : 'bench' }), appearance('foreign', 'CB', { teamId: 'B' })]))
+  const games = Array.from({ length: 5 }, (_, i) => game(i + 1, '3-5-2', [appearance('released', 'GK'), appearance('boundary', 'LM', { role: i < 2 ? 'starter' : 'bench' }), appearance('rare', 'ST', { role: i === 0 ? 'starter' : 'bench' }), appearance('foreign', 'CB', { teamId: 'B' })]))
   const result = selectTeamHistoryBestXI(players, games, 'A')
-  assert.equal(result.teamMatches, 5); assert.equal(result.minimumAppearances, 2)
-  assert.equal(result.bestXI[0].playerId, 'released')
+  assert.equal(result.teamMatches, 5); assert.equal(result.minimumMinutes, 135)
+  assert.equal(result.bestXI.find(slot => slot.slot === 'GK').playerId, 'released')
   assert(result.bestXI.some(slot => slot.playerId === 'boundary'))
   assert(!result.bestXI.some(slot => ['rare', 'foreign'].includes(slot.playerId)))
   assert(result.bestXI.some(slot => slot.playerId === null))

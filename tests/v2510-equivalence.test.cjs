@@ -22,7 +22,7 @@ const s = performanceFixture()
 function equal(file, fn, ...args) {
   const actual = current(file)[fn](...args)
   const original = before(file)[fn](...args)
-  assertPolicyEquivalence(actual, original, file, fn)
+  assertPolicyEquivalence(actual, original, file, fn, args)
 }
 
 test('realistic benchmark history is accepted by the unchanged durable-state validator', () => {
@@ -40,7 +40,7 @@ test('v2.5.9 whole-object equivalence: every match rating, MOM, goal types, manu
   }
 })
 
-test('v2.5.9 whole-object equivalence: all 30 History days, monthly awards, rankings, Best XI and competitions', () => {
+test('v2.5.9 whole-object equivalence: all 30 History days, legacy monthly helpers, rankings, competition rules and approved award policy', () => {
   for (const season of ['Season 1', 'Season 2']) {
     equal('engine/seasonAnalytics.ts', 'buildSeasonAnalytics', s.teams, s.players, s.matches, season)
     equal('engine/competition.ts', 'leagueCompetition', s.teams, s.matches, season, s.players)

@@ -1,12 +1,12 @@
 import { competitionHistory, cupCompetition, championsCompetition, CHAMPIONS_ROUNDS, matchCompetitionType } from './competition'
-import { competitionAwardResult, monthlyCanonicalAwardResult } from './awards'
+import { awardResultForScope, competitionAwardResult } from './awards'
 import { currentStaticTeams } from '../data/teams'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import { AWARD_POLICY_REVISION } from './awardPolicy'
 import { arrayItemRevision } from './arrayItemRevision'
 import type { CompetitionState, CompetitionType, EventSurface, Match, MatchChangePayload, Player, Team } from '../types'
-import { newestMatches, oldestMatches } from './matchChronology'
+import { oldestMatches } from './matchChronology'
 import { buildSeasonAnalytics, rankingMovement } from './seasonAnalytics'
 import { hasPitchAppearance, isOnPitchAtEvent, matchPositionSegments } from './timeline'
 import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts } from './playerMatchFacts'
@@ -317,7 +317,7 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
 
   if (targetPlayerId !== undefined) return sortNewsNewestFirst([...items.values()], matches)
 
-  // Rank and Monthly Award stories consume the shared season snapshots. They
+  // Rank stories consume shared snapshots; half awards use canonical scope results. They
   // never rebuild historical tables or player leaderboards inside this feed.
   for (const [seasonName, analytics] of analyticsBySeason) {
     for (const [day, snapshot] of analytics.leagueSnapshots) {
@@ -344,11 +344,10 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
         for (const [index, row] of rows.slice(0, 5).entries()) { const delta = movement.get(row.playerId); if (!delta || (Math.abs(delta) < 2 && index > 0)) continue; add({ id: `rank:player:${seasonName}:${day}:${metric}:${row.playerId}`, kind: 'player', importance: index === 0 ? 'major' : 'minor', date: lastMatch.date, matchId: lastMatch.id, playerId: row.playerId, eyebrow: `${metric.toUpperCase()} RACE`, title: `${playerName(players, row.playerId)} moves to #${index + 1} in ${metric === 'rating' ? 'Avg Rating' : metric}`, detail: `${delta > 0 ? 'Up' : 'Down'} ${Math.abs(delta)} place${Math.abs(delta) === 1 ? '' : 's'}.`, context: `League · MD${day}` }) }
       }
     }
-    for (const award of analytics.monthlyAwards.values()) {
-      const finalMatch = newestMatches(analytics.leagueSnapshots.get(award.block.endMatchDay)?.matches ?? [])[0]
-      const bestPlayerId = award.bestPlayerId
-      if (!finalMatch || !bestPlayerId) continue
-      for (const article of awardNewsFromResult(monthlyCanonicalAwardResult({ ...award, bestPlayerId }, finalMatch), id => playerName(players, id))) add(article)
+    for (const scope of ['first-half', 'second-half'] as const) {
+      const award = awardResultForScope(scope, seasonName, teams, players, matches, states)
+      if (!award?.complete) continue
+      for (const article of awardNewsFromResult(award, id => playerName(players, id))) add(article)
     }
   }
 

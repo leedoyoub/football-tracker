@@ -80,14 +80,14 @@ test('Records player awards remove a revoked official result after same-array re
  assert.equal(run()[0].rows.length,0)
 })
 
-test('Latest Changes removes revoked league title and monthly awards after a same-array replacement',()=>{
+test('Latest Changes removes revoked league title and half awards after a same-array replacement',()=>{
  const {deriveLatestChanges}=require('../src/engine/latestChanges.ts')
  const s=performanceFixture(1)
  const run=()=>deriveLatestChanges(s.players,s.teams,s.matches,s.competitionStates,'Season 1').flatMap(group=>group.items)
  const original=run();assert.ok(original.some(item=>item.id.startsWith('title:Season 1:league:')))
- assert.ok(original.some(item=>item.id.startsWith('award:player-of-month:Season 1-1:')))
+ assert.ok(original.some(item=>item.id.startsWith('award:first-half-mvp:Season 1')))
  s.matches[0]={...s.matches[0],season:'Season 2'}
  const updated=run()
  assert.ok(!updated.some(item=>item.id.startsWith('title:Season 1:league:')))
- assert.ok(!updated.some(item=>item.id.startsWith('award:player-of-month:Season 1-1:')))
+ assert.ok(!updated.some(item=>item.id.startsWith('award:first-half-mvp:Season 1')))
 })

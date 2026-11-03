@@ -61,13 +61,13 @@ test('defaults retain every approved state-bearing screen field', () => {
   assert.deepEqual(defaultScreenState({ name: 'competition', competitionType: 'champions', rankingMetric: 'mom' }), {
     name: 'competition', competitionType: 'champions', leagueMenu: 'players', cupMenu: 'table', championsMenu: 'bracket', rankingMetric: 'mom',
     leagueTableMode: 'overall', cupTableStage: null, matchFilters: { league: { teamId: null, period: null }, cup: { teamId: null, period: null }, champions: { teamId: null, period: null } },
-    bestXiMode: 'period', monthlyAwardBlock: null, cupAwardStage: null, championsAwardRound: null,
+    bestXiMode: 'period', leagueAwardScope: 'first-half', monthlyAwardBlock: null, cupAwardStage: null, championsAwardRound: null,
     historyMatchday: null, historyComparedTeamIds: [], historyFocusedTeamId: null, historyPlotScrollLeft: null,
   })
   assert.deepEqual(defaultScreenState({ name: 'records' }), {
     name: 'records', category: 'player', competition: 'all', positionFilter: 'all', filterSeasonIds: [], filterTeamIds: [],
     combinationPosition: 'attack', combinationPlayers: 2, combinationMetric: 'starts', bestUnitId: 'best-unit:attack:2:goals',
-    historyPanel: null, historySeason: null, historyBlock: null,
+    historyPanel: null, historySeason: null, historyBlock: null, historyAwardScope: 'league',
   })
   assert.deepEqual(defaultScreenState({ name: 'comparison', leftId: 'p1', rightId: 'p2', season: 'Season 3', competitionType: 'cup' }), {
     name: 'comparison', leftId: 'p1', rightId: 'p2', season: 'Season 3', competition: 'cup', teamId: null,

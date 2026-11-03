@@ -17,7 +17,7 @@ fs.symlinkSync(path.join(root, 'node_modules'), path.join(baseline, 'node_module
 after(() => fs.rmSync(baseline, { recursive: true, force: true }))
 const before = file => require(path.join(baseline, 'src', file))
 const current = file => require(path.join(root, 'src', file))
-function equal(file, name, ...args) { assertPolicyEquivalence(current(file)[name](...args), before(file)[name](...args), file, name) }
+function equal(file, name, ...args) { assertPolicyEquivalence(current(file)[name](...args), before(file)[name](...args), file, name, args) }
 const s = performanceFixture()
 
 test('v2.5.7 equivalence: every saved rating/MOM and team score/ownership remains exact', () => {
@@ -52,7 +52,7 @@ test('v2.5.7 equivalence: official Cup decisions, complete Stage history and neu
   }
 })
 
-test('v2.5.7 equivalence: League history, Champions winners/bracket and every award/Best XI stay exact', () => {
+test('v2.5.7 equivalence: League history and Champions bracket stay exact while official awards follow the approved policy', () => {
   for (const season of ['Season 1', 'Season 2']) {
     const draw = s.competitionStates.find(d => d.season === season)
     equal('engine/competition.ts', 'leagueCompetition', s.teams, s.matches, season, s.players)

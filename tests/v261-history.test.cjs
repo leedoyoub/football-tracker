@@ -49,13 +49,13 @@ test('four team records use appearance attribution, include released/transferred
   assert.strictEqual(history.teamHistoryRecords(players, matches, { teamId: 'A', season: null, competition: 'all' }), groups, 'immutable scoped results reused')
 })
 
-test('team season XI uses actual roles, ceil 40% team games, vacancies and no duplicate player', () => {
+test('team season XI uses actual roles, 30% team minutes, vacancies and no duplicate player', () => {
   const { players, matches } = fixture()
   const result = history.teamHistoryBestXI(players, matches, { teamId: 'A', season: 'Season 1', competition: 'all' })
-  assert.equal(result.teamMatches, 5); assert.equal(result.minimumAppearances, 2)
+  assert.equal(result.teamMatches, 5); assert.equal(result.minimumMinutes, 135)
   assert.equal(result.bestXI.length, 11)
-  assert.equal(result.bestXI[0].playerId, 'gk')
-  assert(result.bestXI.some(slot => slot.playerId === 'released' && slot.displayPosition === 'MID'))
+  assert.equal(result.bestXI.find(slot => slot.slot === 'GK').playerId, 'gk')
+  assert(!result.bestXI.some(slot => slot.playerId === 'released'), 'a CAM-only player cannot be forced into a saved 4-3-3 CM slot')
   assert(!result.bestXI.some(slot => ['rare', 'other', 'bench'].includes(slot.playerId)))
   const selected = result.bestXI.flatMap(slot => slot.playerId ? [slot.playerId] : [])
   assert.equal(selected.length, new Set(selected).size)
@@ -64,7 +64,7 @@ test('team season XI uses actual roles, ceil 40% team games, vacancies and no du
   const boundary = { id: 'boundary', name: 'Boundary', teamId: 'B', position: 'ST' }
   const changed = matches.map((match, index) => index < 2 ? { ...match, appearances: [...match.appearances, { playerId: boundary.id, teamId: 'A', role: 'starter', position: 'RB' }] } : match)
   const atBoundary = history.teamHistoryBestXI([...players, boundary], changed, { teamId: 'A', season: 'Season 1', competition: 'all' })
-  assert(atBoundary.bestXI.some(slot => slot.displayPosition === 'DEF' && slot.playerId === boundary.id))
+  assert(atBoundary.bestXI.some(slot => slot.displayPosition === 'RB' && slot.playerId === boundary.id))
 })
 
 test('early season History shows progress without provisional championships or individual honors', () => {
@@ -179,9 +179,11 @@ test('records preview three rows, virtualize only the expanded metric and Best X
   assert.equal(nodes(tree, n => n.type?.name === 'VirtualRankingList').length, 1)
   assert.equal(nodes(section(tree, 'Most Goals'), n => n.type?.name === 'RankingRow').length, 3)
   tree = h.render({ ...props, screenState: { ...screenState, historyMenu: 'best-xi' } })
-  const pitch = nodes(tree, n => n.type?.name === 'AwardBestXI')[0]
-  assert.strictEqual(pitch.props.result, history.teamHistoryBestXI(players, matches, { teamId: 'A', season: 'Season 1', competition: 'all' }))
-  assert.equal(pitch.props.result.bestXI[0].playerId, 'gk')
-  pitch.props.onPlayerOpen('gk'); assert.equal(destinations[1].id, 'gk')
+  const pitch = nodes(tree, n => n.type?.name === 'Pitch')[0]
+  assert.strictEqual(pitch.props.slots, history.teamHistoryBestXI(players, matches, { teamId: 'A', season: 'Season 1', competition: 'all' }).bestXI)
+  assert.equal(pitch.props.presentation, 'history')
+  const goalkeeper = pitch.props.slots.find(slot => slot.slot === 'GK')
+  assert.equal(goalkeeper.playerId, 'gk')
+  pitch.props.onSlotClick(goalkeeper); assert.equal(destinations[1].id, 'gk')
   assert.equal(nodes(tree, n => n.type?.name === 'VirtualRankingList').length, 0)
 })

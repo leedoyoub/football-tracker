@@ -1,10 +1,11 @@
 import { officialAwardsForSeason, officialSeasonModel } from './officialAwards'
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
-import { sharedStatAwardWinners, type seasonAwards, type awardsForCompetition } from './awards'
+import { awardResultForScope, sharedStatAwardWinners, type AwardScope, type CanonicalAwardResult, type seasonAwards, type awardsForCompetition } from './awards'
 import { buildGlobalRankingData, rankGlobalRankingRows } from './stats'
 import { monthlyAwardForBlock, type MonthlyAwards } from './seasonAnalytics'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { AWARD_POLICY_REVISION } from './awardPolicy'
+import { arrayItemRevision } from './arrayItemRevision'
 
 export type HistoryTimeline = {
   season: string
@@ -34,8 +35,10 @@ type AwardsCache = WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<Co
 type MonthlyCache = WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], Map<string, MonthlyAwards | undefined>>>>
 let timelineCache: TimelineCache = new WeakMap()
 let awardsCache: AwardsCache = new WeakMap()
+let scopedAwardCache: WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], Map<string, CanonicalAwardResult | undefined>>>>> = new WeakMap()
 let monthlyCache: MonthlyCache = new WeakMap()
 const diagnostics = { timelineBuilds: 0, awardBuilds: 0, monthlyBuilds: 0 }
+const sourceKey = (teams: Team[], players: Player[], matches: Match[], states: CompetitionState[] = []) => `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}`
 
 function seasons(matches: Match[], states: CompetitionState[]) {
   return [...new Set([...matches.map(match => match.season), ...states.map(state => state.season)])]
@@ -61,7 +64,7 @@ export function historySeasons(matches: Match[], states: CompetitionState[]) { r
 
 export function historyTimelineForSeason(teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], season: string): HistoryTimeline {
   const cached = stateMap(timelineCache, matches, players, teams, states)
-  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${season}`
+  const key = `${sourceKey(teams, players, matches, states)}:${season}`
   const current = cached.get(key); if (current) return current
   diagnostics.timelineBuilds++
   const model = officialSeasonModel(teams, players, matches, states, season)
@@ -73,13 +76,14 @@ export function historyTimelineForSeason(teams: Team[], players: Player[], match
   const rating = rankGlobalRankingRows(rows, players, 'rating')[0]
   const xi = model.events.filter(event => event.kind === 'season-xi').map(event => event.playerId)
   const result: HistoryTimeline = { season, league: status.league.championId, cup: status.cup.championId, champions: status.champions.championId, scorers, assistLeaders, scorer: scorers[0], assists: assistLeaders[0], rating: rating ? { playerId: rating.playerId, avgRating: rating.avgRating } : undefined, mom: mom ? { playerId: mom.playerId, mom: mom.mom } : undefined, bestXI: xi }
+  if (cached.size >= 32) cached.delete(cached.keys().next().value!)
   cached.set(key, result)
   return result
 }
 
 export function historyAwardsForSeason(teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], season: string, scope: CompetitionType | 'all'): HistoryAwards[] {
   const cached = stateMap(awardsCache, matches, players, teams, states)
-  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${season}:${scope}`; const current = cached.get(key); if (current) return current
+  const key = `${sourceKey(teams, players, matches, states)}:${season}:${scope}`; const current = cached.get(key); if (current) return current
   diagnostics.awardBuilds++
   const model = officialSeasonModel(teams, players, matches, states, season)
   const types = scope === 'all' ? ['league', 'cup', 'champions'] as CompetitionType[] : [scope]
@@ -88,6 +92,7 @@ export function historyAwardsForSeason(teams: Team[], players: Player[], matches
     const published = award.complete ? award : undefined
     return { season, competition, player: published?.mvp, goalkeeper: published?.goalkeeper, goalkeepers: published?.goalkeepers ?? [], goldenGlove: undefined }
   })
+  if (cached.size >= 32) cached.delete(cached.keys().next().value!)
   cached.set(key, result)
   return result
 }
@@ -100,16 +105,29 @@ export function playerTeamTitles(teams: Team[], players: Player[], matches: Matc
 
 export function historyMonthlyAward(teams: Team[], players: Player[], matches: Match[], season: string, block: number) {
   const cached = monthlyMap(matches, players, teams)
-  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${season}:${block}`
+  const key = `${sourceKey(teams, players, matches)}:${season}:${block}`
   if (cached.has(key)) return cached.get(key)
   diagnostics.monthlyBuilds++
   const result = monthlyAwardForBlock(teams, players, matches, season, block)
+  if (cached.size >= 32) cached.delete(cached.keys().next().value!)
+  cached.set(key, result)
+  return result
+}
+
+/** Only an opened History detail derives its selected canonical award scope. */
+export function historyAwardResultForScope(teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], season: string, scope: AwardScope) {
+  const cached = stateMap(scopedAwardCache, matches, players, teams, states)
+  const key = `${sourceKey(teams, players, matches, states)}:${season}:${scope}`
+  if (cached.has(key)) return cached.get(key)
+  diagnostics.awardBuilds++
+  const result = awardResultForScope(scope, season, teams, players, matches, states)
+  if (cached.size >= 32) cached.delete(cached.keys().next().value!)
   cached.set(key, result)
   return result
 }
 
 export function clearHistoryReadModelCache() {
-  timelineCache = new WeakMap(); awardsCache = new WeakMap(); monthlyCache = new WeakMap()
+  timelineCache = new WeakMap(); awardsCache = new WeakMap(); monthlyCache = new WeakMap(); scopedAwardCache = new WeakMap()
   diagnostics.timelineBuilds = 0; diagnostics.awardBuilds = 0; diagnostics.monthlyBuilds = 0
 }
 

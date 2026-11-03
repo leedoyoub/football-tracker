@@ -24,7 +24,7 @@ export function resolvePlayerDestination(target: Extract<View, { name: 'player' 
     const match = matches.find(item => item.id === source.id)
     if (match) competition = matchCompetitionType(match)
   }
-  if (source.name === 'season-highlight' && source.kind === 'monthly') competition = 'league'
+  if (source.name === 'season-highlight' && (source.kind === 'monthly' || source.kind === 'awards')) competition = 'league'
   const season = target.season ?? (source.name === 'match' ? matches.find(item => item.id === source.id)?.season : undefined) ?? (source.name === 'player' && sourceState.name === 'player' ? sourceState.season : undefined) ?? sourceSeason
   return { view: { name: 'player', id: target.id }, screenState: { name: 'player', season, competition: target.competitionType ?? competition, rankTrendMetric: 'rating' } }
 }

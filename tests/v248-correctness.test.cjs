@@ -213,7 +213,7 @@ test('last route preserves supported analytical destinations and their current f
     [{ name: 'comparison', leftId: 'P', rightId: 'Q', season: 'Season 2' }, { ...navigation.defaultScreenState({ name: 'comparison' }), leftId: 'P', rightId: 'Q', season: 'Season 2', competition: 'cup' }, 'cup', 'competition'],
     [{ name: 'records-leaderboard', category: 'player', leaderboardId: 'goals' }, { ...navigation.defaultScreenState({ name: 'records-leaderboard', category: 'player', leaderboardId: 'goals' }), filterSeasonIds: ['Season 2'], filterTeamIds: ['A'] }, 'Season 2', 'filterSeasonIds'],
     [{ name: 'latest-changes', season: 'Season 2' }, { name: 'latest-changes' }, 'Season 2', 'viewSeason'],
-    [{ name: 'season-highlight', season: 'Season 2', kind: 'monthly' }, { name: 'season-highlight' }, 'monthly', 'viewKind'],
+    [{ name: 'season-highlight', season: 'Season 2', kind: 'monthly' }, { name: 'season-highlight' }, 'awards', 'viewKind'],
   ]
   for (const [view, screenState, expected, field] of cases) {
     saveLastRoute(view, undefined, storage, screenState)
@@ -246,7 +246,7 @@ test('last route keeps valid Competition panel selections and drops stale entity
   const screenState = { ...navigation.defaultScreenState(view), leagueMenu: 'history', bestXiMode: 'monthly', monthlyAwardBlock: 2, historyMatchday: 3, historyComparedTeamIds: ['A', 'missing'], comparedPlayerIds: ['P', 'missing'] }
   saveLastRoute(view, undefined, storage, screenState)
   const restored = loadLastNavigationEntry(state, storage).screenState
-  assert.deepEqual([restored.leagueMenu, restored.bestXiMode, restored.monthlyAwardBlock, restored.historyMatchday, restored.historyComparedTeamIds, restored.comparedPlayerIds], ['history', 'period', 2, 3, ['A'], undefined])
+  assert.deepEqual([restored.leagueMenu, restored.bestXiMode, restored.leagueAwardScope, restored.monthlyAwardBlock, restored.historyMatchday, restored.historyComparedTeamIds, restored.comparedPlayerIds], ['history', 'period', 'first-half', null, 3, ['A'], undefined])
 })
 
 test('Records Insights ignores hidden season and team filters, and team records use recorded identity', () => {

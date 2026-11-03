@@ -2,6 +2,7 @@ require('./helpers/register-ts.cjs')
 const { test, after } = require('node:test'), assert = require('node:assert/strict'), path = require('node:path')
 const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const { releaseBaseline } = require('./helpers/v261-baseline.cjs')
+const { assertSelection, withoutSelection } = require('./helpers/v265-award-policy-comparison.cjs')
 const b = releaseBaseline(); after(b.cleanup)
 const fixture = performanceFixture(1)
 const baseline = file => require(path.join(b.directory, 'src', file))
@@ -17,20 +18,20 @@ test('v2.6.1 preserves every REV13 breakdown and MOM for sampled tactical, subst
   }
 })
 
-test('official MVP, non-League GK and 4-3-3 selections stay identical to v2.5.14', () => {
+test('official MVP/XI follow the v265 mathematics while every legacy GK and individual winner stays identical', () => {
   const current = require('../src/engine/awards.ts'), old = baseline('engine/awards.ts')
   for (const type of ['league', 'cup', 'champions']) {
     const args = [type, 'Season 1', fixture.teams, fixture.players, fixture.matches, fixture.competitionStates]
     const now = current.awardsForCompetition(...args), before = old.awardsForCompetition(...args)
-    assert.deepEqual(now.mvp, before.mvp, `${type} MVP`)
-    assert.deepEqual(now.bestXI, before.bestXI, `${type} XI`)
-    if (type !== 'league') assert.deepEqual(now.goalkeeper, before.goalkeeper, `${type} GK`)
+    assertSelection(now, type, 'Season 1', fixture.teams, fixture.players, fixture.matches, fixture.competitionStates)
+    const { scorers: _scorers, assistLeaders: _assistLeaders, goalkeepers: _goalkeepers, ...legacy } = withoutSelection(now)
+    assert.deepEqual(legacy, withoutSelection(before), `${type}: every pre-v261 unaffected award field`)
   }
   const args = ['Season 1', fixture.teams, fixture.players, fixture.matches, fixture.competitionStates]
   const now = current.seasonAwards(...args), before = old.seasonAwards(...args)
-  assert.deepEqual(now.ballon, before.ballon)
-  assert.deepEqual(now.bestXI, before.bestXI)
-  assert.deepEqual(now.goalkeeper, before.goalkeeper)
+  assertSelection(now, 'season', 'Season 1', fixture.teams, fixture.players, fixture.matches, fixture.competitionStates)
+  const { goldenBootWinners: _boot, assistLeaderWinners: _assists, ...legacy } = withoutSelection(now)
+  assert.deepEqual(legacy, withoutSelection(before), 'all unaffected season awards, including the goalkeeper')
 })
 
 test('team History records and XI projections reuse cached immutable scopes', () => {

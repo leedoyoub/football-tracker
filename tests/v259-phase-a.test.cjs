@@ -151,16 +151,32 @@ test('Team Overview uses only light League history with exact baseline rank/move
   })
 })
 
-test('Season Highlight monthly/review do not generate News and kind changes retain exact output', () => {
+test('Season Highlight half awards skip News while review and general News retain exact output', () => {
   const store = performanceFixture(1); const h = harness('SeasonHighlightScreen', store)
   spy(require('../src/engine/news.ts'), 'majorNewsEvents', calls => {
-    for (const kind of ['monthly', 'review']) {
-      const p = { ...props, kind }
-      assert.equal(renderToStaticMarkup(h.render(p)), leagueCopy(renderToStaticMarkup(harness('SeasonHighlightScreen', store, baseline).render(p))))
+    let halfMarkup
+    for (const kind of ['monthly', 'awards']) {
+      const markup = renderToStaticMarkup(h.render({ ...props, kind }))
+      assert.match(markup, /Second Half MVP/)
+      assert.match(markup, /Second Half Best XI/)
+      assert.doesNotMatch(markup, /Player of the Month|Team of the Month/)
+      if (halfMarkup) assert.equal(markup, halfMarkup)
+      halfMarkup = markup
       assert.equal(calls(), 0)
     }
+    const review = { ...props, kind: 'review' }
+    assert.equal(renderToStaticMarkup(h.render(review)), leagueCopy(renderToStaticMarkup(harness('SeasonHighlightScreen', store, baseline).render(review))))
+    assert.equal(calls(), 0)
     const p = { ...props, kind: 'news' }
-    assert.equal(renderToStaticMarkup(expandCardLists(h.render(p))), leagueCopy(renderToStaticMarkup(harness('SeasonHighlightScreen', store, baseline).render(p))))
+    const React = require('react')
+    const withoutAwards = node => {
+      if (Array.isArray(node)) return node.map(withoutAwards)
+      if (!React.isValidElement(node)) return node
+      if (String(node.key).startsWith('award:')) return null
+      return node.props.children === undefined ? node : React.cloneElement(node, {}, withoutAwards(node.props.children))
+    }
+    // Award articles intentionally use the v2.6.5 policy; every other card stays equivalent.
+    assert.equal(renderToStaticMarkup(withoutAwards(expandCardLists(h.render(p)))), leagueCopy(renderToStaticMarkup(withoutAwards(harness('SeasonHighlightScreen', store, baseline).render(p)))))
     assert.equal(calls(), 1)
   })
 })

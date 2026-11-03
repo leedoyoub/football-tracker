@@ -25,10 +25,10 @@ test('locked Recap renders without calling statistics or XI calculators', () => 
   const h = screenHarness(root, 'screens/SeasonRecapScreen.tsx', 'SeasonRecapScreen', s, { '../engine/seasonInsights': { ...actual, seasonRecap: fail, startingXILeaders: fail } })
   assert.doesNotThrow(() => h.render({ season: 'Season 1', onNavigate() {}, onBack() {} }))
 })
-test('completed Recap shares one Starting XI result and equals baseline awards', () => {
+test('completed Recap shares one Starting XI result and preserves unaffected baseline awards', () => {
   const s = performanceFixture(1), actual = require('../src/engine/seasonInsights.ts'), old = require(path.join(b.directory, 'src/engine/seasonInsights.ts'))
   s.competitionStates.push({ id: 'complete', kind: 'season-complete', season: 'Season 1' })
-  assertRecapAwardPolicy(actual.seasonRecap(s.players, s.matches, 'Season 1', s.competitionStates, s.teams), old.seasonRecap(s.players, s.matches, 'Season 1', s.competitionStates, s.teams), s.players, s.matches, 'Season 1')
+  assertRecapAwardPolicy(actual.seasonRecap(s.players, s.matches, 'Season 1', s.competitionStates, s.teams), old.seasonRecap(s.players, s.matches, 'Season 1', s.competitionStates, s.teams), s.players, s.matches, 'Season 1', s.teams, s.competitionStates)
   let shared
   const h = screenHarness(root, 'screens/SeasonRecapScreen.tsx', 'SeasonRecapScreen', s, { '../engine/seasonInsights': { ...actual, startingXILeaders: (...args) => shared = actual.startingXILeaders(...args), seasonRecap: (...args) => { assert.equal(args[5], shared); assert(shared); return actual.seasonRecap(...args) } } })
   h.render({ season: 'Season 1', onNavigate() {}, onBack() {} })

@@ -30,7 +30,9 @@ for (const season of ['Season 1', 'Season 2']) for (const scope of ['all', 'leag
   assert.equal(JSON.stringify(s), snapshot)
 })
 test('timeline, competition rules, constants and durable data remain source identical to v2.5.10', () => {
-  for (const file of ['engine/constants.ts', 'engine/timeline.ts', 'engine/seasonAnalytics.ts', 'engine/competition.ts', 'engine/kickoffLineup.ts', 'lib/repository.ts', 'lib/validation.ts', 'lib/rankingMetrics.ts', 'store.tsx']) {
+  // v2.6.5 permits seasonAnalytics monthly-work removal while its complete
+  // public snapshots remain strictly compared in v264-analytics-baseline.
+  for (const file of ['engine/constants.ts', 'engine/timeline.ts', 'engine/competition.ts', 'engine/kickoffLineup.ts', 'lib/repository.ts', 'lib/validation.ts', 'lib/rankingMetrics.ts', 'store.tsx']) {
     // v2.5.14 adds a latest-only projection and optional resolved models to the
     // Team Detail read model. Keep the canonical history/tournament engines
     // byte-identical; new read-model output is deep-compared in v2514-team.

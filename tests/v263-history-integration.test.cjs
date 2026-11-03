@@ -17,18 +17,19 @@ test('History records invalidate after same-array match replacement, addition an
 
 test('History Best XI explains selected formation and scope, passes vacancies and retains player navigation',()=>{
   const formation={label:'3-5-2',defenders:3,midfielders:5,forwards:2,matches:6}
-  const result={bestXI:[{slot:'GK-1',playerId:'p'}],statsByPlayer:{},teamMatches:9,minimumAppearances:4,formation}
+  const result={bestXI:[{slot:'GK',playerId:'p'}],statsByPlayer:{},teamMatches:9,availableTeamMinutes:810,minimumMinutes:243,formation}
   const h=screenHarness(path.resolve(__dirname,'..'),'screens/TeamHistory.tsx','TeamHistory',{}, {'../engine/teamHistory':{...history,teamHistoryBestXI:()=>result}})
   const destinations=[],props={teamId:'A',season:'Season 3',teams:[{id:'A'}],players:[],matches:[],states:[],screenState:{historyMenu:'best-xi',historyCompetition:'champions'},onStateChange:()=>{},onNavigate:v=>destinations.push(v)}
-  const tree=h.render(props),award=nodes(tree,n=>n.type?.name==='AwardBestXI')[0]
+  const tree=h.render(props),pitch=nodes(tree,n=>n.type?.name==='Pitch')[0]
   const text=JSON.stringify(tree)
   assert.match(text,/3-5-2/);assert.match(text,/Champions/);assert.match(text,/Most-used formation/)
-  assert.equal(award.props.showEmptySlots,true);assert.strictEqual(award.props.result,result)
-  award.props.onPlayerOpen('p');assert.deepEqual(destinations,[{name:'player',id:'p',season:'Season 3',competitionType:'champions'}])
+  assert.equal(pitch.props.showEmptySlots,true);assert.strictEqual(pitch.props.slots,result.bestXI)
+  assert.equal(pitch.props.presentation,'history');assert.equal(pitch.props.showPositionBadge,false)
+  pitch.props.onSlotClick(result.bestXI[0]);assert.deepEqual(destinations,[{name:'player',id:'p',season:'Season 3',competitionType:'champions'}])
   result.formation=null;result.bestXI=[]
   const empty=h.render({...props,screenState:{...props.screenState,historyCompetition:'cup'}})
   assert.match(JSON.stringify(empty),/No valid saved kickoff formation/)
-  assert.equal(nodes(empty,n=>n.type?.name==='AwardBestXI').length,0)
+  assert.equal(nodes(empty,n=>n.type?.name==='Pitch').length,0)
 })
 
 test('History formation scopes stay separate and same-array edits invalidate the entire XI',()=>{
@@ -37,9 +38,9 @@ test('History formation scopes stay separate and same-array edits invalidate the
   const matches=[make('a','A','Season 1','league','3-4-1-2'),make('b','A','Season 1','cup','4-2-3-1'),make('c','A','Season 2','league','4-4-2'),make('d','B','Season 1','league','4-3-3')]
   const scope={teamId:'A',season:'Season 1',competition:'league'}
   const first=history.teamHistoryBestXI(players,matches,scope)
-  assert.equal(first.formation.label,'3-5-2');assert.equal(first.teamMatches,1)
+  assert.equal(first.formation.label,'3-4-1-2');assert.equal(first.teamMatches,1)
   assert.strictEqual(history.teamHistoryBestXI(players,matches,scope),first)
-  assert.equal(history.teamHistoryBestXI(players,matches,{...scope,competition:'cup'}).formation.label,'4-5-1')
+  assert.equal(history.teamHistoryBestXI(players,matches,{...scope,competition:'cup'}).formation.label,'4-2-3-1')
   assert.equal(history.teamHistoryBestXI(players,matches,{...scope,season:'Season 2'}).formation.label,'4-4-2')
   assert.equal(history.teamHistoryBestXI(players,matches,{...scope,teamId:'B'}).formation.label,'4-3-3')
   matches[0]={...matches[0],formation:'4-4-2'}

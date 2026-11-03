@@ -17,14 +17,22 @@ function leagueCopy(value, markup = typeof value === 'string') {
   if (typeof copy.playerId === 'string' && typeof copy.value === 'number' && typeof copy.label === 'string') delete copy.teamId
   return copy
 }
-function assertPolicyEquivalence(actual, original, file, fn) {
+function assertPolicyEquivalence(actual, original, file, fn, args = []) {
+  const { withoutSelection, assertSelection, assertNewsPolicy, assertLatestPolicy } = require('./v265-award-policy-comparison.cjs')
   const a = leagueCopy(actual), b = leagueCopy(original)
+  if (file === 'engine/news.ts' && ['deriveNews', 'deriveFootballEvents', 'majorNewsEvents'].includes(fn)) return assertNewsPolicy(a, b, args, fn)
+  if (file === 'engine/latestChanges.ts' && fn === 'deriveLatestChanges') return assertLatestPolicy(a, b, args)
   if (file === 'engine/awards.ts' && fn === 'competitionAwardResult' && a) delete a.individualAwards
   if (file === 'engine/awards.ts' && fn === 'seasonAwards') {
     for (const value of [a, b]) { delete value.goldenGlove; delete value.goalkeeper }
     // v2.6.1 adds joint-recipient arrays; legacy projections and all selection
     // values below remain exactly equivalent. Dedicated v261 tests assert ties.
     delete a.goldenBootWinners; delete a.assistLeaderWinners
+  }
+  if (file === 'engine/awards.ts' && ['seasonAwards', 'competitionAwardResult', 'awardsForCompetition'].includes(fn)) {
+    const [scope, season, teams, players, matches, states] = fn === 'seasonAwards' ? ['season', ...args] : args
+    assertSelection(actual, scope, season, teams, players, matches, states)
+    return assert.deepStrictEqual(withoutSelection(a), withoutSelection(b), `${file}:${fn}: all unaffected award fields`)
   }
   assert.deepStrictEqual(a, b, `${file}:${fn}: unchanged policy fields`)
 }

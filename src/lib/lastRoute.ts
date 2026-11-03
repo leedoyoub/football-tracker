@@ -5,6 +5,7 @@ import { normalizeCompetitionScreenState } from './competitionScreenState'
 import { rankTrendMetricOptions } from '../engine/playerRankTrend'
 import { scopedPositionFamilyByPlayer } from '../engine/positionScope'
 import { matchCompetitionType } from '../engine/competitionContext'
+import { normalizeAwardRecordId } from '../engine/awardRecords'
 
 /** Device-only UI state. It is deliberately never part of the sync queue. */
 export const LAST_ROUTE_STORAGE_KEY = 'football-tracker-last-route'
@@ -65,15 +66,15 @@ export function validRestoredView(value: unknown, state: AppState): View | null 
     case 'global-ranking':
       return { name: 'global-ranking', ...(season(view.season) ? { season: season(view.season) } : {}), ...(scope(view.competitionType) ? { competitionType: view.competitionType } : {}), ...(rankingMetrics.has(view.rankingMetric ?? '') ? { rankingMetric: view.rankingMetric } : {}), ...(hasTeam(view.teamId) ? { teamId: view.teamId } : {}) }
     case 'award-race':
-      return { name: 'award-race', ...(season(view.season) ? { season: season(view.season) } : {}), ...(scope(view.competitionType) ? { competitionType: view.competitionType } : {}) }
+      return { name: 'award-race', ...(season(view.season) ? { season: season(view.season) } : {}), ...(scope(view.competitionType) ? { competitionType: view.competitionType } : {}), ...(view.awardScope === 'first-half' || view.awardScope === 'second-half' ? { awardScope: view.awardScope, competitionType: 'league' } : {}) }
     case 'comparison':
       return { name: 'comparison', ...(hasPlayer(view.leftId) ? { leftId: view.leftId } : {}), ...(hasPlayer(view.rightId) ? { rightId: view.rightId } : {}), ...(season(view.season) ? { season: season(view.season) } : {}), ...(scope(view.competitionType) ? { competitionType: view.competitionType } : {}) }
     case 'records-leaderboard':
-      return { name: 'records-leaderboard', category: ['player', 'team', 'combination'].includes(view.category) ? view.category : 'player', leaderboardId: typeof view.leaderboardId === 'string' && view.leaderboardId ? view.leaderboardId : 'rating', ...(scope(view.competition) ? { competition: view.competition } : {}), ...(positionFilters.has(view.positionFilter ?? '') ? { positionFilter: view.positionFilter } : {}), seasonIds: Array.isArray(view.seasonIds) ? view.seasonIds.filter(hasSeason) : [], teamIds: Array.isArray(view.teamIds) ? view.teamIds.filter(hasTeam) : [] }
+      return { name: 'records-leaderboard', category: ['player', 'team', 'combination'].includes(view.category) ? view.category : 'player', leaderboardId: typeof view.leaderboardId === 'string' && view.leaderboardId ? normalizeAwardRecordId(view.leaderboardId) : 'rating', ...(scope(view.competition) ? { competition: view.competition } : {}), ...(positionFilters.has(view.positionFilter ?? '') ? { positionFilter: view.positionFilter } : {}), seasonIds: Array.isArray(view.seasonIds) ? view.seasonIds.filter(hasSeason) : [], teamIds: Array.isArray(view.teamIds) ? view.teamIds.filter(hasTeam) : [] }
     case 'latest-changes':
       return { name: 'latest-changes', ...(season(view.season) ? { season: season(view.season) } : {}) }
     case 'season-highlight':
-      return { name: 'season-highlight', season: season(view.season) ?? state.matches[0]?.season ?? 'Season 1', kind: ['monthly', 'review', 'news'].includes(view.kind) ? view.kind : 'review' }
+      return { name: 'season-highlight', season: season(view.season) ?? state.matches[0]?.season ?? 'Season 1', kind: view.kind === 'monthly' ? 'awards' : ['awards', 'review', 'news'].includes(view.kind) ? view.kind : 'review' }
     case 'season-recap':
       return typeof view.season === 'string' && view.season.length > 0 && state.matches.some(match => match.season === view.season) ? { name: 'season-recap', season: view.season } : null
     case 'team':
@@ -129,9 +130,9 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
       competitionType: competitionTypes.includes(saved.competitionType as typeof competitionTypes[number]) ? saved.competitionType as typeof competitionTypes[number] : base.competitionType,
       rankingMetric: validMetric(saved.rankingMetric) ? saved.rankingMetric as typeof base.rankingMetric : base.rankingMetric,
       bestXiMode: saved.bestXiMode === 'season' || saved.bestXiMode === 'competition' ? 'competition' : 'period',
-      monthlyAwardBlock: Number.isInteger(saved.monthlyAwardBlock) && (saved.monthlyAwardBlock as number) >= 1 && (saved.monthlyAwardBlock as number) <= 10 ? saved.monthlyAwardBlock as number : null,
+      monthlyAwardBlock: null,
       cupAwardStage: ['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'stage6', 'stage7', 'final', 'finalReplay'].includes(saved.cupAwardStage as string) ? saved.cupAwardStage as typeof base.cupAwardStage : null,
-      championsAwardRound: ['roundOf16', 'quarterFinal', 'semiFinal', 'final'].includes(saved.championsAwardRound as string) ? saved.championsAwardRound as typeof base.championsAwardRound : null,
+      championsAwardRound: null,
       historyMatchday: leagueDay(saved.historyMatchday), historyComparedTeamIds: teamIds(saved.historyComparedTeamIds),
     }, state.teams.map(team => team.id))
   }
@@ -141,7 +142,8 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
   }
   if (view.name === 'award-race') {
     const base = fallback as ScreenStateByView['award-race']
-    return { ...base, season: validSeason(saved.season) ? saved.season as string : base.season, scope: validScope(saved.scope) ? saved.scope as typeof base.scope : base.scope, positionFilter: validPosition(saved.positionFilter) ? saved.positionFilter as typeof base.positionFilter : base.positionFilter, teamId: typeof saved.teamId === 'string' && state.teams.some(team => team.id === saved.teamId) ? saved.teamId : null }
+    const awardScope = saved.awardScope === 'first-half' || saved.awardScope === 'second-half' ? saved.awardScope : base.awardScope
+    return { ...base, ...(awardScope ? { awardScope } : {}), season: validSeason(saved.season) ? saved.season as string : base.season, scope: awardScope ? 'league' : validScope(saved.scope) ? saved.scope as typeof base.scope : base.scope, positionFilter: validPosition(saved.positionFilter) ? saved.positionFilter as typeof base.positionFilter : base.positionFilter, teamId: typeof saved.teamId === 'string' && state.teams.some(team => team.id === saved.teamId) ? saved.teamId : null }
   }
   if (view.name === 'comparison') {
     const base = fallback as ScreenStateByView['comparison']
@@ -164,11 +166,12 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
       combinationMetric: ['starts', 'minutes', 'ppg'].includes(saved.combinationMetric as string) ? saved.combinationMetric as typeof base.combinationMetric : base.combinationMetric,
       bestUnitId: typeof saved.bestUnitId === 'string' && saved.bestUnitId.startsWith('best-unit:') ? saved.bestUnitId : base.bestUnitId,
       recordsMode: saved.recordsMode === 'awards' ? 'awards' : 'performance',
-      awardMetricId: typeof saved.awardMetricId === 'string' && /^(awards-|history-)/.test(saved.awardMetricId) ? saved.awardMetricId : undefined,
+      awardMetricId: typeof saved.awardMetricId === 'string' && /^(awards-|history-)/.test(saved.awardMetricId) ? normalizeAwardRecordId(saved.awardMetricId) : undefined,
       teamAwardKindsOpen: saved.teamAwardKindsOpen === true,
       historyPanel: saved.historyPanel === 'timeline' || saved.historyPanel === 'awards' ? saved.historyPanel : null,
       historySeason: validSeason(saved.historySeason) ? saved.historySeason as string : null,
-      historyBlock: Number.isInteger(saved.historyBlock) && (saved.historyBlock as number) >= 1 && (saved.historyBlock as number) <= 10 ? saved.historyBlock as number : null,
+      historyBlock: null,
+      historyAwardScope: ['first-half', 'second-half', 'league', 'cup', 'champions', 'season'].includes(String(saved.historyAwardScope)) ? saved.historyAwardScope as typeof base.historyAwardScope : typeof saved.historyBlock === 'number' ? saved.historyBlock > 5 ? 'second-half' : 'first-half' : base.historyAwardScope,
     }
   }
   if (view.name === 'team') {

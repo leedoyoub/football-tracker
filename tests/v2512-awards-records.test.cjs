@@ -29,7 +29,7 @@ test('League Golden Glove counts clean sheets without the forty-percent gate', (
   assert.equal(award.goalkeeper?.value, 1)
 })
 
-test('final award shares canonical MOM priorities and stable complete ties', () => {
+test('legacy final performance helper retains canonical MOM priorities without publishing official awards', () => {
   const ps = [player('z', 'ST'), player('a', 'ST'), player('defender', 'CB')]
   const match = game('cup-final', ps.map(p => app(p)), { competitionType: 'cup', competitionStage: 'final' })
   assert.equal(finalPlayerAward(ps, [match])?.playerId, getMatchManOfTheMatch(match, ps))
@@ -46,13 +46,13 @@ function leagueFixture(days = 30) {
   const matches = STATIC_TEAMS.flatMap((team, ti) => Array.from({ length: days }, (_, i) => game(`league:${ti}:${i}`, ti === 0 ? [app(p)] : [], { teamId: team.id, homeTeamId: team.id, awayTeamId: `opponent-${ti}`, matchDay: i + 1, events: ti === 0 ? [{ id: `goal:${i}`, type: 'goal', minute: 10, teamId: team.id, playerId: p.id }] : [] })))
   return { p, matches }
 }
-test('official career events exclude unfinished blocks, deduplicate, and use competition appearances for titles', () => {
-  const { p, matches } = leagueFixture(3)
+test('official career events exclude unfinished halves, deduplicate, and use competition appearances for titles', () => {
+  const { p, matches } = leagueFixture(15)
   assert.equal(official(STATIC_TEAMS, [p], matches.slice(1), [], 'S1').length, 0)
   const players = [p], states = []
   const events = official(STATIC_TEAMS, players, matches, states, 'S1')
-  assert.deepEqual(events.map(e => e.kind).sort(), ['monthly-player', 'monthly-xi'])
-  assert(events.every(e => e.finalized && e.teamId === p.teamId && e.period === 1))
+  assert.deepEqual(events.map(e => e.kind).sort(), ['first-half-mvp', 'first-half-xi'])
+  assert(events.every(e => e.finalized && e.teamId === p.teamId && e.period === undefined))
   assert.equal(new Set(events.map(e => e.id)).size, events.length)
   assert.strictEqual(official(STATIC_TEAMS, players, matches, states, 'S1'), events)
   const completed = leagueFixture()
@@ -71,10 +71,11 @@ test('award Records share totals, filters, historical teams and official season 
   const input = { category: 'player', section: 'awards', players: [{ ...p, teamId: 'new' }], teams: STATIC_TEAMS, matches, states: [], scope: { seasons: ['S1'], teamIds: [p.teamId], competition: 'all', positionFilter: 'st-ss' } }
   const groups = recordsLeaderboardGroups(input)
   const n = id => groups.find(g => g.id === id)?.rows[0]?.numeric
-  assert.equal(n('awards-individual'), 24)
+  assert.equal(n('awards-individual'), 8)
   assert.equal(n('awards-championships'), 1)
-  assert.equal(n('awards-total'), 25)
-  assert.equal(n('awards-monthly'), 20)
+  assert.equal(n('awards-total'), 9)
+  assert(!groups.some(g => /monthly|round|final/.test(g.id)))
+  for (const kind of ['first-half-mvp', 'first-half-xi', 'second-half-mvp', 'second-half-xi']) assert.equal(n(`awards-${kind}`), 1)
   assert.equal(recordsLeaderboardGroups({ ...input, scope: { ...input.scope, competition: 'cup' } }).find(g => g.id === 'awards-individual')?.rows.length, 0)
   assert.equal(recordsLeaderboardGroups({ ...input, scope: { ...input.scope, positionFilter: 'gk' } }).find(g => g.id === 'awards-individual')?.rows.length, 0)
   const history = recordsLeaderboardGroups({ ...input, category: 'team' })
@@ -93,23 +94,25 @@ test('career UI groups awards into accessible disclosures with historical detail
   assert.match(html, /Championships/)
   assert.match(html, /Runner-up Finishes/)
   assert.match(html, /<details/)
-  assert.match(html, /Player of the Month.*?×10/s)
-  assert.match(html, /Season 1-10/)
+  assert.match(html, /First Half MVP.*?×1/s)
+  assert.match(html, /Second Half Best XI.*?×1/s)
+  assert.match(html, /Season 1 · First Half/)
+  assert.doesNotMatch(html, /Player of the Month|Team of the Round|Player of the Final/)
   assert.doesNotMatch(html, /MD 28|Most MOM|Best Duo/)
   assert.match(html, /Real Madrid/)
 })
 
-test('Champions round selector excludes Final and uses the shared AwardBestXI pitch', () => {
+test('Champions ignores legacy round selection and retains the official competition pitch', () => {
   const { screenHarness, nodes } = require('./helpers/v259-harness.cjs')
   const { defaultScreenState } = require('../src/lib/navigation.ts')
   const path = require('node:path')
-  const matches = ['roundOf16', 'quarterFinal', 'semiFinal', 'final'].map((stage, i) => game(stage, [], { competitionType: 'champions', competitionStage: stage, matchDay: i + 1 }))
+  const p = player('official-champions', 'ST')
+  const matches = ['roundOf16', 'quarterFinal', 'semiFinal', 'final'].map((stage, i) => game(stage, [app(p)], { competitionType: 'champions', competitionStage: stage, matchDay: i + 1 }))
   const h = screenHarness(path.resolve(__dirname, '..'), 'screens/CompetitionScreen.tsx', 'CompetitionBestElevens', { competitionStates: [] })
-  const tree = h.render({ season: 'S1', type: 'champions', screenState: { ...defaultScreenState({ name: 'competition' }), bestXiMode: 'period', championsAwardRound: 'final' }, onStateChange() {}, players: [], teams, matches, allMatches: matches, cup: null, champions: { rounds: { roundOf16: [], quarterFinal: [], semiFinal: [], final: [] } }, onNavigate() {} })
-  const selector = nodes(tree, n => n.props?.ariaLabel === 'Champions round')[0]
-  assert.deepEqual(selector.props.options.map(o => o.value), ['roundOf16', 'quarterFinal', 'semiFinal'])
-  assert.equal(selector.props.value, 'semiFinal')
-  assert(nodes(tree, n => n.props?.children === 'In progress').length || JSON.stringify(tree).includes('In progress'))
+  const tree = h.render({ season: 'S1', type: 'champions', screenState: { ...defaultScreenState({ name: 'competition' }), bestXiMode: 'period', championsAwardRound: 'final' }, onStateChange() {}, players: [p], teams, matches, allMatches: matches, cup: null, champions: { rounds: { roundOf16: [], quarterFinal: [], semiFinal: [], final: [] } }, onNavigate() {} })
+  assert.equal(nodes(tree, n => n.props?.ariaLabel === 'Champions round').length, 0)
+  assert.equal(nodes(tree, n => n.props?.label === 'Best XI view').length, 0)
+  assert(nodes(tree, n => n.type?.name === 'BestEleven' && n.props.title === 'Champions Best XI').length)
 })
 
 test('full Records uses bounded virtual rows and retains historical season details', () => {
@@ -149,12 +152,11 @@ function championsFixture() {
   }
   return { matches, ps, states }
 }
-test('Champions publishes R16/QF/SF only when every series finishes and final MVP after two games per side', () => {
+test('Champions removes round/final awards while publishing competition MVP only after every series finishes', () => {
   const { matches, ps, states } = championsFixture()
   const all = official(STATIC_TEAMS, ps, matches, states, 'S1')
-  assert.equal(all.filter(e => e.kind === 'champions-round-player').length, 3)
-  assert.equal(all.filter(e => e.kind === 'champions-final').length, 1)
-  assert(!all.some(e => e.kind === 'champions-round-xi' && e.period === 'final'))
+  assert.equal(all.filter(e => e.kind === 'champions-mvp').length, 1)
+  assert(!all.some(e => /champions-(round|final)/.test(e.kind)))
   const partial = official(STATIC_TEAMS, ps, matches.slice(0, -1), states, 'S1')
   assert(!partial.some(e => e.kind === 'champions-final' || e.kind === 'champions-mvp'))
   const missingR16 = matches.filter(m => m.id !== matches[0].id)
@@ -163,14 +165,15 @@ test('Champions publishes R16/QF/SF only when every series finishes and final MV
   assert.equal(all.filter(e => e.category === 'runner-up').length, 1)
 })
 
-test('Cup replay combines finals for MVP, publishes only after resolution, and counts one final appearance', () => {
+test('Cup replay keeps result resolution and final appearances while never publishing a final MVP', () => {
   const { matches, ps } = cupFixture(true)
   assert(!official(STATIC_TEAMS, ps, matches, [], 'S1').some(e => e.kind === 'cup-final'))
   const replay = ps.map((p, i) => game(`replay:${p.id}`, [app(p)], { teamId: p.teamId, homeTeamId: p.teamId, awayTeamId: `opp:${p.teamId}`, competitionType: 'cup', competitionStage: 'finalReplay', events: i ? [] : [{ id: 'winner', type: 'goal', minute: 10, teamId: p.teamId, playerId: p.id }] }))
   const all = [...matches, ...replay]
   const model = require('../src/engine/officialAwards.ts').officialSeasonModel(STATIC_TEAMS, ps, all, [], 'S1')
-  assert.equal(model.events.filter(e => e.kind === 'cup-final').length, 1)
-  assert.equal(model.events.find(e => e.kind === 'cup-final').playerId, finalPlayerAward(ps, all.filter(m => ['final', 'finalReplay'].includes(m.competitionStage))).playerId)
+  assert.equal(model.events.filter(e => e.kind === 'cup-final').length, 0)
+  assert(model.status.cup.championId)
+  assert(model.events.some(e => e.kind === 'cup-scorer'))
   assert.equal(model.teamResults.filter(r => r.competition === 'cup' && r.finalAppearance).length, 2)
 })
 

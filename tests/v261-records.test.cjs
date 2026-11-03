@@ -21,20 +21,20 @@ test('team award totals count each finalized recipient once and dynamically incl
 
 function fixture() {
   const players = ['GK', 'CB', 'CM', 'ST'].map((position, i) => ({ id: `winner-${i}`, name: `Player ${i}`, displayName: `Player ${i}`, position, number: i + 1, teamId: STATIC_TEAMS[i].id }))
-  const matches = STATIC_TEAMS.flatMap((team, ti) => Array.from({ length: 3 }, (_, day) => ({ id: `${ti}:${day}`, season: 'S1', date: `2026-01-0${day + 1}`, duration: 90, teamId: team.id, homeTeamId: team.id, awayTeamId: `opp-${ti}`, competitionType: 'league', competitionStage: 'regular', matchDay: day + 1, appearances: players[ti] ? [{ playerId: players[ti].id, teamId: team.id, role: 'starter', position: players[ti].position, matchPosition: players[ti].position }] : [], events: [] })))
+  const matches = STATIC_TEAMS.flatMap((team, ti) => Array.from({ length: 15 }, (_, day) => ({ id: `${ti}:${day}`, season: 'S1', date: `2026-01-0${day + 1}`, duration: 90, teamId: team.id, homeTeamId: team.id, awayTeamId: `opp-${ti}`, competitionType: 'league', competitionStage: 'regular', matchDay: day + 1, appearances: players[ti] ? [{ playerId: players[ti].id, teamId: team.id, role: 'starter', position: players[ti].position, matchPosition: players[ti].position }] : [], events: [] })))
   return { teams: STATIC_TEAMS, players, matches, states: [] }
 }
 
 test('scoped canonical index preserves former teams, filters finalized scopes and invalidates edits', () => {
   const f = fixture(), transferred = f.players.map(p => ({ ...p, teamId: 'new-club', teamIds: ['new-club'] }))
   const events = scopedIndividualAwardEvents(f.teams, transferred, f.matches, f.states, scope)
-  assert.equal(events.filter(e => e.kind === 'monthly-xi').length, 4)
+  assert.equal(events.filter(e => e.kind === 'first-half-xi').length, 4)
   assert(events.every(e => e.teamId !== 'new-club'))
   assert.strictEqual(scopedIndividualAwardEvents(f.teams, transferred, f.matches, f.states, scope), events)
   assert.equal(scopedIndividualAwardEvents(f.teams, transferred, f.matches, f.states, { ...scope, competition: 'cup' }).length, 0)
   assert.equal(scopedIndividualAwardEvents(f.teams, transferred, f.matches, f.states, { ...scope, seasons: ['S2'] }).length, 0)
   const selected = scopedIndividualAwardEvents(f.teams, transferred, f.matches, f.states, { ...scope, teamIds: [f.players[0].teamId] })
-  assert.equal(selected.filter(e => e.kind === 'monthly-xi').length, 1)
+  assert.equal(selected.filter(e => e.kind === 'first-half-xi').length, 1)
   assert.equal(scopedIndividualAwardEvents(f.teams, transferred, f.matches.slice(1), f.states, scope).length, 0)
 })
 
@@ -42,7 +42,7 @@ test('team awards Records keep the 17 existing honor groups and add canonical to
   const f = fixture(), groups = recordsLeaderboardGroups({ category: 'team', section: 'awards', ...f, scope })
   assert.equal(groups.filter(g => g.id.startsWith('history-')).length, 17)
   assert.equal(groups.find(g => g.id === 'team-awards-individual').rows.reduce((n, r) => n + r.numeric, 0), 5)
-  assert.equal(groups.find(g => g.id === 'team-awards:monthly-xi').rows.reduce((n, r) => n + r.numeric, 0), 4)
+  assert.equal(groups.find(g => g.id === 'team-awards:first-half-xi').rows.reduce((n, r) => n + r.numeric, 0), 4)
   assert.equal(recordsLeaderboardGroups({ category: 'team', section: 'awards', ...f, scope: { ...scope, competition: 'cup' } }).find(g => g.id === 'team-awards-individual').rows.length, 0)
 })
 

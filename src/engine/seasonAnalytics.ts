@@ -13,6 +13,7 @@ import { compareStandings, type Standing } from './standings'
 import type { LeaderboardMetric } from './stats'
 import { performanceAwardResult } from './awards'
 import { competitionIdentityForMatch } from './competitionContext'
+import { AWARD_POLICY_REVISION } from './awardPolicy'
 
 export type RankMovement = number | null
 export type RankedStanding = Standing & { movement: RankMovement }
@@ -233,7 +234,7 @@ export function buildLeagueHistory(teams: Team[], players: Player[], matches: Ma
   let byPlayers = historyCache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); historyCache.set(matches, byPlayers) }
   let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
   let bySeason = byTeams.get(teams); if (!bySeason) { bySeason = new Map(); byTeams.set(teams, bySeason) }
-  const key = `${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${season}`
+  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${season}`
   const existing = bySeason.get(key); if (existing) return existing
   const leagueMatches = competitionMatches(matches, season, 'league')
   const currentMatchDay = Math.max(0, ...leagueMatches.map(leagueDay).filter(day => Number.isInteger(day) && day >= 1 && day <= LEAGUE_MATCHES_PER_TEAM))
@@ -258,7 +259,7 @@ export function buildLeagueHistory(teams: Team[], players: Player[], matches: Ma
 /** Team Detail needs only day N versus day N-1. Reuse full History if already built. */
 const latestStandingsCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], Map<string, RankedStanding[]>>>>()
 export function latestLeagueStandings(teams: Team[], players: Player[], matches: Match[], season: string): RankedStanding[] {
-  const key = `${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${season}`
+  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${season}`
   const existing = historyCache.get(matches)?.get(players)?.get(teams)?.get(key)
   if (existing) return existing.leagueSnapshots.get(existing.currentMatchDay)?.standings ?? []
   let byPlayers = latestStandingsCache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); latestStandingsCache.set(matches, byPlayers) }
@@ -280,25 +281,32 @@ export function buildSeasonAnalytics(teams: Team[], players: Player[], matches: 
   let byPlayers = cache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); cache.set(matches, byPlayers) }
   let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
   let bySeason = byTeams.get(teams); if (!bySeason) { bySeason = new Map(); byTeams.set(teams, bySeason) }
-  const key = `${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${season}`
+  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${season}`
   const existing = bySeason.get(key); if (existing) return existing
   const { leagueMatches, currentMatchDay, leagueSnapshots, latestCompletedMatchDay } = buildLeagueHistory(teams, players, matches, season)
   const playerSnapshots = buildPlayerSnapshots(players, leagueMatches)
-  const monthlyAwards = new Map<number, MonthlyAwards>()
-  for (let blockId = 1; blockId <= 10; blockId++) {
-    const block = monthlyBlockRange(blockId)!
-    const finalized = isMonthlyBlockComplete(teams, leagueMatches, season, block)
-    if (finalized) monthlyAwards.set(blockId, monthlyAwardsFor(block, teams, players, leagueMatches, true))
+  // Legacy exported monthly access stays lazy; current screens and News use half scopes.
+  let legacyMonthly: Map<number, MonthlyAwards> | undefined
+  const monthlyAwards = () => {
+    if (legacyMonthly) return legacyMonthly
+    legacyMonthly = new Map()
+    for (let blockId = 1; blockId <= 10; blockId++) {
+      const block = monthlyBlockRange(blockId)!
+      if (isMonthlyBlockComplete(teams, leagueMatches, season, block)) legacyMonthly.set(blockId, monthlyAwardsFor(block, teams, players, leagueMatches, true))
+    }
+    return legacyMonthly
   }
-  const monthlyResults = [...monthlyAwards.values()]
-  const latestMonthlyAwards = monthlyResults[monthlyResults.length - 1]
-  const activeBlock = monthlyBlockRange(monthlyBlockForMatchday(currentMatchDay) ?? 0)
-  const activeMonthlyAwards = activeBlock && leagueMatches.some(match => leagueDay(match) >= activeBlock.startMatchDay && leagueDay(match) <= activeBlock.endMatchDay)
-    ? monthlyAwards.get(activeBlock.id) ?? monthlyAwardsFor(activeBlock, teams, players, leagueMatches, false)
-    : undefined
   const result: SeasonAnalytics = {
     season, leagueMatches, currentMatchDay, latestCompletedMatchDay, leagueSnapshots, playerSnapshots,
-    formTable: leagueFormTable(teams, leagueMatches), monthlyAwards, activeMonthlyAwards, latestMonthlyAwards,
+    formTable: leagueFormTable(teams, leagueMatches),
+    get monthlyAwards() { return monthlyAwards() },
+    get latestMonthlyAwards() { const results = [...monthlyAwards().values()]; return results[results.length - 1] },
+    get activeMonthlyAwards() {
+      const block = monthlyBlockRange(monthlyBlockForMatchday(currentMatchDay) ?? 0)
+      return block && leagueMatches.some(match => leagueDay(match) >= block.startMatchDay && leagueDay(match) <= block.endMatchDay)
+        ? monthlyAwards().get(block.id) ?? monthlyAwardsFor(block, teams, players, leagueMatches, false)
+        : undefined
+    },
     latestReview: latestCompletedMatchDay ? buildReview(latestCompletedMatchDay, leagueSnapshots, playerSnapshots) : undefined,
   }
   if (bySeason.size >= 32) bySeason.delete(bySeason.keys().next().value!)

@@ -38,7 +38,7 @@ function equal(file, fn, ...args) {
       return standings.seasonStandings([team], recent, season)[0]
     }).sort(standings.compareStandings).map((row, index) => ({ ...row, rank: index + 1 }))
     assert.deepStrictEqual(actualForm, expected, 'v2.5.8 Form matches the independent five-game baseline projection')
-  } else assertPolicyEquivalence(actual, original, file, fn)
+  } else assertPolicyEquivalence(actual, original, file, fn, args)
 }
 
 test('realistic benchmark history is accepted by the unchanged durable-state validator', () => {
@@ -56,7 +56,7 @@ test('v2.5.4 whole-object equivalence: every match rating, MOM, goal types, manu
   }
 })
 
-test('v2.5.4 whole-object equivalence: all 30 History days, monthly awards, rankings, Best XI and competitions', () => {
+test('v2.5.4 whole-object equivalence: all 30 History days, legacy monthly helpers, rankings, competition rules and approved award policy', () => {
   for (const season of ['Season 1', 'Season 2']) {
     equal('engine/seasonAnalytics.ts', 'buildSeasonAnalytics', s.teams, s.players, s.matches, season)
     equal('engine/competition.ts', 'leagueCompetition', s.teams, s.matches, season, s.players)

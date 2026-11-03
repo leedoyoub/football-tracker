@@ -1,14 +1,14 @@
 # Football Tracker
 
-Football Tracker v2.6.4 tracks saved football matches, player performances, competitions and historical honors. It uses React, TypeScript and Vite, with local IndexedDB storage and offline PWA support.
+Football Tracker v2.6.5 tracks saved football matches, player performances, competitions and historical honors. It uses React, TypeScript and Vite, with local IndexedDB storage and offline PWA support.
 
-[Open the app](https://leedoyoub.github.io/football-tracker/) · [v2.6.4 release notes](docs/v2.6.4-release.md)
+[Open the app](https://leedoyoub.github.io/football-tracker/) · [v2.6.5 release notes](docs/v2.6.5-release.md)
 
 In v2.6.1, Team Detail adds **History → Honors / Records / Best XI**. Official top scorers, assist leaders and League Golden Glove winners share awards when their primary totals tie. Team honors and individual awards retain the team recorded at the time of the award.
 
 Run `npm.cmd test`, `npm.cmd run lint` and `npm.cmd run build` on Windows (`npm` works in shells without the PowerShell script restriction). For local development use `npm.cmd run dev`. Main pushes trigger the GitHub Pages deployment workflow.
 
-v2.6.4 fixes full recipient names, keeps Team History pitches at 3:4 with 40px players, and places selected wide defenders/midfielders by actual historical minutes. News/Latest Changes and League History avoid repeated work while preserving existing results. [Measurements and layout limits](docs/performance/v2.6.4.md) describe the verified gains and extreme narrow-screen counter cases.
+v2.6.5 unifies six official Best XI scopes, MVP and Award Race around raw average ratings, 50% playing-time eligibility and participation-scaled team bonuses. First/Second Half honors replace monthly/Champions round/final honors. Team History uses its saved modal tactical formation, 30% team minutes and qualified detailed roles with the existing Team Players pitch. Rating REV13, match MOM, tournament rules and saved data stay unchanged. [Measurements and verification limits](docs/performance/v2.6.5.md) include both cache gains and additional cold-calculation costs.
 
 ## Development template notes
 

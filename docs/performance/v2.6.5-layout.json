@@ -1,0 +1,357 @@
+{
+  "browser": "chrome.exe",
+  "stylesheet": "index-D3VRXN3d.css",
+  "method": "Actual Chromium rendering of canonical selected XI / Latest XI SSR with built application CSS; visible bounds and hit targets. History must equal the unchanged Latest XI geometry, including disclosed inherited limits. Navigation callbacks are separately exercised by UI harness tests. No physical-device or deployed-app interaction claim.",
+  "cases": 36,
+  "errors": 6,
+  "inheritedNarrowLimits": [
+    {
+      "scope": "team-history",
+      "width": 288,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [
+        "0:1",
+        "2:3"
+      ],
+      "errors": [
+        "visible-overlap:1:4",
+        "visible-overlap:2:5",
+        "visible-overlap:2:10"
+      ]
+    },
+    {
+      "scope": "latest-xi-reference",
+      "width": 288,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [
+        "0:1",
+        "2:3"
+      ],
+      "errors": [
+        "visible-overlap:1:4",
+        "visible-overlap:2:5",
+        "visible-overlap:2:10"
+      ]
+    }
+  ],
+  "results": [
+    {
+      "scope": "first-half",
+      "width": 288,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "second-half",
+      "width": 288,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "league",
+      "width": 288,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "cup",
+      "width": 288,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "champions",
+      "width": 288,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "season",
+      "width": 288,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "team-history",
+      "width": 288,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [
+        "0:1",
+        "2:3"
+      ],
+      "errors": [
+        "visible-overlap:1:4",
+        "visible-overlap:2:5",
+        "visible-overlap:2:10"
+      ]
+    },
+    {
+      "scope": "latest-xi-reference",
+      "width": 288,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [
+        "0:1",
+        "2:3"
+      ],
+      "errors": [
+        "visible-overlap:1:4",
+        "visible-overlap:2:5",
+        "visible-overlap:2:10"
+      ]
+    },
+    {
+      "scope": "history-tabs",
+      "width": 288,
+      "columns": 3,
+      "rows": 2,
+      "errors": []
+    },
+    {
+      "scope": "first-half",
+      "width": 320,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "second-half",
+      "width": 320,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "league",
+      "width": 320,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "cup",
+      "width": 320,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "champions",
+      "width": 320,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "season",
+      "width": 320,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "team-history",
+      "width": 320,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [
+        "0:1",
+        "2:3"
+      ],
+      "errors": []
+    },
+    {
+      "scope": "latest-xi-reference",
+      "width": 320,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [
+        "0:1",
+        "2:3"
+      ],
+      "errors": []
+    },
+    {
+      "scope": "history-tabs",
+      "width": 320,
+      "columns": 3,
+      "rows": 2,
+      "errors": []
+    },
+    {
+      "scope": "first-half",
+      "width": 375,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "second-half",
+      "width": 375,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "league",
+      "width": 375,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "cup",
+      "width": 375,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "champions",
+      "width": 375,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "season",
+      "width": 375,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "team-history",
+      "width": 375,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [
+        "0:1",
+        "2:3"
+      ],
+      "errors": []
+    },
+    {
+      "scope": "latest-xi-reference",
+      "width": 375,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [
+        "0:1",
+        "2:3"
+      ],
+      "errors": []
+    },
+    {
+      "scope": "history-tabs",
+      "width": 375,
+      "columns": 3,
+      "rows": 2,
+      "errors": []
+    },
+    {
+      "scope": "first-half",
+      "width": 390,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "second-half",
+      "width": 390,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "league",
+      "width": 390,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "cup",
+      "width": 390,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "champions",
+      "width": 390,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "season",
+      "width": 390,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [],
+      "errors": []
+    },
+    {
+      "scope": "team-history",
+      "width": 390,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [
+        "0:1",
+        "2:3"
+      ],
+      "errors": []
+    },
+    {
+      "scope": "latest-xi-reference",
+      "width": 390,
+      "cards": 11,
+      "aspect": 0.75,
+      "transparentHitboxOverlaps": [
+        "0:1",
+        "2:3"
+      ],
+      "errors": []
+    },
+    {
+      "scope": "history-tabs",
+      "width": 390,
+      "columns": 3,
+      "rows": 2,
+      "errors": []
+    }
+  ]
+}

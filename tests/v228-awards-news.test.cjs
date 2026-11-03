@@ -41,17 +41,27 @@ test('v2.2.8 reuses the canonical Season N-B label and block-only award stats', 
   assert.equal(award.bestXI.find(slot => slot.playerId === 'salah').avgRating, award.statsByPlayer.salah.avgRating)
 })
 
-test('v2.2.8 News emits stable separate player and Team of the Month articles using block labels', () => {
-  const matches = [leagueMatch('d1', 1, { salahGoals: 1 }), leagueMatch('d2', 2, { salahGoals: 1 }), leagueMatch('d3', 3, { salahGoals: 1 })]
-  const news = deriveNews(players, teams, matches, [])
-  const playerAward = news.find(item => item.id === 'award:player-of-month:Season 1-1:salah')
-  const teamAward = news.find(item => item.id.startsWith('award:team-of-month:Season 1-1:'))
+test('News emits stable separate finalized half articles and preserves general articles', () => {
+  const halfTeams = require('../src/data/teams.ts').STATIC_TEAMS
+  const halfPlayers = [{ ...salah, teamId: halfTeams[0].id }, { ...rival, teamId: halfTeams[1].id }]
+  const matches = halfTeams.flatMap((team, index) => Array.from({ length: 15 }, (_, day) => ({
+    ...leagueMatch(`${team.id}:${day}`, day + 1), teamId: team.id, homeTeamId: team.id, awayTeamId: `opponent-${index}`,
+    appearances: halfPlayers[index] ? [appearance(halfPlayers[index], team.id)] : [],
+    events: index === 0 ? [{ id: `goal:${day}`, type: 'goal', teamId: team.id, minute: 1, playerId: salah.id }] : [],
+  })))
+  const prior = deriveNews(halfPlayers, halfTeams, matches.filter(match => match.matchDay < 15), []).filter(item => !item.id.startsWith('award:'))
+  const news = deriveNews(halfPlayers, halfTeams, matches, [])
+  const playerAward = news.find(item => item.id.startsWith('award:first-half-mvp:') && item.playerId === 'salah')
+  const teamAward = news.find(item => item.id.startsWith('award:first-half-best-xi:'))
   assert(playerAward)
   assert(teamAward)
-  assert.equal(playerAward.title, 'Salah wins Season 1-1 Player of the Month')
-  assert.equal(teamAward.title, 'Season 1-1 Best XI revealed')
+  assert.equal(playerAward.title, 'Salah wins First Half MVP')
+  assert.equal(teamAward.title, 'First Half Best XI revealed')
+  assert(!news.some(item => /Month/.test(item.title)))
   assert.equal(news.filter(item => item.id === playerAward.id).length, 1)
   assert.equal(news.filter(item => item.id === teamAward.id).length, 1)
+  assert(prior.length > 0)
+  for (const item of prior) assert.deepEqual(news.find(current => current.id === item.id), item)
 })
 
 test('v2.2.8 News is newest-first with a deterministic id tie-break', () => {

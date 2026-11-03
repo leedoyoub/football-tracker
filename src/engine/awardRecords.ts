@@ -10,17 +10,14 @@ export const AWARD_RECORD_METRICS: Metric[] = [
   { id: 'total', title: 'Most Total Honors', accepts: e => e.category !== 'runner-up' },
   { id: 'championships', title: 'Most Championships', accepts: e => e.category === 'championship' },
   { id: 'runner-ups', title: 'Most Runner-up Finishes', accepts: e => e.category === 'runner-up' },
-  { id: 'monthly', title: 'Most Monthly Awards', accepts: e => e.kind.startsWith('monthly-') },
   { id: 'mvps', title: 'Most Competition MVPs', accepts: e => ['league-mvp', 'cup-mvp', 'champions-mvp'].includes(e.kind) },
   { id: 'xi', title: 'Most Best XI Selections', accepts: e => e.kind.endsWith('-xi') },
-  { id: 'finals', title: 'Most Final MVPs', accepts: e => e.kind.endsWith('-final') },
   ...[
-    ['monthly-player', 'Player of the Month'], ['monthly-xi', 'Team of the Month'],
+    ['first-half-mvp', 'First Half MVP'], ['first-half-xi', 'First Half Best XI'],
+    ['second-half-mvp', 'Second Half MVP'], ['second-half-xi', 'Second Half Best XI'],
     ['league-mvp', 'Player of the League'], ['cup-mvp', 'Player of the Cup'], ['champions-mvp', 'Player of the Tournament'], ['season-mvp', 'Player of the Season'],
     ['league-gk', 'League Golden Gloves'], ['cup-gk', 'Goalkeeper of the Cup'], ['champions-gk', 'Goalkeeper of the Tournament'], ['season-gk', 'Goalkeeper of the Season'],
     ['league-xi', 'League Best XI'], ['cup-xi', 'Cup Best XI'], ['champions-xi', 'Champions Best XI'], ['season-xi', 'Season Best XI'],
-    ['champions-round-player', 'Champions Player of the Round'], ['champions-round-xi', 'Champions Team of the Round'],
-    ['cup-final', 'Cup Final MVPs'], ['champions-final', 'Champions Final MVPs'],
   ].map(([id, title]) => ({ id, title: `Most ${title}`, accepts: (e: OfficialAwardEvent) => e.kind === id })),
   { id: 'scorers', title: 'Most Top Scorer Awards', accepts: e => e.kind.endsWith('-scorer') },
   { id: 'assisters', title: 'Most Assist King Awards', accepts: e => e.kind.endsWith('-assists') },
@@ -29,6 +26,20 @@ export const AWARD_RECORD_METRICS: Metric[] = [
     { id: `${type}-assists`, title: `Most ${type === 'season' ? 'Season' : type === 'league' ? 'League' : type === 'cup' ? 'Cup' : 'Champions'} Assist King Awards`, accepts: (e: OfficialAwardEvent) => e.kind === `${type}-assists` },
   ]),
 ]
+
+export const AWARD_SUMMARY_METRIC_IDS = ['individual', 'total', 'championships', 'runner-ups', 'mvps', 'xi']
+export const AWARD_DETAIL_METRICS = AWARD_RECORD_METRICS.filter(metric => !AWARD_SUMMARY_METRIC_IDS.includes(metric.id))
+
+/** Retired device-only routes should resolve to a current, useful honor. */
+export function normalizeAwardRecordId(id: string): string {
+  const replacements: Record<string, string> = {
+    monthly: 'first-half-mvp', 'monthly-player': 'first-half-mvp', 'monthly-xi': 'first-half-xi',
+    finals: 'mvps', 'cup-final': 'cup-mvp', 'champions-final': 'champions-mvp',
+    'champions-round-player': 'champions-mvp', 'champions-round-xi': 'champions-xi',
+  }
+  if (id.startsWith('team-awards:')) return 'team-awards:' + (replacements[id.slice(12)] ?? id.slice(12))
+  return id.startsWith('awards-') ? 'awards-' + (replacements[id.slice(7)] ?? id.slice(7)) : id
+}
 
 function ranked(rows: Omit<RecordsLeaderboardRow, 'rank'>[], ascending = false): RecordsLeaderboardRow[] {
   let previous: number | undefined, rank = 0

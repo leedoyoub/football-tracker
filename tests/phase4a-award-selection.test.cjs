@@ -19,7 +19,7 @@ const leagueMatch = (id, day, appearances = []) => ({
   date: `2026-01-${String(day).padStart(2, '0')}`, duration: 90, homeTeamId: 'A', awayTeamId: 'B', appearances, events: [],
 })
 
-test('cumulative Best XI eligibility uses ceil of forty percent while Team of the Week remains separate', () => {
+test('legacy short-window eligibility remains separate from official minutes eligibility', () => {
   assert.equal(isAwardEligible(2, 3), true)
   assert.equal(isAwardEligible(2, 4), true)
   assert.equal(isAwardEligible(2, 5), true)
@@ -31,7 +31,7 @@ test('cumulative Best XI eligibility uses ceil of forty percent while Team of th
   assert.equal(isAwardEligible(12, 30), true)
 })
 
-test('season Best XI uses the historical team forty-percent denominator', () => {
+test('legacy unified performance XI retains its historical-team appearance denominator', () => {
   const striker = player('striker')
   const matches = [
     leagueMatch('m1', 1, [appearance(striker)]),
@@ -44,11 +44,11 @@ test('season Best XI uses the historical team forty-percent denominator', () => 
   assert.equal(strikerSlot.teamId, 'A')
 })
 
-test('competition achievement tables are exact direct selection bonuses', () => {
-  assert.deepEqual(Array.from({ length: 16 }, (_, index) => leaguePositionBonus(index + 1)), [.20, .08, .035, .025, .015, .015, .015, .015, 0, 0, 0, 0, 0, 0, 0, 0])
-  assert.deepEqual(['roundOf16', 'quarterFinal', 'semiFinal', 'runnerUp', 'champion'].map(championsProgressBonus), [0, .020, .035, .08, .20])
-  assert.deepEqual(['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'stage6', 'stage7', 'runnerUp', 'champion'].map(cupProgressBonus), [0, 0, 0, .015, .025, .030, .035, .08, .20])
-  assert(Math.abs(ratingAwardScore(7.4, .20, 45, 30) - 7.6) < 1e-12)
+test('competition achievement bases scale only the selection bonus by participation', () => {
+  assert.deepEqual(Array.from({ length: 16 }, (_, index) => leaguePositionBonus(index + 1)), [.3, .21, .15, .105, .09, .075, .0675, .06, .0525, .045, .0375, .03, .0225, .015, .0075, 0])
+  assert.deepEqual(['roundOf16', 'quarterFinal', 'semiFinal', 'runnerUp', 'champion'].map(championsProgressBonus), [0, .06, .12, .21, .30])
+  assert.deepEqual(['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'stage6', 'stage7', 'runnerUp', 'champion'].map(cupProgressBonus), [0, 0, 0, 0, .06, .06, .12, .21, .30])
+  assert(Math.abs(ratingAwardScore(7.4, .30, 45, 30) - 7.405) < 1e-12)
 })
 
 test('shared candidate ordering uses full precision metrics and player ID only as the final fallback', () => {
@@ -115,7 +115,7 @@ test('Team of the Week requires three actual recent qualifying ratings and never
   assert.equal(unifiedBestEleven([leftBack], three, 'S1', true).slots.find(slot => slot.playerId === leftBack.id).matches, 3)
 })
 
-test('season achievement tables are exact and a treble is sixty-two hundredths', () => {
+test('legacy goalkeeper achievement tables retain their pre-XI-reform values', () => {
   assert.deepEqual(Array.from({ length: 16 }, (_, index) => seasonLeaguePositionBonus(index + 1)), [.26, .12, .06, .05, .04, .04, .03, .03, .015, .015, .015, .015, 0, 0, 0, 0])
   assert.deepEqual(['roundOf16', 'quarterFinal', 'semiFinal', 'runnerUp', 'champion'].map(seasonChampionsProgressBonus), [0, .03, .05, .11, .24])
   assert.deepEqual(['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'stage6', 'stage7', 'runnerUp', 'champion'].map(seasonCupProgressBonus), [0, 0, 0, .020, .025, .030, .035, .06, .12])
@@ -132,7 +132,7 @@ test('shared Best XI selector never duplicates a player across matching slots', 
 
 test('live competition Best Player and Best XI share scored historical-team candidates', () => {
   const transferred = player('transferred', 'B', 'GK')
-  const matches = [1, 2, 3, 4, 5].map(day => leagueMatch(`live-${day}`, day, day <= 2 ? [appearance({ ...transferred, position: 'ST' }, 'A')] : []))
+  const matches = [1, 2, 3, 4, 5].map(day => leagueMatch(`live-${day}`, day, day <= 3 ? [appearance({ ...transferred, position: 'ST' }, 'A')] : []))
   const teams = [{ id: 'A', name: 'Alpha', shortName: 'A' }, { id: 'B', name: 'Beta', shortName: 'B' }]
   const models = { league: { complete: false, championId: undefined, standings: [{ teamId: 'A', rank: 1 }, { teamId: 'B', rank: 2 }] } }
   const award = awardsForCompetition('league', 'S1', teams, [transferred], matches, [], models)
@@ -141,7 +141,7 @@ test('live competition Best Player and Best XI share scored historical-team cand
   assert.equal(award.complete, false)
   assert.equal(award.mvp.playerId, transferred.id)
   assert.equal(award.mvp.value, 6.5)
-  assert(Math.abs(award.mvp.awardScore - 6.7) < 1e-12)
+  assert(Math.abs(award.mvp.awardScore - 6.68) < 1e-12)
   assert.equal(award.bestXI.find(slot => slot.playerId === transferred.id).teamId, 'A')
   assert.equal(live.bestPlayerId, transferred.id)
   assert.deepEqual(live.bestXI, award.bestXI)
@@ -156,7 +156,7 @@ test('season award domain exposes live shared Best Player and Best XI without ch
   assert.equal(award.complete, false)
   assert.equal(award.ballon.playerId, striker.id)
   assert.equal(award.bestXI.find(slot => slot.playerId === striker.id).teamId, 'A')
-  assert(Math.abs((award.ballon.awardScore - award.ballon.value) - .26) < 1e-12)
+  assert(Math.abs((award.ballon.awardScore - award.ballon.value) - .21) < 1e-12)
 })
 
 test('an out-of-bracket historical Cup team receives no current-stage achievement bonus', () => {
@@ -176,19 +176,19 @@ test('short-window candidates carry no achievement bonus', () => {
   assert.equal(candidate.selectionScore, candidate.average)
 })
 
-test('unfinished Cup and Champions finals award only already-reached progress, never winner or runner-up', () => {
+test('unfinished Cup and Champions finalists receive secured runner-up base, never a prospective champion base', () => {
   const striker = player('progress-striker')
   const cupMatch = { ...leagueMatch('cup-final-progress', 1, [appearance(striker)]), competitionType: 'cup', competitionStage: 'stage7' }
   const cup = awardsForCompetition('cup', 'S1', [{ id: 'A', name: 'Alpha', shortName: 'A' }], [striker], [cupMatch], [], {
     cup: { stage: 'final', activeTeamIds: ['A', 'B'], eliminatedAtByTeam: {}, championId: undefined, runnerUpId: undefined },
   })
-  assert(Math.abs((cup.mvp.awardScore - cup.mvp.value) - .035) < 1e-12)
+  assert(Math.abs((cup.mvp.awardScore - cup.mvp.value) - .21) < 1e-12)
 
   const championsMatch = { ...leagueMatch('champions-final-progress', 1, [appearance(striker)]), competitionType: 'champions', competitionStage: 'final' }
   const champions = awardsForCompetition('champions', 'S1', [{ id: 'A', name: 'Alpha', shortName: 'A' }], [striker], [championsMatch], [], {
     champions: { currentStage: 'final', championId: undefined, runnerUpId: undefined, rounds: { roundOf16: [], quarterFinal: [], semiFinal: [], final: [{ teamIds: ['A', 'B'] }] } },
   })
-  assert(Math.abs((champions.mvp.awardScore - champions.mvp.value) - .035) < 1e-12)
+  assert(Math.abs((champions.mvp.awardScore - champions.mvp.value) - .21) < 1e-12)
 })
 
 test('award selection leaves canonical match rating and MOM untouched', () => {
