@@ -1,0 +1,177 @@
+{
+  "browser": "chrome.exe",
+  "stylesheet": "index-D3VRXN3d.css",
+  "method": "Actual isolated Chromium rendering of synthetic real Competition/Race component SSR with built CSS. Handler/navigation tests run separately. No manual full-app, deployed-app or physical-device interaction claim.",
+  "cases": 24,
+  "errors": 0,
+  "results": [
+    {
+      "scope": "first-half",
+      "width": 320,
+      "raceHeadings": 1,
+      "pitches": 1,
+      "errors": []
+    },
+    {
+      "scope": "first-half-view-all",
+      "width": 320,
+      "raceHeadings": 0,
+      "pitches": 0,
+      "errors": []
+    },
+    {
+      "scope": "second-half",
+      "width": 320,
+      "raceHeadings": 1,
+      "pitches": 1,
+      "errors": []
+    },
+    {
+      "scope": "second-half-view-all",
+      "width": 320,
+      "raceHeadings": 0,
+      "pitches": 0,
+      "errors": []
+    },
+    {
+      "scope": "league",
+      "width": 320,
+      "raceHeadings": 1,
+      "pitches": 1,
+      "errors": []
+    },
+    {
+      "scope": "league-view-all",
+      "width": 320,
+      "raceHeadings": 0,
+      "pitches": 0,
+      "errors": []
+    },
+    {
+      "scope": "cup",
+      "width": 320,
+      "raceHeadings": 1,
+      "pitches": 1,
+      "errors": []
+    },
+    {
+      "scope": "cup-view-all",
+      "width": 320,
+      "raceHeadings": 0,
+      "pitches": 0,
+      "errors": []
+    },
+    {
+      "scope": "first-half",
+      "width": 375,
+      "raceHeadings": 1,
+      "pitches": 1,
+      "errors": []
+    },
+    {
+      "scope": "first-half-view-all",
+      "width": 375,
+      "raceHeadings": 0,
+      "pitches": 0,
+      "errors": []
+    },
+    {
+      "scope": "second-half",
+      "width": 375,
+      "raceHeadings": 1,
+      "pitches": 1,
+      "errors": []
+    },
+    {
+      "scope": "second-half-view-all",
+      "width": 375,
+      "raceHeadings": 0,
+      "pitches": 0,
+      "errors": []
+    },
+    {
+      "scope": "league",
+      "width": 375,
+      "raceHeadings": 1,
+      "pitches": 1,
+      "errors": []
+    },
+    {
+      "scope": "league-view-all",
+      "width": 375,
+      "raceHeadings": 0,
+      "pitches": 0,
+      "errors": []
+    },
+    {
+      "scope": "cup",
+      "width": 375,
+      "raceHeadings": 1,
+      "pitches": 1,
+      "errors": []
+    },
+    {
+      "scope": "cup-view-all",
+      "width": 375,
+      "raceHeadings": 0,
+      "pitches": 0,
+      "errors": []
+    },
+    {
+      "scope": "first-half",
+      "width": 390,
+      "raceHeadings": 1,
+      "pitches": 1,
+      "errors": []
+    },
+    {
+      "scope": "first-half-view-all",
+      "width": 390,
+      "raceHeadings": 0,
+      "pitches": 0,
+      "errors": []
+    },
+    {
+      "scope": "second-half",
+      "width": 390,
+      "raceHeadings": 1,
+      "pitches": 1,
+      "errors": []
+    },
+    {
+      "scope": "second-half-view-all",
+      "width": 390,
+      "raceHeadings": 0,
+      "pitches": 0,
+      "errors": []
+    },
+    {
+      "scope": "league",
+      "width": 390,
+      "raceHeadings": 1,
+      "pitches": 1,
+      "errors": []
+    },
+    {
+      "scope": "league-view-all",
+      "width": 390,
+      "raceHeadings": 0,
+      "pitches": 0,
+      "errors": []
+    },
+    {
+      "scope": "cup",
+      "width": 390,
+      "raceHeadings": 1,
+      "pitches": 1,
+      "errors": []
+    },
+    {
+      "scope": "cup-view-all",
+      "width": 390,
+      "raceHeadings": 0,
+      "pitches": 0,
+      "errors": []
+    }
+  ]
+}

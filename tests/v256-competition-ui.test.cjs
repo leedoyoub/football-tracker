@@ -73,7 +73,7 @@ test('all Players menus show ranking then Award Race and the live Best XI Race w
     h.state = { ...h.state, competitionType: type, leagueMenu: 'players', cupMenu: 'players', championsMenu: 'players' }
     const html = renderToStaticMarkup(h.render())
     assert(html.indexOf('Top 10') < html.indexOf('Award Race'), type)
-    assert.match(html, /Best XI Race/, type)
+    assert.match(html, type === 'league' ? /League Awards/ : /Best XI Race/, type)
     assert.doesNotMatch(html, /Cup table stage|Champions fixed knockout bracket|Historical League Matchday/, type)
   }
 })

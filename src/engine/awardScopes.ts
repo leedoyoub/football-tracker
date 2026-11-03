@@ -1,5 +1,5 @@
 import type { ChampionsStage, CupStage, Match } from '../types'
-import { CHAMPIONS_ROUNDS, CUP_STAGES, competitionMatches } from './competition'
+import { CHAMPIONS_ROUNDS, competitionMatches } from './competition'
 import { competitionIdentityForMatch, matchCompetitionStage } from './competitionContext'
 import { monthlyBlockRange } from './seasonAnalytics'
 import type { AwardScope } from './awards'
@@ -40,14 +40,6 @@ export function startedMonthlyAwardBlocks(matches: Match[], season: string): num
       return day >= range.startMatchDay && day <= range.endMatchDay
     })
   })
-}
-
-export function startedCupAwardStages(matches: Match[], season: string): CupStage[] {
-  const cupMatches = competitionMatches(matches, season, 'cup')
-  return [...CUP_STAGES, 'final'].filter(stage => {
-    const stages = stage === 'final' ? ['final', 'finalReplay'] : [stage]
-    return cupMatches.some(match => stages.includes(matchCompetitionStage(match)))
-  }) as CupStage[]
 }
 
 export function startedChampionsAwardRounds(matches: Match[], season: string): Exclude<ChampionsStage, 'finalReplay'>[] {

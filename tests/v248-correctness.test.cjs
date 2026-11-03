@@ -246,7 +246,7 @@ test('last route keeps valid Competition panel selections and drops stale entity
   const screenState = { ...navigation.defaultScreenState(view), leagueMenu: 'history', bestXiMode: 'monthly', monthlyAwardBlock: 2, historyMatchday: 3, historyComparedTeamIds: ['A', 'missing'], comparedPlayerIds: ['P', 'missing'] }
   saveLastRoute(view, undefined, storage, screenState)
   const restored = loadLastNavigationEntry(state, storage).screenState
-  assert.deepEqual([restored.leagueMenu, restored.bestXiMode, restored.leagueAwardScope, restored.monthlyAwardBlock, restored.historyMatchday, restored.historyComparedTeamIds, restored.comparedPlayerIds], ['history', 'period', 'first-half', null, 3, ['A'], undefined])
+  assert.deepEqual([restored.leagueMenu, restored.bestXiMode, restored.leagueAwardScope, restored.monthlyAwardBlock, restored.historyMatchday, restored.historyComparedTeamIds, restored.comparedPlayerIds], ['history', undefined, 'league', null, 3, ['A'], undefined])
 })
 
 test('Records Insights ignores hidden season and team filters, and team records use recorded identity', () => {

@@ -129,9 +129,7 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
     return normalizeCompetitionScreenState(saved, { ...base,
       competitionType: competitionTypes.includes(saved.competitionType as typeof competitionTypes[number]) ? saved.competitionType as typeof competitionTypes[number] : base.competitionType,
       rankingMetric: validMetric(saved.rankingMetric) ? saved.rankingMetric as typeof base.rankingMetric : base.rankingMetric,
-      bestXiMode: saved.bestXiMode === 'season' || saved.bestXiMode === 'competition' ? 'competition' : 'period',
       monthlyAwardBlock: null,
-      cupAwardStage: ['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'stage6', 'stage7', 'final', 'finalReplay'].includes(saved.cupAwardStage as string) ? saved.cupAwardStage as typeof base.cupAwardStage : null,
       championsAwardRound: null,
       historyMatchday: leagueDay(saved.historyMatchday), historyComparedTeamIds: teamIds(saved.historyComparedTeamIds),
     }, state.teams.map(team => team.id))

@@ -8,7 +8,7 @@ import { TeamIcon } from '../components/TeamIcon'
 import { TeamIdentityAction } from '../components/EntityActions'
 import { resultTone } from '../lib/resultTone'
 import { CompetitionMatches } from '../components/CompetitionMatches'
-import { competitionMenu } from '../lib/competitionScreenState'
+import { competitionMenu, normalizeLeagueAwardScope } from '../lib/competitionScreenState'
 import { cupTableModel } from '../lib/cupTable'
 import { leagueMatchdayResults } from '../lib/competitionResults'
 import { StandingsTable } from '../components/StandingsTable'
@@ -29,8 +29,7 @@ import { buildGlobalRankingData, rankGlobalRankingRows, seasonsFromMatches, type
 import { buildLeagueHistory, leagueFormTable, type LeagueHistoryAnalytics } from '../engine/seasonAnalytics'
 import { SectionHeader, SegmentedControl } from '../components/SeasonUI'
 import { currentStaticTeams } from '../data/teams'
-import { awardResultForScope, awardsForCompetition, competitionAwardResult, competitionAwardLabel, performanceAwardResult, type CanonicalAwardResult } from '../engine/awards'
-import { matchesForAwardPeriod, startedCupAwardStages } from '../engine/awardScopes'
+import { awardResultForScope, awardsForCompetition, competitionAwardResult, type CanonicalAwardResult } from '../engine/awards'
 import { AwardRacePanel } from '../components/AwardRacePanel'
 import { positionHistoryLabelVisible, scrollTrendToLatest, TREND_POINT_SPACING, trendPlotWidth } from '../lib/trendPlot'
 import { useStore } from '../store'
@@ -134,7 +133,7 @@ function DeferredCompetitionPanels({ season, type, screenState, onStateChange, p
     {stage === 0 && <section aria-label="Competition summaries" className="mt-7 h-14 rounded-2xl bg-zinc-900/60" />}
     {type === 'league' && league && stage >= 1 && <LeaguePlayers season={season} teams={teams} players={players} matches={matches} league={league} screenState={screenState} onStateChange={onStateChange} onNavigate={onNavigate} />}
     {type !== 'league' && stage >= 1 && <DeferredCompetitionRankings season={season} type={type} screenState={screenState} onStateChange={onStateChange} players={players} teams={teams} allMatches={matches} leagueMatches={league?.matches} onNavigate={onNavigate} />}
-    {type !== 'league' && stage >= 2 && <DeferredCompetitionBestElevens season={season} type={type} screenState={screenState} onStateChange={onStateChange} players={players} teams={teams} allMatches={matches} leagueMatches={league?.matches} cup={cup} champions={champions} onNavigate={onNavigate} />}
+    {type !== 'league' && stage >= 2 && <DeferredCompetitionBestElevens season={season} type={type} players={players} teams={teams} allMatches={matches} cup={cup} champions={champions} onNavigate={onNavigate} />}
     {stage >= 3 && <DeferredSeasonCompletion season={season} teams={tournamentTeams} players={players} matches={matches} draw={draw} finalized={finalized} nextSeason={nextSeason} onComplete={onComplete} />}
   </>
 }
@@ -144,9 +143,8 @@ function DeferredCompetitionRankings({ season, type, screenState, onStateChange,
   return <CompetitionRankings season={season} type={type} screenState={screenState} onStateChange={onStateChange} players={players} teams={teams} matches={matches} onNavigate={onNavigate} />
 }
 
-function DeferredCompetitionBestElevens({ season, type, screenState, onStateChange, players, teams, allMatches, leagueMatches, cup, champions, onNavigate }: { season: string; type: CompetitionType; screenState: ScreenStateByView['competition']; onStateChange: CompetitionStateChange; players: Player[]; teams: Team[]; allMatches: Match[]; leagueMatches?: Match[]; cup: CupCompetition | null; champions: ReturnType<typeof championsCompetition> | null; onNavigate: (view: View) => void }) {
-  const matches = useMemo(() => measuredInDevelopment('Best XI match scope lookup', () => type === 'league' && leagueMatches ? leagueMatches : competitionMatches(allMatches, season, type)), [type, leagueMatches, allMatches, season])
-  return <CompetitionBestElevens season={season} type={type} screenState={screenState} onStateChange={onStateChange} players={players} teams={teams} matches={matches} allMatches={allMatches} cup={cup} champions={champions} onNavigate={onNavigate} />
+function DeferredCompetitionBestElevens({ season, type, players, teams, allMatches, cup, champions, onNavigate }: { season: string; type: CompetitionType; players: Player[]; teams: Team[]; allMatches: Match[]; cup: CupCompetition | null; champions: ReturnType<typeof championsCompetition> | null; onNavigate: (view: View) => void }) {
+  return <CompetitionBestElevens season={season} type={type} players={players} teams={teams} allMatches={allMatches} cup={cup} champions={champions} onNavigate={onNavigate} />
 }
 
 function DeferredSeasonCompletion({ season, teams, players, matches, draw, finalized, nextSeason, onComplete }: { season: string; teams: Team[]; players: Player[]; matches: Match[]; draw?: CompetitionState; finalized: boolean; nextSeason: string; onComplete: () => void }) {
@@ -174,7 +172,7 @@ function LeagueView({ season, teams, players, matches, league, screenState, onSt
 
 function LeaguePlayers({ season, teams, players, matches, league, screenState, onStateChange, onNavigate }: { season: string; teams: Team[]; players: Player[]; matches: Match[]; league: ReturnType<typeof leagueCompetition>; screenState: ScreenStateByView['competition']; onStateChange: CompetitionStateChange; onNavigate: (view: View) => void }) {
   const playerMetric = screenState.rankingMetric as RankingDisplayMetric
-  const awardScope = screenState.leagueAwardScope ?? 'first-half'
+  const awardScope = normalizeLeagueAwardScope(screenState.leagueAwardScope)
   const { competitionStates = [] } = useStore()
   const patchState = (patch: Partial<ScreenStateByView['competition']>) => onStateChange({ ...screenState, ...patch })
   const setPlayerMetric = (value: RankingDisplayMetric) => patchState({ rankingMetric: value })
@@ -191,11 +189,11 @@ function LeaguePlayers({ season, teams, players, matches, league, screenState, o
     return { complete: award.complete, individualAwards: award }
   }, [canonicalAward, season, teams, players, matches, league])
   const selectedAward = useMemo(() => awardResultForScope(awardScope, season, teams, players, matches, competitionStates), [awardScope, season, teams, players, matches, competitionStates])
-  return <section><RankingMetricTabs label="League player category" value={playerMetric} onChange={setPlayerMetric} options={RANKING_METRICS} /><section className="mt-3"><SectionHeader title={rankingTitle('league')} subtitle="Top 10" /><div {...playerSwipe} className="mt-2 overflow-hidden rounded-xl bg-zinc-900 touch-pan-y" aria-label="Swipe League ranking metrics">{playerRows.map((row, index) => { const player = playerById.get(row.playerId); return <div key={row.playerId} className="border-b border-white/5 last:border-0"><RankingRow positionLabel={row.scopedPositionFamily} rank={index + 1} compact player={player} team={teamById.get(row.historicalTeamId ?? row.teamId)} value={playerValue(row)} onPlayerNavigate={id => onNavigate({ name: 'player', id, season, competitionType: 'league' })} onTeamNavigate={id => onNavigate({ name: 'team', id })} /></div> })}{!playerRows.length && <p className="p-3 text-xs text-zinc-500">No qualifying players yet.</p>}</div><button type="button" onClick={() => onNavigate({ name: 'global-ranking', season, competitionType: 'league', rankingMetric: playerMetric })} className="secondary-view-all mt-3 w-full">View All</button></section><AwardRacePanel candidates={canonicalAward?.candidates ?? []} title="Award Race" previewCount={5} season={season} type="league" players={players} teams={teams} matches={matches} onNavigate={onNavigate} /><CompetitionIndividualAwards result={individualResult} season={season} type="league" players={players} teams={teams} onNavigate={onNavigate} /><section className="mt-5"><h2 className="mb-3 text-lg font-semibold">{selectedAward?.complete ? 'Best XI' : 'Best XI Race'}</h2>
-    <SegmentedControl label="Best XI view" value={awardScope} onChange={value => patchState({ leagueAwardScope: value as typeof awardScope })} options={[{ value: 'first-half', label: 'First Half' }, { value: 'second-half', label: 'Second Half' }, { value: 'league', label: 'League Best XI' }]} />
-    {selectedAward ? <><p className="mt-3 text-[10px] text-zinc-500">{selectedAward.scopeLabel} · {selectedAward.complete ? 'Finalized' : 'In progress'} · MVP is marked blue.</p>
-      {awardScope !== 'league' && <AwardRacePanel candidates={selectedAward.candidates ?? []} title={awardScope === 'first-half' ? 'First Half Award Race' : 'Second Half Award Race'} previewCount={5} awardScope={awardScope} season={season} type="league" players={players} teams={teams} matches={matches} competitionStates={competitionStates} onNavigate={onNavigate} />}
-      <AwardBestXI title={selectedAward.teamLabel} result={selectedAward} players={players} teams={teams} onPlayerOpen={id => onNavigate({ name: 'player', id, season, competitionType: 'league' })} /></> : <Empty text="Not available yet." />}
+  return <section><RankingMetricTabs label="League player category" value={playerMetric} onChange={setPlayerMetric} options={RANKING_METRICS} /><section className="mt-3"><SectionHeader title={rankingTitle('league')} subtitle="Top 10" /><div {...playerSwipe} className="mt-2 overflow-hidden rounded-xl bg-zinc-900 touch-pan-y" aria-label="Swipe League ranking metrics">{playerRows.map((row, index) => { const player = playerById.get(row.playerId); return <div key={row.playerId} className="border-b border-white/5 last:border-0"><RankingRow positionLabel={row.scopedPositionFamily} rank={index + 1} compact player={player} team={teamById.get(row.historicalTeamId ?? row.teamId)} value={playerValue(row)} onPlayerNavigate={id => onNavigate({ name: 'player', id, season, competitionType: 'league' })} onTeamNavigate={id => onNavigate({ name: 'team', id })} /></div> })}{!playerRows.length && <p className="p-3 text-xs text-zinc-500">No qualifying players yet.</p>}</div><button type="button" onClick={() => onNavigate({ name: 'global-ranking', season, competitionType: 'league', rankingMetric: playerMetric })} className="secondary-view-all mt-3 w-full">View All</button></section><CompetitionIndividualAwards result={individualResult} season={season} type="league" players={players} teams={teams} onNavigate={onNavigate} /><section className="mt-5" aria-label="League Awards"><h2 className="mb-3 text-lg font-semibold">League Awards</h2>
+    <SegmentedControl label="Best XI view" value={awardScope} onChange={value => patchState({ leagueAwardScope: value as typeof awardScope })} options={[{ value: 'first-half', label: 'First Half' }, { value: 'second-half', label: 'Second Half' }, { value: 'league', label: 'League' }]} />
+    {selectedAward && <p className="mt-3 text-[10px] text-zinc-500">{selectedAward.scopeLabel} · {selectedAward.complete ? 'Finalized' : 'In progress'} · MVP is marked blue.</p>}
+    <AwardRacePanel candidates={selectedAward?.candidates ?? []} title="Award Race" previewCount={5} awardScope={awardScope === 'league' ? undefined : awardScope} season={season} type="league" players={players} teams={teams} matches={matches} competitionStates={competitionStates} onNavigate={onNavigate} />
+    {selectedAward ? <AwardBestXI title={selectedAward.teamLabel} result={selectedAward} players={players} teams={teams} onPlayerOpen={id => onNavigate({ name: 'player', id, season, competitionType: 'league' })} /> : <Empty text="Not available yet." />}
     </section></section>
 }
 
@@ -328,11 +326,6 @@ function CompetitionRankings({ season, type, screenState, onStateChange, players
 }
 
 
-function AwardScopeSelector({ ariaLabel, options, value, onChange }: { ariaLabel: string; options: { value: string | number; label: string }[]; value: string | number | undefined; onChange: (value: string | number) => void }) {
-  if (options.length < 2) return null
-  return <div role="group" aria-label={ariaLabel} className="mt-3 flex flex-wrap gap-1">{options.map(option => <button key={option.value} type="button" aria-pressed={option.value === value} onClick={() => onChange(option.value)} className={`rounded-full px-2.5 py-1 text-[10px] font-black ${option.value === value ? 'bg-emerald-400 text-black' : 'bg-zinc-800 text-zinc-300'}`}>{option.label}</button>)}</div>
-}
-
 function CompetitionIndividualAwards({ result, season, type, players, teams, onNavigate }: { result?: Pick<CanonicalAwardResult, 'complete' | 'individualAwards'>; season: string; type: CompetitionType; players: Player[]; teams: Team[]; onNavigate: (view: View) => void }) {
   if (!result?.complete || !result.individualAwards) return null
   const award = result.individualAwards
@@ -344,7 +337,7 @@ function CompetitionIndividualAwards({ result, season, type, players, teams, onN
   return <section aria-label="Finalized competition awards" className="mt-5"><h2 className="mb-3 text-lg font-semibold">Competition Awards</h2><div className="space-y-2">{groups.map(group => <div key={group.label} className="rounded-xl bg-zinc-900 p-3"><h3 className="text-[10px] font-bold uppercase tracking-wide text-emerald-400">{group.label}</h3><div className="mt-1 flex flex-wrap gap-1">{group.winners.map(winner => <button key={winner.playerId} type="button" onClick={() => onNavigate({ name: 'player', id: winner.playerId, season, competitionType: type })} className="min-h-9 rounded-lg bg-white/5 px-2.5 py-1.5 text-left text-xs"><span className="block font-semibold">{players.find(player => player.id === winner.playerId)?.displayName ?? players.find(player => player.id === winner.playerId)?.name ?? `Historical player ${winner.playerId}`}</span><small className="block text-zinc-400">{teams.find(team => team.id === winner.teamId)?.name ?? winner.teamId} · {group.value(winner.value)}</small></button>)}{!group.winners.length && <p className="text-xs text-zinc-500">No qualifying players.</p>}</div></div>)}</div></section>
 }
 
-function CompetitionBestElevens({ season, type, screenState, onStateChange, players, teams, allMatches, cup, champions, onNavigate }: { season: string; type: CompetitionType; screenState: ScreenStateByView['competition']; onStateChange: CompetitionStateChange; players: Player[]; teams: Team[]; matches: Match[]; allMatches: Match[]; cup: CupCompetition | null; champions: ReturnType<typeof championsCompetition> | null; onNavigate: (view: View) => void }) {
+function CompetitionBestElevens({ season, type, players, teams, allMatches, cup, champions, onNavigate }: { season: string; type: CompetitionType; players: Player[]; teams: Team[]; allMatches: Match[]; cup: CupCompetition | null; champions: ReturnType<typeof championsCompetition> | null; onNavigate: (view: View) => void }) {
   const { competitionStates = [] } = useStore()
   const tournamentTeams = useMemo(() => currentStaticTeams(teams), [teams])
   const awardModels = useMemo(() => type === 'cup' ? { cup: cup ?? undefined } : type === 'champions' ? { champions: champions ?? undefined } : {}, [type, cup, champions])
@@ -354,22 +347,11 @@ function CompetitionBestElevens({ season, type, screenState, onStateChange, play
     const award = awardsForCompetition(type, season, tournamentTeams, players, allMatches, competitionStates, awardModels)
     return { complete: award.complete, individualAwards: award }
   }, [canonicalAward, type, season, tournamentTeams, players, allMatches, competitionStates, awardModels])
-  const cupStages = useMemo(() => startedCupAwardStages(allMatches, season), [allMatches, season])
-  const selectedScope = cupStages.includes(screenState.cupAwardStage as CupStage) ? screenState.cupAwardStage! : cupStages[cupStages.length - 1]
-  const scopeMatches = useMemo(() => type === 'cup' && selectedScope ? matchesForAwardPeriod(allMatches, season, 'cup', selectedScope) : [], [allMatches, season, type, selectedScope])
-  const scopeAward = useMemo(() => scopeMatches.length ? performanceAwardResult(players, scopeMatches) : undefined, [players, scopeMatches])
-  const scopeFinalized = Boolean(cup && (cup.championId || cup.eliminatedTeamIds.length && selectedScope && Number(String(selectedScope).replace('stage', '')) < Number(cup.stage.replace('stage', ''))))
   const finalXI = canonicalAward ? { slots: canonicalAward.bestXI, statsByPlayer: canonicalAward.statsByPlayer } : undefined
-  const stageLabel = selectedScope === 'final' ? 'Final' : 'Stage ' + String(selectedScope).replace('stage', '')
-  const showStage = type === 'cup' && screenState.bestXiMode === 'period'
   return <><AwardRacePanel candidates={canonicalAward?.candidates ?? []} title="Award Race" previewCount={5} season={season} type={type} players={players} teams={tournamentTeams} matches={allMatches} competitionStates={competitionStates} onNavigate={onNavigate} />
     <CompetitionIndividualAwards result={individualResult} season={season} type={type} players={players} teams={teams} onNavigate={onNavigate} />
     <section className="mt-5"><h2 className="mb-3 text-lg font-semibold">{canonicalAward?.complete ? 'Best XI' : 'Best XI Race'}</h2>
-      {type === 'cup' && <SegmentedControl label="Best XI view" value={screenState.bestXiMode} onChange={value => onStateChange({ ...screenState, bestXiMode: value as 'period' | 'competition' })} options={[{ value: 'period', label: 'Team of the Stage' }, { value: 'competition', label: competitionAwardLabel(type) }]} />}
-      {showStage ? scopeAward && selectedScope ? <><AwardScopeSelector ariaLabel="Cup Team of Stage" options={cupStages.map(scope => ({ value: scope, label: scope === 'final' ? 'Final' : 'Stage ' + String(scope).replace('stage', '') }))} value={selectedScope} onChange={value => onStateChange({ ...screenState, cupAwardStage: value as CupStage })} />
-        <p className="mt-2 text-[10px] text-zinc-500">{scopeFinalized ? 'Finalized' : 'In progress'} · Player of the Stage is marked blue.</p>
-        <BestEleven title={'Team of the Stage · ' + stageLabel} xi={{ slots: scopeAward.bestXI, statsByPlayer: scopeAward.statsByPlayer }} bestPlayerId={scopeAward.bestPlayerId} players={players} teams={teams} onNavigate={onNavigate} season={season} competitionType={type} /></> : <Empty text="Not available yet." />
-        : canonicalAward && finalXI ? <BestEleven title={canonicalAward.teamLabel} xi={finalXI} bestPlayerId={canonicalAward.bestPlayerId} players={players} teams={teams} onNavigate={onNavigate} season={season} competitionType={type} /> : <Empty text="No eligible players yet." />}
+      {canonicalAward && finalXI ? <BestEleven title={canonicalAward.teamLabel} xi={finalXI} bestPlayerId={canonicalAward.bestPlayerId} players={players} teams={teams} onNavigate={onNavigate} season={season} competitionType={type} /> : <Empty text="No eligible players yet." />}
     </section></>
 }
 

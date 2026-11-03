@@ -10,16 +10,16 @@ const { matchesForAwardPeriod } = require('../src/engine/awardScopes.ts')
 
 const game = (id, type, stage, day) => ({ id, season: 'S1', date: '2026-01-01', competitionType: type, competitionStage: stage, matchDay: day, teamId: 'A', homeTeamId: 'A', awayTeamId: 'B', appearances: [], events: [] })
 
-test('Best XI defaults to period and restores modern or legacy tabs and Back state', () => {
+test('League awards default to League and restore valid scopes while ignoring legacy modes', () => {
   const view = { name: 'competition', season: 'S1', competitionType: 'league' }
   const base = navigation.defaultScreenState(view)
-  assert.equal(base.bestXiMode, 'period')
+  assert.equal(base.leagueAwardScope, 'league')
   const app = { teams: [{ id: 'A', name: 'A' }], players: [], matches: [game('m', 'league', 'regular', 1)] }
   const restored = mode => loadLastNavigationEntry(app, { getItem: key => key === LAST_ROUTE_STORAGE_KEY ? JSON.stringify({ version: 2, view, screenState: { ...base, bestXiMode: mode, monthlyAwardBlock: 2 } }) : null }).screenState
-  for (const [saved, expected] of [['monthly', 'period'], ['season', 'competition'], ['period', 'period'], ['competition', 'competition']]) {
-    assert.equal(restored(saved).bestXiMode, expected)
+  for (const saved of ['monthly', 'season', 'period', 'competition']) {
+    assert.equal(restored(saved).leagueAwardScope, 'league'); assert.equal(restored(saved).bestXiMode, undefined)
   }
-  const entry = navigation.createNavigationEntry(view, { ...base, bestXiMode: 'competition', monthlyAwardBlock: 2 })
+  const entry = navigation.createNavigationEntry(view, { ...base, leagueAwardScope: 'second-half' })
   const opened = navigation.navigateBrowseEntry([entry], { name: 'player', id: 'p' }, 352)
   assert.deepEqual(navigation.popNavigationEntry(opened), [{ ...entry, scrollTop: 352 }])
 })

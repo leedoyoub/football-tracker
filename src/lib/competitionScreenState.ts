@@ -9,13 +9,17 @@ export function defaultCompetitionScreenState(competitionType: CompetitionType =
     name: 'competition', competitionType, leagueMenu: 'players', cupMenu: 'table', championsMenu: 'bracket',
     leagueTableMode: 'overall', cupTableStage: null,
     matchFilters: { league: { teamId: null, period: null }, cup: { teamId: null, period: null }, champions: { teamId: null, period: null } },
-    rankingMetric, bestXiMode: 'period', leagueAwardScope: 'first-half', monthlyAwardBlock: null, cupAwardStage: null, championsAwardRound: null,
+    rankingMetric, leagueAwardScope: 'league', monthlyAwardBlock: null, championsAwardRound: null,
     historyMatchday: null, historyComparedTeamIds: [], historyFocusedTeamId: null, historyPlotScrollLeft: null,
   }
 }
 
 export function competitionMenu(state: State) {
   return state.competitionType === 'league' ? state.leagueMenu : state.competitionType === 'cup' ? state.cupMenu : state.championsMenu
+}
+
+export function normalizeLeagueAwardScope(value: unknown): State['leagueAwardScope'] {
+  return value === 'first-half' || value === 'second-half' ? value : 'league'
 }
 
 export function validMatchPeriod(type: CompetitionType, value: unknown): value is string {
@@ -36,11 +40,7 @@ export function normalizeCompetitionScreenState(saved: Record<string, unknown>, 
   }
   return {
     ...base, leagueMenu,
-    leagueAwardScope: saved.bestXiMode === 'monthly' || saved.bestXiMode === 'period' && saved.leagueAwardScope === undefined
-      ? typeof saved.monthlyAwardBlock === 'number' && saved.monthlyAwardBlock > 5 ? 'second-half' : 'first-half'
-      : saved.bestXiMode === 'season' ? 'league'
-        : ['first-half', 'second-half', 'league'].includes(String(saved.leagueAwardScope)) ? saved.leagueAwardScope as State['leagueAwardScope']
-          : saved.bestXiMode === 'competition' ? 'league' : base.leagueAwardScope,
+    leagueAwardScope: normalizeLeagueAwardScope(saved.leagueAwardScope),
     cupMenu: ['players', 'table', 'matches'].includes(String(saved.cupMenu)) ? saved.cupMenu as State['cupMenu'] : base.cupMenu,
     championsMenu: ['players', 'bracket', 'matches'].includes(String(saved.championsMenu)) ? saved.championsMenu as State['championsMenu'] : base.championsMenu,
     leagueTableMode: saved.leagueTableMode === 'form' || saved.leagueMenu === undefined && saved.tab === 'form' ? 'form' : 'overall',
@@ -53,5 +53,5 @@ export function normalizeCompetitionScreenState(saved: Record<string, unknown>, 
 
 export function resetCompetitionSeasonState(state: State): State {
   const defaults = defaultCompetitionScreenState(state.competitionType, state.rankingMetric)
-  return { ...state, cupTableStage: null, matchFilters: defaults.matchFilters, monthlyAwardBlock: null, cupAwardStage: null, championsAwardRound: null, historyMatchday: null, historyComparedTeamIds: [], historyFocusedTeamId: null, historyPlotScrollLeft: null }
+  return { ...state, leagueAwardScope: normalizeLeagueAwardScope(state.leagueAwardScope), cupTableStage: null, matchFilters: defaults.matchFilters, monthlyAwardBlock: null, championsAwardRound: null, historyMatchday: null, historyComparedTeamIds: [], historyFocusedTeamId: null, historyPlotScrollLeft: null }
 }

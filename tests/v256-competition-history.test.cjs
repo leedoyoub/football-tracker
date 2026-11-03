@@ -67,11 +67,11 @@ test('reload preserves a focused automatic History comparison without requiring 
 
 test('season switch resets period selections and filters while preserving independent menus', () => {
   assert.equal(typeof screenStates.resetCompetitionSeasonState, 'function')
-  const s = { ...defaultScreenState({ name: 'competition' }), leagueMenu: 'history', cupMenu: 'matches', cupTableStage: 'total', historyMatchday: 12, cupAwardStage: 'stage3' }
+  const s = { ...defaultScreenState({ name: 'competition' }), leagueMenu: 'history', cupMenu: 'matches', cupTableStage: 'total', historyMatchday: 12, leagueAwardScope: 'second-half' }
   s.matchFilters.cup = { teamId: 'T1', period: 'stage2' }
   const next = screenStates.resetCompetitionSeasonState(s)
   assert.equal(next.leagueMenu, 'history'); assert.equal(next.cupMenu, 'matches')
-  assert.equal(next.cupTableStage, null); assert.equal(next.historyMatchday, null); assert.equal(next.cupAwardStage, null)
+  assert.equal(next.cupTableStage, null); assert.equal(next.historyMatchday, null); assert.equal(next.leagueAwardScope, 'second-half'); assert.equal(next.cupAwardStage, undefined)
   assert.deepEqual(next.matchFilters.cup, filters)
 })
 

@@ -6,7 +6,7 @@ for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module
 
 const { competitionAwardLabel, seasonAwards } = require('../src/engine/awards.ts')
 const { monthlyAwardForStartedBlock } = require('../src/engine/seasonAnalytics.ts')
-const { startedCupAwardStages, startedChampionsAwardRounds } = require('../src/engine/awardScopes.ts')
+const { matchesForAwardPeriod, startedChampionsAwardRounds } = require('../src/engine/awardScopes.ts')
 const { awardBestXIProps } = require('../src/components/awardBestXIProps.ts')
 
 const player = (id, teamId = 'A', position = 'ST') => ({ id, name: id, displayName: id, fullName: id, teamId, position, number: 9 })
@@ -31,7 +31,7 @@ test('started monthly blocks expose only canonical started periods and recompute
   assert.equal(future, undefined)
 })
 
-test('cup and Champions selectors expose only recorded stages and rounds', () => {
+test('Cup period matching preserves recorded stages and replays; Champions exposes recorded rounds', () => {
   const cup = [
     { ...leagueMatch('cup-1', 1), competitionType: 'cup', competitionStage: 'stage1' },
     { ...leagueMatch('cup-final', 2), competitionType: 'cup', competitionStage: 'finalReplay' },
@@ -40,7 +40,8 @@ test('cup and Champions selectors expose only recorded stages and rounds', () =>
     { ...leagueMatch('cl-r16', 1), competitionType: 'champions', competitionStage: 'roundOf16' },
     { ...leagueMatch('cl-final', 2), competitionType: 'champions', competitionStage: 'final' },
   ]
-  assert.deepEqual(startedCupAwardStages(cup, 'Season 1'), ['stage1', 'final'])
+  assert.deepEqual(matchesForAwardPeriod(cup, 'Season 1', 'cup', 'stage1').map(match => match.id), ['cup-1'])
+  assert.deepEqual(matchesForAwardPeriod(cup, 'Season 1', 'cup', 'final').map(match => match.id), ['cup-final'])
   assert.deepEqual(startedChampionsAwardRounds(champions, 'Season 1'), ['roundOf16', 'final'])
 })
 
@@ -76,7 +77,7 @@ test('competition screen owns historical award selector state rather than local 
   const types = fs.readFileSync('src/types.ts', 'utf8')
   const defaults = fs.readFileSync('src/lib/competitionScreenState.ts', 'utf8')
   assert.match(types, /monthlyAwardBlock/)
-  assert.match(types, /cupAwardStage/)
+  assert.doesNotMatch(types, /cupAwardStage|bestXiMode/)
   assert.match(types, /championsAwardRound/)
   assert.match(defaults, /monthlyAwardBlock: null/)
 })

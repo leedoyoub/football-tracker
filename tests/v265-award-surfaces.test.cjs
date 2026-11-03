@@ -12,8 +12,8 @@ const restored = (view, saved) => loadLastNavigationEntry(app, { getItem: key =>
 
 test('retired selectors and honor routes restore to existing half or competition scopes', () => {
   const view = { name: 'competition', season: 'S1', competitionType: 'league' }
-  assert.equal(defaultScreenState(view).leagueAwardScope, 'first-half')
-  assert.equal(restored(view, { bestXiMode: 'monthly', monthlyAwardBlock: 8 }).screenState.leagueAwardScope, 'second-half')
+  assert.equal(defaultScreenState(view).leagueAwardScope, 'league')
+  assert.equal(restored(view, { bestXiMode: 'monthly', monthlyAwardBlock: 8 }).screenState.leagueAwardScope, 'league')
   assert.equal(restored(view, { bestXiMode: 'season' }).screenState.leagueAwardScope, 'league')
   assert.equal(restored({ name: 'records' }, { awardMetricId: 'awards-monthly-player', historyPanel: 'awards', historyBlock: 8 }).screenState.awardMetricId, 'awards-first-half-mvp')
   assert.equal(restored({ name: 'records' }, { historyAwardScope: 'season' }).screenState.historyAwardScope, 'season')
@@ -36,9 +36,9 @@ test('League awards tabs preserve selected half when opening and returning from 
   const patches = [], candidates = [{ playerId: 'p', average: 7.2, selectionScore: 7.8 }]
   const award = { scopeLabel: 'S1 First Half', complete: false, bestXI: [], statsByPlayer: {}, candidates, playerLabel: 'First Half MVP', teamLabel: 'First Half Best XI' }
   const h = screenHarness(root, 'screens/CompetitionScreen.tsx', 'LeaguePlayers', { competitionStates: [] }, { '../engine/awards': { ...require('../src/engine/awards.ts'), awardResultForScope: () => award } })
-  const tree = h.render({ season: 'S1', teams, players: [], matches: [], league: { matches: [] }, screenState: defaultScreenState({ name: 'competition' }), onStateChange: state => patches.push(state), onNavigate() {} })
+  const tree = h.render({ season: 'S1', teams, players: [], matches: [], league: { matches: [] }, screenState: { ...defaultScreenState({ name: 'competition' }), leagueAwardScope: 'first-half' }, onStateChange: state => patches.push(state), onNavigate() {} })
   const tabs = nodes(tree, node => node.props?.label === 'Best XI view')[0]
-  assert.deepEqual(tabs.props.options.map(option => option.label), ['First Half', 'Second Half', 'League Best XI'])
+  assert.deepEqual(tabs.props.options.map(option => option.label), ['First Half', 'Second Half', 'League'])
   tabs.props.onChange('second-half')
   assert.equal(patches.at(-1).leagueAwardScope, 'second-half')
   const halfRace = nodes(tree, node => node.type?.name === 'AwardRacePanel' && node.props.awardScope === 'first-half')[0]

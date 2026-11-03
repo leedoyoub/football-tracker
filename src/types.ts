@@ -258,10 +258,8 @@ export interface ScreenStateByView {
     cupTableStage: CupStage | 'total' | null
     matchFilters: Record<CompetitionType, { teamId: string | null; period: string | null }>
     rankingMetric: RankSort
-    bestXiMode: 'period' | 'competition'
     leagueAwardScope: 'first-half' | 'second-half' | 'league'
     monthlyAwardBlock: number | null
-    cupAwardStage: CupStage | null
     championsAwardRound: Exclude<ChampionsStage, 'finalReplay'> | null
     historyMatchday: number | null
     historyComparedTeamIds: string[]

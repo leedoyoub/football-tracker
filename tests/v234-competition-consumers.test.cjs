@@ -12,7 +12,7 @@ test('deferred Competition consumers use selector-backed models and retain stage
   assert.match(source, /selectCompetitionSeasonComplete\(competitionCacheOwner/)
   assert.match(bestElevens, /const awardModels = useMemo/)
   assert.match(bestElevens, /competitionAwardResult\(type, season, tournamentTeams, players, allMatches, competitionStates, awardModels\)/)
-  assert.match(bestElevens, /startedCupAwardStages\(allMatches, season\)/)
+  assert.doesNotMatch(bestElevens, /startedCupAwardStages|performanceAwardResult|scopeAward|scopeMatches/)
   assert.equal(bestElevens.includes('startedChampionsAwardRounds('), false)
   assert.equal(bestElevens.includes('performanceAwardResult(players, matches)'), false)
   assert.equal(bestElevens.includes('competitionStageMatches(allMatches'), false)
