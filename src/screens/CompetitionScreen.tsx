@@ -12,6 +12,7 @@ import { competitionMenu, normalizeLeagueAwardScope } from '../lib/competitionSc
 import { cupTableModel } from '../lib/cupTable'
 import { leagueMatchdayResults } from '../lib/competitionResults'
 import { StandingsTable } from '../components/StandingsTable'
+import { CupStandingsTable } from '../components/CupStandingsTable'
 import {
   championsCompetition,
   projectChampionsBracket,
@@ -26,7 +27,7 @@ import { selectChampionsCompetition, selectCompetitionSeasonComplete, selectCupC
 import { isRecordedForTeam, teamPerspectiveScore, teamsCreditedWithResult } from '../engine/matchPerspective'
 import { LEAGUE_MATCHES_PER_TEAM } from '../engine/leagueFormat'
 import { buildGlobalRankingData, rankGlobalRankingRows, seasonsFromMatches, type LeaderboardMetric } from '../engine/stats'
-import { buildLeagueHistory, leagueFormTable, type LeagueHistoryAnalytics } from '../engine/seasonAnalytics'
+import { buildLeagueHistory, latestLeagueStandings, leagueFormTable, type LeagueHistoryAnalytics } from '../engine/seasonAnalytics'
 import { SectionHeader, SegmentedControl } from '../components/SeasonUI'
 import { currentStaticTeams } from '../data/teams'
 import { awardResultForScope, awardsForCompetition, competitionAwardResult, type CanonicalAwardResult } from '../engine/awards'
@@ -162,12 +163,13 @@ function CompetitionHeader({ type, label, season, champion, progress }: { type: 
 }
 
 function LeagueView({ season, teams, players, matches, league, screenState, onStateChange, onNavigate, onPersistPlotScroll }: { season: string; teams: Team[]; players: Player[]; matches: Match[]; league: ReturnType<typeof leagueCompetition>; screenState: ScreenStateByView['competition']; onStateChange: CompetitionStateChange; onNavigate: (view: View) => void; onPersistPlotScroll?: (left: number) => void }) {
-  const needsHistory = screenState.leagueMenu === 'history' || screenState.leagueTableMode === 'overall'
+  const needsHistory = screenState.leagueMenu === 'history'
   const analytics = useMemo(() => needsHistory ? buildLeagueHistory(teams, players, matches, season) : null, [needsHistory, teams, players, matches, season])
   const form = useMemo(() => screenState.leagueMenu === 'table' && screenState.leagueTableMode === 'form' ? leagueFormTable(teams, league.matches) : [], [screenState.leagueMenu, screenState.leagueTableMode, teams, league.matches])
-  const current = analytics?.leagueSnapshots.get(analytics.currentMatchDay)?.standings ?? league.standings
+  const latest = useMemo(() => !needsHistory && screenState.leagueTableMode === 'overall' ? latestLeagueStandings(teams, players, matches, season) : [], [needsHistory, screenState.leagueTableMode, teams, players, matches, season])
+  const current = latest.length ? latest : league.standings
   if (screenState.leagueMenu === 'history' && analytics) return <LeagueHistory analytics={analytics} teams={teams} screenState={screenState} onStateChange={onStateChange} onNavigate={onNavigate} onPersistPlotScroll={onPersistPlotScroll} />
-  return <div><RankingMetricTabs label="League table mode" value={screenState.leagueTableMode} onChange={value => onStateChange({ ...screenState, leagueTableMode: value as 'overall' | 'form' })} options={[{ value: 'overall', label: 'Overall' }, { value: 'form', label: 'Form' }]} /><div className="mt-3">{screenState.leagueTableMode === 'overall' ? <StandingsTable standings={current} teams={teams} compact onTeamNavigate={id => onNavigate({ name: 'team', id })} /> : <><p className="mb-2 text-xs text-zinc-500">Last 5 League matches only · recent form comparison.</p>{form.some(row => row.played) ? <StandingsTable standings={form} teams={teams} compact onTeamNavigate={id => onNavigate({ name: 'team', id })} /> : <Empty text="No League matches for Last 5." />}</>}</div></div>
+  return <div><RankingMetricTabs label="League table mode" value={screenState.leagueTableMode} onChange={value => onStateChange({ ...screenState, leagueTableMode: value as 'overall' | 'form' })} options={[{ value: 'overall', label: 'Overall' }, { value: 'form', label: 'Form' }]} /><div className="mt-3">{screenState.leagueTableMode === 'overall' ? <StandingsTable sortScope={season + ":overall"} standings={current} teams={teams} compact onTeamNavigate={id => onNavigate({ name: 'team', id })} /> : <><p className="mb-2 text-xs text-zinc-500">Last 5 League matches only · recent form comparison.</p>{form.some(row => row.played) ? <StandingsTable sortScope={season + ":form"} standings={form} teams={teams} compact onTeamNavigate={id => onNavigate({ name: 'team', id })} /> : <Empty text="No League matches for Last 5." />}</>}</div></div>
 }
 
 function LeaguePlayers({ season, teams, players, matches, league, screenState, onStateChange, onNavigate }: { season: string; teams: Team[]; players: Player[]; matches: Match[]; league: ReturnType<typeof leagueCompetition>; screenState: ScreenStateByView['competition']; onStateChange: CompetitionStateChange; onNavigate: (view: View) => void }) {
@@ -210,7 +212,7 @@ function LeagueHistory({ analytics, teams, screenState, onStateChange, onNavigat
   return <div><div className="rounded-xl bg-zinc-900 p-3"><div className="flex items-center justify-between text-xs"><b>MD {snapshot.matchDay}</b><span className={snapshot.complete ? 'text-emerald-400' : 'text-amber-300'}>{snapshot.complete ? 'Complete' : 'Incomplete Matchday'}</span></div><input aria-label="Historical League Matchday" type="range" min="1" max={analytics.currentMatchDay} value={snapshot.matchDay} onChange={event => setDay(Number(event.target.value))} className="league-history-range mt-3" style={{ '--league-range-progress': `${analytics.currentMatchDay > 1 ? (snapshot.matchDay - 1) / (analytics.currentMatchDay - 1) * 100 : 0}%` } as React.CSSProperties} /><div className="mt-1 flex justify-between text-[9px] text-zinc-600"><span>MD1</span><span>MD{analytics.currentMatchDay}</span></div></div>
     <div className="no-scrollbar my-3 flex gap-1 overflow-x-auto">{teams.map(team => <button key={team.id} type="button" aria-pressed={compared.includes(team.id)} onClick={() => toggle(team.id)} className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold ${compared.includes(team.id) ? 'bg-emerald-500 text-black' : 'bg-zinc-900 text-zinc-400'}`}>{team.shortName}</button>)}</div>
     <PositionHistory analytics={analytics} teamIds={compared} teams={teams} focusedTeamId={screenState.historyFocusedTeamId} plotScrollLeft={screenState.historyPlotScrollLeft} onFocus={id => onStateChange({ ...screenState, historyFocusedTeamId: id })} onPlotScroll={left => onStateChange({ ...screenState, historyPlotScrollLeft: left }, { historyPlotScrollLeft: left })} onPersistPlotScroll={onPersistPlotScroll} />
-    <div className="mt-3"><StandingsTable standings={snapshot.standings} teams={teams} compact onTeamNavigate={id => onNavigate({ name: 'team', id })} /></div>
+    <div className="mt-3"><StandingsTable sortScope={analytics.season + ":history:" + day} standings={snapshot.standings} teams={teams} compact onTeamNavigate={id => onNavigate({ name: 'team', id })} /></div>
     <section className="mt-5"><SectionHeader title="MD Results" subtitle={'MD ' + day + ' · ' + mdResults.length + ' recorded matches'} /><div className="mt-2 grid grid-cols-4 gap-1.5" aria-label="Selected Matchday results">{mdResults.length ? mdResults.map(result => <button key={result.match.id} type="button" onClick={() => onNavigate({ name: 'match', id: result.match.id })} aria-label={'Open ' + result.teamName + ', ' + result.outcome + ', ' + result.goalsFor + ' to ' + result.goalsAgainst + ', match details'} className={'flex min-h-20 min-w-0 flex-col items-center justify-center gap-2 rounded-xl border px-1 py-2 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-300 ' + resultTone(result.outcome)}><TeamIcon team={teamById.get(result.teamId)} className="h-7 w-7 text-[7px]" /><b className="text-xs tabular-nums">{result.goalsFor}–{result.goalsAgainst}</b></button>) : <div className="col-span-4"><Empty text="No recorded matches in this Matchday." /></div>}</div></section>
   </div>
 }
@@ -265,7 +267,6 @@ export function PositionHistory({ analytics, teamIds, teams, focusedTeamId, plot
 }
 
 function CupView({ season, teams, tournamentTeams, players, matches, cup, selection, onSelection, onNavigate }: { season: string; teams: Team[]; tournamentTeams: Team[]; players: Player[]; matches: Match[]; cup: CupCompetition; selection: CupStage | 'total' | null; onSelection: (value: CupStage | 'total') => void; onNavigate: (view: View) => void }) {
-  const byId = useMemo(() => Object.fromEntries(teams.map(team => [team.id, team])), [teams])
   const model = useMemo(() => cupTableModel(tournamentTeams, matches, season, players, cup, selection), [tournamentTeams, matches, season, players, cup, selection])
   const total = model.selection === 'total'
   const playedTeams = new Set(cup.stageMatches.flatMap(match => teamsCreditedWithResult(match)).filter(id => cup.activeTeamIds.includes(id))).size
@@ -274,14 +275,7 @@ function CupView({ season, teams, tournamentTeams, players, matches, cup, select
     <p className="mb-2 text-xs font-bold text-zinc-400">{model.label}{!total && model.complete ? ' · Complete' : ''}</p>
     {model.replayRequired && <p className="mb-2 text-xs text-amber-300">Final tied · Final Replay required.</p>}
     {model.eliminationDrawTeamIds.length > 0 && <p className="mb-2 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-[10px] font-bold text-amber-200">Elimination Draw applies only to {model.eliminationDrawTeamIds.length} teams tied across the Survival Line.</p>}
-    <div className="overflow-hidden rounded-xl bg-zinc-900"><div className="grid grid-cols-[24px_1fr_20px_42px_44px_26px_26px] px-2 py-2 text-[9px] font-bold uppercase text-zinc-500"><span>#</span><span>Team</span><span>P</span><span>W-D-L</span><span>GF-GA</span><span>GD</span><span>Pts</span></div>{model.rows.map((row, index) => {
-      const team = byId[row.teamId]
-      const currentElimination = !total && model.complete && /^stage/.test(model.selection) && row.eliminatedStage === Number(model.selection.replace('stage', ''))
-      const previous = model.rows[index - 1]
-      const previousCurrentElimination = previous?.eliminatedStage === Number(model.selection.replace('stage', ''))
-      const showLine = !total && (row.state === 'at-risk' && previous?.state !== 'at-risk' || currentElimination && !previousCurrentElimination)
-      return <div key={row.teamId}>{showLine && <div className="border-t border-dashed border-amber-400/70 px-2 py-1 text-center text-[8px] font-black uppercase tracking-[.18em] text-amber-300">{model.provisional ? 'Provisional Survival Line' : 'Survival Line'}</div>}<button type="button" onClick={() => onNavigate({ name: 'team', id: row.teamId })} className={'grid w-full grid-cols-[24px_1fr_20px_42px_44px_26px_26px] items-center border-t border-white/[.05] px-2 py-2.5 text-left text-[10px] ' + (row.state === 'at-risk' ? 'bg-orange-400/10 text-orange-100' : row.state === 'eliminated' ? 'bg-zinc-950/30 text-zinc-500 opacity-60' : '')}><b>{row.rank}</b><span className="flex min-w-0 items-center gap-1.5"><TeamIcon team={team} className="h-6 w-6 text-[6px]" /><span className="min-w-0"><b className="block truncate">{team?.shortName ?? team?.name ?? row.teamId}</b><small className={row.state === 'at-risk' ? 'text-orange-300' : 'text-zinc-500'}>{row.status}</small></span></span><span>{row.played}</span><span>{row.wins}-{row.draws}-{row.losses}</span><span>{row.goalsFor}-{row.goalsAgainst}</span><span>{row.goalDifference > 0 ? '+' : ''}{row.goalDifference}</span><b>{row.points}</b></button></div>
-    })}</div>
+    <CupStandingsTable model={model} teams={teams} sortScope={season + ":" + model.selection} onTeamNavigate={id => onNavigate({ name: 'team', id })} />
     {!total && <p className="mt-2 text-center text-[10px] text-zinc-500">Survivors show this Stage; eliminated teams are frozen at elimination. Teams eliminated in this Stage show Stage totals.</p>}
   </section>
 }

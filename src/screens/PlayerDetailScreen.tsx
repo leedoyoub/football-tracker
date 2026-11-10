@@ -1,3 +1,5 @@
+import { DetailBack } from '../components/DetailBack'
+import { SegmentedControl } from '../components/SeasonUI'
 import { DeferredAnalysis } from '../components/DeferredAnalysis'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { PlayerAvatar } from '../components/PlayerAvatar'
@@ -46,41 +48,47 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
   const competition = screenState.competition
   const setSelectedSeason = (value: string) => onStateChange({ ...screenState, season: value, rankTrendMetric: 'rating' })
   const setCompetition = (value: CompetitionType | 'all') => onStateChange({ ...screenState, competition: value, rankTrendMetric: 'rating' })
-  const rankingScope = useMemo(() => playerDetailRankingScope(players, matches, selectedSeason, competition), [players, matches, selectedSeason, competition])
-  const scopedMatches = rankingScope.games
+  const tab = screenState.tab === 'matches' ? 'matches' : 'overview'
+  const scopedMatches = useMemo(() => matches.filter(match => match.season === selectedSeason && (competition === 'all' || matchCompetitionType(match) === competition)), [matches, selectedSeason, competition])
   const playerScopedMatches = useMemo(() => scopedMatches.filter(match => match.appearances.some(appearance => appearance.playerId === playerId)), [scopedMatches, playerId])
-  const activeStreaks = useMemo(() => player ? playerStreaks(player, playerScopedMatches).filter(row => row.current > 1).sort((a, b) => b.current - a.current).slice(0, 3) : [], [player, playerScopedMatches])
-  let playerDerivedCacheHit = false
-  const data = player ? derivePlayerScope(player, players, matches, { season: selectedSeason, competition }, diagnostic => { playerDerivedCacheHit = diagnostic.cacheHit }) : null
-  const dominantPosition = (data?.minutes ? rankingScope.families.get(playerId) : scopedPositionFamilyByPlayer(players, matches, {}).get(playerId)) ?? player?.position
-  const historicalTeamId = latestAppearanceTeamId(playerId, playerScopedMatches)
-  if (!player || !data) {
-    if (!matches.some(match => match.appearances.some(row => row.playerId === playerId))) return <div className="p-6 text-sm text-zinc-400">Player not found.</div>
-    return <div className="px-4 pb-8 pt-6">
-      <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">Back</button>
-      <h1 className="text-2xl font-semibold">{historicalPlayerLabel(playerId)}</h1>
-      <p className="mb-4 mt-2 text-xs text-zinc-400">This player is absent from the current roster. Saved match records retain their original identity. Rating unavailable.</p>
-      <div className="mb-4 space-y-2"><CompactFilterMenu value={selectedSeason} options={seasons.map(item => ({ value: item, label: item }))} onChange={setSelectedSeason} label="Player detail season" popupAlign="start" /><RankingMetricTabs value={competition} options={competitions} onChange={setCompetition} label="Player detail competition" /></div>
-      <h2 className="mb-2 text-sm font-semibold">Matches</h2>
-      <div className="space-y-2">{playerScopedMatches.map(match => {
-        const appearance = match.appearances.find(row => row.playerId === playerId)!
-        const goals = playerGoalEvents(match, appearance).length; const assists = playerAssistEvents(match, appearance).length
-        return <button key={match.id} type="button" onClick={() => onNavigate({ name: 'match', id: match.id })} className="block w-full rounded-2xl bg-zinc-900 p-3 text-left text-xs">
-          <span className="block">{formatCompactCompetitionContext(assignmentSnapshotForMatch(match))} · {formatDate(match.date)}</span>
-          <span className="mt-1 block">{representativeMatchPosition(match, appearance)} · {hasPitchAppearance(match, appearance) ? `${creditedMinutesPlayed(match, appearance)}'` : 'Unused'} · {'⚽'.repeat(goals)} {'👟'.repeat(assists)}</span>
-        </button>
-      })}{!playerScopedMatches.length && <p className="text-xs text-zinc-500">No matches in this scope.</p>}</div>
-    </div>
-  }
+  const profilePlayers = useMemo(() => player ? [player] : [], [player])
+  const dominantPosition = useMemo(() => {
+    if (!player) return undefined
+    const selected = scopedPositionFamilyByPlayer(profilePlayers, playerScopedMatches, { fallback: 'none' }).get(playerId)
+    return selected ?? scopedPositionFamilyByPlayer(profilePlayers, matches, {}).get(playerId) ?? player.position
+  }, [player, profilePlayers, playerScopedMatches, matches, playerId])
+  if (!player) return <div className="detail-page px-4 pb-8 pt-6">
+    <DetailBack onBack={onBack} />
+    <h1 className="text-2xl font-semibold">{matches.some(match => match.appearances.some(row => row.playerId === playerId)) ? historicalPlayerLabel(playerId) : 'Player not found.'}</h1>
+    <p className="mb-4 mt-2 text-xs text-zinc-400">This player is absent from the current roster. Saved match records retain their original identity. Rating unavailable.</p>
+    <div className="mb-4 space-y-2"><CompactFilterMenu value={selectedSeason} options={seasons.map(item => ({ value: item, label: item }))} onChange={setSelectedSeason} label="Player detail season" popupAlign="start" /><RankingMetricTabs value={competition} options={competitions} onChange={setCompetition} label="Player detail competition" /></div>
+    <SegmentedControl sticky stickyOffset="var(--detail-back-height)" label="Player detail section" value={tab} onChange={tab => onStateChange({ ...screenState, tab })} options={[{ value: 'overview', label: 'Overview' }, { value: 'matches', label: 'Matches' }]} />
+    {tab === 'matches' ? <SavedPlayerMatches playerId={playerId} matches={playerScopedMatches} onNavigate={onNavigate} /> : <p className="mt-4 text-xs text-zinc-500">Overview unavailable for a player absent from the current roster. Saved records are available in Matches.</p>}
+  </div>
   const membership = currentMembershipPresentation(player, [], teams)
   const currentTeam = teams.find(team => team.id === membership.teamId)
+  return <div className="detail-page px-4 pb-8 pt-6">
+    <DetailBack onBack={onBack} />
+    <header className="mb-4 flex items-start gap-3"><PlayerAvatar photoUrl={player.photoUrl || player.image} number={player.number} className="h-14 w-14 text-sm" /><div className="min-w-0 flex-1"><p className="text-xs text-zinc-400"><TeamIdentityAction team={currentTeam} onNavigate={id => onNavigate({ name: 'team', id })} className="inline-flex items-center gap-1">{membership.label}</TeamIdentityAction> · #{player.number} · {dominantPosition}</p><h1 className="break-words text-2xl font-semibold">{playerFullName(player)}</h1><div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => onNavigate({ name: 'edit-player', id: player.id })} className="rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-bold">Edit player</button><button type="button" onClick={() => onNavigate({ name: 'comparison', leftId: player.id, season: selectedSeason, competitionType: competition })} className="rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-bold">Compare</button></div></div></header>
+    <div className="mb-4 min-w-0 space-y-2"><CompactFilterMenu value={selectedSeason} options={seasons.map(item => ({ value: item, label: item }))} onChange={setSelectedSeason} label="Player detail season" popupAlign="start" /><RankingMetricTabs value={competition} options={competitions} onChange={setCompetition} label="Player detail competition" /></div>
+    <SegmentedControl sticky stickyOffset="var(--detail-back-height)" label="Player detail section" value={tab} onChange={tab => onStateChange({ ...screenState, tab })} options={[{ value: 'overview', label: 'Overview' }, { value: 'matches', label: 'Matches' }]} />
+    <div className="mt-4">{tab === 'matches'
+      ? <PlayerMatches player={player} scopedMatches={playerScopedMatches} onNavigate={onNavigate} />
+      : <PlayerOverview player={player} players={players} teams={teams} matches={matches} competitionStates={competitionStates} selectedSeason={selectedSeason} competition={competition} playerScopedMatches={playerScopedMatches} screenState={screenState} onStateChange={onStateChange} onNavigate={onNavigate} />}</div>
+  </div>
+}
+
+function PlayerOverview({ player, players, teams, matches, competitionStates, selectedSeason, competition, playerScopedMatches, screenState, onStateChange, onNavigate }: { player: Player; players: Player[]; teams: Team[]; matches: Match[]; competitionStates: CompetitionState[]; selectedSeason: string; competition: CompetitionType | 'all'; playerScopedMatches: Match[]; screenState: ScreenStateByView['player']; onStateChange: (state: ScreenStateByView['player']) => void; onNavigate: (view: View) => void }) {
+  const playerId = player.id
+  const rankingScope = useMemo(() => playerDetailRankingScope(players, matches, selectedSeason, competition), [players, matches, selectedSeason, competition])
+  const activeStreaks = useMemo(() => playerStreaks(player, playerScopedMatches).filter(row => row.current > 1).sort((a, b) => b.current - a.current).slice(0, 3), [player, playerScopedMatches])
+  const data = derivePlayerScope(player, players, matches, { season: selectedSeason, competition })
+  const dominantPosition = (data.minutes ? rankingScope.families.get(playerId) : scopedPositionFamilyByPlayer(players, matches, {}).get(playerId)) ?? player.position
+  const historicalTeamId = latestAppearanceTeamId(playerId, playerScopedMatches)
   const form = playerForm(data.appearances)
   const ranks = rankingScope.ranksFor(playerId, historicalTeamId)
   const positions = [...data.positionMinutes.entries()].map(([position, minutes]) => ({ position, minutes, share: data.minutes ? minutes / data.minutes * 100 : 0 })).filter(row => row.minutes > 0).sort((left, right) => right.minutes - left.minutes)
-  return <div className="px-4 pb-8 pt-6">
-    <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">Back</button>
-    <header className="mb-4 flex items-start gap-3"><PlayerAvatar photoUrl={player.photoUrl || player.image} number={player.number} className="h-14 w-14 text-sm" /><div className="min-w-0 flex-1"><p className="text-xs text-zinc-400"><TeamIdentityAction team={currentTeam} onNavigate={id => onNavigate({ name: 'team', id })} className="inline-flex items-center gap-1">{membership.label}</TeamIdentityAction> · #{player.number} · {dominantPosition}</p><h1 className="break-words text-2xl font-semibold">{playerFullName(player)}</h1><div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => onNavigate({ name: 'edit-player', id: player.id })} className="rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-bold">Edit player</button><button type="button" onClick={() => onNavigate({ name: 'comparison', leftId: player.id, season: selectedSeason, competitionType: competition })} className="rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-bold">Compare</button></div></div></header>
-    <div className="mb-4 min-w-0 space-y-2"><CompactFilterMenu value={selectedSeason} options={seasons.map(item => ({ value: item, label: item }))} onChange={setSelectedSeason} label="Player detail season" popupAlign="start" /><RankingMetricTabs value={competition} options={competitions} onChange={setCompetition} label="Player detail competition" /></div>
+  return <>
     <Overview data={data} ranks={ranks} />
     <RecentForm form={form} playerId={playerId} players={players} teams={teams} onNavigate={onNavigate} />
     <DeferredRankTrend playerId={playerId} players={players} matches={matches} season={selectedSeason} competition={competition} position={dominantPosition} metric={screenState.rankTrendMetric} onMetric={rankTrendMetric => onStateChange({ ...screenState, rankTrendMetric })} />
@@ -89,8 +97,24 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
     <PositionStats data={data} position={dominantPosition ?? player.position} />
     <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Positions Played</h2><p className="mt-1 text-[10px] text-zinc-500">Match-position timeline minutes · all played positions.</p>{positions.length ? <div className="mt-3 space-y-2">{positions.map(row => <div key={row.position} className="grid grid-cols-[34px_1fr_auto] items-center gap-2 text-xs"><b>{row.position}</b><span className="h-2 overflow-hidden rounded-full bg-black/30"><span className="block h-full rounded-full bg-emerald-400" style={{ width: `${row.share}%` }} /></span><span className="tabular-nums">{positionShare(row.share)} · {row.minutes}'</span></div>)}</div> : <p className="mt-2 text-xs text-zinc-500">No position minutes yet.</p>}</section>
     <StartingPerformance rows={data.startingPerformance} teams={teams} />
-    <DeferredMount player={player} players={players} teams={teams} matches={matches} scopedMatches={playerScopedMatches} data={data} displayCacheHit={playerDerivedCacheHit} dominantPosition={dominantPosition ?? player.position} onNavigate={onNavigate} />
-  </div>
+    <DeferredMount player={player} players={players} teams={teams} matches={matches} scopedMatches={playerScopedMatches} data={data} dominantPosition={dominantPosition ?? player.position} onNavigate={onNavigate} />
+  </>
+}
+
+function PlayerMatches({ player, scopedMatches, onNavigate }: { player: Player; scopedMatches: Match[]; onNavigate: (view: View) => void }) {
+  const history = useMemo(() => playerAppearanceMatches(player, scopedMatches), [player, scopedMatches])
+  return <section><h2 className="mb-2 text-sm font-semibold">Matches</h2><p className="mb-2 text-[10px] text-zinc-500">Actual appearances in the selected scope.</p><div className="space-y-2">{history.map(match => <MatchRow key={match.id} match={match} player={player} onNavigate={onNavigate} />)}{!history.length && <p className="text-xs text-zinc-500">No matches in this scope.</p>}</div></section>
+}
+
+function SavedPlayerMatches({ playerId, matches, onNavigate }: { playerId: string; matches: Match[]; onNavigate: (view: View) => void }) {
+  return <section className="mt-4"><h2 className="mb-2 text-sm font-semibold">Matches</h2><div className="space-y-2">{matches.map(match => {
+    const appearance = match.appearances.find(row => row.playerId === playerId)!
+    const goals = playerGoalEvents(match, appearance).length; const assists = playerAssistEvents(match, appearance).length
+    return <button key={match.id} type="button" onClick={() => onNavigate({ name: 'match', id: match.id })} className="block w-full rounded-2xl bg-zinc-900 p-3 text-left text-xs">
+      <span className="block">{formatCompactCompetitionContext(assignmentSnapshotForMatch(match))} · {formatDate(match.date)}</span>
+      <span className="mt-1 block">{representativeMatchPosition(match, appearance)} · {hasPitchAppearance(match, appearance) ? creditedMinutesPlayed(match, appearance) + "'" : 'Unused'} · {'⚽'.repeat(goals)} {'👟'.repeat(assists)}</span>
+    </button>
+  })}{!matches.length && <p className="text-xs text-zinc-500">No matches in this scope.</p>}</div></section>
 }
 
 function PlayerHighlights({ player, players, teams, matches, competitionStates, playerScopedMatches, onNavigate }: { player: Player; players: Player[]; teams: Team[]; matches: Match[]; competitionStates: CompetitionState[]; selectedSeason: string; competition: CompetitionType | 'all'; playerScopedMatches: Match[]; onNavigate: (view: View) => void }) {
@@ -172,14 +196,13 @@ function PositionStats({ data, position }: { data: PlayerDerived; position: stri
 }
 function StartingPerformance({ rows, teams }: { rows: PlayerDerived['startingPerformance']; teams: { id: string; name: string }[] }) { return <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Team Performance When Starting</h2><p className="mt-1 text-[10px] text-zinc-500">Match outcomes, not individual causation. Separate by team stint.</p>{rows.length ? <div className="mt-3 space-y-2">{rows.map(row => <div key={row.teamId} className="rounded-xl bg-black/20 p-2.5 text-xs"><div className="mb-2 flex justify-between"><b>{teams.find(team => team.id === row.teamId)?.name ?? row.teamId}</b><span>{row.wins}-{row.draws}-{row.losses}</span></div><div className="grid grid-cols-2 gap-1.5">{metric('Starter PPG', value(row.starterPpg))}{metric('Team overall PPG', value(row.teamPpg))}{metric('Starter GD / match', value(row.starterGdPerMatch))}{metric('Team overall GD / match', value(row.teamGdPerMatch))}</div></div>)}</div> : <p className="mt-2 text-xs text-zinc-500">No starts in this scope.</p>}</section> }
 
-function DeferredMount(props: { player: Player; players: Player[]; teams: { id: string; name: string; shortName: string }[]; matches: Match[]; scopedMatches: Match[]; data: PlayerDerived; displayCacheHit: boolean; dominantPosition: string; onNavigate: (view: View) => void }) { const [ready, setReady] = useState(() => typeof window === 'undefined'); useEffect(() => { if (typeof window === 'undefined') return; const timer = window.setTimeout(() => setReady(true), 80); return () => window.clearTimeout(timer) }, [props.player.id, props.scopedMatches]); return ready ? <DeferredPlayerSections {...props} /> : <div className="mb-4 h-12 rounded-2xl bg-zinc-900/60" aria-label="Loading secondary player statistics" /> }
-function DeferredPlayerSections({ player, players, teams, matches, scopedMatches, data, displayCacheHit, dominantPosition, onNavigate }: { player: Player; players: Player[]; teams: { id: string; name: string; shortName: string }[]; matches: Match[]; scopedMatches: Match[]; data: PlayerDerived; displayCacheHit: boolean; dominantPosition: string; onNavigate: (view: View) => void }) {
+function DeferredMount(props: { player: Player; players: Player[]; teams: { id: string; name: string; shortName: string }[]; matches: Match[]; scopedMatches: Match[]; data: PlayerDerived; dominantPosition: string; onNavigate: (view: View) => void }) { const [ready, setReady] = useState(() => typeof window === 'undefined'); useEffect(() => { if (typeof window === 'undefined') return; const timer = window.setTimeout(() => setReady(true), 80); return () => window.clearTimeout(timer) }, [props.player.id, props.scopedMatches]); return ready ? <DeferredPlayerSections {...props} /> : <div className="mb-4 h-12 rounded-2xl bg-zinc-900/60" aria-label="Loading secondary player statistics" /> }
+function DeferredPlayerSections({ player, players, teams, matches, scopedMatches, data, dominantPosition }: { player: Player; players: Player[]; teams: { id: string; name: string; shortName: string }[]; matches: Match[]; scopedMatches: Match[]; data: PlayerDerived; dominantPosition: string; onNavigate: (view: View) => void }) {
   const impact = useMemo(() => substituteImpact(player, data.appearances.map(row => row.match)), [player, data])
   const chemistry = useMemo(() => playerChemistry(player, players, scopedMatches, {}, dominantPosition), [player, players, scopedMatches, dominantPosition])
   const career = useMemo(() => playerCareerTimeline(player, players, matches), [player, players, matches])
   const records = useMemo(() => playerPersonalRecords(player, players, matches), [player, players, matches])
-  const history = useMemo(() => playerAppearanceMatches(player, scopedMatches), [player, scopedMatches])
-  return <><RoleImpact data={data} impact={impact} /><GoalTypes data={data} /><section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Player Chemistry</h2><p className="mt-1 text-[10px] text-zinc-500">Evidence-based partnerships in the selected scope.</p>{chemistry.direct || chemistry.positional || chemistry.results ? <div className="mt-3 grid gap-2 text-xs">{chemistry.direct && <ChemistryCard title="🤝 Top goal connection" text={`${playerFullName(players.find(item => item.id === chemistry.direct!.partnerId))} · ${chemistry.direct.connections} links · ${chemistry.direct.minutesTogether}' together`} />}{chemistry.positional && <ChemistryCard title="Best positional partner" text={`${chemistry.positional.playerIds.filter(id => id !== player.id).map(id => playerFullName(players.find(item => item.id === id))).join(', ')} · ${chemistry.positional.startsTogether} starts`} />}{chemistry.results && <ChemistryCard title="Best results together" text={`${chemistry.results.playerIds.filter(id => id !== player.id).map(id => playerFullName(players.find(item => item.id === id))).join(', ')} · PPG ${value(startingPPG(chemistry.results))}`} />}</div> : <p className="mt-2 text-xs text-zinc-500">No shared-match partnership data in this scope.</p>}</section><section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Career Timeline</h2><div className="mt-3 space-y-1.5">{career.map((row, index) => <div key={`${row.season}:${row.teamId}:${index}`} className="flex items-center justify-between rounded-xl bg-black/20 px-3 py-2 text-xs"><span><b>{row.season}</b><small className="ml-2 text-zinc-500">{teams.find(team => team.id === row.teamId)?.shortName ?? row.teamId}</small></span><b>{row.apps} apps · {row.goals}G {row.assists}A · {value(row.averageRating)}</b></div>)}</div></section><CareerMilestones player={player} players={players} matches={matches} /><section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Career Personal Records</h2><div className="mt-3 grid grid-cols-2 gap-1.5">{metric('Highest rating', value(records.highestRating))}{metric('Best 5-match avg', records.bestFiveAverage === null ? '—' : value(records.bestFiveAverage))}{metric('Goals in match', records.mostGoals)}{metric('Assists in match', records.mostAssists)}{metric('G+A in match', records.mostGA)}{metric('Scoring streak', records.scoringStreak)}{metric('G+A streak', records.contributionStreak)}{metric(`${GOOD_RATING_THRESHOLD}+ streak`, records.goodMatchStreak)}</div></section><section><h2 className="mb-2 text-sm font-semibold">Matches</h2><p className="mb-2 text-[10px] text-zinc-500">Actual appearances in the selected scope.</p><div className="space-y-2">{history.map(match => <MatchRow key={match.id} match={match} player={player} displayCacheHit={displayCacheHit} onNavigate={onNavigate} />)}{!history.length && <p className="text-xs text-zinc-500">No matches in this scope.</p>}</div></section></>
+  return <><RoleImpact data={data} impact={impact} /><GoalTypes data={data} /><section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Player Chemistry</h2><p className="mt-1 text-[10px] text-zinc-500">Evidence-based partnerships in the selected scope.</p>{chemistry.direct || chemistry.positional || chemistry.results ? <div className="mt-3 grid gap-2 text-xs">{chemistry.direct && <ChemistryCard title="🤝 Top goal connection" text={`${playerFullName(players.find(item => item.id === chemistry.direct!.partnerId))} · ${chemistry.direct.connections} links · ${chemistry.direct.minutesTogether}' together`} />}{chemistry.positional && <ChemistryCard title="Best positional partner" text={`${chemistry.positional.playerIds.filter(id => id !== player.id).map(id => playerFullName(players.find(item => item.id === id))).join(', ')} · ${chemistry.positional.startsTogether} starts`} />}{chemistry.results && <ChemistryCard title="Best results together" text={`${chemistry.results.playerIds.filter(id => id !== player.id).map(id => playerFullName(players.find(item => item.id === id))).join(', ')} · PPG ${value(startingPPG(chemistry.results))}`} />}</div> : <p className="mt-2 text-xs text-zinc-500">No shared-match partnership data in this scope.</p>}</section><section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Career Timeline</h2><div className="mt-3 space-y-1.5">{career.map((row, index) => <div key={`${row.season}:${row.teamId}:${index}`} className="flex items-center justify-between rounded-xl bg-black/20 px-3 py-2 text-xs"><span><b>{row.season}</b><small className="ml-2 text-zinc-500">{teams.find(team => team.id === row.teamId)?.shortName ?? row.teamId}</small></span><b>{row.apps} apps · {row.goals}G {row.assists}A · {value(row.averageRating)}</b></div>)}</div></section><CareerMilestones player={player} players={players} matches={matches} /><section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Career Personal Records</h2><div className="mt-3 grid grid-cols-2 gap-1.5">{metric('Highest rating', value(records.highestRating))}{metric('Best 5-match avg', records.bestFiveAverage === null ? '—' : value(records.bestFiveAverage))}{metric('Goals in match', records.mostGoals)}{metric('Assists in match', records.mostAssists)}{metric('G+A in match', records.mostGA)}{metric('Scoring streak', records.scoringStreak)}{metric('G+A streak', records.contributionStreak)}{metric(`${GOOD_RATING_THRESHOLD}+ streak`, records.goodMatchStreak)}</div></section></>
 }
 
 function CareerMilestones({ player, players, matches }: { player: Player; players: Player[]; matches: Match[] }) {
@@ -189,7 +212,7 @@ function CareerMilestones({ player, players, matches }: { player: Player; player
 function RoleImpact({ data, impact }: { data: PlayerDerived; impact: ReturnType<typeof substituteImpact> }) { const typicalEntry = impact.summary.apps ? Math.round(impact.appearances.reduce((sum, row) => sum + row.entryMinute, 0) / impact.summary.apps) : null; return <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Role Impact</h2><div className="mt-3 grid grid-cols-2 gap-2 text-xs">{([['Starter', data.starter], ['Substitute', data.substitute]] as const).map(([label, row]) => <div key={label} className="rounded-xl bg-black/20 p-2.5"><b>{label}</b><div className="mt-2 grid grid-cols-2 gap-1">{metric('Apps', row.apps)}{metric('Avg rating', value(row.averageRating))}{metric('Goals/90', value(row.goalsPer90))}{metric('Assists/90', value(row.assistsPer90))}{metric('G+A/90', value(row.gaPer90))}</div></div>)}</div>{impact.summary.apps > 0 && <details className="mt-3 rounded-xl bg-black/20 p-2.5 text-xs"><summary className="cursor-pointer font-bold">Substitute impact · typical entry {typicalEntry}'</summary><div className="mt-2 grid grid-cols-3 gap-1.5">{metric('On-pitch GF', impact.summary.goalsFor)}{metric('On-pitch GA', impact.summary.goalsAgainst)}{metric('On-pitch GD', `${impact.summary.goalDifference > 0 ? '+' : ''}${impact.summary.goalDifference}`)}{metric('GD/90', value(impact.summary.gdPer90))}{metric('G+A/90', value(impact.summary.gaPer90))}{metric('Sub apps', impact.summary.apps)}</div><div className="mt-2 space-y-1">{impact.appearances.map(row => <p key={row.match.id} className="rounded-lg bg-zinc-900 px-2 py-1.5">{row.entryMinute}' · entry {row.scoreAtEntry.home}-{row.scoreAtEntry.away} · final {row.finalScore.home}-{row.finalScore.away} · GF {row.goalsFor}, GA {row.goalsAgainst}</p>)}</div></details>}</section> }
 function GoalTypes({ data }: { data: PlayerDerived }) { const base = [['opening', 'Opening'], ['equalizer', 'Equalizer'], ['goAhead', 'Go-Ahead'], ['leadExtending', 'Lead-Extending'], ['deficitReducing', 'Deficit-Reducing']] as const; const special = [['gameWinning', 'Game Winners'], ['comeback', 'Comeback Goals'], ['stoppageTime', 'Stoppage-Time Goals']] as const; const row = ([key, label]: readonly [keyof PlayerDerived['goalTypes'], string]) => <div key={key} className="flex justify-between rounded-lg bg-black/20 px-2 py-2"><span>{label}</span><b>{data.goalTypes[key]}</b></div>; return <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Goal Types</h2><p className="mt-1 text-[10px] text-zinc-500">Base types are exclusive; special goals may overlap.</p><h3 className="mt-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Base</h3><div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">{base.map(row)}</div><h3 className="mt-3 border-t border-white/10 pt-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Special Goals</h3><div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">{special.map(row)}</div></section> }
 function ChemistryCard({ title, text }: { title: string; text: string }) { return <div className="rounded-xl bg-black/20 p-2.5"><b>{title}</b><p className="mt-1 text-zinc-400">{text}</p></div> }
-function MatchRow({ match, player, displayCacheHit, onNavigate }: { match: Match; player: Player; displayCacheHit: boolean; onNavigate: (view: View) => void }) {
+function MatchRow({ match, player, onNavigate }: { match: Match; player: Player; onNavigate: (view: View) => void }) {
   const appearance = match.appearances.find(a => a.playerId === player.id)
   const rating = appearance ? ratePlayerMatch(match, player) : null
   const score = matchScore(match)
@@ -208,10 +231,10 @@ function MatchRow({ match, player, displayCacheHit, onNavigate }: { match: Match
       {goals > 0 && <span>{Array(goals).fill('⚽').join('')}</span>}
       {assists > 0 && <span>{Array(assists).fill('👟').join('')}</span>}
     </div>
-    {rating && <RatingDetails match={match} player={player} rating={rating} displayCacheHit={displayCacheHit} />}
+    {rating && <RatingDetails match={match} player={player} rating={rating} />}
   </article>
 }
-function RatingDetails({ match, player, rating, displayCacheHit }: { match: Match; player: Player; rating: RatingBreakdown; displayCacheHit: boolean }) {
+function RatingDetails({ match, player, rating }: { match: Match; player: Player; rating: RatingBreakdown }) {
   const [open, setOpen] = useState(false)
   const trace = useMemo(() => open ? tracePlayerMatchRating(match, player) : null, [open, match, player])
   const appearance = match.appearances.find(row => row.playerId === player.id)
@@ -231,7 +254,7 @@ function RatingDetails({ match, player, rating, displayCacheHit }: { match: Matc
         {metric('Result', value(trace.result))}{metric('Raw pre-clamp', value(trace.preClamp, 5))}
         {metric('Final Raw Rating', value(trace.raw, 5))}{metric('Displayed Rating', trace.display)}
       </div>
-      <details className="text-[10px] text-zinc-500"><summary className="cursor-pointer">Calculation source</summary><p>Current raw Match/Event engine · Match {trace.matchId} · Player {trace.playerId} · scope cache {displayCacheHit ? 'HIT' : 'MISS'}</p>{trace.legacyStoredPlayerRating !== undefined && <p>Legacy stored player rating {trace.legacyStoredPlayerRating} is ignored.</p>}</details>
+      <details className="text-[10px] text-zinc-500"><summary className="cursor-pointer">Calculation source</summary><p>Current raw Match/Event engine · Match {trace.matchId} · Player {trace.playerId} · direct match rating</p>{trace.legacyStoredPlayerRating !== undefined && <p>Legacy stored player rating {trace.legacyStoredPlayerRating} is ignored.</p>}</details>
     </div>}
   </details>
 }

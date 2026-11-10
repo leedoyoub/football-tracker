@@ -63,7 +63,21 @@ test('settled Home and Player Detail retain v2.5.8 markup around canonical award
     }) : h(baseline, name, store)
     if (name === 'HomeScreen') assertSelection(require('../src/engine/awards.ts').seasonAwards('Season 1', store.teams, store.players, store.matches, store.competitionStates), 'season', 'Season 1', store.teams, store.players, store.matches, store.competitionStates)
     const expected = renderToStaticMarkup(originalHarness.render(props)).replace(/(<summary class="cursor-pointer text-zinc-400">)Rating Details · [A-Z]+ · \d+&#x27;(<\/summary>)/g, '$1Rating Details$2').replace('positions under 10% are hidden.', 'all played positions.').replace('100% · ', '100.0% · ').replace('official 40% eligibility', 'minimum 50% playing time')
-    const actual = unchangedPlayerMarkup(renderToStaticMarkup(h(root, name, store).render(props)))
+    let rendered = renderToStaticMarkup(h(root, name, store).render(props))
+    if (name === 'PlayerDetailScreen') {
+      // v2.6.7 moves only the original Matches section into a separate tab.
+      // Recombine the two panels and remove the approved sticky shell so the
+      // complete prior section content, order, stats and rows remain compared.
+      const matchesHtml = renderToStaticMarkup(h(root, name, store).render({ ...props, screenState: { ...props.screenState, tab: 'matches' } }))
+      const marker = '<section><h2 class="mb-2 text-sm font-semibold">Matches</h2>'
+      const history = matchesHtml.slice(matchesHtml.indexOf(marker), matchesHtml.lastIndexOf('</section>') + '</section>'.length)
+      assert.ok(history.startsWith(marker)); assert.ok(history.includes('Rating Details'))
+      rendered = rendered.replace('class="detail-page px-4 pb-8 pt-6"', 'class="px-4 pb-8 pt-6"')
+        .replace(/<div class="detail-back [^]*?<\/button><\/div>/, '<button type="button" class="mb-3 text-xs font-semibold text-emerald-400">Back</button>')
+        .replace(/<div role="tablist" aria-label="Player detail section"[^]*?<\/div><div class="mt-4">/, '')
+        .replace(/<\/div><\/div>$/, `${history}</div>`)
+    }
+    const actual = unchangedPlayerMarkup(rendered)
     const original = unchangedPlayerMarkup(expected)
     if (actual !== original) {
       let offset = 0

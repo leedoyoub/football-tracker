@@ -30,6 +30,9 @@ import { historicalPlayerLabel } from '../lib/historicalPlayerDisplay'
 import { matchRoleLabel } from './matchDetailPosition'
 import { currentStaticTeams } from '../data/teams'
 import { kickoffFromAssignments, validateKickoffLineup } from '../engine/kickoffLineup'
+import { sameRawFootballValue, sameRawMatch } from '../engine/competitionRevision'
+import { applyMatchMetadata, type MatchMetadataProposal } from '../lib/matchMetadata'
+import { MatchMetadataDialog } from '../components/MatchMetadataDialog'
 
 type MatchDraftState = { slotAssignments: Record<string, string>; homeBench: string[]; events: MatchEvent[]; positionHistories: Record<string, PositionChange[]> }
 const localCalendarDate = () => {
@@ -83,7 +86,6 @@ export function NewMatchScreen(props: NewMatchScreenProps) {
 function MatchEditor({
   requestedSeason,
   competitionType: initialCompetitionType,
-  editingMatchId,
   onBack,
   onComplete,
   sourceMatch,
@@ -92,16 +94,20 @@ function MatchEditor({
   mode,
   freshCheckpointId,
 }: NewMatchScreenProps & { mode: EditorLifecycleMode; sourceMatch?: Match; selectedTeamId: string; restored: ReturnType<typeof restoreDraft>; freshCheckpointId: string }) {
-  const { teams, players, matches, competitionStates = [], saveMatchDurably, saveDraftMatch, clearDraftMatch } = useStore()
+  const { teams, players, matches, competitionStates = [], saveMatchDurably, saveDraftMatch } = useStore()
   const representative = useMemo(() => scopedPositionFamilyByPlayer(players, matches, {}), [players, matches])
   const [draftId] = useState(() => sourceMatch?.id ?? freshCheckpointId)
   const savingRef = useRef(false)
+  const originalEditSource = useRef(mode === 'edit' ? sourceMatch : undefined)
   const [saveError, setSaveError] = useState('')
   const [saveStatus, setSaveStatus] = useState('')
   const completedSeasons = useMemo(() => competitionStates.filter(state => state.kind === 'season-complete').map(state => state.season), [competitionStates])
-  const [competitionType, setCompetitionType] = useState<CompetitionType>(() => mode === 'fresh' ? initialCompetitionType ?? 'league' : matchCompetitionType(sourceMatch!))
+  const [metadata, setMetadata] = useState<MatchMetadataProposal | undefined>(undefined)
+  const [metadataOpen, setMetadataOpen] = useState(false)
+  const [selectedCompetitionType, setCompetitionType] = useState<CompetitionType>(() => mode === 'fresh' ? initialCompetitionType ?? 'league' : matchCompetitionType(sourceMatch!))
+  const competitionType = mode === 'edit' && metadata ? metadata.assignment.competitionType : selectedCompetitionType
   const nextMatch = useMemo(() => getNextMatchDayForTeam(selectedTeamId, matches, completedSeasons, competitionType, requestedSeason), [selectedTeamId, matches, completedSeasons, competitionType, requestedSeason])
-  const season = mode === 'fresh' ? requestedSeason ?? nextMatch.season : sourceMatch!.season
+  const season = mode === 'edit' && metadata ? metadata.assignment.season : mode === 'fresh' ? requestedSeason ?? nextMatch.season : sourceMatch!.season
   const [date, setDate] = useState(() => mode === 'fresh' ? localCalendarDate() : sourceMatch!.date)
   const [opponentSotDraft, setOpponentSotDraft] = useState(() => initialOpponentSotDraft(sourceMatch, mode === 'fresh'))
   const { halftimeOpponentSot, fulltimeOpponentSot, fulltimeOpponentSotAutoLinked } = opponentSotDraft
@@ -122,12 +128,13 @@ function MatchEditor({
   const proposedAssignment = useMemo(() => competitionAssignment(competitionType, season, selectedTeamId, tournamentTeams, matches, championsDraw, players), [competitionType, season, selectedTeamId, tournamentTeams, matches, championsDraw, players])
   const proposalMatchDay = canonicalScheduleOrdinal(competitionType, proposedAssignment.stage, proposedAssignment.seriesGame) ?? nextMatch.matchDay
   const [frozenAssignment, setFrozenAssignment] = useState(() => mode === 'fresh' ? undefined : sourceMatch ? assignmentSnapshotForMatch(sourceMatch) : undefined)
-  const matchDay = frozenAssignment?.matchDay ?? proposalMatchDay
+  const matchDay = mode === 'edit' && metadata ? metadata.assignment.matchDay : frozenAssignment?.matchDay ?? proposalMatchDay
   const proposedSnapshot = useMemo(() => freezeCompetitionAssignment({ competitionType, season, teamId: selectedTeamId, stage: proposedAssignment.stage, pairingId: proposedAssignment.pairingId, seriesGame: proposedAssignment.seriesGame, opponentTeamId: proposedAssignment.opponentTeamId, matchDay }), [competitionType, season, selectedTeamId, proposedAssignment, matchDay])
-  const activeAssignment = activeEditorIdentity(mode, sourceMatch, frozenAssignment ?? proposedSnapshot)
-  const assignment = frozenAssignment ? { available: true, stage: frozenAssignment.stage, pairingId: frozenAssignment.pairingId, seriesGame: frozenAssignment.seriesGame, opponentTeamId: frozenAssignment.opponentTeamId, message: formatCompetitionContext(frozenAssignment) } : proposedAssignment
+  const activeAssignment = mode === 'edit' && metadata ? metadata.assignment : activeEditorIdentity(mode, sourceMatch, frozenAssignment ?? proposedSnapshot)
+  const acceptedAssignment = mode === 'edit' && metadata ? activeAssignment : frozenAssignment
+  const assignment = acceptedAssignment ? { available: true, stage: acceptedAssignment.stage, pairingId: acceptedAssignment.pairingId, seriesGame: acceptedAssignment.seriesGame, opponentTeamId: acceptedAssignment.opponentTeamId, message: formatCompetitionContext(acceptedAssignment) } : proposedAssignment
   const opponentId = mode === 'fresh' ? activeAssignment.opponentTeamId ?? `opponent:${draftId}` : recordedOpponentId(sourceMatch!)
-  const opponentName = mode === 'fresh' ? teams.find(team => team.id === activeAssignment.opponentTeamId)?.shortName ?? 'OPP' : sourceMatch?.opponentName ?? teams.find(team => team.id === activeAssignment.opponentTeamId)?.shortName ?? 'OPP'
+  const opponentName = mode === 'edit' && metadata?.opponentName !== undefined ? metadata.opponentName : mode === 'fresh' ? teams.find(team => team.id === activeAssignment.opponentTeamId)?.shortName ?? 'OPP' : sourceMatch?.opponentName ?? teams.find(team => team.id === activeAssignment.opponentTeamId)?.shortName ?? 'OPP'
   const homeTeamId = mode === 'fresh' ? selectedTeamId : sourceMatch?.homeTeamId ?? selectedTeamId
   const awayTeamId = mode === 'fresh' ? opponentId : sourceMatch!.awayTeamId
   
@@ -382,11 +389,14 @@ function MatchEditor({
   }
 
   const kickoffSnapshot = useMemo(() => kickoffFromAssignments(startingSnapshot), [startingSnapshot])
-  const savedKickoffSnapshot = sourceMatch?.kickoffLineup && restored && sameAssignments(startingSnapshot, restored.starters)
-    ? sourceMatch.kickoffLineup : kickoffSnapshot
+  const unchangedKickoff = Boolean(sourceMatch && restored && sameAssignments(startingSnapshot, restored.starters))
+  const savedKickoffSnapshot = unchangedKickoff && (mode === 'edit' || sourceMatch?.kickoffLineup)
+    ? sourceMatch?.kickoffLineup : kickoffSnapshot
   const kickoffFormationName = kickoffSnapshot.length ? kickoffFormation(kickoffSnapshot) : activeFormationName
   const kickoffIsValid = validateKickoffLineup(kickoffSnapshot).valid && isGoalkeeperPlayer(startingSnapshot.GK) && Object.values(startingSnapshot).filter(isGoalkeeperPlayer).length === 1
   const appearances: Appearance[] = useMemo(() => {
+    // Metadata-only edits retain raw history, including missing roster IDs.
+    if (mode === 'edit' && sourceMatch && restored && sameRawFootballValue(matchDraft, restored.draft) && sameAssignments(startingSnapshot, restored.starters) && sameRawFootballValue(startingBenchSnapshot, restored.bench)) return sourceMatch.appearances
     const res: Appearance[] = []
     const source = lineupLocked ? startingSnapshot : matchDraft.slotAssignments
     Object.entries(source).forEach(([slotId, id]) => {
@@ -415,7 +425,7 @@ function MatchEditor({
     // history after deleting the last tactical move. Other fixture sides stay raw.
     return [...res.map(appearance => ({ ...appearance, positionHistory: matchDraft.positionHistories[appearance.playerId] })),
       ...(sourceMatch?.appearances.filter(appearance => appearance.teamId !== selectedTeamId) ?? [])]
-  }, [selectedTeamId, draftPlayers, sourceMatch, matchDraft, startingSnapshot, startingBenchSnapshot, lineupLocked])
+  }, [mode, restored, selectedTeamId, draftPlayers, sourceMatch, matchDraft, startingSnapshot, startingBenchSnapshot, lineupLocked])
 
   const eventMatch: Match = { id: draftId, season, matchDay, date, duration: 90, homeTeamId, awayTeamId, appearances, events: matchDraft.events }
   const liveBenchIds = activeDraft.homeBench.filter(Boolean)
@@ -484,12 +494,22 @@ function MatchEditor({
     })
   }
 
-  const finalMatchData = useMemo<Match>(() => ({
-    ...sourceMatch,
-    id: draftId,
-    season, competitionType: activeAssignment.competitionType, competitionStage: activeAssignment.stage, competitionPairingId: activeAssignment.pairingId, competitionSeriesGame: activeAssignment.seriesGame, competitionAssignment: activeAssignment, matchDay, date, formation: kickoffFormationName, homeAway: mode === 'fresh' ? 'home' : sourceMatch?.homeAway, homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: sourceMatch?.duration ?? 90,
-    halftimeOpponentSot: parseOpponentSot(halftimeOpponentSot), fulltimeOpponentSot: parseOpponentSot(fulltimeOpponentSot), appearances, events: matchDraft.events, kickoffLineup: savedKickoffSnapshot,
-  }), [draftId, season, activeAssignment, matchDay, date, kickoffFormationName, mode, sourceMatch, homeTeamId, awayTeamId, selectedTeamId, opponentName, halftimeOpponentSot, fulltimeOpponentSot, appearances, matchDraft.events, savedKickoffSnapshot])
+  const finalMatchData = useMemo<Match>(() => {
+    const { competitionPairingId: _pairing, competitionSeriesGame: _series, ...source } = sourceMatch ?? {}
+    return {
+      ...source,
+      id: draftId,
+      season, competitionType: activeAssignment.competitionType, competitionStage: activeAssignment.stage,
+      ...(activeAssignment.pairingId ? { competitionPairingId: activeAssignment.pairingId } : {}),
+      ...(activeAssignment.seriesGame ? { competitionSeriesGame: activeAssignment.seriesGame } : {}),
+      competitionAssignment: activeAssignment, matchDay, date,
+      formation: mode === 'edit' && unchangedKickoff ? sourceMatch?.formation : kickoffFormationName,
+      homeAway: mode === 'fresh' ? 'home' : metadata ? metadata.homeAway : sourceMatch?.homeAway,
+      homeTeamId, awayTeamId, teamId: selectedTeamId, opponentName, duration: sourceMatch?.duration ?? 90,
+      halftimeOpponentSot: parseOpponentSot(halftimeOpponentSot), fulltimeOpponentSot: parseOpponentSot(fulltimeOpponentSot),
+      appearances, events: matchDraft.events, kickoffLineup: savedKickoffSnapshot,
+    }
+  }, [draftId, season, activeAssignment, matchDay, date, kickoffFormationName, unchangedKickoff, mode, metadata, sourceMatch, homeTeamId, awayTeamId, selectedTeamId, opponentName, halftimeOpponentSot, fulltimeOpponentSot, appearances, matchDraft.events, savedKickoffSnapshot])
   const draftCheckpoint = useMemo<Match>(() => ({ ...finalMatchData, kickoffLineup: lineupLocked ? savedKickoffSnapshot : sourceMatch?.kickoffLineup && restored && sameAssignments(matchDraft.slotAssignments, restored.starters) ? sourceMatch.kickoffLineup : kickoffFromAssignments(matchDraft.slotAssignments, false), fulltimeOpponentSotAutoLinked: fulltimeOpponentSotAutoLinked }), [finalMatchData, savedKickoffSnapshot, lineupLocked, sourceMatch, restored, matchDraft.slotAssignments, fulltimeOpponentSotAutoLinked])
 
   function applyOpponentSot(next: OpponentSotDraftState) {
@@ -514,9 +534,15 @@ function MatchEditor({
 
   async function save(): Promise<boolean> {
     if (savingRef.current || liveEvent || !kickoffIsValid) return false
+    if (mode === 'edit' && originalEditSource.current) {
+      const latest = matches.find(match => match.id === originalEditSource.current!.id)
+      if (!latest || !sameRawMatch(originalEditSource.current, latest)) {
+        setSaveError('This match changed while editing. Reopen the match to preserve the newer saved facts.')
+        return false
+      }
+    }
     savingRef.current = true
     setSaveError('')
-    setSaveStatus('Saving…')
     if (!matchesCompetitionAssignmentExactly(finalMatchData, activeAssignment)) {
       setSaveError('Competition identity changed. Reopen the match and try again.')
       savingRef.current = false
@@ -533,8 +559,14 @@ function MatchEditor({
       savingRef.current = false
       return false
     }
+    setSaveStatus('Saving…')
     try {
       const result = await saveMatchDurably(finalMatchData)
+      if (result.superseded) {
+        savingRef.current = false
+        setSaveStatus('Newer changes superseded these saved details. Reopen the match to continue.')
+        return false
+      }
       setSaveStatus(result.mirrorSaved ? 'Saved' : 'Saved locally · mirror pending')
       onComplete({ name: 'match', id: draftId })
       return true
@@ -542,22 +574,33 @@ function MatchEditor({
       // Keep the in-memory editor and its draft intact. Navigation is allowed
       // only after LocalRepository has verified primary read-back.
       savingRef.current = false
+      setSaveStatus('')
       setSaveError(error instanceof Error ? error.message : 'Save failed. Your match was not safely stored. Please retry.')
       return false
     }
   }
 
+  function acceptMetadata(proposal: MatchMetadataProposal) {
+    if (mode !== 'edit' || !sourceMatch) return
+    const candidate = applyMatchMetadata(sourceMatch, proposal, { teams, players, matches, competitionStates })
+    setMetadata({ assignment: candidate.competitionAssignment!, date: candidate.date, opponentName: candidate.opponentName, homeAway: candidate.homeAway })
+    setDate(candidate.date)
+    setMetadataOpen(false)
+    setSaveError('')
+  }
+
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 max-w-full touch-pan-y flex-col overflow-x-clip bg-black text-white">
       <div className="px-4 pt-3">
-        <button onClick={() => { if (editingMatchId) clearDraftMatch(); onBack() }} className="mb-3 text-xs font-semibold text-emerald-400">← Cancel</button>
+        <button onClick={onBack} className="mb-3 text-xs font-semibold text-emerald-400">← Cancel</button>
         <h1 className="text-2xl font-bold">Log Match</h1>
-        <div className="mb-2 flex min-w-0 items-center justify-between gap-3 rounded-xl bg-zinc-900 px-3 py-2">
+        <button type="button" aria-label={mode === 'edit' ? 'Edit match details' : 'Match details'} disabled={mode !== 'edit' || Boolean(liveEvent) || saveStatus === 'Saving…'} onClick={() => setMetadataOpen(true)} className="mb-2 flex w-full min-w-0 items-center justify-between gap-3 rounded-xl bg-zinc-900 px-3 py-2 text-left">
           <div className="min-w-0"><p className="text-sm font-bold leading-tight text-zinc-300">{competitionContextParts(activeAssignment).primary}</p><p className="mt-0.5 text-xs font-black leading-tight text-emerald-400">{competitionContextParts(activeAssignment).secondary}</p></div>
           <p aria-label="Live score" className="shrink-0 text-right text-xl font-black tabular-nums text-white">{matchScore(eventMatch).home} - {matchScore(eventMatch).away}</p>
-      </div>
+      </button>
       </div>
 
+      {mode === 'edit' && metadataOpen && <MatchMetadataDialog match={finalMatchData} data={{ teams, players, matches, competitionStates }} onAccept={acceptMetadata} onCancel={() => setMetadataOpen(false)} onEditScore={() => { setMetadataOpen(false); setStep(1) }} />}
       {historyError && <p role="alert" className="px-4 text-xs text-red-400">{historyError}</p>}{saveError && <p role="alert" className="mx-4 rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-200">{saveError}</p>}{saveStatus && <p aria-live="polite" className="mx-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-200">{saveStatus}</p>}
       <div className="no-scrollbar min-h-0 min-w-0 w-full max-w-full flex-1 overflow-x-clip overflow-y-auto overscroll-x-none touch-pan-y px-4 pb-4">
         {step === 0 && (

@@ -1,0 +1,73 @@
+{
+  "baseSha": "fc6eab2f6ebd672058692b5f037808d2ffa26a03",
+  "browser": "chrome.exe",
+  "samples": 11,
+  "fixture": {
+    "players": 367,
+    "matches": 1152,
+    "seasons": 2
+  },
+  "method": "Alternating isolated incognito contexts, selected Player Matches path. Baseline is its original combined Overview/Matches screen; await settled content, then two animation frames and forced V8 garbage collection before CDP JSHeapUsedSize observation. Measures retained JS heap of different intended screen workloads, not peak/browser-total memory or a long-term leak test. No timing claims from this run.",
+  "before": {
+    "medianBytes": 28394284,
+    "p95Bytes": 28417328,
+    "samplesBytes": [
+      28383696,
+      28394284,
+      28382340,
+      28390760,
+      28412728,
+      28385660,
+      28412788,
+      28391524,
+      28407404,
+      28417328,
+      28410720
+    ]
+  },
+  "after": {
+    "medianBytes": 11481788,
+    "p95Bytes": 11529300,
+    "samplesBytes": [
+      11481964,
+      11481788,
+      11481656,
+      11481784,
+      11482160,
+      11480408,
+      11529300,
+      11481752,
+      11481776,
+      11481788,
+      11482228
+    ]
+  },
+  "domElements": {
+    "before": [
+      1034,
+      1034,
+      1034,
+      1034,
+      1034,
+      1034,
+      1034,
+      1034,
+      1034,
+      1034,
+      1034
+    ],
+    "after": [
+      427,
+      427,
+      427,
+      427,
+      427,
+      427,
+      427,
+      427,
+      427,
+      427,
+      427
+    ]
+  }
+}

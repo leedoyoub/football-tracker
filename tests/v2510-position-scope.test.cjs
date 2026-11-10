@@ -105,7 +105,9 @@ test('Positions Played keeps normalized CAM and every positive-minute position i
   assert.deepEqual([...data.positionMinutes], [['CAM', 85], ['ST', 5]])
   const h = screenHarness(root, 'screens/PlayerDetailScreen.tsx', 'PlayerDetailScreen', { players: [player], teams, matches: [match], competitionStates: [] })
   const tree = h.render({ playerId: 'p', season: 'S1', screenState: defaultScreenState({ name: 'player', id: 'p' }), onStateChange() {}, onNavigate() {}, onBack() {} })
-  const section = nodes(tree, n => n.type === 'section' && nodes(n.props.children, c => c.type === 'h2' && c.props.children === 'Positions Played').length)[0]
+  const overview = nodes(tree, n => n.type?.name === 'PlayerOverview')[0]
+  const content = screenHarness(root, 'screens/PlayerDetailScreen.tsx', 'PlayerOverview', { players: [player], teams, matches: [match] }).render(overview.props)
+  const section = nodes(content, n => n.type === 'section' && nodes(n.props.children, c => c.type === 'h2' && c.props.children === 'Positions Played').length)[0]
   assert.deepEqual(nodes(section, n => n.type === 'b').map(n => n.props.children), ['CAM', 'ST'])
 })
 
@@ -114,7 +116,7 @@ test('opening a deleted historical player retains access to recorded matches wit
   const bytes = JSON.stringify(match)
   const h = screenHarness(root, 'screens/PlayerDetailScreen.tsx', 'PlayerDetailScreen', { players: [], teams, matches: [match], competitionStates: [] })
   const { renderToStaticMarkup } = require('react-dom/server')
-  const tree = h.render({ playerId: 'deleted', season: 'S1', screenState: { ...defaultScreenState({ name: 'player', id: 'deleted' }), season: 'S1' }, onStateChange() {}, onNavigate() {}, onBack() {} })
+  const tree = h.render({ playerId: 'deleted', season: 'S1', screenState: { ...defaultScreenState({ name: 'player', id: 'deleted' }), season: 'S1', tab: 'matches' }, onStateChange() {}, onNavigate() {}, onBack() {} })
   const html = renderToStaticMarkup(tree)
   assert.match(html, /Historical player \(deleted\)/)
   assert.match(html, /CAM/); assert.match(html, /90/); assert.match(html, /⚽/)

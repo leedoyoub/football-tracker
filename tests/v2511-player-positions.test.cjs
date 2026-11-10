@@ -14,7 +14,9 @@ function game(id, position, history = [], extra = {}) {
 function section(matches, competition = 'all') {
   const h = screenHarness(root, 'screens/PlayerDetailScreen.tsx', 'PlayerDetailScreen', { players: [player], teams, matches })
   const tree = h.render({ playerId: 'p', season: 'S1', screenState: { ...defaultScreenState({ name: 'player', id: 'p' }), competition }, onStateChange() {}, onNavigate() {}, onBack() {} })
-  return nodes(tree, n => n.type === 'section' && nodes(n, c => c.type === 'h2' && c.props.children === 'Positions Played').length)[0]
+  const overview = nodes(tree, n => n.type?.name === 'PlayerOverview')[0]
+  const content = screenHarness(root, 'screens/PlayerDetailScreen.tsx', 'PlayerOverview', { players: [player], teams, matches }).render(overview.props)
+  return nodes(content, n => n.type === 'section' && nodes(n, c => c.type === 'h2' && c.props.children === 'Positions Played').length)[0]
 }
 const labels = node => nodes(node, n => n.type === 'b').map(n => n.props.children)
 const shares = node => nodes(node, n => n.type === 'span' && n.props.className === 'tabular-nums').map(n => n.props.children[0])

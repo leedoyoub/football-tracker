@@ -1,6 +1,6 @@
 import { POSITIONS, type AppState, type NavigationEntry, type ScreenState, type ScreenStateByView, type View } from '../types'
 import { draftContext, isResumableDraft } from './draftLifecycle'
-import { createNavigationEntry, defaultScreenState } from './navigation'
+import { createNavigationEntry, defaultScreenState, normalizePlayerScreenState } from './navigation'
 import { normalizeCompetitionScreenState } from './competitionScreenState'
 import { rankTrendMetricOptions } from '../engine/playerRankTrend'
 import { scopedPositionFamilyByPlayer } from '../engine/positionScope'
@@ -81,8 +81,10 @@ export function validRestoredView(value: unknown, state: AppState): View | null 
       return hasTeam(view.id) ? { name: 'team', id: view.id } : null
     case 'import-squad':
       return hasTeam(view.teamId) ? { name: 'import-squad', teamId: view.teamId } : null
-    case 'player': case 'edit-player':
-      return hasPlayer(view.id) ? { name: view.name, id: view.id } : null
+    case 'player':
+      return hasPlayer(view.id) || typeof view.id === 'string' && state.matches.some(match => match.appearances?.some(row => row.playerId === view.id)) ? { name: 'player', id: view.id } : null
+    case 'edit-player':
+      return hasPlayer(view.id) ? { name: 'edit-player', id: view.id } : null
     case 'match': case 'edit-match':
       return hasMatch(view.id) ? { name: view.name, id: view.id } : null
     case 'new-player':
@@ -111,7 +113,7 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
     const player = state.players.find(player => player.id === view.id)
     const family = (player && scoped.every(match => Array.isArray(match.appearances)) ? scopedPositionFamilyByPlayer([player], scoped, {}).get(view.id) : undefined) ?? player?.position
     const rankTrendMetric = rankTrendMetricOptions(family).find(option => option.value === saved.rankTrendMetric)?.value ?? 'rating'
-    return { name: 'player', season, competition, rankTrendMetric }
+    return normalizePlayerScreenState({ name: 'player', season, competition, rankTrendMetric, tab: saved.tab as ScreenStateByView['player']['tab'], tabScrollTop: saved.tabScrollTop as ScreenStateByView['player']['tabScrollTop'] })
   }
   const validScope = (scope: unknown) => scope === 'all' || competitionTypes.includes(scope as typeof competitionTypes[number])
   const validMetric = (metric: unknown) => typeof metric === 'string' && rankingMetrics.has(metric)
@@ -207,7 +209,8 @@ export function loadLastNavigationEntry(state: AppState, target = storage()): Na
     const parsed = JSON.parse(raw)
     const wrapped = parsed?.version === 2 && parsed.view && typeof parsed.view === 'object'
     const view = validRestoredView(wrapped ? parsed.view : parsed, state) ?? { name: 'home' }
-    return createNavigationEntry(view, restoredScreenState(view, wrapped ? parsed.screenState : null, state))
+    const screenState = restoredScreenState(view, wrapped ? parsed.screenState : null, state)
+    return createNavigationEntry(view, screenState, screenState.name === 'player' ? screenState.tabScrollTop[screenState.tab] : 0)
   } catch {
     return createNavigationEntry({ name: 'home' })
   }

@@ -210,7 +210,12 @@ test('historical Match and Player Detail actually render the same current-engine
       screenState: defaultScreenState({ name: 'player', id: p.id }),
       onStateChange() {}, onNavigate() {}, onBack() {},
     }))
-    assert.match(matchHtml, />5\.9</); assert.match(playerHtml, />5\.9</); assert.match(playerHtml, />5\.94</)
+    const matchesHtml = renderToStaticMarkup(React.createElement(PlayerDetailScreen, {
+      playerId: p.id, season: 'S1',
+      screenState: { ...defaultScreenState({ name: 'player', id: p.id }), tab: 'matches' },
+      onStateChange() {}, onNavigate() {}, onBack() {},
+    }))
+    assert.match(matchHtml, />5\.9</); assert.match(matchesHtml, />5\.9</); assert.match(playerHtml, />5\.94</)
   } finally { if (previous) require.cache[path] = previous; else delete require.cache[path] }
 })
 test('live history accepts stoppage-time subs and validates goals in saved order', () => {

@@ -320,7 +320,7 @@ export interface ScreenStateByView {
   }
   'import-squad': { name: 'import-squad' }
   players: { name: 'players'; search: string; filters: { seasons: string[]; teams: string[]; positions: Position[] } }
-  player: { name: 'player'; season: string | null; competition: CompetitionType | 'all'; rankTrendMetric: 'rating' | 'goals' | 'assists' | 'g+a' | 'sotAllowed' | 'defenderGaPer90' | 'cleanSheets' | 'saves' | 'goalkeeperGaPer90' }
+  player: { name: 'player'; tab: 'overview' | 'matches'; tabScrollTop: { overview: number; matches: number }; season: string | null; competition: CompetitionType | 'all'; rankTrendMetric: 'rating' | 'goals' | 'assists' | 'g+a' | 'sotAllowed' | 'defenderGaPer90' | 'cleanSheets' | 'saves' | 'goalkeeperGaPer90' }
   match: { name: 'match'; tab: 'facts' | 'lineup' | 'ratings' }
   'edit-match': { name: 'edit-match' }
   'new-match': { name: 'new-match' }

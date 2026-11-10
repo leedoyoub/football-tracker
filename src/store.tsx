@@ -10,7 +10,7 @@ import {
 } from 'react'
 import type { AppState, CompetitionState, Match, Player, Team } from './types'
 import { LocalRepository, prepareImportData, preservePreImportBackup, type DurableSaveResult } from './lib/repository'
-import { STATIC_TEAMS, withStaticTeams } from './data/teams'
+import { STATIC_TEAMS, currentStaticTeams, withStaticTeams } from './data/teams'
 import { assertRosterCapacity, currentTeamIds } from './lib/roster'
 import { applySquadImport, type SquadImportItem } from './lib/squadImport'
 import { SyncManager } from './lib/sync'
@@ -24,8 +24,10 @@ import { createPersistenceQueue } from './lib/persistenceQueue'
 import { sanitizeDraftLifecycle } from './lib/draftLifecycle'
 import { measureInDevelopment } from './lib/developmentMeasurement'
 import { performAtomicImport } from './lib/importTransaction'
+import { validateMatchMetadataMutation } from './lib/matchMetadata'
 
 type StoreSnapshot = { data: AppState; competitionRevisions: CompetitionRevisions; teamCatalogRevision: number }
+type MatchSaveResult = DurableSaveResult & { superseded?: true }
 
 interface StoreValue extends AppState {
   competitionRevisions: CompetitionRevisions
@@ -39,7 +41,7 @@ interface StoreValue extends AppState {
   updatePlayer: (id: string, player: Partial<Player>) => void
   importPlayers: (players: SquadImportItem[]) => void
   addMatch: (match: Omit<Match, 'id'> & { id?: string }) => string
-  saveMatchDurably: (match: Match) => Promise<DurableSaveResult>
+  saveMatchDurably: (match: Match) => Promise<MatchSaveResult>
   updateMatch: (id: string, match: Match) => void
   saveDraftMatch: (match: Match) => void
   clearDraftMatch: () => void
@@ -201,10 +203,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const prior = before.data
     const previousMatch = prior.matches.find(item => item.id === match.id)
     const saved = previousMatch ? preserveRecordedAt(previousMatch, match) : recordNewMatch(match)
-    if (previousMatch) {
-      const safety = competitionMutationSafety(prior.matches, previousMatch, saved, prior.teams, prior.players, prior.competitionStates?.find(state => state.kind === 'champions-draw' && state.season === previousMatch.season))
-      if (!safety.safe) throw new Error(safety.message)
+    const replacementProblem = (data: AppState): string | undefined => {
+      const latest = data.matches.find(item => item.id === saved.id)
+      if (previousMatch ? !latest || !sameRawMatch(previousMatch, latest) : latest) return 'This match changed while saving. Reopen the match before retrying.'
+      if (!latest) return
+      const metadata = validateMatchMetadataMutation(data, latest, saved)
+      if (!metadata.safe) return metadata.message ?? 'The metadata replacement is no longer safe.'
+      const safety = competitionMutationSafety(data.matches, latest, saved, currentStaticTeams(data.teams), data.players, data.competitionStates?.find(state => state.kind === 'champions-draw' && state.season === latest.season))
+      if (!safety.safe) return safety.message ?? 'The competition replacement is no longer safe.'
     }
+    const validateReplacement = (data: AppState) => {
+      const problem = replacementProblem(data)
+      if (problem) throw new Error(problem)
+    }
+    validateReplacement(prior)
     if (draftTimer.current) { clearTimeout(draftTimer.current); draftTimer.current = undefined }
     const cancelledDraftEpoch = ++draftEpoch.current
     finalizingDraftIds.current.add(saved.id)
@@ -217,9 +229,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // The final Match and removal of its matching checkpoint share one
     // authoritative primary write. An unrelated draft is intentionally kept.
     let durability: DurableSaveResult
+    let superseded = false
     try {
-      durability = await persistLatest(() => withSavedMatch(snapshotRef.current.data), () => finalizingDraftIds.current.has(saved.id), () => {
+      durability = await persistLatest(() => {
+        const current = snapshotRef.current.data
+        validateReplacement(current)
+        return withSavedMatch(current)
+      }, () => finalizingDraftIds.current.has(saved.id), () => {
         const current = snapshotRef.current
+        // Primary read-back succeeded, but intervening edits/deletions remain
+        // authoritative. Their queued save must read those newest facts.
+        if (replacementProblem(current.data)) {
+          superseded = true
+          finalizingDraftIds.current.delete(saved.id)
+          return
+        }
         const currentPrevious = current.data.matches.find(item => item.id === saved.id)
         publishSnapshot({ data: withSavedMatch(current.data), competitionRevisions: reviseChangedMatch(current.competitionRevisions, currentPrevious, saved), teamCatalogRevision: current.teamCatalogRevision })
       }, false)
@@ -230,7 +254,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     // Upload remains optional; a queue/cloud failure cannot negate durable
     // primary success or the navigation that follows it.
-    return durability
+    return superseded ? { ...durability, superseded: true as const } : durability
   }), [persistLatest, publishSnapshot])
   const saveDraftMatch = useCallback(function saveDraftMatch(match: Match) {
     if (importing.current) { afterImport.current.push(() => saveDraftMatch(match)); return }
@@ -333,7 +357,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const previous = snapshotRef.current.data.matches.find(item => item.id === id)
         if (previous) {
           const replacement = preserveRecordedAt(previous, { ...match, id })
-          const safety = competitionMutationSafety(snapshotRef.current.data.matches, previous, replacement, snapshotRef.current.data.teams, snapshotRef.current.data.players, snapshotRef.current.data.competitionStates?.find(state => state.kind === 'champions-draw' && state.season === previous.season))
+          const safety = competitionMutationSafety(snapshotRef.current.data.matches, previous, replacement, currentStaticTeams(snapshotRef.current.data.teams), snapshotRef.current.data.players, snapshotRef.current.data.competitionStates?.find(state => state.kind === 'champions-draw' && state.season === previous.season))
           if (!safety.safe) throw new Error(safety.message)
         }
         update((prev) => {
@@ -351,7 +375,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       deleteMatch: (id: string) => {
         const previous = snapshotRef.current.data.matches.find(item => item.id === id)
         if (previous) {
-          const safety = competitionMutationSafety(snapshotRef.current.data.matches, previous, undefined, snapshotRef.current.data.teams, snapshotRef.current.data.players, snapshotRef.current.data.competitionStates?.find(state => state.kind === 'champions-draw' && state.season === previous.season))
+          const safety = competitionMutationSafety(snapshotRef.current.data.matches, previous, undefined, currentStaticTeams(snapshotRef.current.data.teams), snapshotRef.current.data.players, snapshotRef.current.data.competitionStates?.find(state => state.kind === 'champions-draw' && state.season === previous.season))
           if (!safety.safe) throw new Error(safety.message)
         }
         update((prev) => {

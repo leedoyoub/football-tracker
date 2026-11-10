@@ -108,9 +108,14 @@ test('Cup displays 16 team actions, fixed Total and neutral cumulative rows with
   h.state = { ...h.state, competitionType: 'cup' }
   const view = walk(h.render(), n => n.type?.name === 'CupView')[0]
   const tree = view.type(view.props)
-  const rowButtons = walk(tree, n => n.type === 'button' && String(n.props.className).includes('grid w-full'))
-  assert.equal(rowButtons.length, 16)
-  rowButtons[0].props.onClick(); assert.equal(h.destinations[0].name, 'team')
+  const table = walk(tree, n => n.type?.name === 'CupStandingsTable')[0]
+  const tableTree = require('./helpers/v259-harness.cjs').screenHarness(path.resolve(__dirname, '..'), 'components/CupStandingsTable.tsx', 'CupStandingsTable', {}).render(table.props)
+  const rows = walk(tableTree, n => n.type === 'tr' && n.props['data-team-id'])
+  const teamActions = walk(tableTree, n => n.type?.name === 'TeamLink')
+  assert.equal(rows.length, 16)
+  assert.equal(teamActions.length, 16)
+  for (const action of teamActions) action.props.onNavigate(action.props.team.id)
+  assert.deepEqual(h.destinations, teamActions.map(action => ({ name: 'team', id: action.props.team.id })))
   const selector = walk(tree, n => n.type?.name === 'RankingMetricTabs' && n.props.label === 'Cup table stage')[0]
   assert.deepEqual(selector.props.pinnedOption, { value: 'total', label: 'Total' })
   selector.props.onChange('total'); assert.equal(h.state.cupTableStage, 'total')

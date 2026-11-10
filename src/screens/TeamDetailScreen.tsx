@@ -1,3 +1,4 @@
+import { DetailBack } from '../components/DetailBack'
 import { useMemo } from 'react'
 import { derivedResults } from '../lib/results'
 import { ResultCard } from '../components/ResultCard'
@@ -64,7 +65,7 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
   }, [tab, players, matches, teamId, activeSeason, playersCompetition, representative])
   const matchData = useMemo(() => tab === 'matches' ? derivedResults(matches.filter(match => match.season === activeSeason && (matchesCompetition === 'all' || matchCompetitionType(match) === matchesCompetition) && teamsCreditedWithResult(match).includes(teamId)), teams, teamId) : [], [tab, matches, teams, activeSeason, matchesCompetition, teamId])
   const form = useMemo(() => tab === 'overview' ? teamForm(teamId, players, matches, selectedBestSeason, bestCompetition) : undefined, [tab, teamId, players, matches, selectedBestSeason, bestCompetition])
-  if (!team) return <div className="p-6 text-sm text-zinc-400">Team not found.</div>
+  if (!team) return <div className="detail-page p-6 text-sm text-zinc-400"><DetailBack onBack={onBack} />Team not found.</div>
 
   const best = playerData?.best
   const statsByPlayer = playerData?.statsByPlayer ?? {}
@@ -72,14 +73,14 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
   const allTeamPlayers = playerData?.allTeamPlayers ?? []
   const leagueRow = standings.find(row => row.teamId === teamId)
   const renderResult = (result: ReturnType<typeof derivedResults>[number]) => <ResultCard key={result.match.id} result={result} teams={teams} showCompetition onMatchNavigate={() => onNavigate({ name: 'match', id: result.match.id })} onTeamNavigate={id => onNavigate({ name: 'team', id })} />
-  return <div className="px-4 pb-8 pt-6">
-    <button type="button" onClick={onBack} className="mb-3 min-h-9 px-1 text-xs font-semibold text-emerald-400">← Back</button>
+  return <div className="detail-page px-4 pb-8 pt-6">
+    <DetailBack onBack={onBack} />
     <header className="mb-5 flex items-center gap-3">
       <TeamIcon team={team} className="h-12 w-12 text-sm font-black">{team.shortName}</TeamIcon>
       <div><h1 className="text-xl font-bold">{team.name}</h1><p className="text-[10px] uppercase tracking-widest text-zinc-500">{activeSeason} · Season stats</p></div>
       <div className="ml-auto"><button type="button" onClick={() => onNavigate({ name: 'new-match', teamId, season: activeSeason })} className="rounded-full bg-emerald-500 px-3 py-2 text-xs font-bold text-black">Log match</button></div>
     </header>
-    <SegmentedControl sticky label="Team detail section" value={tab} onChange={setTab} options={[{ value: 'overview', label: 'Overview' }, { value: 'matches', label: 'Matches' }, { value: 'players', label: 'Players' }, { value: 'history', label: 'History' }]} />
+    <SegmentedControl sticky stickyOffset="var(--detail-back-height)" label="Team detail section" value={tab} onChange={setTab} options={[{ value: 'overview', label: 'Overview' }, { value: 'matches', label: 'Matches' }, { value: 'players', label: 'Players' }, { value: 'history', label: 'History' }]} />
     {tab === 'history' && <TeamHistory teamId={teamId} season={activeSeason} teams={teams} players={players} matches={matches} states={competitionStates} screenState={screenState} onStateChange={patchState} onNavigate={onNavigate} />}
     {tab === 'players' && <div className="mt-4"><RankingMetricTabs value={playersCompetition} options={COMPETITION_OPTIONS} onChange={playersCompetition => patchState({ playersCompetition })} label="Team players competition" /></div>}
     {tab === 'overview' && overview && <><div className="mt-4 mb-5 grid grid-cols-4 gap-2 text-center">

@@ -23,7 +23,10 @@ test('unmodified rating, competition, durability and scroll sources remain ident
   // Their preserved behavior is checked by v261-equivalence and navigation tests.
   // v2.6.5 explicitly changes awardRules' derived candidate fields; independent
   // mathematical selection assertions replace its old byte-identity guard.
-  for (const file of ['engine/rating.ts', 'engine/ratingRevision.ts', 'engine/timeline.ts', 'engine/constants.ts', 'engine/competitionSelectors.ts', 'engine/standings.ts', 'engine/competitionContext.ts', 'engine/competitionRevision.ts', 'engine/unitRecords.ts', 'store.tsx', 'lib/repository.ts', 'lib/validation.ts', 'lib/scrollCheckpoint.ts', 'lib/cardWindow.ts', 'screens/TeamsScreen.tsx']) {
+  // v2.6.7 intentionally changes Store's replacement safety. The real-Store
+  // v267-match-metadata and p0-durability tests cover queue/read-back races,
+  // saved identity and draft preservation; durable serializers remain exact.
+  for (const file of ['engine/rating.ts', 'engine/ratingRevision.ts', 'engine/timeline.ts', 'engine/constants.ts', 'engine/competitionSelectors.ts', 'engine/standings.ts', 'engine/competitionContext.ts', 'engine/competitionRevision.ts', 'engine/unitRecords.ts', 'lib/repository.ts', 'lib/validation.ts', 'lib/scrollCheckpoint.ts', 'lib/cardWindow.ts', 'screens/TeamsScreen.tsx']) {
     const read = root => fs.readFileSync(path.join(root, 'src', file), 'utf8').replaceAll('\r\n', '\n')
       // v2.6.2 permits progress values to wrap inside the same-sized cards.
       .replaceAll('<dd className="min-w-0 text-right font-bold text-zinc-100">', '<dd className="font-bold text-zinc-100">')

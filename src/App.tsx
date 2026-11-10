@@ -37,7 +37,7 @@ import { canUseApp, shouldRestoreLastRoute, startupScreen } from './lib/startup'
 import { BootstrapShell, StartupRecovery } from './components/StartupBoundary'
 import { appContentOverflowClass } from './lib/routeLayout'
 import { loadLocalModePreference, saveLocalModePreference } from './lib/localMode'
-import { backFromTeamDetailEntries, closeTransientWorkflow, completeTransientWorkflowToBrowse, createNavigationEntry, enterTransientWorkflow, navigateBrowseEntry, popNavigationEntry, replaceNavigationEntry, resetNavigationEntries, updateCurrentScreenState } from './lib/navigation'
+import { backFromTeamDetailEntries, changePlayerTab, closeTransientWorkflow, completeTransientWorkflowToBrowse, createNavigationEntry, enterTransientWorkflow, navigateBrowseEntry, popNavigationEntry, replaceNavigationEntry, resetNavigationEntries, updateCurrentScreenState } from './lib/navigation'
 import { restoreScrollWhenReachable } from './lib/scrollRestoration'
 import { flushScrollCheckpoints } from './lib/scrollCheckpoint'
 import { resetCompetitionTypeScroll } from './lib/competitionTypeScroll'
@@ -58,6 +58,8 @@ export default function App() {
   const [routeRestored, setRouteRestored] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const restoreScroll = useRef(true)
+  // A tab can navigate again before React replaces its outgoing DOM content.
+  const pendingPlayerTabScroll = useRef<{ id: string; tab: ScreenStateByView['player']['tab']; top: number } | null>(null)
   const entry = history[history.length - 1]
   const view = entry.view
   const startup = useMemo(
@@ -96,11 +98,17 @@ export default function App() {
   }, [])
 
   useLayoutEffect(() => {
-    if (!restoreScroll.current) return
+    if (!restoreScroll.current && !pendingPlayerTabScroll.current) return
     const container = scrollRef.current
     if (!container) return
     restoreScroll.current = false
-    return restoreScrollWhenReachable(container, entry.scrollTop)
+    const pending = entry.view.name === 'player' && entry.screenState.name === 'player'
+      ? { id: entry.view.id, tab: entry.screenState.tab, top: entry.scrollTop } : null
+    pendingPlayerTabScroll.current = pending
+    return restoreScrollWhenReachable(container, entry.scrollTop, undefined, undefined, undefined, {
+      cancelOnUserInput: pending !== null,
+      onSettled: () => { if (pendingPlayerTabScroll.current === pending) pendingPlayerTabScroll.current = null },
+    })
   }, [entry, history])
 
   const tab: Tab = useMemo(() => {
@@ -129,10 +137,11 @@ export default function App() {
     flushScrollCheckpoints()
     restoreScroll.current = true
     setHistory((prev) => {
-      const scrollTop = scrollRef.current?.scrollTop ?? 0
+      const current = prev[prev.length - 1]
+      const pending = pendingPlayerTabScroll.current
+      const scrollTop = current.view.name === 'player' && current.screenState.name === 'player' && pending?.id === current.view.id && pending.tab === current.screenState.tab ? pending.top : scrollRef.current?.scrollTop ?? 0
       if (next.name === 'new-match' || next.name === 'edit-match') return enterTransientWorkflow(prev, next, scrollTop)
       if (next.name === 'player') {
-        const current = prev[prev.length - 1]
         const destination = resolvePlayerDestination(next, current.view, current.screenState, season, matches)
         return navigateBrowseEntry(prev, destination.view, scrollTop, destination.screenState)
       }
@@ -177,7 +186,18 @@ export default function App() {
   }
 
   function onStateChange(next: ScreenState, patch?: Partial<ScreenState>) {
+    if (next.name === 'player') flushScrollCheckpoints()
     setHistory(prev => {
+      const active = prev[prev.length - 1]
+      if (next.name === 'player' && active?.view.name === 'player' && active.screenState.name === 'player' && next.tab !== active.screenState.tab) {
+        const pending = pendingPlayerTabScroll.current
+        const outgoingTop = pending?.id === active.view.id && pending.tab === active.screenState.tab ? pending.top : scrollRef.current?.scrollTop ?? 0
+        const changed = changePlayerTab(prev, next.tab, outgoingTop)
+        const target = changed[changed.length - 1]
+        restoreScroll.current = true
+        pendingPlayerTabScroll.current = { id: active.view.id, tab: next.tab, top: target.scrollTop }
+        return updateCurrentScreenState(changed, { ...next, tabScrollTop: (target.screenState as ScreenStateByView['player']).tabScrollTop })
+      }
       if (!patch) return updateCurrentScreenState(prev, next)
       const current = prev[prev.length - 1]
       if (!current || current.screenState.name !== next.name) return prev

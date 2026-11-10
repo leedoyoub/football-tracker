@@ -93,8 +93,10 @@ test('Cup selector uses award-size labels and original IDs with pinned Total and
 
 for (const p of [0, 1, 2, 3, 4, 5, 6]) test(`P=${p} renders exactly one line above the first provisional risk row, or none at zero`, () => {
   const tree = cupTree(Array.from({ length: p }, (_, i) => game(`g${i}`, teams[i].id, { ga: i + 1 })))
-  const rows = nodes(tree, n => n.type === 'div' && /^T\d+$/.test(n.key ?? ''))
-  const lineIndices = rows.flatMap((row, i) => nodes(row, n => n.type === 'div' && /Survival Line$/.test(n.props.children ?? '')).length ? [i] : [])
+  const table = nodes(tree, n => n.type?.name === 'CupStandingsTable')[0]
+  const tableTree = require('./helpers/v259-harness.cjs').screenHarness(path.resolve(__dirname, '..'), 'components/CupStandingsTable.tsx', 'CupStandingsTable', {}).render(table.props)
+  const rows = nodes(tableTree, n => n.type === React.Fragment && /^T\d+$/.test(n.key ?? ''))
+  const lineIndices = rows.flatMap((row, i) => nodes(row, n => n.props?.['data-survival-line'] === true).length ? [i] : [])
   assert.deepEqual(lineIndices, p ? [Math.max(0, p - 2)] : [])
   const html = renderToStaticMarkup(tree)
   assert.equal((html.match(/bg-orange-400\/10/g) ?? []).length, Math.min(2, p))

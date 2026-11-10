@@ -10,7 +10,7 @@ const { competitionContextParts } = require('../src/engine/competitionContext.ts
 test('v2.2.9 Log Match keeps a readable flexible two-line context and a right-side score', () => {
   const log = source('../src/screens/NewMatchScreen.tsx')
   const header = log.slice(log.indexOf('<h1 className="text-2xl font-bold">Log Match</h1>'), log.indexOf('{historyError'))
-  assert(header.includes('flex min-w-0 items-center justify-between'))
+  assert(header.includes('flex w-full min-w-0 items-center justify-between'))
   assert(header.includes('className="min-w-0"'))
   assert(header.includes('aria-label="Live score"') && header.includes('shrink-0') && header.includes('tabular-nums'))
   assert(!header.includes('grid-cols-[1fr_auto_1fr]') && !header.includes('truncate'))
@@ -23,7 +23,7 @@ test('v2.2.9 canonical context parts provide full two-line Champions wording', (
 
 test('Team Detail match rows reuse the shared card with canonical metadata and a fixed right-side score', () => {
   const team = source('../src/screens/TeamDetailScreen.tsx')
-  const rows = team.slice(team.indexOf('const renderResult'), team.indexOf('return <div className="px-4'))
+  const rows = team.slice(team.indexOf('const renderResult'), team.indexOf('return <div className="detail-page px-4'))
   assert(rows.includes('<ResultCard') && rows.includes('showCompetition'))
   assert(rows.includes("name: 'match', id: result.match.id"))
   const card = source('../src/components/ResultCard.tsx')

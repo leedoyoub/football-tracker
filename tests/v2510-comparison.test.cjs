@@ -28,7 +28,9 @@ for (const competition of ['league', 'cup', 'champions', 'all']) test(`Compariso
   const tree = renderComparison('S2', competition, null)
   const values = nodes(tree, n => typeof n.type === 'function' && n.type.name === 'ComparisonValue')
   const detail = screenHarness(root, 'screens/PlayerDetailScreen.tsx', 'PlayerDetailScreen', store).render({ playerId: 'a', season: 'S2', screenState: { ...defaultScreenState({ name: 'player', id: 'a' }), season: 'S2', competition }, onStateChange: noop, onNavigate: noop, onBack: noop })
-  const detailRanks = nodes(detail, n => typeof n.type === 'function' && n.type.name === 'Overview')[0].props.ranks.rating
+  const overview = nodes(detail, n => n.type?.name === 'PlayerOverview')[0]
+  const content = screenHarness(root, 'screens/PlayerDetailScreen.tsx', 'PlayerOverview', store).render(overview.props)
+  const detailRanks = nodes(content, n => typeof n.type === 'function' && n.type.name === 'Overview')[0].props.ranks.rating
   const scope = matches.filter(m => m.season === 'S2' && (competition === 'all' || matchCompetitionType(m) === competition))
   const ranking = rankGlobalRankingRows(buildGlobalRankingData(players, scope, { seasons: ['S2'], teams: [], positions: [] }, 'rating'), players, 'rating')
   const families = scopedPositionFamilyByPlayer(players, scope, {})

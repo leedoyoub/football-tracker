@@ -1,5 +1,6 @@
 import type { Match, ScreenState, ScreenStateByView, View } from '../types'
 import { matchCompetitionType } from '../engine/competitionContext'
+import { defaultScreenState } from './navigation'
 
 /** Resolve entry context once; the resulting View carries only the entity ID. */
 export function resolvePlayerDestination(target: Extract<View, { name: 'player' }>, source: View, sourceState: ScreenState, currentSeason: string, matches: Match[]): { view: Extract<View, { name: 'player' }>; screenState: ScreenStateByView['player'] } {
@@ -26,7 +27,7 @@ export function resolvePlayerDestination(target: Extract<View, { name: 'player' 
   }
   if (source.name === 'season-highlight' && (source.kind === 'monthly' || source.kind === 'awards')) competition = 'league'
   const season = target.season ?? (source.name === 'match' ? matches.find(item => item.id === source.id)?.season : undefined) ?? (source.name === 'player' && sourceState.name === 'player' ? sourceState.season : undefined) ?? sourceSeason
-  return { view: { name: 'player', id: target.id }, screenState: { name: 'player', season, competition: target.competitionType ?? competition, rankTrendMetric: 'rating' } }
+  return { view: { name: 'player', id: target.id }, screenState: { ...defaultScreenState(target), name: 'player', season, competition: target.competitionType ?? competition, rankTrendMetric: 'rating' } }
 }
 
 /** Removes Edit Player when returning to its existing detail route. */

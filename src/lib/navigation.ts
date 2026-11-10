@@ -14,7 +14,7 @@ export function defaultScreenState<V extends View>(view: V): ScreenStateByView[V
     case 'comparison': state = { name: 'comparison', leftId: view.leftId ?? null, rightId: view.rightId ?? null, season: view.season ?? null, competition: view.competitionType ?? 'all', teamId: null }; break
     case 'team': state = { name: 'team', tab: 'overview', bestPlayersSeason: null, bestPlayersCompetition: 'all', bestPlayersMetric: 'rating', matchesCompetition: 'all', playersCompetition: 'all', historyCompetition: 'all', historyMenu: 'honors', historySeason: null, historyRecordsMode: 'season', historyExpandedRecords: [], historyDisclosures: [] }; break
     case 'players': state = { name: 'players', search: '', filters: { seasons: [], teams: [], positions: [] } }; break
-    case 'player': state = { name: 'player', season: view.season ?? null, competition: view.competitionType ?? 'all', rankTrendMetric: 'rating' }; break
+    case 'player': state = { name: 'player', tab: 'overview', tabScrollTop: { overview: 0, matches: 0 }, season: view.season ?? null, competition: view.competitionType ?? 'all', rankTrendMetric: 'rating' }; break
     case 'match': state = { name: 'match', tab: 'facts' }; break
     default: state = { name: view.name } as ScreenStateByView[keyof ScreenStateByView]
   }
@@ -22,11 +22,33 @@ export function defaultScreenState<V extends View>(view: V): ScreenStateByView[V
 }
 
 export function createNavigationEntry<V extends View>(view: V, screenState: ScreenStateByView[V['name']] = defaultScreenState(view), scrollTop = 0): NavigationEntry<V> {
-  return { view, screenState, scrollTop }
+  const normalized = screenState.name === 'player' ? normalizePlayerScreenState(screenState as ScreenStateByView['player']) : screenState
+  return { view, screenState: normalized as ScreenStateByView[V['name']], scrollTop }
+}
+
+/** Older device routes have neither a tab nor per-tab offsets. */
+export function normalizePlayerScreenState(state: ScreenStateByView['player']): ScreenStateByView['player'] {
+  const offset = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0
+  return { ...state, tab: state.tab === 'matches' ? 'matches' : 'overview', tabScrollTop: { overview: offset(state.tabScrollTop?.overview), matches: offset(state.tabScrollTop?.matches) } }
+}
+
+/** Capture before swapping content; entry.scrollTop remains the restoration target. */
+export function changePlayerTab(entries: NavigationEntry[], tab: ScreenStateByView['player']['tab'], scrollTop: number): NavigationEntry[] {
+  const snapped = snapshotScroll(entries, entries.length - 1, scrollTop)
+  return snapped.map((entry, index) => {
+    if (index !== snapped.length - 1 || entry.screenState.name !== 'player') return entry
+    const state = normalizePlayerScreenState(entry.screenState)
+    return { ...entry, screenState: { ...state, tab }, scrollTop: state.tabScrollTop[tab] }
+  })
 }
 
 export function snapshotScroll(entries: NavigationEntry[], index: number, scrollTop: number): NavigationEntry[] {
-  return entries.map((entry, entryIndex) => entryIndex === index ? { ...entry, scrollTop } : entry)
+  return entries.map((entry, entryIndex) => {
+    if (entryIndex !== index) return entry
+    if (entry.screenState.name !== 'player') return { ...entry, scrollTop }
+    const state = normalizePlayerScreenState(entry.screenState)
+    return { ...entry, scrollTop, screenState: { ...state, tabScrollTop: { ...state.tabScrollTop, [state.tab]: scrollTop } } }
+  })
 }
 
 export function pushNavigationEntry<V extends View>(entries: NavigationEntry[], view: V, currentScrollTop: number, screenState?: ScreenStateByView[V['name']]): NavigationEntry[] {
