@@ -20,7 +20,7 @@ import { scopedPositionFamilyByPlayer } from '../engine/positionScope'
 import { positionFamily } from '../engine/positionScope'
 import { latestAppearanceTeamId } from '../engine/playerDetailScope'
 import { playerForm } from '../engine/playerForm'
-import { playerAssistEvents, playerGoalEvents, representativeMatchPosition } from '../engine/playerMatchFacts'
+import { playerAssistEvents, playerGoalEvents, playerSaveCount, representativeMatchPosition } from '../engine/playerMatchFacts'
 import { creditedMinutesPlayed, hasPitchAppearance, matchDisplayPositionSegments } from '../engine/timeline'
 import { historicalPlayerLabel } from '../lib/historicalPlayerDisplay'
 import { playerRankTrend, rankTrendMetricOptions, type RankTrendMetric } from '../engine/playerRankTrend'
@@ -110,9 +110,10 @@ function SavedPlayerMatches({ playerId, matches, onNavigate }: { playerId: strin
   return <section className="mt-4"><h2 className="mb-2 text-sm font-semibold">Matches</h2><div className="space-y-2">{matches.map(match => {
     const appearance = match.appearances.find(row => row.playerId === playerId)!
     const goals = playerGoalEvents(match, appearance).length; const assists = playerAssistEvents(match, appearance).length
+    const saves = playerSaveCount(match, appearance)
     return <button key={match.id} type="button" onClick={() => onNavigate({ name: 'match', id: match.id })} className="block w-full rounded-2xl bg-zinc-900 p-3 text-left text-xs">
       <span className="block">{formatCompactCompetitionContext(assignmentSnapshotForMatch(match))} · {formatDate(match.date)}</span>
-      <span className="mt-1 block">{representativeMatchPosition(match, appearance)} · {hasPitchAppearance(match, appearance) ? creditedMinutesPlayed(match, appearance) + "'" : 'Unused'} · {'⚽'.repeat(goals)} {'👟'.repeat(assists)}</span>
+      <span className="mt-1 block">{representativeMatchPosition(match, appearance)} · {hasPitchAppearance(match, appearance) ? creditedMinutesPlayed(match, appearance) + "'" : 'Unused'} · {'⚽'.repeat(goals)} {'👟'.repeat(assists)}{saves > 0 && <> <span className="whitespace-nowrap" aria-label={`${saves} saves`}>🧤 {saves}</span></>}</span>
     </button>
   })}{!matches.length && <p className="text-xs text-zinc-500">No matches in this scope.</p>}</div></section>
 }
@@ -232,6 +233,7 @@ function MatchRow({ match, player, momId, onNavigate }: { match: Match; player: 
   const score = matchScore(match)
   const goals = appearance ? playerGoalEvents(match, appearance).length : 0
   const assists = appearance ? playerAssistEvents(match, appearance).length : 0
+  const saves = appearance ? playerSaveCount(match, appearance) : 0
   return <article className="rounded-2xl bg-zinc-900 p-3">
     <button type="button" onClick={() => onNavigate({ name: 'match', id: match.id })} className="flex w-full justify-between text-left">
       <span className="text-xs">{formatCompactCompetitionContext(assignmentSnapshotForMatch(match))} · {formatDate(match.date)} · {score.home}-{score.away}</span>
@@ -244,6 +246,7 @@ function MatchRow({ match, player, momId, onNavigate }: { match: Match; player: 
     <div className="mt-1 flex gap-2 text-xs">
       {goals > 0 && <span>{Array(goals).fill('⚽').join('')}</span>}
       {assists > 0 && <span>{Array(assists).fill('👟').join('')}</span>}
+      {saves > 0 && <span className="whitespace-nowrap" aria-label={`${saves} saves`}>🧤 {saves}</span>}
     </div>
     {rating && <RatingDetails match={match} player={player} rating={rating} />}
   </article>

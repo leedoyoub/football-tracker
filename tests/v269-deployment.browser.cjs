@@ -10,12 +10,12 @@ const { launchBrowser } = require('./helpers/v267-browser.cjs')
     // the existing local-only entry instead of assuming saved device consent.
     await page.waitFor('!!document.querySelector(".app-content footer") || [...document.querySelectorAll("button")].some(button => button.textContent.trim() === "Continue without signing in")', 60000)
     const anonymousEntry = await page.evaluate('(() => { const button = [...document.querySelectorAll("button")].find(button => button.textContent.trim() === "Continue without signing in"); if (!button) return false; button.click(); return true })()')
-    await page.waitFor('document.querySelector(".app-content footer")?.textContent.includes("v2.6.9")', 60000)
+    await page.waitFor('document.querySelector(".app-content footer")?.textContent.includes("v2.6.10")', 60000)
     const result = await page.evaluate('({url:location.href,title:document.querySelector(".app-content h1")?.textContent,versionFooter:document.querySelector(".app-content footer").textContent,serviceWorkerScript: navigator.serviceWorker.getRegistration().then(r=>r?.active?.scriptURL)})')
     // Promise-valued properties are resolved explicitly for the JSON evidence.
     result.serviceWorkerScript = await page.evaluate('navigator.serviceWorker.ready.then(r=>r.active?.scriptURL)')
-    assert(result.versionFooter.includes('v2.6.9'))
-    assert(result.serviceWorkerScript.endsWith('/sw.js?v=2.6.9'))
+    assert(result.versionFooter.includes('v2.6.10'))
+    assert(result.serviceWorkerScript.endsWith('/sw.js?v=2.6.10'))
     assert.deepEqual(browser.exceptions, [])
     const output = process.env.V269_DEPLOYMENT_OUTPUT || '.superpowers/sdd/v269/deployment.json'
     fs.mkdirSync(path.dirname(output), { recursive: true })
