@@ -110,6 +110,14 @@
       "name": "diff",
       "command": "git diff --check",
       "exitCode": 0
+    },
+    {
+      "name": "deployment-browser",
+      "command": "node tests/v269-deployment.browser.cjs",
+      "exitCode": 0,
+      "anonymousEntry": true,
+      "versionFooter": "Football Tracker · v2.6.9 · Manage data",
+      "serviceWorkerScript": "https://leedoyoub.github.io/football-tracker/sw.js?v=2.6.9"
     }
   ],
   "lint": {
@@ -158,6 +166,19 @@
   "deployment": {
     "target": "https://leedoyoub.github.io/football-tracker/",
     "workflow": "https://github.com/leedoyoub/football-tracker/actions/workflows/deploy.yml",
-    "verification": "Checked after committing and pushing; see matching commit workflow and final task report."
+    "verification": "Checked after committing and pushing; see matching commit workflow and final task report.",
+    "firstVerifiedReleaseCommit": "f00de1deff8bdad289ed98e9d33e6ddff9ebbb52",
+    "firstSuccessfulRun": "https://github.com/leedoyoub/football-tracker/actions/runs/43423563814",
+    "publicVerification": {
+      "checkedAt": "2026-11-13T12:18:01.330Z",
+      "method": "Fresh isolated production Chromium context, actual public GitHub Pages URL, no fixture and no user profile. Choose the existing anonymous local entry when shown; read visible Home footer and active service-worker URL.",
+      "anonymousEntry": true,
+      "url": "https://leedoyoub.github.io/football-tracker/",
+      "title": "Season 1",
+      "versionFooter": "Football Tracker · v2.6.9 · Manage data",
+      "serviceWorkerScript": "https://leedoyoub.github.io/football-tracker/sw.js?v=2.6.9",
+      "runtimeErrors": []
+    },
+    "testCorrection": "The fresh public session required the existing anonymous local entry. Reproduced timeout first, then added the UI click and observed v2.6.9 footer and active service worker. No app source changed."
   }
 }
