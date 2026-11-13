@@ -5,14 +5,15 @@ const { execFileSync } = require('node:child_process'), { createHash } = require
 const { renderToStaticMarkup } = require('react-dom/server'), assert = require('node:assert/strict')
 const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const { screenHarness, nodes } = require('./helpers/v259-harness.cjs')
-const root = path.resolve(__dirname, '..'), sha = 'fc6eab2f6ebd672058692b5f037808d2ffa26a03'
-const kinds = ['standings-entry', 'league-overall', 'league-history', 'cup-stage', 'player-overview', 'player-matches', 'editor-input', 'records', 'awards', 'news', 'startup-restore']
+const root = path.resolve(__dirname, '..'), sha = process.env.V267_BASE_SHA || 'fc6eab2f6ebd672058692b5f037808d2ffa26a03'
+const kinds = process.env.V267_KINDS?.split(',') || ['standings-entry', 'league-overall', 'league-history', 'cup-stage', 'player-overview', 'player-matches', 'editor-input', 'records', 'awards', 'news', 'startup-restore']
 const samples = Number(process.env.V267_SAMPLES || 11)
 const scales = process.env.V267_SCALES ? process.env.V267_SCALES.split(',').map(Number) : [2, 6]
 const output = process.env.V267_OUTPUT || 'docs/performance/v2.6.7-cpu.json'
 const summary = values => { const sorted = values.slice().sort((a, b) => a - b); return { medianMs: sorted[Math.floor(sorted.length / 2)], p95Ms: sorted[Math.ceil(sorted.length * .95) - 1], samplesMs: values } }
 const digest = value => createHash('sha256').update(JSON.stringify(value, (_, item) => item instanceof Map ? { entries: [...item] } : item instanceof Set ? [...item] : item)).digest('hex')
 const report = { baseSha: sha, node: process.version, cpu: os.cpus()[0].model, samples, method: 'Alternating independent baseline/current deterministic fixtures; isolated process per workflow, module loading/TypeScript transpilation and fixture creation outside timing; GC outside timing. Cold means first data query, warm unchanged query, Player revisit a new hook lifecycle on the same data, edit immutable removal of latest first-team League goal event and rerun. Real screen functions use deterministic hooks; Player measurements include production React settled SSR. CPU/SSR excludes browser paint and deferred scheduling. Before Player Matches is the original combined detail screen. Existing official result fingerprints must agree for comparable workflows. Sort is a new presentation feature measured separately. No real user data or live cloud.', scales: {} }
+if (process.env.V267_BASE_SHA) report.method = 'Alternating independent archived baseline/current deterministic fixtures; isolated process per workflow. Module loading, TypeScript transpilation, fixture creation and GC outside timing. Cold first query, warm unchanged query, Player revisit a new hook lifecycle on same data, edit immutable removal of latest first-team League goal event. Player measurements use production settled SSR (all analysis complete), not initial paint. Other workflows engine CPU only. Comparable official outputs must have identical complete JSON SHA256. Both Player sides have separate Overview/Matches. Browser painting/scheduling/storage I/O are separate measurements. No real user data or live cloud.'
 const write = value => { fs.mkdirSync(path.dirname(output), { recursive: true }); fs.writeFileSync(output, JSON.stringify(value, null, 2) + '\n') }
 function safeRemove(directory) {
   const resolved = fs.realpathSync(directory), allowed = fs.realpathSync(os.tmpdir()) + path.sep
@@ -25,7 +26,7 @@ function workflow(sourceRoot, kind, state, season) {
   const store = { ...state, competitionCacheOwner: {}, competitionRevisions: {}, teamCatalogRevision: 0, saveDraftMatch: noop, clearDraftMatch: noop, saveMatchDurably: noop }
   let revision = 0
   const props = { season, onNavigate: noop, onStateChange: noop, onBack: noop, onComplete: noop, onReplace: noop }
-  let h, body, scope, selectors, cupTable, records, awards, news, repository, serialized
+  let h, body, scope, selectors, cupTable, records, awards, news, repository, serialized, latest, recap
   if (kind === 'standings-entry') h = screenHarness(sourceRoot, 'screens/StandingsScreen.tsx', 'StandingsScreen', store)
   if (kind === 'league-overall') { h = screenHarness(sourceRoot, 'screens/CompetitionScreen.tsx', 'LeagueView', store); scope = { ...nav.defaultScreenState({ name: 'competition' }), leagueMenu: 'table' }; selectors = source('engine/competitionSelectors.ts') }
   if (kind === 'cup-stage') cupTable = source('lib/cupTable.ts')
@@ -34,9 +35,11 @@ function workflow(sourceRoot, kind, state, season) {
   if (kind === 'records') records = source('screens/recordsLeaderboards.ts')
   if (kind === 'awards') awards = source('engine/officialAwards.ts')
   if (kind === 'news') news = source('engine/news.ts')
+  if (kind === 'latest-changes') latest = source('engine/latestChanges.ts')
+  if (kind === 'season-recap') recap = source('engine/seasonInsights.ts')
   if (kind === 'startup-restore') { repository = source('lib/repository.ts'); serialized = JSON.stringify(state) }
   return {
-    comparable: ['league-history', 'cup-stage', 'records', 'awards', 'news', 'startup-restore'].includes(kind),
+    comparable: ['league-history', 'cup-stage', 'records', 'awards', 'news', 'latest-changes', 'season-recap', 'startup-restore'].includes(kind),
     remount() { if (kind.startsWith('player-')) h = screenHarness(sourceRoot, 'screens/PlayerDetailScreen.tsx', 'PlayerDetailScreen', store) },
     edit() {
       const last = state.matches.findLastIndex(match => match.teamId === state.teams[0].id && match.season === season && match.competitionType === 'league')
@@ -70,6 +73,11 @@ function workflow(sourceRoot, kind, state, season) {
       if (kind === 'records') return records.recordsLeaderboardGroups({ category: 'player', section: 'performance', ...state, states: state.competitionStates, scope: { seasons: [], teamIds: [], competition: 'all', positionFilter: 'all' } })
       if (kind === 'awards') return awards.officialSeasonModel(state.teams, state.players, state.matches, state.competitionStates, season).events
       if (kind === 'news') return news.deriveFootballEvents(state.players, state.teams, state.matches, state.competitionStates)
+      if (kind === 'latest-changes') return latest.deriveLatestChanges(state.players, state.teams, state.matches, state.competitionStates, season)
+      if (kind === 'season-recap') {
+        const leaders = recap.startingXILeaders(state.players, state.matches, season)
+        return { recap: recap.seasonRecap(state.players, state.matches, season, state.competitionStates, state.teams, leaders), leaders }
+      }
       global.localStorage = { getItem: key => key === 'football-tracker-v1' ? serialized : null }
       return repository.LocalRepository.getAppState()
     },

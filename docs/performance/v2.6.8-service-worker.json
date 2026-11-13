@@ -1,0 +1,337 @@
+{
+  "baseSha": "82c2c8a9e1975797b55397eac4389d2d1a8a6cc7",
+  "method": "Functional diagnosis in isolated production Chromium with ServiceWorker and Network CDP event collection, synthetic fixture, actual worker enabled. Independent archived v2.6.7 build. Initial controlled load, normal reload and a second navigation identify cache storage versus network responses. Current production build uses the corrected public/sw.js. This report is correctness evidence, not a performance benchmark.",
+  "currentBeforeFix": {
+    "controller": {
+      "url": "http://127.0.0.1:52029/football-tracker/sw.js?v=2.6.8",
+      "state": "activated"
+    },
+    "cachesAfterControlledReload": [
+      {
+        "name": "football-tracker-2.6.8",
+        "urls": [
+          "http://127.0.0.1:52029/football-tracker/",
+          "http://127.0.0.1:52029/football-tracker/index.html",
+          "http://127.0.0.1:52029/football-tracker/favicon.svg",
+          "http://127.0.0.1:52029/football-tracker/manifest.json"
+        ]
+      }
+    ],
+    "cachesAfterSecondNavigation": [
+      {
+        "name": "football-tracker-2.6.8",
+        "urls": [
+          "http://127.0.0.1:52029/football-tracker/",
+          "http://127.0.0.1:52029/football-tracker/index.html",
+          "http://127.0.0.1:52029/football-tracker/favicon.svg",
+          "http://127.0.0.1:52029/football-tracker/manifest.json"
+        ]
+      }
+    ],
+    "workerErrors": [
+      {
+        "errorMessage": "Uncaught (in promise) TypeError: Failed to execute 'clone' on 'Response': Response body is already used",
+        "registrationId": "1",
+        "versionId": "1",
+        "sourceURL": "http://127.0.0.1:52029/football-tracker/sw.js?v=2.6.8",
+        "lineNumber": 39,
+        "columnNumber": -1
+      },
+      {
+        "errorMessage": "Uncaught (in promise) TypeError: Failed to execute 'clone' on 'Response': Response body is already used",
+        "registrationId": "1",
+        "versionId": "1",
+        "sourceURL": "http://127.0.0.1:52029/football-tracker/sw.js?v=2.6.8",
+        "lineNumber": 45,
+        "columnNumber": -1
+      },
+      {
+        "errorMessage": "Uncaught (in promise) TypeError: Failed to execute 'clone' on 'Response': Response body is already used",
+        "registrationId": "1",
+        "versionId": "1",
+        "sourceURL": "http://127.0.0.1:52029/football-tracker/sw.js?v=2.6.8",
+        "lineNumber": 45,
+        "columnNumber": -1
+      },
+      {
+        "errorMessage": "Uncaught (in promise) TypeError: Failed to execute 'clone' on 'Response': Response body is already used",
+        "registrationId": "1",
+        "versionId": "1",
+        "sourceURL": "http://127.0.0.1:52029/football-tracker/sw.js?v=2.6.8",
+        "lineNumber": 39,
+        "columnNumber": -1
+      },
+      {
+        "errorMessage": "Uncaught (in promise) TypeError: Failed to execute 'clone' on 'Response': Response body is already used",
+        "registrationId": "1",
+        "versionId": "1",
+        "sourceURL": "http://127.0.0.1:52029/football-tracker/sw.js?v=2.6.8",
+        "lineNumber": 45,
+        "columnNumber": -1
+      },
+      {
+        "errorMessage": "Uncaught (in promise) TypeError: Failed to execute 'clone' on 'Response': Response body is already used",
+        "registrationId": "1",
+        "versionId": "1",
+        "sourceURL": "http://127.0.0.1:52029/football-tracker/sw.js?v=2.6.8",
+        "lineNumber": 45,
+        "columnNumber": -1
+      }
+    ],
+    "assetResponses": [
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:52029/football-tracker/assets/index-C3XmUCy6.css",
+        "status": 200,
+        "fromServiceWorker": false,
+        "fromDiskCache": false
+      },
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:52029/football-tracker/assets/index-BEpPrC7N.js",
+        "status": 200,
+        "fromServiceWorker": false,
+        "fromDiskCache": false
+      },
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:52029/football-tracker/assets/index-C3XmUCy6.css",
+        "status": 200,
+        "fromServiceWorker": true,
+        "fromDiskCache": false,
+        "serviceWorkerResponseSource": "network"
+      },
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:52029/football-tracker/assets/index-BEpPrC7N.js",
+        "status": 200,
+        "fromServiceWorker": true,
+        "fromDiskCache": false,
+        "serviceWorkerResponseSource": "network"
+      },
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:52029/football-tracker/assets/index-C3XmUCy6.css",
+        "status": 200,
+        "fromServiceWorker": true,
+        "fromDiskCache": false,
+        "serviceWorkerResponseSource": "network"
+      },
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:52029/football-tracker/assets/index-BEpPrC7N.js",
+        "status": 200,
+        "fromServiceWorker": true,
+        "fromDiskCache": false,
+        "serviceWorkerResponseSource": "network"
+      }
+    ]
+  },
+  "baseline": {
+    "controller": {
+      "url": "http://127.0.0.1:55602/football-tracker/sw.js?v=2.6.7",
+      "state": "activated"
+    },
+    "cachesAfterControlledReload": [
+      {
+        "name": "football-tracker-2.6.7",
+        "urls": [
+          "http://127.0.0.1:55602/football-tracker/",
+          "http://127.0.0.1:55602/football-tracker/index.html",
+          "http://127.0.0.1:55602/football-tracker/favicon.svg",
+          "http://127.0.0.1:55602/football-tracker/manifest.json"
+        ]
+      }
+    ],
+    "cachesAfterSecondNavigation": [
+      {
+        "name": "football-tracker-2.6.7",
+        "urls": [
+          "http://127.0.0.1:55602/football-tracker/",
+          "http://127.0.0.1:55602/football-tracker/index.html",
+          "http://127.0.0.1:55602/football-tracker/favicon.svg",
+          "http://127.0.0.1:55602/football-tracker/manifest.json"
+        ]
+      }
+    ],
+    "workerErrors": [
+      {
+        "errorMessage": "Uncaught (in promise) TypeError: Failed to execute 'clone' on 'Response': Response body is already used",
+        "registrationId": "1",
+        "versionId": "1",
+        "sourceURL": "http://127.0.0.1:55602/football-tracker/sw.js?v=2.6.7",
+        "lineNumber": 39,
+        "columnNumber": -1
+      },
+      {
+        "errorMessage": "Uncaught (in promise) TypeError: Failed to execute 'clone' on 'Response': Response body is already used",
+        "registrationId": "1",
+        "versionId": "1",
+        "sourceURL": "http://127.0.0.1:55602/football-tracker/sw.js?v=2.6.7",
+        "lineNumber": 45,
+        "columnNumber": -1
+      },
+      {
+        "errorMessage": "Uncaught (in promise) TypeError: Failed to execute 'clone' on 'Response': Response body is already used",
+        "registrationId": "1",
+        "versionId": "1",
+        "sourceURL": "http://127.0.0.1:55602/football-tracker/sw.js?v=2.6.7",
+        "lineNumber": 45,
+        "columnNumber": -1
+      },
+      {
+        "errorMessage": "Uncaught (in promise) TypeError: Failed to execute 'clone' on 'Response': Response body is already used",
+        "registrationId": "1",
+        "versionId": "1",
+        "sourceURL": "http://127.0.0.1:55602/football-tracker/sw.js?v=2.6.7",
+        "lineNumber": 39,
+        "columnNumber": -1
+      },
+      {
+        "errorMessage": "Uncaught (in promise) TypeError: Failed to execute 'clone' on 'Response': Response body is already used",
+        "registrationId": "1",
+        "versionId": "1",
+        "sourceURL": "http://127.0.0.1:55602/football-tracker/sw.js?v=2.6.7",
+        "lineNumber": 45,
+        "columnNumber": -1
+      },
+      {
+        "errorMessage": "Uncaught (in promise) TypeError: Failed to execute 'clone' on 'Response': Response body is already used",
+        "registrationId": "1",
+        "versionId": "1",
+        "sourceURL": "http://127.0.0.1:55602/football-tracker/sw.js?v=2.6.7",
+        "lineNumber": 45,
+        "columnNumber": -1
+      }
+    ],
+    "assetResponses": [
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:55602/football-tracker/assets/index-BtPES_rb.css",
+        "status": 200,
+        "fromServiceWorker": false,
+        "fromDiskCache": false
+      },
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:55602/football-tracker/assets/index-B7oMFRU-.js",
+        "status": 200,
+        "fromServiceWorker": false,
+        "fromDiskCache": false
+      },
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:55602/football-tracker/assets/index-BtPES_rb.css",
+        "status": 200,
+        "fromServiceWorker": true,
+        "fromDiskCache": false,
+        "serviceWorkerResponseSource": "network"
+      },
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:55602/football-tracker/assets/index-B7oMFRU-.js",
+        "status": 200,
+        "fromServiceWorker": true,
+        "fromDiskCache": false,
+        "serviceWorkerResponseSource": "network"
+      },
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:55602/football-tracker/assets/index-BtPES_rb.css",
+        "status": 200,
+        "fromServiceWorker": true,
+        "fromDiskCache": false,
+        "serviceWorkerResponseSource": "network"
+      },
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:55602/football-tracker/assets/index-B7oMFRU-.js",
+        "status": 200,
+        "fromServiceWorker": true,
+        "fromDiskCache": false,
+        "serviceWorkerResponseSource": "network"
+      }
+    ]
+  },
+  "currentAfterFix": {
+    "controller": {
+      "url": "http://127.0.0.1:51104/football-tracker/sw.js?v=2.6.8",
+      "state": "activated"
+    },
+    "cachesAfterControlledReload": [
+      {
+        "name": "football-tracker-2.6.8",
+        "urls": [
+          "http://127.0.0.1:51104/football-tracker/",
+          "http://127.0.0.1:51104/football-tracker/favicon.svg",
+          "http://127.0.0.1:51104/football-tracker/manifest.json",
+          "http://127.0.0.1:51104/football-tracker/index.html",
+          "http://127.0.0.1:51104/football-tracker/assets/index-BEpPrC7N.js",
+          "http://127.0.0.1:51104/football-tracker/assets/index-C3XmUCy6.css"
+        ]
+      }
+    ],
+    "cachesAfterSecondNavigation": [
+      {
+        "name": "football-tracker-2.6.8",
+        "urls": [
+          "http://127.0.0.1:51104/football-tracker/",
+          "http://127.0.0.1:51104/football-tracker/favicon.svg",
+          "http://127.0.0.1:51104/football-tracker/manifest.json",
+          "http://127.0.0.1:51104/football-tracker/assets/index-BEpPrC7N.js",
+          "http://127.0.0.1:51104/football-tracker/assets/index-C3XmUCy6.css",
+          "http://127.0.0.1:51104/football-tracker/index.html"
+        ]
+      }
+    ],
+    "workerErrors": [],
+    "assetResponses": [
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:51104/football-tracker/assets/index-C3XmUCy6.css",
+        "status": 200,
+        "fromServiceWorker": false,
+        "fromDiskCache": false
+      },
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:51104/football-tracker/assets/index-BEpPrC7N.js",
+        "status": 200,
+        "fromServiceWorker": false,
+        "fromDiskCache": false
+      },
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:51104/football-tracker/assets/index-C3XmUCy6.css",
+        "status": 200,
+        "fromServiceWorker": true,
+        "fromDiskCache": false,
+        "serviceWorkerResponseSource": "network"
+      },
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:51104/football-tracker/assets/index-BEpPrC7N.js",
+        "status": 200,
+        "fromServiceWorker": true,
+        "fromDiskCache": false,
+        "serviceWorkerResponseSource": "network"
+      },
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:51104/football-tracker/assets/index-C3XmUCy6.css",
+        "status": 200,
+        "fromServiceWorker": true,
+        "fromDiskCache": true,
+        "serviceWorkerResponseSource": "cache-storage"
+      },
+      {
+        "method": "Network.responseReceived",
+        "url": "http://127.0.0.1:51104/football-tracker/assets/index-BEpPrC7N.js",
+        "status": 200,
+        "fromServiceWorker": true,
+        "fromDiskCache": true,
+        "serviceWorkerResponseSource": "cache-storage"
+      }
+    ]
+  }
+}

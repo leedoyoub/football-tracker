@@ -119,9 +119,37 @@ test('v266 legacy Cup stage state never calculates stage XI and retains official
   assert.deepEqual(nodes(tree, n => n.type?.name === 'CompetitionIndividualAwards')[0].props.result.individualAwards, canonical.individualAwards)
 })
 
-test('v266 evaluation, publication, Team History, shared race and pitch sources remain byte-equivalent to v265', () => {
+test('v266 official scoring, publication, Team History, shared race and pitch remain byte-equivalent to v265', () => {
   for (const file of ['engine/awards.ts', 'engine/awardEvaluation.ts', 'engine/awardRules.ts', 'engine/officialAwards.ts', 'engine/awardPolicy.ts', 'engine/rating.ts', 'engine/ratingRevision.ts', 'engine/competition.ts', 'engine/teamHistorySelection.ts', 'components/Pitch.tsx', 'components/awardBestXIProps.ts', 'components/AwardBestXI.tsx', 'components/AwardRacePanel.tsx', 'screens/AwardRaceScreen.tsx']) {
     const old = execFileSync('git', ['show', `5347394:src/${file}`], { encoding: 'utf8' }).replaceAll('\r', '')
-    assert.equal(fs.readFileSync(path.join(root, 'src', file), 'utf8').replaceAll('\r', ''), old, file)
+    const current = fs.readFileSync(path.join(root, 'src', file), 'utf8').replaceAll('\r', '')
+    // v268 indexes historical registrations once; the entire shared scoring,
+    // qualification, weighting, deduplication and tie-selection code stays exact.
+    // The independent result check below also protects the changed input index.
+    const sharedScoring = source => {
+      const start = source.indexOf('/** Shared individual facts')
+      assert(start >= 0)
+      return source.slice(start)
+    }
+    assert.equal(file === 'engine/awardEvaluation.ts' ? sharedScoring(current) : current, file === 'engine/awardEvaluation.ts' ? sharedScoring(old) : old, file)
   }
+})
+
+test('v268 indexed participation preserves every official candidate field across scopes and historical edits', () => {
+  const baseline = require(path.join(require('./helpers/v268-baseline.cjs').baselineRoot(), 'src/engine/awardEvaluation.ts'))
+  const current = require('../src/engine/awardEvaluation.ts')
+  const s = require('./helpers/v255-fixture.cjs').performanceFixture(1)
+  const compare = label => {
+    for (const type of ['all', 'league', 'cup', 'champions']) {
+      const games = s.matches.filter(m => type === 'all' || m.competitionType === type)
+      const args = [s.players, games, s.matches, (competition, teamId) => (s.teams.findIndex(t => t.id === teamId) + 1) * ({ league: .01, cup: .02, champions: .03 }[competition]), { league: .7, cup: .2, champions: .4 }]
+      assert.deepEqual(current.evaluateOfficialCandidates(...args), baseline.evaluateOfficialCandidates(...args), `${label}: ${type}`)
+    }
+  }
+  compare('original')
+  s.matches[0] = { ...s.matches[0], events: [] }
+  compare('same-array historical replacement')
+  s.matches.splice(1, 1)
+  s.players[9] = { ...s.players[9], teamId: s.teams[2].id, position: 'GK' }
+  compare('historical deletion and player transfer')
 })

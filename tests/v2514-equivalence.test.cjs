@@ -26,10 +26,19 @@ test('unmodified rating, competition, durability and scroll sources remain ident
   // v2.6.7 intentionally changes Store's replacement safety. The real-Store
   // v267-match-metadata and p0-durability tests cover queue/read-back races,
   // saved identity and draft preservation; durable serializers remain exact.
+  // v2.6.8 adds a revision-aware unit cache. Strip only its wrapper: keep
+  // byte equality for every underlying interval, goal, SOT and ordering rule.
+  // v268-records independently checks complete boards and mutation invalidation.
   for (const file of ['engine/rating.ts', 'engine/ratingRevision.ts', 'engine/timeline.ts', 'engine/constants.ts', 'engine/competitionSelectors.ts', 'engine/standings.ts', 'engine/competitionContext.ts', 'engine/competitionRevision.ts', 'engine/unitRecords.ts', 'lib/repository.ts', 'lib/validation.ts', 'lib/scrollCheckpoint.ts', 'lib/cardWindow.ts', 'screens/TeamsScreen.tsx']) {
     const read = root => fs.readFileSync(path.join(root, 'src', file), 'utf8').replaceAll('\r\n', '\n')
       // v2.6.2 permits progress values to wrap inside the same-sized cards.
       .replaceAll('<dd className="min-w-0 text-right font-bold text-zinc-100">', '<dd className="font-bold text-zinc-100">')
-    assert.equal(read(b.root), read(b.directory), file)
+    const unitCalculation = source => source
+      .replace("import { arrayItemRevision } from './arrayItemRevision'\n", '')
+      .replace("import { RATING_ENGINE_REVISION } from './ratingRevision'\n", '')
+      .replace('const unitCache = new WeakMap<Match[], WeakMap<Player[], Map<string, UnitRecord[]>>>()\n', '')
+      .replace(/  let byPlayers = unitCache[^]*?(?=  const families =)/, '')
+      .replace(/  const result = ([^\n]+)\n  if \(byScope.size >= 24\)[^]*?  return result\n/, '  return $1\n')
+    assert.equal(file === 'engine/unitRecords.ts' ? unitCalculation(read(b.root)) : read(b.root), read(b.directory), file)
   }
 })

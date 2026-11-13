@@ -156,7 +156,7 @@ function clonePlayerRows(rows: Map<string, PlayerSnapshotRow>): Map<LeaderboardM
   return new Map(METRICS.map(metric => [metric, all.slice().sort(playerRowOrder(metric))]))
 }
 
-function buildPlayerSnapshots(players: Player[], games: Match[]): Map<number, PlayerRankingSnapshot> {
+function buildPlayerSnapshots(players: Player[], games: Match[], selectedDays?: ReadonlySet<number>): Map<number, PlayerRankingSnapshot> {
   const rows = new Map<string, PlayerSnapshotRow>()
   const byPlayer = new Map(players.map(player => [player.id, player]))
   const result = new Map<number, PlayerRankingSnapshot>()
@@ -176,8 +176,29 @@ function buildPlayerSnapshots(players: Player[], games: Match[]): Map<number, Pl
         rows.set(player.id, row)
       }
     }
-    if (games.some(match => leagueDay(match) === day)) result.set(day, { matchDay: day, rows: clonePlayerRows(rows) })
+    if ((!selectedDays || selectedDays.has(day)) && games.some(match => leagueDay(match) === day)) result.set(day, { matchDay: day, rows: clonePlayerRows(rows) })
   }
+  return result
+}
+
+type CurrentPlayerRankingSnapshots = { currentMatchDay: number; current: PlayerRankingSnapshot | undefined; previous: PlayerRankingSnapshot | undefined }
+const currentPlayerSnapshotsCache = new WeakMap<Match[], WeakMap<Player[], Map<string, CurrentPlayerRankingSnapshots>>>()
+
+/** Ranking movement needs two player snapshots, with no standings or award history. */
+export function currentPlayerRankingSnapshots(players: Player[], matches: Match[], season: string): CurrentPlayerRankingSnapshots {
+  let byPlayers = currentPlayerSnapshotsCache.get(matches)
+  if (!byPlayers) { byPlayers = new WeakMap(); currentPlayerSnapshotsCache.set(matches, byPlayers) }
+  let bySeason = byPlayers.get(players)
+  if (!bySeason) { bySeason = new Map(); byPlayers.set(players, bySeason) }
+  const key = `${RATING_ENGINE_REVISION}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${season}`
+  const existing = bySeason.get(key)
+  if (existing) return existing
+  const games = competitionMatches(matches, season, 'league')
+  const currentMatchDay = Math.max(0, ...games.map(leagueDay).filter(day => Number.isInteger(day) && day >= 1 && day <= LEAGUE_MATCHES_PER_TEAM))
+  const snapshots = buildPlayerSnapshots(players, games, new Set([currentMatchDay, currentMatchDay - 1]))
+  const result = { currentMatchDay, current: snapshots.get(currentMatchDay), previous: snapshots.get(currentMatchDay - 1) }
+  if (bySeason.size >= 24) bySeason.delete(bySeason.keys().next().value!)
+  bySeason.set(key, result)
   return result
 }
 

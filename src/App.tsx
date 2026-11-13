@@ -43,6 +43,7 @@ import { flushScrollCheckpoints } from './lib/scrollCheckpoint'
 import { resetCompetitionTypeScroll } from './lib/competitionTypeScroll'
 import { resolvePlayerDestination } from './lib/playerNavigation'
 import { resetCompetitionSeasonState } from './lib/competitionScreenState'
+import { attachEdgeSwipeBack, hasEdgeBack, usesNativeEdgeBack } from './lib/edgeSwipeBack'
 
 export default function App() {
   const { user, loading, startupError, signInWithGoogle, retryStartup } = useAuth()
@@ -62,6 +63,7 @@ export default function App() {
   const pendingPlayerTabScroll = useRef<{ id: string; tab: ScreenStateByView['player']['tab']; top: number } | null>(null)
   const entry = history[history.length - 1]
   const view = entry.view
+  const edgeBack = useRef<() => void>(() => {})
   const startup = useMemo(
     () => ({ authLoading: loading, authError: startupError, isSupabaseConfigured, hasUser: Boolean(user), localOnly, routeRestored }),
     [loading, startupError, user, localOnly, routeRestored],
@@ -110,6 +112,14 @@ export default function App() {
       onSettled: () => { if (pendingPlayerTabScroll.current === pending) pendingPlayerTabScroll.current = null },
     })
   }, [entry, history])
+
+  useLayoutEffect(() => { edgeBack.current = view.name === 'team' ? onTeamDetailBack : onBack })
+  useLayoutEffect(() => {
+    const container = scrollRef.current
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true
+    if (!container || !routeRestored || !canUseApp(startup) || !hasEdgeBack(view) || usesNativeEdgeBack(navigator.userAgent, navigator.platform, navigator.maxTouchPoints, standalone)) return
+    return attachEdgeSwipeBack(container, () => edgeBack.current())
+  }, [view, routeRestored, startup])
 
   const tab: Tab = useMemo(() => {
     if (view.name === 'teams' || view.name === 'team' || view.name === 'import-squad' || view.name === 'new-match') {

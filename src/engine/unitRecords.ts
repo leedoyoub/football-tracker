@@ -5,6 +5,8 @@ import { playerGoalEvents } from './playerMatchFacts'
 import { positionFamily, scopedPositionFamilyByPlayer, type PositionFamily } from './positionScope'
 import { teamPerspectiveScore } from './matchPerspective'
 import { creditedPositionSegments, isOnPitchAtEvent, matchPositionAtEvent, scoringTeamId } from './timeline'
+import { arrayItemRevision } from './arrayItemRevision'
+import { RATING_ENGINE_REVISION } from './ratingRevision'
 
 export type UnitPosition = 'attack' | 'midfield' | 'defence' | 'cb'
 export type UnitRecord = {
@@ -13,6 +15,7 @@ export type UnitRecord = {
   memberGoals: number; teamGF: number; teamGA: number
   intervalGA: number; intervalSOT: number
 }
+const unitCache = new WeakMap<Match[], WeakMap<Player[], Map<string, UnitRecord[]>>>()
 
 const groupOf = (family?: PositionFamily): Exclude<UnitPosition, 'cb'> | undefined => {
   if (family === 'ST' || family === 'SS' || family === 'LW' || family === 'RW') return 'attack'
@@ -40,6 +43,11 @@ function commonIntervals(segments: ReturnType<typeof creditedPositionSegments>[]
 /** One scoped pass builds all 2/3/4-player unit facts from actual same-team appearances. */
 export function buildUnitRecords(players: Player[], matches: Match[], teamIds: string[], requested?: ReadonlySet<string>): UnitRecord[] {
   if (requested?.size === 0) return []
+  let byPlayers = unitCache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); unitCache.set(matches, byPlayers) }
+  let byScope = byPlayers.get(players); if (!byScope) { byScope = new Map(); byPlayers.set(players, byScope) }
+  const cacheKey = JSON.stringify([RATING_ENGINE_REVISION, arrayItemRevision(matches), arrayItemRevision(players), [...teamIds].sort(), requested ? [...requested].sort() : null])
+  const cached = byScope.get(cacheKey)
+  if (cached) return cached
   const families = scopedPositionFamilyByPlayer(players, matches, { teams: teamIds })
   const known = new Set(players.map(player => player.id))
   const totals = new Map<string, UnitRecord>()
@@ -83,5 +91,8 @@ export function buildUnitRecords(players: Player[], matches: Match[], teamIds: s
       }
     }
   }
-  return [...totals.values()].sort((a, b) => a.key.localeCompare(b.key))
+  const result = [...totals.values()].sort((a, b) => a.key.localeCompare(b.key))
+  if (byScope.size >= 24) byScope.delete(byScope.keys().next().value!)
+  byScope.set(cacheKey, result)
+  return result
 }

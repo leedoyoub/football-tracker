@@ -1,0 +1,627 @@
+{
+  "method": "Isolated real production Chromium, CDP touch/mouse sequences at 320/375/390px, synthetic data. No physical iOS/Safari/Android device validation.",
+  "cases": 71,
+  "errors": [],
+  "results": [
+    {
+      "area": "route-back",
+      "width": 320,
+      "route": "player",
+      "before": "Synthetic real-madrid 9",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 320,
+      "route": "match",
+      "before": "RMA 3-1 OPP",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 320,
+      "route": "team",
+      "before": "Real Madrid",
+      "after": "Teams",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 320,
+      "route": "global-ranking",
+      "before": "Global Ranking",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 320,
+      "route": "award-race",
+      "before": "Award Race",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 320,
+      "route": "records-leaderboard",
+      "before": "All-time Goals",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 320,
+      "route": "results",
+      "before": "Results",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 320,
+      "route": "latest-changes",
+      "before": "Latest Changes",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 320,
+      "route": "season-recap",
+      "before": "Season Recap",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 320,
+      "route": "season-highlight",
+      "before": "News",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 320,
+      "route": "chemistry",
+      "before": "Combinations",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "team-history-disclosures-allow-back",
+      "width": 320
+    },
+    {
+      "area": "player-scroll-tab-filter-refresh",
+      "width": 320,
+      "restoredTop": 300,
+      "ignoredInputs": 5
+    },
+    {
+      "area": "modal-blocks-back",
+      "width": 320
+    },
+    {
+      "area": "filter-and-metric-swipe-conflicts",
+      "width": 320
+    },
+    {
+      "area": "active-touch-route-change-cancels",
+      "width": 320
+    },
+    {
+      "area": "ranking-metric-restored-after-player-back",
+      "width": 320
+    },
+    {
+      "area": "records-scope-restored-after-player-back",
+      "width": 320
+    },
+    {
+      "area": "second-finger-outside-content-cancels",
+      "width": 320
+    },
+    {
+      "area": "popup-opening-and-closing-cancels",
+      "width": 320
+    },
+    {
+      "area": "active-touch-blur-cancels",
+      "width": 320
+    },
+    {
+      "area": "active-touch-pagehide-cancels",
+      "width": 320
+    },
+    {
+      "area": "editor-excluded",
+      "width": 320
+    },
+    {
+      "area": "route-back",
+      "width": 375,
+      "route": "player",
+      "before": "Synthetic real-madrid 9",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 375,
+      "route": "match",
+      "before": "RMA 3-1 OPP",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 375,
+      "route": "team",
+      "before": "Real Madrid",
+      "after": "Teams",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 375,
+      "route": "global-ranking",
+      "before": "Global Ranking",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 375,
+      "route": "award-race",
+      "before": "Award Race",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 375,
+      "route": "records-leaderboard",
+      "before": "All-time Goals",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 375,
+      "route": "results",
+      "before": "Results",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 375,
+      "route": "latest-changes",
+      "before": "Latest Changes",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 375,
+      "route": "season-recap",
+      "before": "Season Recap",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 375,
+      "route": "season-highlight",
+      "before": "News",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 375,
+      "route": "chemistry",
+      "before": "Combinations",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "team-history-disclosures-allow-back",
+      "width": 375
+    },
+    {
+      "area": "player-scroll-tab-filter-refresh",
+      "width": 375,
+      "restoredTop": 300,
+      "ignoredInputs": 5
+    },
+    {
+      "area": "modal-blocks-back",
+      "width": 375
+    },
+    {
+      "area": "filter-and-metric-swipe-conflicts",
+      "width": 375
+    },
+    {
+      "area": "active-touch-route-change-cancels",
+      "width": 375
+    },
+    {
+      "area": "ranking-metric-restored-after-player-back",
+      "width": 375
+    },
+    {
+      "area": "records-scope-restored-after-player-back",
+      "width": 375
+    },
+    {
+      "area": "second-finger-outside-content-cancels",
+      "width": 375
+    },
+    {
+      "area": "popup-opening-and-closing-cancels",
+      "width": 375
+    },
+    {
+      "area": "active-touch-blur-cancels",
+      "width": 375
+    },
+    {
+      "area": "active-touch-pagehide-cancels",
+      "width": 375
+    },
+    {
+      "area": "editor-excluded",
+      "width": 375
+    },
+    {
+      "area": "route-back",
+      "width": 390,
+      "route": "player",
+      "before": "Synthetic real-madrid 9",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 390,
+      "route": "match",
+      "before": "RMA 3-1 OPP",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 390,
+      "route": "team",
+      "before": "Real Madrid",
+      "after": "Teams",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 390,
+      "route": "global-ranking",
+      "before": "Global Ranking",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 390,
+      "route": "award-race",
+      "before": "Award Race",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 390,
+      "route": "records-leaderboard",
+      "before": "All-time Goals",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 390,
+      "route": "results",
+      "before": "Results",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 390,
+      "route": "latest-changes",
+      "before": "Latest Changes",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 390,
+      "route": "season-recap",
+      "before": "Season Recap",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 390,
+      "route": "season-highlight",
+      "before": "News",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "route-back",
+      "width": 390,
+      "route": "chemistry",
+      "before": "Combinations",
+      "after": "Season 2",
+      "listenersCleaned": true,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "team-history-disclosures-allow-back",
+      "width": 390
+    },
+    {
+      "area": "player-scroll-tab-filter-refresh",
+      "width": 390,
+      "restoredTop": 300,
+      "ignoredInputs": 5
+    },
+    {
+      "area": "modal-blocks-back",
+      "width": 390
+    },
+    {
+      "area": "filter-and-metric-swipe-conflicts",
+      "width": 390
+    },
+    {
+      "area": "active-touch-route-change-cancels",
+      "width": 390
+    },
+    {
+      "area": "ranking-metric-restored-after-player-back",
+      "width": 390
+    },
+    {
+      "area": "records-scope-restored-after-player-back",
+      "width": 390
+    },
+    {
+      "area": "second-finger-outside-content-cancels",
+      "width": 390
+    },
+    {
+      "area": "popup-opening-and-closing-cancels",
+      "width": 390
+    },
+    {
+      "area": "active-touch-blur-cancels",
+      "width": 390
+    },
+    {
+      "area": "active-touch-pagehide-cancels",
+      "width": 390
+    },
+    {
+      "area": "editor-excluded",
+      "width": 390
+    },
+    {
+      "area": "ios-browser-native-adapter",
+      "physicalSafari": false
+    },
+    {
+      "area": "ios-standalone-custom-adapter",
+      "physicalPWA": false
+    }
+  ]
+}

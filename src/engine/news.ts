@@ -1,5 +1,6 @@
 import { competitionHistory, cupCompetition, championsCompetition, CHAMPIONS_ROUNDS, matchCompetitionType } from './competition'
-import { awardResultForScope, competitionAwardResult } from './awards'
+import { awardResultForScope, competitionAwardResult, isLeagueHalfFinalized } from './awards'
+import { matchesForAwardScope } from './awardScopes'
 import { currentStaticTeams } from '../data/teams'
 import { getMatchManOfTheMatch, matchScore, ratePlayerMatch } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
@@ -27,7 +28,7 @@ type Streak = { scoring: number; contribution: number }
 type TeamRun = { wins: number; unbeaten: number; cleanSheets: number; seasonGoals: number; seasonCleanSheets: number }
 
 const EMPTY_STATES: CompetitionState[] = []
-type NewsCacheEntry = { revision: number; awardRevision: number; sourceRevision: string; items?: NewsItem[]; playerMilestones: Map<string, NewsItem[]> }
+type NewsCacheEntry = { revision: number; awardRevision: number; sourceRevision: string; items?: NewsItem[]; playerMilestones: Map<string, NewsItem[]>; events?: Map<string, DerivedFootballEvent[]> }
 const newsCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], NewsCacheEntry>>>>()
 
 /** The sole News chronology rule: newest date, newest anchored Match, then ID. */
@@ -345,6 +346,10 @@ function deriveNewsUncached(players: Player[], teams: Team[], matches: Match[], 
       }
     }
     for (const scope of ['first-half', 'second-half'] as const) {
+      // News publishes finalized halves only. Reuse the official completion
+      // gate before deriving a live candidate model that would be discarded.
+      const games = matchesForAwardScope(matches, seasonName, scope)
+      if (!isLeagueHalfFinalized(teams, games, seasonName, scope === 'first-half' ? 1 : 16)) continue
       const award = awardResultForScope(scope, seasonName, teams, players, matches, states)
       if (!award?.complete) continue
       for (const article of awardNewsFromResult(award, id => playerName(players, id))) add(article)
@@ -437,7 +442,14 @@ function surfaceFor(item: NewsItem): EventSurface {
 
 /** Canonical, non-persistent event model consumed by News and Match Changes. */
 export function deriveFootballEvents(players: Player[], teams: Team[], matches: Match[], states: CompetitionState[] = EMPTY_STATES, options: { includeAllRanking?: boolean; includeMatchPerformance?: boolean } = {}): DerivedFootballEvent[] {
-  const derived = deriveNews(players, teams, matches, states)
+  const entry = newsEntry(players, teams, matches, states)
+  // These four semantic selections share the same source/revision owner as the
+  // News feed. Reopening and changing Latest Changes' season filter must not
+  // reproject every article, traverse contributions and sort the entire feed.
+  const selection = `${Boolean(options.includeAllRanking)}:${options.includeMatchPerformance !== false}`
+  const cached = entry.events?.get(selection)
+  if (cached) return cached
+  const derived = (entry.items ??= deriveNewsUncached(players, teams, matches, states))
     // The participant-only transition index owns detailed ranking movement.
     // Snapshot stories enter this model solely for an explicit core-metric #1.
     .filter(item => options.includeAllRanking || !item.id.startsWith('rank:') || item.surface === 'news')
@@ -455,7 +467,10 @@ export function deriveFootballEvents(players: Player[], teams: Team[], matches: 
       return { id: `match-performance:${match.id}:${playerId}`, kind: 'match' as const, date: match.date, matchId: match.id, playerId, eyebrow: 'MATCH CHANGE', title: `${name} records ${summary}`, detail: summary, context: scoreText(match, teams), emoji: '⚽', surface: 'match-change' as const, matchChange: { kind: 'performance' as const, label: `${name}: ${summary}` } }
     })
   })
-  return sortNewsNewestFirst([...derived, ...contributions], matches)
+  const result = sortNewsNewestFirst([...derived, ...contributions], matches)
+  entry.events ??= new Map()
+  entry.events.set(selection, result)
+  return result
 }
 
 /** Major News projection: one deterministic whitelist shared by Home and View All. */

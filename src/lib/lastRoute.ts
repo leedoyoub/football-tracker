@@ -38,7 +38,8 @@ export function saveLastRoute(view: View, draftMatch?: AppState['draftMatch'], t
   try {
     const restored = restorableView(view, draftMatch)
     const identity = restored.name === 'player' ? { name: 'player', id: restored.id } as View : restored
-    target.setItem(LAST_ROUTE_STORAGE_KEY, JSON.stringify(screenState ? { version: 2, view: identity, screenState } : identity))
+    const serialized = JSON.stringify(screenState ? { version: 2, view: identity, screenState } : identity)
+    if (target.getItem(LAST_ROUTE_STORAGE_KEY) !== serialized) target.setItem(LAST_ROUTE_STORAGE_KEY, serialized)
   } catch {
     // Storage can be unavailable in private browsing; navigation must still work.
   }

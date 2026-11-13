@@ -23,10 +23,10 @@ const approvedTeamIds = [
 test('v2.6.7 aligns actual release metadata while using rating revision 13', () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
   const lockfile = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'))
-  assert.equal(packageJson.version, '2.6.7')
-  assert.equal(lockfile.version, '2.6.7')
-  assert.equal(lockfile.packages[''].version, '2.6.7')
-  assert.equal(APP_VERSION, '2.6.7')
+  assert.equal(packageJson.version, '2.6.8')
+  assert.equal(lockfile.version, '2.6.8')
+  assert.equal(lockfile.packages[''].version, '2.6.8')
+  assert.equal(APP_VERSION, '2.6.8')
   assert.equal(RATING_ENGINE_REVISION, 13)
 })
 

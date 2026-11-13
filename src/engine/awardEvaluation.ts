@@ -1,4 +1,4 @@
-import type { CompetitionType, Match, Player } from '../types'
+import type { Appearance, CompetitionType, Match, Player } from '../types'
 import { buildGlobalRankingData, type GlobalLeaderboardRow } from './stats'
 import { rankAwardCandidates, type AwardCandidate } from './awardRules'
 import { scopedAwardFamilyByPlayer } from './positionScope'
@@ -12,18 +12,22 @@ import { RATING_ENGINE_REVISION } from './ratingRevision'
 
 type Participation = { minutes: number; availableMinutes: number; teamMinutes: Map<string, number> }
 const competitions = ['league', 'cup', 'champions'] as const
+type SeasonParticipationRow = { match: Match; identity: ReturnType<typeof competitionIdentityForMatch>; teamIds: string[]; appearances: Map<string, Appearance>; minutes: Map<string, number> }
+type SeasonParticipation = { revision: string; ordered: SeasonParticipationRow[]; evidence: Map<string, { index: number; teamId: string }[]> }
+const seasonParticipationCache = new WeakMap<Match[], SeasonParticipation>()
 
-/** A transfer date is not stored. Recorded registrations delimit the evidenced
- * stints; the last known team owns uncertain gaps. Before the first record the
- * first evidenced team owns the opportunities. No current-roster inference. */
-function scopeParticipation(players: Player[], games: Match[], seasonGames: Match[]) {
+/** Every award scope uses the same recorded season registration history. Keep
+ * this roster-independent input once; opportunities remain scope-specific. */
+function seasonParticipation(seasonGames: Match[]): SeasonParticipation {
+  const revision = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${arrayItemRevision(seasonGames)}`
+  const cached = seasonParticipationCache.get(seasonGames)
+  if (cached?.revision === revision) return cached
   const ordered = oldestMatches(seasonGames).map(match => {
     const identity = competitionIdentityForMatch(match)
     const teamIds = [...new Set([match.teamId ?? match.homeTeamId, match.awayTeamId])].filter(teamId => isRecordedForTeam(match, teamId))
     const appearances = new Map(match.appearances.filter(a => teamIds.includes(a.teamId)).map(a => [a.playerId, a]))
     return { match, identity, teamIds, appearances, minutes: new Map([...appearances].map(([id, appearance]) => [id, Math.min(90, creditedMinutesPlayed(match, appearance))])) }
   })
-  const selected = new Set(games)
   const evidence = new Map<string, { index: number; teamId: string }[]>()
   ordered.forEach(({ appearances }, index) => {
     for (const appearance of appearances.values()) {
@@ -31,11 +35,25 @@ function scopeParticipation(players: Player[], games: Match[], seasonGames: Matc
       rows.push({ index, teamId: appearance.teamId }); evidence.set(appearance.playerId, rows)
     }
   })
+  const result = { revision, ordered, evidence }
+  seasonParticipationCache.set(seasonGames, result)
+  return result
+}
+
+/** A transfer date is not stored. Recorded registrations delimit the evidenced
+ * stints; the last known team owns uncertain gaps. Before the first record the
+ * first evidenced team owns the opportunities. No current-roster inference. */
+function scopeParticipation(players: Player[], games: Match[], seasonGames: Match[]) {
+  const { ordered, evidence } = seasonParticipation(seasonGames)
+  const selected = new Set(games)
   // Team-local repeated slots remain distinct records. Across transferred teams
   // the same League round / tournament game is one opportunity, not two.
   const ordinalByTeam = new Map<string, number>()
   const slots = new Map<Match, Map<string, string>>()
-  for (const { match, identity, teamIds } of ordered) {
+  const selectedByTeam = new Map<string, { index: number; row: typeof ordered[number] }[]>()
+  const seenGames = new Set<string>()
+  for (const [index, row] of ordered.entries()) {
+    const { match, identity, teamIds } = row
     if (!selected.has(match)) continue
     const base = `${match.season}:${match.date?.trim() || match.id}:${identity.competitionType}:${identity.stage}:${identity.seriesGame ?? identity.matchDay}`
     const byTeam = new Map<string, string>()
@@ -45,33 +63,48 @@ function scopeParticipation(players: Player[], games: Match[], seasonGames: Matc
       ordinalByTeam.set(key, ordinal + 1); byTeam.set(teamId, `${base}:${ordinal}`)
     }
     slots.set(match, byTeam)
+    // Deduplication was identical for every player. Keep assigning ordinals to
+    // all saved rows above, but visit only the first selected ID in each stint.
+    if (seenGames.has(match.id)) continue
+    seenGames.add(match.id)
+    for (const teamId of teamIds) {
+      const rows = selectedByTeam.get(teamId) ?? []
+      rows.push({ index, row }); selectedByTeam.set(teamId, rows)
+    }
   }
   const result = new Map<string, Record<CompetitionType, Participation>>()
   for (const player of players) {
     const history = evidence.get(player.id)
     if (!history?.length) continue
     const facts = Object.fromEntries(competitions.map(type => [type, { minutes: 0, availableMinutes: 0, teamMinutes: new Map<string, number>() }])) as Record<CompetitionType, Participation>
-    let cursor = 0
-    let teamId = history[0].teamId
     const opportunities = new Map<string, { type: CompetitionType; recorded: boolean }>()
-    const seenGames = new Set<string>()
-    ordered.forEach(({ match, identity, appearances, minutes: playedMinutes }, index) => {
-      while (cursor < history.length && history[cursor].index <= index) { teamId = history[cursor].teamId; cursor++ }
-      if (!selected.has(match) || seenGames.has(match.id)) return
-      seenGames.add(match.id)
-      const type = identity.competitionType
-      const appearance = appearances.get(player.id)
-      const owner = appearance?.teamId ?? teamId
-      const key = slots.get(match)?.get(owner)
-      if (key) {
+    let teamId = history[0].teamId, start = 0
+    for (let stint = 1; stint <= history.length; stint++) {
+      if (stint < history.length && history[stint].teamId === teamId) continue
+      const end = stint < history.length ? history[stint].index : ordered.length
+      const rows = selectedByTeam.get(teamId) ?? []
+      // Registrations delimit chronological ownership. A team's records outside
+      // that window cannot contribute minutes or an opportunity for this player.
+      let low = 0, high = rows.length
+      while (low < high) {
+        const middle = (low + high) >>> 1
+        if (rows[middle].index < start) low = middle + 1
+        else high = middle
+      }
+      for (let cursor = low; cursor < rows.length && rows[cursor].index < end; cursor++) {
+        const { match, identity, appearances, minutes: playedMinutes } = rows[cursor].row
+        const type = identity.competitionType
+        const appearance = appearances.get(player.id)
+        const key = slots.get(match)!.get(teamId)!
         const previous = opportunities.get(key)
         if (!previous || appearance && !previous.recorded) opportunities.set(key, { type, recorded: Boolean(appearance) })
+        if (!appearance) continue
+        const minutes = playedMinutes.get(player.id) ?? 0
+        facts[type].minutes += minutes
+        facts[type].teamMinutes.set(appearance.teamId, (facts[type].teamMinutes.get(appearance.teamId) ?? 0) + minutes)
       }
-      if (!appearance) return
-      const minutes = playedMinutes.get(player.id) ?? 0
-      facts[type].minutes += minutes
-      facts[type].teamMinutes.set(appearance.teamId, (facts[type].teamMinutes.get(appearance.teamId) ?? 0) + minutes)
-    })
+      if (stint < history.length) { teamId = history[stint].teamId; start = end }
+    }
     for (const opportunity of opportunities.values()) facts[opportunity.type].availableMinutes += 90
     result.set(player.id, facts)
   }

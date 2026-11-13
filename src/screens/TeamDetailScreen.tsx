@@ -80,7 +80,7 @@ export function TeamDetailScreen({ teamId, season, screenState, onStateChange, o
       <div><h1 className="text-xl font-bold">{team.name}</h1><p className="text-[10px] uppercase tracking-widest text-zinc-500">{activeSeason} · Season stats</p></div>
       <div className="ml-auto"><button type="button" onClick={() => onNavigate({ name: 'new-match', teamId, season: activeSeason })} className="rounded-full bg-emerald-500 px-3 py-2 text-xs font-bold text-black">Log match</button></div>
     </header>
-    <SegmentedControl sticky stickyOffset="var(--detail-back-height)" label="Team detail section" value={tab} onChange={setTab} options={[{ value: 'overview', label: 'Overview' }, { value: 'matches', label: 'Matches' }, { value: 'players', label: 'Players' }, { value: 'history', label: 'History' }]} />
+    <SegmentedControl sticky label="Team detail section" value={tab} onChange={setTab} options={[{ value: 'overview', label: 'Overview' }, { value: 'matches', label: 'Matches' }, { value: 'players', label: 'Players' }, { value: 'history', label: 'History' }]} />
     {tab === 'history' && <TeamHistory teamId={teamId} season={activeSeason} teams={teams} players={players} matches={matches} states={competitionStates} screenState={screenState} onStateChange={patchState} onNavigate={onNavigate} />}
     {tab === 'players' && <div className="mt-4"><RankingMetricTabs value={playersCompetition} options={COMPETITION_OPTIONS} onChange={playersCompetition => patchState({ playersCompetition })} label="Team players competition" /></div>}
     {tab === 'overview' && overview && <><div className="mt-4 mb-5 grid grid-cols-4 gap-2 text-center">

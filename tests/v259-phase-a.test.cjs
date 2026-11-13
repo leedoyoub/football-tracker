@@ -147,11 +147,14 @@ test('Team Overview uses only light League history with exact baseline rank/move
     // v2.6.7 adds only the shared sticky Back shell and its tab offset.
     // Normalize those exact wrappers, retaining all original statistics/rows.
     const beforeHistoryTab = originalProgress(actual)
+      // v2.6.8 excludes the existing metric swipe from the new edge gesture.
+      .replaceAll(' data-edge-swipe="ignore"', '')
       .replace('class="detail-page px-4 pb-8 pt-6"', 'class="px-4 pb-8 pt-6"')
       .replace(/<div class="detail-back [^]*?<\/button><\/div>/, '<button type="button" class="mb-3 min-h-9 px-1 text-xs font-semibold text-emerald-400">← Back</button>')
       .replace(';top:var(--detail-back-height)', '')
       .replace('repeat(4, minmax(0, 1fr))', 'repeat(3, minmax(0, 1fr))').replace(/<button type="button" role="tab" aria-selected="false" class="[^"]*">History<\/button>/, '')
     assert.match(actual, />History<\/button>/, 'approved History tab is visible')
+    assert.match(actual, /<div data-edge-swipe="ignore" [^>]*aria-label="Swipe Team Best Player metrics">/, 'the metric swipe excludes edge Back')
     assert.equal(beforeHistoryTab, expected)
     assert.equal(calls(), 0)
   })

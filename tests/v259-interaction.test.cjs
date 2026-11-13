@@ -20,7 +20,7 @@ after(() => fs.rmSync(baseline, { recursive: true, force: true }))
 const noop = () => {}
 function browser() {
   const frames = new Map(); const idles = new Map(); const entries = new Map(); const listeners = new Map(); let id = 0
-  return { frames, idles, entries, listeners, requestAnimationFrame: fn => { frames.set(++id, fn); return id }, cancelAnimationFrame: key => frames.delete(key), requestIdleCallback: fn => { idles.set(++id, fn); return id }, cancelIdleCallback: key => idles.delete(key), addEventListener(type, fn) { const callbacks = listeners.get(type) ?? new Set(); callbacks.add(fn); listeners.set(type, callbacks) }, removeEventListener(type, fn) { listeners.get(type)?.delete(fn) }, dispatch(type) { for (const callback of listeners.get(type) ?? []) callback() }, localStorage: { getItem: key => entries.get(key) ?? null, setItem: (key, value) => entries.set(key, value), removeItem: key => entries.delete(key) } }
+  return { frames, idles, entries, listeners, matchMedia: media => ({ media, matches: false, onchange: null, addListener: noop, removeListener: noop, addEventListener: noop, removeEventListener: noop, dispatchEvent: () => true }), requestAnimationFrame: fn => { frames.set(++id, fn); return id }, cancelAnimationFrame: key => frames.delete(key), requestIdleCallback: fn => { idles.set(++id, fn); return id }, cancelIdleCallback: key => idles.delete(key), addEventListener(type, fn) { const callbacks = listeners.get(type) ?? new Set(); callbacks.add(fn); listeners.set(type, callbacks) }, removeEventListener(type, fn) { listeners.get(type)?.delete(fn) }, dispatch(type) { for (const callback of listeners.get(type) ?? []) callback() }, localStorage: { getItem: key => entries.get(key) ?? null, setItem: (key, value) => entries.set(key, value), removeItem: key => entries.delete(key) } }
 }
 async function withBrowser(fn) {
   const prior = { window: global.window, requestAnimationFrame: global.requestAnimationFrame, cancelAnimationFrame: global.cancelAnimationFrame }
@@ -64,6 +64,12 @@ test('settled Home and Player Detail retain v2.5.8 markup around canonical award
     if (name === 'HomeScreen') assertSelection(require('../src/engine/awards.ts').seasonAwards('Season 1', store.teams, store.players, store.matches, store.competitionStates), 'season', 'Season 1', store.teams, store.players, store.matches, store.competitionStates)
     const expected = renderToStaticMarkup(originalHarness.render(props)).replace(/(<summary class="cursor-pointer text-zinc-400">)Rating Details · [A-Z]+ · \d+&#x27;(<\/summary>)/g, '$1Rating Details$2').replace('positions under 10% are hidden.', 'all played positions.').replace('100% · ', '100.0% · ').replace('official 40% eligibility', 'minimum 50% playing time')
     let rendered = renderToStaticMarkup(h(root, name, store).render(props))
+    if (name === 'HomeScreen') {
+      // v2.6.8 marks the existing horizontal metric gesture as an edge-Back
+      // exclusion; every surrounding element and football value stays compared.
+      assert.match(rendered, /<div data-edge-swipe="ignore" [^>]*aria-label="Swipe Global Ranking metrics">/, 'the metric swipe excludes edge Back')
+      rendered = rendered.replaceAll(' data-edge-swipe="ignore"', '')
+    }
     if (name === 'PlayerDetailScreen') {
       // v2.6.7 moves only the original Matches section into a separate tab.
       // Recombine the two panels and remove the approved sticky shell so the

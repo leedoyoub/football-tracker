@@ -111,16 +111,17 @@ test('removed-roster Matches preserves every saved record and ID, stats, filter 
   assert.equal(changes[0].competition, 'cup'); assert.equal(changes[0].tab, 'matches'); assert.equal(changes[0].rankTrendMetric, 'rating')
 })
 
-test('shared sticky Back retains callbacks, safe area and scoped sticky offsets', () => {
+test('shared scrolling Back retains callbacks and tabs use their normal top offset', () => {
   let backs = 0
   const tree = screenHarness(root, 'components/DetailBack.tsx', 'DetailBack', {}).render({ onBack: () => backs++ })
   nodes(tree, n => n.type === 'button')[0].props.onClick(); assert.equal(backs, 1)
   assert.ok(renderToStaticMarkup(tree).includes('detail-back'))
   const css = fs.readFileSync(path.join(root, 'src/index.css'), 'utf8')
-  assert.match(css, /safe-area-inset-top/); assert.match(css, /\.detail-back/)
+  assert.doesNotMatch(tree.props.className, /\bsticky\b/)
+  assert.doesNotMatch(css, /--detail-back-height/)
   for (const screen of ['Player', 'Match', 'Team']) {
     const source = fs.readFileSync(path.join(root, `src/screens/${screen}DetailScreen.tsx`), 'utf8')
-    assert.match(source, /<DetailBack onBack=\{onBack\}/); assert.match(source, /stickyOffset="var\(--detail-back-height\)"/)
+    assert.match(source, /<DetailBack onBack=\{onBack\}/); assert.doesNotMatch(source, /stickyOffset="var\(--detail-back-height\)"/)
   }
   const regular = screenHarness(root, 'components/SeasonUI.tsx', 'SegmentedControl', {}).render({ label: 'Other', value: 'a', options: [{ value: 'a', label: 'A' }], onChange: noop, sticky: true })
   assert.ok(regular.props.className.includes('top-0')); assert.equal(regular.props.style.top, undefined)

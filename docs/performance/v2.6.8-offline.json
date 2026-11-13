@@ -1,0 +1,21 @@
+{
+  "method": "Isolated production Chromium, actual service worker with bypass disabled, JS/CSS cache primed online then CDP offline reload with a new-document barrier; synthetic data only. Does not claim physical installed iOS PWA validation.",
+  "offlineReload": true,
+  "tabAndCompetitionRestored": true,
+  "storedMatchCount": 1152,
+  "allStoredIdsPreserved": true,
+  "cachedAssets": [
+    {
+      "name": "football-tracker-2.6.8",
+      "urls": [
+        "http://127.0.0.1:61105/football-tracker/",
+        "http://127.0.0.1:61105/football-tracker/favicon.svg",
+        "http://127.0.0.1:61105/football-tracker/manifest.json",
+        "http://127.0.0.1:61105/football-tracker/index.html",
+        "http://127.0.0.1:61105/football-tracker/assets/index-BEpPrC7N.js",
+        "http://127.0.0.1:61105/football-tracker/assets/index-C3XmUCy6.css"
+      ]
+    }
+  ],
+  "errors": []
+}

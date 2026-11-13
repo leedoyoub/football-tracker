@@ -9,6 +9,9 @@ import { oldestMatches } from './matchChronology'
 import { competitionIdentityForMatch, matchCompetitionType } from './competitionContext'
 import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts } from './playerMatchFacts'
 import { orderedEvents } from './timeline'
+import { arrayItemRevision } from './arrayItemRevision'
+import { RATING_ENGINE_REVISION } from './ratingRevision'
+import { AWARD_POLICY_REVISION } from './awardPolicy'
 
 /** All season insight calculations live here so none of them require extra match input. */
 export const STARTING_XI_MIN_SAMPLE = 3
@@ -125,19 +128,39 @@ export function startingXIAnalytics(players: Player[], matches: Match[], season:
 }
 
 export type StartingXILeaders = { mostUsed?: StartingXIStat; highestWinRate?: StartingXIStat; bestRated?: StartingXIStat }
+const xiLeadersCache = new WeakMap<Match[], WeakMap<Player[], Map<string, StartingXILeaders>>>()
 export function startingXILeaders(players: Player[], matches: Match[], season: string, teamId?: string): StartingXILeaders {
+  let byPlayers = xiLeadersCache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); xiLeadersCache.set(matches, byPlayers) }
+  let byScope = byPlayers.get(players); if (!byScope) { byScope = new Map(); byPlayers.set(players, byScope) }
+  const key = JSON.stringify([RATING_ENGINE_REVISION, arrayItemRevision(matches), arrayItemRevision(players), season, teamId ?? null])
+  const cached = byScope.get(key)
+  if (cached) return cached
   const rows = startingXIAnalytics(players, matches, season, teamId).filter(row => row.eligible)
   const mostUsed = rows.slice().sort((a, b) => b.matches - a.matches || b.winRate - a.winRate)[0]
   const highestWinRate = rows.slice().sort((a, b) => b.winRate - a.winRate || b.matches - a.matches)[0]
   const bestRated = rows.slice().sort((a, b) => b.averageRating - a.averageRating || b.matches - a.matches)[0]
-  return { mostUsed, highestWinRate, bestRated }
+  const result = { mostUsed, highestWinRate, bestRated }
+  if (byScope.size >= 16) byScope.delete(byScope.keys().next().value!)
+  byScope.set(key, result)
+  return result
 }
 
 export type SeasonAward = { id: string; title: string; playerIds: string[]; detail: string }
 export type SeasonRecap = { season: string; complete: boolean; matchDays: number; awards: SeasonAward[]; bestXI: ReturnType<typeof seasonAwards>['bestXI'] }
+type RecapCacheEntry = { xiLeaders: StartingXILeaders | undefined; recap: SeasonRecap }
+const recapCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], Map<string, RecapCacheEntry>>>>>()
+const EMPTY_RECAP_STATES: CompetitionState[] = []
+const EMPTY_RECAP_TEAMS: Team[] = []
 export function isSeasonComplete(_matches: Match[], season: string, states: CompetitionState[] = []) { return states.some(state => state.kind === 'season-complete' && state.season === season) }
 
-export function seasonRecap(players: Player[], matches: Match[], season: string, states: CompetitionState[] = [], teams: Team[] = [], xiLeaders?: StartingXILeaders): SeasonRecap {
+export function seasonRecap(players: Player[], matches: Match[], season: string, states: CompetitionState[] = EMPTY_RECAP_STATES, teams: Team[] = EMPTY_RECAP_TEAMS, xiLeaders?: StartingXILeaders): SeasonRecap {
+  let byPlayers = recapCache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); recapCache.set(matches, byPlayers) }
+  let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
+  let byStates = byTeams.get(teams); if (!byStates) { byStates = new WeakMap(); byTeams.set(teams, byStates) }
+  let bySeason = byStates.get(states); if (!bySeason) { bySeason = new Map(); byStates.set(states, bySeason) }
+  const key = JSON.stringify([RATING_ENGINE_REVISION, AWARD_POLICY_REVISION, arrayItemRevision(matches), arrayItemRevision(players), arrayItemRevision(teams), arrayItemRevision(states), season])
+  const cached = bySeason.get(key)
+  if (cached && cached.xiLeaders === xiLeaders) return cached.recap
   const stats = players.map(player => ({ player, stats: playerSeasonStats(player, players, matches, season) })).filter(row => row.stats.matches > 0)
   const pick = (rows: typeof stats, value: (row: typeof stats[number]) => number) => rows.slice().sort((a, b) => value(b) - value(a) || b.stats.minutes - a.stats.minutes)[0]
   const awardFor = (id: string, title: string, row: typeof stats[number] | undefined, detail: (row: typeof stats[number]) => string): SeasonAward | undefined => row && { id, title, playerIds: [row.player.id], detail: detail(row) }
@@ -167,7 +190,10 @@ export function seasonRecap(players: Player[], matches: Match[], season: string,
     awardFor('substitute', 'Best Substitute', bestSub, row => `${splits.get(row.player.id)!.substitute.averageRating.toFixed(2)} as a substitute`),
     xi && { id: 'most-used-xi', title: 'Most Used XI', playerIds: xi.playerIds, detail: `${xi.matches} matches · ${(xi.winRate * 100).toFixed(0)}% wins` },
   ].filter((award): award is SeasonAward => Boolean(award))
-  return { season, complete: isSeasonComplete(matches, season, states), matchDays: new Set(matches.filter(match => match.season === season && matchCompetitionType(match) === 'league').map(match => competitionIdentityForMatch(match).matchDay)).size, awards, bestXI }
+  const recap = { season, complete: isSeasonComplete(matches, season, states), matchDays: new Set(matches.filter(match => match.season === season && matchCompetitionType(match) === 'league').map(match => competitionIdentityForMatch(match).matchDay)).size, awards, bestXI }
+  if (bySeason.size >= 16) bySeason.delete(bySeason.keys().next().value!)
+  bySeason.set(key, { xiLeaders, recap })
+  return recap
 }
 
 export type DataStory = { id: string; eyebrow: string; title: string; detail: string; playerIds: string[] }

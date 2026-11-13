@@ -1,8 +1,10 @@
 # Football Tracker
 
-Football Tracker v2.6.6 tracks saved football matches, player performances, competitions and historical honors. It uses React, TypeScript and Vite, with local IndexedDB storage and offline PWA support.
+Football Tracker v2.6.8 tracks saved football matches, player performances, competitions and historical honors. It uses React, TypeScript and Vite, with localStorage, IndexedDB backup and offline PWA support.
 
-[Open the app](https://leedoyoub.github.io/football-tracker/) · [v2.6.6 release notes](docs/v2.6.6-release.md)
+[Open the app](https://leedoyoub.github.io/football-tracker/) · [v2.6.8 release notes and measurements](docs/v2.6.8-release.md)
+
+v2.6.8 adds safe edge Swipe Back on read-only detail screens, removes sticky Back while retaining the normal button, and preserves filters, tabs and scroll restoration. Measured News, Player Overview, ranking movement and Records metric calculations reuse shared facts without changing official results or saved data. The release also fixes service-worker response caching for offline reload. Physical iPhone Safari/PWA behavior remains a documented verification limit.
 
 In v2.6.1, Team Detail adds **History → Honors / Records / Best XI**. Official top scorers, assist leaders and League Golden Glove winners share awards when their primary totals tie. Team honors and individual awards retain the team recorded at the time of the award.
 

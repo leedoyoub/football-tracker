@@ -1,6 +1,6 @@
 // Isolated Chromium + CDP for synthetic full-app checks. Never attaches to a user profile.
 const fs = require('node:fs'), path = require('node:path')
-const http = require('node:http'), { spawn, execFileSync } = require('node:child_process')
+const http = require('node:http'), { spawn, execFileSync } = require('node:child_process'), { createHash } = require('node:crypto')
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 const browserPath = () => process.env.CHROME_PATH || ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', '/usr/bin/chromium'].find(fs.existsSync)
 
@@ -30,17 +30,24 @@ for ($profileAttempt=0; $profileAttempt -lt 20; $profileAttempt++) {
 }
 
 /** Reproduce the reference assets from Git when the ignored local copy is absent. */
-function ensureBaselineBuild(directory = '.superpowers/sdd/v267/baseline-dist') {
+function ensureBaselineBuild(directory = '.superpowers/sdd/v267/baseline-dist', sha = 'fc6eab2f6ebd672058692b5f037808d2ffa26a03') {
   const root = path.resolve(__dirname, '../..'), destination = path.resolve(root, directory)
-  if (fs.existsSync(path.join(destination, 'index.html'))) return destination
+  // Use the same public build configuration as the current root build. Values
+  // stay in the child environment and are never printed or written to metadata.
+  const publicEnvironment = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', `import {loadEnv} from 'vite';const e=loadEnv('production',process.cwd(),'VITE_');process.stdout.write(JSON.stringify({VITE_SUPABASE_URL:e.VITE_SUPABASE_URL||'',VITE_SUPABASE_ANON_KEY:e.VITE_SUPABASE_ANON_KEY||''}));`], { cwd: root, encoding: 'utf8' }))
+  const buildEnvironment = { ...process.env, ...publicEnvironment, VITE_ENABLE_CLOUD_SYNC: 'false' }
+  const stamp = createHash('sha256').update(JSON.stringify([sha, publicEnvironment, false])).digest('hex')
+  const stampFile = path.join(destination, '.build-configuration')
+  if (fs.existsSync(path.join(destination, 'index.html')) && fs.existsSync(stampFile) && fs.readFileSync(stampFile, 'utf8').trim() === stamp) return destination
   const workspace = path.join(root, '.superpowers/sdd/v267')
   fs.mkdirSync(workspace, { recursive: true })
   const checkout = fs.mkdtempSync(path.join(workspace, 'baseline-build-'))
   const files = ['src', 'public', 'index.html', 'package.json', 'vite.config.ts', 'tsconfig.json', 'tsconfig.app.json', 'tsconfig.node.json']
-  execFileSync('tar', ['-xf', '-', '-C', checkout], { input: execFileSync('git', ['archive', 'fc6eab2f6ebd672058692b5f037808d2ffa26a03', ...files], { cwd: root, maxBuffer: 32 * 1024 * 1024 }) })
+  execFileSync('tar', ['-xf', '-', '-C', checkout], { input: execFileSync('git', ['archive', sha, ...files], { cwd: root, maxBuffer: 32 * 1024 * 1024 }) })
   fs.symlinkSync(path.join(root, 'node_modules'), path.join(checkout, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir')
-  execFileSync(process.execPath, [path.join(root, 'node_modules/vite/bin/vite.js'), 'build'], { cwd: checkout, env: { ...process.env, VITE_ENABLE_CLOUD_SYNC: 'false' }, stdio: 'pipe' })
+  execFileSync(process.execPath, [path.join(root, 'node_modules/vite/bin/vite.js'), 'build'], { cwd: checkout, env: buildEnvironment, stdio: 'pipe' })
   fs.cpSync(path.join(checkout, 'dist'), destination, { recursive: true })
+  fs.writeFileSync(stampFile, stamp + '\n')
   return destination
 }
 
@@ -86,15 +93,17 @@ async function launchBrowser() {
         const request = pending.get(data.id)
         if (!request) return
         pending.delete(data.id)
+        clearTimeout(request.timer)
         if (data.error) request.reject(Error(JSON.stringify(data.error)))
         else request.resolve(data.result)
       }
       if (data.method === 'Runtime.exceptionThrown') exceptions.push({ sessionId: data.sessionId, details: data.params.exceptionDetails })
     })
-    socket.addEventListener('close', () => { for (const request of pending.values()) request.reject(Error('Chromium connection closed')); pending.clear() })
+    socket.addEventListener('close', () => { for (const request of pending.values()) { clearTimeout(request.timer); request.reject(Error('Chromium connection closed')) }; pending.clear() })
     const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
       const id = ++serial
-      pending.set(id, { resolve, reject }); socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }))
+      const timer = setTimeout(() => { pending.delete(id); reject(Error(`Chromium command timed out: ${method}`)) }, 30000)
+      pending.set(id, { resolve, reject, timer }); socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }))
     })
     return {
       executable, exceptions,
@@ -105,7 +114,7 @@ async function launchBrowser() {
         const command = (method, params = {}) => send(method, params, sessionId)
         await command('Page.enable'); await command('Runtime.enable'); await command('Network.enable'); await command('Performance.enable')
         await command('Network.setBypassServiceWorker', { bypass: true })
-        await command('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: true })
+        await command('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: width < 768 })
         await command('Emulation.setFocusEmulationEnabled', { enabled: true })
         if (seedScript) await command('Page.addScriptToEvaluateOnNewDocument', { source: seedScript })
         const evaluate = async expression => {
@@ -116,9 +125,19 @@ async function launchBrowser() {
         return {
           sessionId, command, evaluate,
           navigate: url => command('Page.navigate', { url }),
+          async reload() {
+            await evaluate('window.__footballTrackerReloadPending = true')
+            await command('Page.reload')
+            await this.waitFor('window.__footballTrackerReloadPending !== true')
+          },
           async waitFor(expression, timeout = 30000) {
             const start = Date.now()
-            while (Date.now() - start < timeout) { if (await evaluate(expression)) return; await delay(30) }
+            while (Date.now() - start < timeout) {
+              const seedError = await evaluate('window.__footballTrackerSeedError || null')
+              if (seedError) throw Error(`Synthetic fixture seed failed: ${seedError.name}: ${seedError.message}`)
+              if (await evaluate(expression)) return
+              await delay(30)
+            }
             throw Error(`Timed out waiting for ${expression}: ${(await evaluate('document.body.innerText')).slice(0, 1200)}`)
           },
           async screenshot(file) { const result = await command('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(file, Buffer.from(result.data, 'base64')) },
@@ -131,7 +150,14 @@ async function launchBrowser() {
         for (let i = 0; i < 100 && child.exitCode === null; i++) await delay(25)
         if (child.exitCode === null) child.kill()
         await delay(100)
-        removeProfile(temporary, profileRoot)
+        try { removeProfile(temporary, profileRoot) }
+        catch (error) {
+          // Windows may retain a GCM/antivirus handle after Chromium has exited.
+          // Keep the verified temporary profile for later cleanup; do not hide
+          // a real UI assertion behind a synthetic profile's sharing violation.
+          if (process.platform !== 'win32' || !['EPERM', 'EBUSY', 'EACCES'].includes(error.code) && !error.stderr?.toString().includes('Remove-Item')) throw error
+          console.warn(`Temporary Chromium profile cleanup deferred: ${temporary}`)
+        }
       },
     }
   } catch (error) { socket?.close(); child.kill(); throw error }
@@ -139,7 +165,7 @@ async function launchBrowser() {
 
 function seedApplication(state, view = { name: 'home' }, screenState) {
   const route = JSON.stringify({ version: 2, view, screenState })
-  return `if (location.protocol === 'http:') { localStorage.setItem('football-tracker-v1', ${JSON.stringify(JSON.stringify(state))}); localStorage.setItem('football-tracker-local-mode', 'true'); localStorage.setItem('football-tracker-last-route', ${JSON.stringify(route)}); }
+  return `try { if (location.protocol === 'http:') { localStorage.setItem('football-tracker-v1', ${JSON.stringify(JSON.stringify(state))}); localStorage.setItem('football-tracker-local-mode', 'true'); localStorage.setItem('football-tracker-last-route', ${JSON.stringify(route)}); } } catch(error) { window.__footballTrackerSeedError={name:error.name,message:error.message}; }
     window.__v267SeedEnd = performance.now(); window.__v267FirstScreen = null;
     new MutationObserver(() => { if (window.__v267FirstScreen === null && document.querySelector('.app-content h1')) requestAnimationFrame(() => { if (window.__v267FirstScreen === null) window.__v267FirstScreen = performance.now(); }); }).observe(document, { childList: true, subtree: true });`
 }

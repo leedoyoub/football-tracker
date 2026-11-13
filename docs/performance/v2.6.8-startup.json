@@ -1,0 +1,1180 @@
+{
+  "baseSha": "82c2c8a9e1975797b55397eac4389d2d1a8a6cc7",
+  "browser": "chrome.exe",
+  "cpu": "Intel(R) Core(TM) Ultra 7 256V",
+  "samples": 11,
+  "fixture": {
+    "players": 367,
+    "matches": 1152,
+    "seasons": 2
+  },
+  "method": "Alternating baseline/current production builds on local HTTP without throttling; fresh isolated incognito context per navigation. App frame is first .app-content h1 plus next requestAnimationFrame, excluding synthetic localStorage seed time. FCP is the browser navigation paint entry and may be the loading shell. No real user storage, network conditions or physical mobile device claims. Service worker bypassed to compare release assets. All-analysis frame is the selected screen with all DeferredAnalysis loading placeholders removed (Home) or Career Personal Records mounted (Overview), plus two animation frames. Closed disclosures and unselected metrics are outside this definition. Long tasks are collected from after seeding through this frame. Retained heap is measured only after that frame and forced GC; it is not peak memory or a long-term leak test. Heap is a CDP observation immediately after reading the app-frame marker; deferred work may have begun. It is not peak usage or a leak test.",
+  "before": {
+    "payload": {
+      "entryBytes": 1014590,
+      "entryGzipBytes": 285934
+    },
+    "routes": {
+      "home": {
+        "appFrame": {
+          "medianMs": 555,
+          "p95Ms": 684.3999999999069,
+          "samplesMs": [
+            563.6000000000931,
+            529.3999999999069,
+            532.1000000000931,
+            555,
+            641.9000000003725,
+            550.7999999998137,
+            553,
+            519.8999999999069,
+            684.3999999999069,
+            620.7000000001863,
+            591.6000000000931
+          ]
+        },
+        "allAnalysisFrame": {
+          "medianMs": 2089.0999999996275,
+          "p95Ms": 2618.2999999998137,
+          "samplesMs": [
+            1932.1999999997206,
+            1905.6000000000931,
+            1943.9000000003725,
+            2064.5,
+            2589.2000000001863,
+            2068.6999999997206,
+            2255.2999999998137,
+            2089.0999999996275,
+            2618.2999999998137,
+            2223.8000000002794,
+            2342.100000000093
+          ]
+        },
+        "firstContentfulPaint": {
+          "medianMs": 188,
+          "p95Ms": 204,
+          "samplesMs": [
+            196,
+            180,
+            188,
+            196,
+            192,
+            180,
+            172,
+            168,
+            200,
+            188,
+            204
+          ]
+        },
+        "heapUsedAfterAppFrame": {
+          "medianBytes": 58888436,
+          "p95Bytes": 65566096,
+          "samplesBytes": [
+            59428860,
+            48914996,
+            61248700,
+            20249056,
+            61090664,
+            65566096,
+            58888436,
+            35024544,
+            48172196,
+            59954432,
+            37212036
+          ]
+        },
+        "retainedHeapAfterAnalysisAndGC": {
+          "medianBytes": 31047396,
+          "p95Bytes": 31070584,
+          "samplesBytes": [
+            31055176,
+            31024244,
+            31054164,
+            31008164,
+            31059676,
+            31047396,
+            31015972,
+            31039908,
+            31018780,
+            31070584,
+            31048304
+          ]
+        },
+        "longTasksBeforeAnalysisComplete": [
+          {
+            "count": 5,
+            "totalMs": 1761,
+            "maxMs": 1048
+          },
+          {
+            "count": 5,
+            "totalMs": 1720,
+            "maxMs": 1042
+          },
+          {
+            "count": 5,
+            "totalMs": 1764,
+            "maxMs": 1057
+          },
+          {
+            "count": 5,
+            "totalMs": 1858,
+            "maxMs": 1096
+          },
+          {
+            "count": 6,
+            "totalMs": 2422,
+            "maxMs": 1450
+          },
+          {
+            "count": 6,
+            "totalMs": 1934,
+            "maxMs": 1125
+          },
+          {
+            "count": 6,
+            "totalMs": 2122,
+            "maxMs": 1269
+          },
+          {
+            "count": 5,
+            "totalMs": 1903,
+            "maxMs": 1150
+          },
+          {
+            "count": 6,
+            "totalMs": 2450,
+            "maxMs": 1412
+          },
+          {
+            "count": 5,
+            "totalMs": 2022,
+            "maxMs": 1140
+          },
+          {
+            "count": 5,
+            "totalMs": 2140,
+            "maxMs": 1319
+          }
+        ]
+      },
+      "league-overall": {
+        "appFrame": {
+          "medianMs": 573.5,
+          "p95Ms": 736.2000000001863,
+          "samplesMs": [
+            618.4000000003725,
+            562.6999999997206,
+            571.2000000001863,
+            602.3000000002794,
+            544.3999999999069,
+            530.1000000000931,
+            736.2000000001863,
+            563,
+            636,
+            588.7999999998137,
+            573.5
+          ]
+        },
+        "allAnalysisFrame": {
+          "medianMs": 581.8000000002794,
+          "p95Ms": 813.2000000001863,
+          "samplesMs": [
+            631.7000000001863,
+            576,
+            577.6000000000931,
+            637.8999999999069,
+            581,
+            566.3000000002794,
+            813.2000000001863,
+            568.3000000002794,
+            680.5,
+            595,
+            581.8000000002794
+          ]
+        },
+        "firstContentfulPaint": {
+          "medianMs": 184,
+          "p95Ms": 216,
+          "samplesMs": [
+            216,
+            196,
+            192,
+            184,
+            184,
+            180,
+            164,
+            180,
+            180,
+            172,
+            184
+          ]
+        },
+        "heapUsedAfterAppFrame": {
+          "medianBytes": 19511940,
+          "p95Bytes": 31812312,
+          "samplesBytes": [
+            31793184,
+            19479496,
+            15820156,
+            19512256,
+            19511940,
+            19489388,
+            19480596,
+            31812312,
+            19525644,
+            19513216,
+            15817756
+          ]
+        },
+        "retainedHeapAfterAnalysisAndGC": {
+          "medianBytes": 15788644,
+          "p95Bytes": 15790216,
+          "samplesBytes": [
+            15788644,
+            15743324,
+            15789576,
+            15788976,
+            15788128,
+            15786672,
+            15744448,
+            15789604,
+            15790216,
+            15789648,
+            15787604
+          ]
+        },
+        "longTasksBeforeAnalysisComplete": [
+          {
+            "count": 4,
+            "totalMs": 536,
+            "maxMs": 186
+          },
+          {
+            "count": 4,
+            "totalMs": 501,
+            "maxMs": 168
+          },
+          {
+            "count": 4,
+            "totalMs": 513,
+            "maxMs": 173
+          },
+          {
+            "count": 4,
+            "totalMs": 522,
+            "maxMs": 166
+          },
+          {
+            "count": 3,
+            "totalMs": 442,
+            "maxMs": 158
+          },
+          {
+            "count": 3,
+            "totalMs": 433,
+            "maxMs": 159
+          },
+          {
+            "count": 5,
+            "totalMs": 731,
+            "maxMs": 244
+          },
+          {
+            "count": 3,
+            "totalMs": 460,
+            "maxMs": 172
+          },
+          {
+            "count": 4,
+            "totalMs": 578,
+            "maxMs": 201
+          },
+          {
+            "count": 4,
+            "totalMs": 529,
+            "maxMs": 172
+          },
+          {
+            "count": 3,
+            "totalMs": 442,
+            "maxMs": 162
+          }
+        ]
+      },
+      "player-overview": {
+        "appFrame": {
+          "medianMs": 669.1000000000931,
+          "p95Ms": 765.7999999998137,
+          "samplesMs": [
+            642.3000000002794,
+            765.7999999998137,
+            685.1000000000931,
+            709.6000000000931,
+            668.6999999997206,
+            692.4000000003725,
+            665.3999999999069,
+            669.1000000000931,
+            658.3999999999069,
+            660.5,
+            691.3999999999069
+          ]
+        },
+        "allAnalysisFrame": {
+          "medianMs": 1605.2999999998137,
+          "p95Ms": 1833.2999999998137,
+          "samplesMs": [
+            1528.2000000001863,
+            1833.2999999998137,
+            1625.6000000000931,
+            1623.1000000000931,
+            1527.1000000000931,
+            1618.3000000002794,
+            1526.1000000000931,
+            1573.1000000000931,
+            1559.2000000001863,
+            1630.6000000000931,
+            1605.2999999998137
+          ]
+        },
+        "firstContentfulPaint": {
+          "medianMs": 192,
+          "p95Ms": 208,
+          "samplesMs": [
+            176,
+            196,
+            208,
+            196,
+            192,
+            208,
+            188,
+            196,
+            168,
+            192,
+            184
+          ]
+        },
+        "heapUsedAfterAppFrame": {
+          "medianBytes": 32935244,
+          "p95Bytes": 61582992,
+          "samplesBytes": [
+            22345660,
+            22277744,
+            61582992,
+            44128336,
+            28800500,
+            55995980,
+            61509300,
+            32793068,
+            60102308,
+            32745448,
+            32935244
+          ]
+        },
+        "retainedHeapAfterAnalysisAndGC": {
+          "medianBytes": 28182484,
+          "p95Bytes": 28189828,
+          "samplesBytes": [
+            28178768,
+            28179948,
+            28173728,
+            28189828,
+            28182484,
+            28183580,
+            28182120,
+            28183364,
+            28182864,
+            28179508,
+            28183632
+          ]
+        },
+        "longTasksBeforeAnalysisComplete": [
+          {
+            "count": 5,
+            "totalMs": 1338,
+            "maxMs": 628
+          },
+          {
+            "count": 6,
+            "totalMs": 1681,
+            "maxMs": 764
+          },
+          {
+            "count": 6,
+            "totalMs": 1495,
+            "maxMs": 674
+          },
+          {
+            "count": 6,
+            "totalMs": 1477,
+            "maxMs": 660
+          },
+          {
+            "count": 5,
+            "totalMs": 1348,
+            "maxMs": 604
+          },
+          {
+            "count": 6,
+            "totalMs": 1464,
+            "maxMs": 690
+          },
+          {
+            "count": 5,
+            "totalMs": 1352,
+            "maxMs": 613
+          },
+          {
+            "count": 5,
+            "totalMs": 1390,
+            "maxMs": 637
+          },
+          {
+            "count": 6,
+            "totalMs": 1426,
+            "maxMs": 631
+          },
+          {
+            "count": 6,
+            "totalMs": 1491,
+            "maxMs": 707
+          },
+          {
+            "count": 6,
+            "totalMs": 1475,
+            "maxMs": 656
+          }
+        ]
+      },
+      "player-matches": {
+        "appFrame": {
+          "medianMs": 466,
+          "p95Ms": 508.79999999981374,
+          "samplesMs": [
+            438.5,
+            505.10000000009313,
+            467,
+            466,
+            455.39999999990687,
+            475,
+            433,
+            508.79999999981374,
+            479.29999999981374,
+            465.20000000018626,
+            439.6999999997206
+          ]
+        },
+        "allAnalysisFrame": {
+          "medianMs": 491.79999999981374,
+          "p95Ms": 546.1000000000931,
+          "samplesMs": [
+            474.39999999990687,
+            546.1000000000931,
+            501.8000000002794,
+            470.5,
+            491.79999999981374,
+            479.79999999981374,
+            469.1999999997206,
+            517.6000000000931,
+            515.8999999999069,
+            500.70000000018626,
+            476.1999999997206
+          ]
+        },
+        "firstContentfulPaint": {
+          "medianMs": 176,
+          "p95Ms": 196,
+          "samplesMs": [
+            184,
+            196,
+            180,
+            188,
+            180,
+            172,
+            176,
+            176,
+            172,
+            168,
+            172
+          ]
+        },
+        "heapUsedAfterAppFrame": {
+          "medianBytes": 23452844,
+          "p95Bytes": 23517300,
+          "samplesBytes": [
+            11507840,
+            11507968,
+            11505612,
+            23452844,
+            11555388,
+            23451932,
+            23480120,
+            23481716,
+            23453872,
+            23517300,
+            23515856
+          ]
+        },
+        "retainedHeapAfterAnalysisAndGC": {
+          "medianBytes": 11487444,
+          "p95Bytes": 11535040,
+          "samplesBytes": [
+            11487412,
+            11487456,
+            11487444,
+            11487424,
+            11535040,
+            11487100,
+            11486972,
+            11535036,
+            11487444,
+            11487624,
+            11487424
+          ]
+        },
+        "longTasksBeforeAnalysisComplete": [
+          {
+            "count": 2,
+            "totalMs": 297,
+            "maxMs": 186
+          },
+          {
+            "count": 3,
+            "totalMs": 390,
+            "maxMs": 218
+          },
+          {
+            "count": 3,
+            "totalMs": 351,
+            "maxMs": 175
+          },
+          {
+            "count": 2,
+            "totalMs": 292,
+            "maxMs": 175
+          },
+          {
+            "count": 2,
+            "totalMs": 310,
+            "maxMs": 177
+          },
+          {
+            "count": 2,
+            "totalMs": 299,
+            "maxMs": 171
+          },
+          {
+            "count": 2,
+            "totalMs": 291,
+            "maxMs": 171
+          },
+          {
+            "count": 3,
+            "totalMs": 371,
+            "maxMs": 198
+          },
+          {
+            "count": 3,
+            "totalMs": 376,
+            "maxMs": 191
+          },
+          {
+            "count": 3,
+            "totalMs": 362,
+            "maxMs": 171
+          },
+          {
+            "count": 2,
+            "totalMs": 292,
+            "maxMs": 171
+          }
+        ]
+      }
+    }
+  },
+  "after": {
+    "payload": {
+      "entryBytes": 1021346,
+      "entryGzipBytes": 288281
+    },
+    "routes": {
+      "home": {
+        "appFrame": {
+          "medianMs": 556.1999999997206,
+          "p95Ms": 1179,
+          "samplesMs": [
+            531.8999999999069,
+            523.3999999999069,
+            540.7000000001863,
+            574,
+            1179,
+            556.1999999997206,
+            611.5,
+            539.5,
+            568.6999999997206,
+            532,
+            573.7000000001863
+          ]
+        },
+        "allAnalysisFrame": {
+          "medianMs": 1825.4000000003725,
+          "p95Ms": 2626.5,
+          "samplesMs": [
+            1749.2999999998137,
+            1733.8999999999069,
+            1738,
+            1860.8000000002794,
+            2626.5,
+            1797,
+            2117.600000000093,
+            1825.4000000003725,
+            1818.3999999999069,
+            1838.1999999997206,
+            1867.7000000001863
+          ]
+        },
+        "firstContentfulPaint": {
+          "medianMs": 184,
+          "p95Ms": 280,
+          "samplesMs": [
+            176,
+            184,
+            184,
+            176,
+            192,
+            180,
+            280,
+            188,
+            192,
+            188,
+            176
+          ]
+        },
+        "heapUsedAfterAppFrame": {
+          "medianBytes": 36362924,
+          "p95Bytes": 71220588,
+          "samplesBytes": [
+            35884880,
+            35987040,
+            71220588,
+            45523500,
+            16554676,
+            49225904,
+            16644668,
+            20293692,
+            36362924,
+            41117312,
+            53751892
+          ]
+        },
+        "retainedHeapAfterAnalysisAndGC": {
+          "medianBytes": 33445432,
+          "p95Bytes": 33496344,
+          "samplesBytes": [
+            33451952,
+            33447496,
+            33440600,
+            33431712,
+            33410424,
+            33449900,
+            33412468,
+            33462676,
+            33496344,
+            33445432,
+            33430824
+          ]
+        },
+        "longTasksBeforeAnalysisComplete": [
+          {
+            "count": 6,
+            "totalMs": 1599,
+            "maxMs": 906
+          },
+          {
+            "count": 5,
+            "totalMs": 1565,
+            "maxMs": 912
+          },
+          {
+            "count": 6,
+            "totalMs": 1601,
+            "maxMs": 890
+          },
+          {
+            "count": 6,
+            "totalMs": 1735,
+            "maxMs": 985
+          },
+          {
+            "count": 6,
+            "totalMs": 2439,
+            "maxMs": 1029
+          },
+          {
+            "count": 5,
+            "totalMs": 1601,
+            "maxMs": 924
+          },
+          {
+            "count": 6,
+            "totalMs": 1962,
+            "maxMs": 1118
+          },
+          {
+            "count": 5,
+            "totalMs": 1635,
+            "maxMs": 963
+          },
+          {
+            "count": 6,
+            "totalMs": 1699,
+            "maxMs": 959
+          },
+          {
+            "count": 5,
+            "totalMs": 1643,
+            "maxMs": 971
+          },
+          {
+            "count": 6,
+            "totalMs": 1730,
+            "maxMs": 957
+          }
+        ]
+      },
+      "league-overall": {
+        "appFrame": {
+          "medianMs": 564.6000000000931,
+          "p95Ms": 582.3000000002794,
+          "samplesMs": [
+            572.7000000001863,
+            564.6999999997206,
+            553.2000000001863,
+            563.5,
+            528.7000000001863,
+            547.7999999998137,
+            564.6000000000931,
+            551.5,
+            582.3000000002794,
+            579.3000000002794,
+            570
+          ]
+        },
+        "allAnalysisFrame": {
+          "medianMs": 576.3999999999069,
+          "p95Ms": 621.1000000000931,
+          "samplesMs": [
+            586.1000000000931,
+            600,
+            570.2999999998137,
+            571,
+            562.2000000001863,
+            562.5,
+            576.3999999999069,
+            556.1999999997206,
+            621.1000000000931,
+            588.6000000000931,
+            604.7000000001863
+          ]
+        },
+        "firstContentfulPaint": {
+          "medianMs": 184,
+          "p95Ms": 240,
+          "samplesMs": [
+            200,
+            212,
+            180,
+            180,
+            172,
+            172,
+            240,
+            184,
+            196,
+            196,
+            180
+          ]
+        },
+        "heapUsedAfterAppFrame": {
+          "medianBytes": 19487884,
+          "p95Bytes": 31831388,
+          "samplesBytes": [
+            19532368,
+            15781664,
+            15827236,
+            19531636,
+            15782924,
+            19576080,
+            19487884,
+            15778968,
+            19517704,
+            31831388,
+            15830180
+          ]
+        },
+        "retainedHeapAfterAnalysisAndGC": {
+          "medianBytes": 15794780,
+          "p95Bytes": 15840900,
+          "samplesBytes": [
+            15797372,
+            15751108,
+            15800876,
+            15795356,
+            15749892,
+            15840900,
+            15751860,
+            15748560,
+            15783144,
+            15794780,
+            15832092
+          ]
+        },
+        "longTasksBeforeAnalysisComplete": [
+          {
+            "count": 3,
+            "totalMs": 473,
+            "maxMs": 180
+          },
+          {
+            "count": 4,
+            "totalMs": 502,
+            "maxMs": 161
+          },
+          {
+            "count": 3,
+            "totalMs": 451,
+            "maxMs": 172
+          },
+          {
+            "count": 3,
+            "totalMs": 461,
+            "maxMs": 187
+          },
+          {
+            "count": 3,
+            "totalMs": 425,
+            "maxMs": 157
+          },
+          {
+            "count": 3,
+            "totalMs": 455,
+            "maxMs": 186
+          },
+          {
+            "count": 3,
+            "totalMs": 476,
+            "maxMs": 175
+          },
+          {
+            "count": 4,
+            "totalMs": 496,
+            "maxMs": 170
+          },
+          {
+            "count": 4,
+            "totalMs": 524,
+            "maxMs": 174
+          },
+          {
+            "count": 3,
+            "totalMs": 448,
+            "maxMs": 172
+          },
+          {
+            "count": 4,
+            "totalMs": 516,
+            "maxMs": 173
+          }
+        ]
+      },
+      "player-overview": {
+        "appFrame": {
+          "medianMs": 598.3999999999069,
+          "p95Ms": 663.4000000003725,
+          "samplesMs": [
+            605,
+            578.1000000000931,
+            602.8999999999069,
+            598.3999999999069,
+            597.9000000003725,
+            663.4000000003725,
+            610.8999999999069,
+            606.1999999997206,
+            581.0999999996275,
+            596.7999999998137,
+            552.2000000001863
+          ]
+        },
+        "allAnalysisFrame": {
+          "medianMs": 1361.5,
+          "p95Ms": 1536.6000000000931,
+          "samplesMs": [
+            1352.8999999999069,
+            1472.9000000003725,
+            1367.2999999998137,
+            1393.1999999997206,
+            1335.2000000001863,
+            1536.6000000000931,
+            1363,
+            1344.5,
+            1349.2999999998137,
+            1361.5,
+            1278.2000000001863
+          ]
+        },
+        "firstContentfulPaint": {
+          "medianMs": 188,
+          "p95Ms": 252,
+          "samplesMs": [
+            216,
+            188,
+            252,
+            188,
+            172,
+            196,
+            180,
+            208,
+            192,
+            188,
+            176
+          ]
+        },
+        "heapUsedAfterAppFrame": {
+          "medianBytes": 22416148,
+          "p95Bytes": 49181892,
+          "samplesBytes": [
+            20506260,
+            20577756,
+            16801664,
+            49181892,
+            22765672,
+            22416148,
+            48657344,
+            46086756,
+            20506656,
+            41093784,
+            16798896
+          ]
+        },
+        "retainedHeapAfterAnalysisAndGC": {
+          "medianBytes": 30314852,
+          "p95Bytes": 30353684,
+          "samplesBytes": [
+            30311812,
+            30313960,
+            30353464,
+            30343140,
+            30353684,
+            30316316,
+            30321992,
+            30310420,
+            30310580,
+            30314852,
+            30314812
+          ]
+        },
+        "longTasksBeforeAnalysisComplete": [
+          {
+            "count": 5,
+            "totalMs": 1137,
+            "maxMs": 509
+          },
+          {
+            "count": 5,
+            "totalMs": 1289,
+            "maxMs": 588
+          },
+          {
+            "count": 6,
+            "totalMs": 1236,
+            "maxMs": 508
+          },
+          {
+            "count": 5,
+            "totalMs": 1198,
+            "maxMs": 550
+          },
+          {
+            "count": 6,
+            "totalMs": 1196,
+            "maxMs": 488
+          },
+          {
+            "count": 6,
+            "totalMs": 1365,
+            "maxMs": 583
+          },
+          {
+            "count": 6,
+            "totalMs": 1240,
+            "maxMs": 533
+          },
+          {
+            "count": 6,
+            "totalMs": 1225,
+            "maxMs": 523
+          },
+          {
+            "count": 5,
+            "totalMs": 1163,
+            "maxMs": 519
+          },
+          {
+            "count": 6,
+            "totalMs": 1222,
+            "maxMs": 519
+          },
+          {
+            "count": 5,
+            "totalMs": 1101,
+            "maxMs": 487
+          }
+        ]
+      },
+      "player-matches": {
+        "appFrame": {
+          "medianMs": 471.3000000002794,
+          "p95Ms": 539.3000000002794,
+          "samplesMs": [
+            498.10000000009313,
+            515.1999999997206,
+            430.59999999962747,
+            471.3000000002794,
+            472.60000000009313,
+            440.10000000009313,
+            439.5,
+            458.39999999990687,
+            478.29999999981374,
+            539.3000000002794,
+            465.5
+          ]
+        },
+        "allAnalysisFrame": {
+          "medianMs": 477.90000000037253,
+          "p95Ms": 554,
+          "samplesMs": [
+            536.2000000001863,
+            554,
+            467,
+            476.70000000018626,
+            477.90000000037253,
+            475.3000000002794,
+            475.90000000037253,
+            497.59999999962747,
+            516.5,
+            546.5,
+            470.70000000018626
+          ]
+        },
+        "firstContentfulPaint": {
+          "medianMs": 180,
+          "p95Ms": 236,
+          "samplesMs": [
+            192,
+            192,
+            188,
+            236,
+            180,
+            180,
+            172,
+            168,
+            180,
+            144,
+            168
+          ]
+        },
+        "heapUsedAfterAppFrame": {
+          "medianBytes": 23427656,
+          "p95Bytes": 23531152,
+          "samplesBytes": [
+            11519812,
+            11520096,
+            11517104,
+            11519524,
+            23531152,
+            23427656,
+            23498168,
+            23526160,
+            23519988,
+            23444156,
+            11519584
+          ]
+        },
+        "retainedHeapAfterAnalysisAndGC": {
+          "medianBytes": 11498436,
+          "p95Bytes": 11498636,
+          "samplesBytes": [
+            11498424,
+            11498600,
+            11498192,
+            11498436,
+            11498636,
+            11498180,
+            11498584,
+            11498572,
+            11497984,
+            11498424,
+            11498496
+          ]
+        },
+        "longTasksBeforeAnalysisComplete": [
+          {
+            "count": 3,
+            "totalMs": 396,
+            "maxMs": 218
+          },
+          {
+            "count": 3,
+            "totalMs": 386,
+            "maxMs": 211
+          },
+          {
+            "count": 2,
+            "totalMs": 294,
+            "maxMs": 178
+          },
+          {
+            "count": 3,
+            "totalMs": 351,
+            "maxMs": 172
+          },
+          {
+            "count": 2,
+            "totalMs": 292,
+            "maxMs": 173
+          },
+          {
+            "count": 2,
+            "totalMs": 295,
+            "maxMs": 177
+          },
+          {
+            "count": 2,
+            "totalMs": 295,
+            "maxMs": 175
+          },
+          {
+            "count": 2,
+            "totalMs": 314,
+            "maxMs": 194
+          },
+          {
+            "count": 2,
+            "totalMs": 321,
+            "maxMs": 195
+          },
+          {
+            "count": 3,
+            "totalMs": 390,
+            "maxMs": 199
+          },
+          {
+            "count": 2,
+            "totalMs": 291,
+            "maxMs": 169
+          }
+        ]
+      }
+    }
+  }
+}

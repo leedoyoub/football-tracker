@@ -9,7 +9,7 @@ import { buildGlobalRankingData, rankGlobalRankingRows, type LeaderboardMetric }
 import { positionFilterFamilies } from '../engine/positionScope'
 import { PositionFilter } from '../components/PositionFilter'
 import { TeamFilter } from '../components/TeamFilter'
-import { buildSeasonAnalytics, rankingMovement } from '../engine/seasonAnalytics'
+import { currentPlayerRankingSnapshots, rankingMovement } from '../engine/seasonAnalytics'
 import { useStore } from '../store'
 import type { ScreenStateByView, View } from '../types'
 
@@ -24,8 +24,8 @@ export function GlobalRankingScreen({ season, screenState, onStateChange, onNavi
   const scopedMatches = useMemo(() => matches.filter(match => match.season === season && (scope === 'all' || matchCompetitionType(match) === scope)), [matches, season, scope])
   const index = useMemo(() => buildGlobalRankingData(players, scopedMatches, { seasons: [season], teams: teamId ? [teamId] : [], positions: positionFilterFamilies(screenState.positionFilter) }, 'rating'), [players, scopedMatches, season, teamId, screenState.positionFilter])
   const rows = useMemo(() => rankGlobalRankingRows(index, players, metric), [index, players, metric])
-  const analytics = useMemo(() => scope === 'league' && !teamId && screenState.positionFilter === 'all' ? buildSeasonAnalytics(teams, players, matches, season) : null, [scope, teamId, screenState.positionFilter, teams, players, matches, season])
-  const movement = useMemo(() => analytics && !teamId ? rankingMovement(analytics.playerSnapshots.get(analytics.currentMatchDay), analytics.playerSnapshots.get(analytics.currentMatchDay - 1), metric) : new Map<string, number | null>(), [analytics, teamId, metric])
+  const snapshots = useMemo(() => scope === 'league' && !teamId && screenState.positionFilter === 'all' ? currentPlayerRankingSnapshots(players, matches, season) : null, [scope, teamId, screenState.positionFilter, players, matches, season])
+  const movement = useMemo(() => snapshots && !teamId ? rankingMovement(snapshots.current, snapshots.previous, metric) : new Map<string, number | null>(), [snapshots, teamId, metric])
   const rowMovement = teamId ? new Map<string, number | null>() : movement
   // League snapshots are unfiltered; do not attach their movement to a scoped rank.
   const visibleRowMovement = screenState.positionFilter !== 'all' ? new Map<string, number | null>() : rowMovement

@@ -48,7 +48,7 @@ async function bounds(page) {
   let browser
   try {
     browser = await launchBrowser()
-    for (const width of [320, 375, 390]) {
+    for (const width of [320, 375, 390, 1280]) {
       const view = { name: 'competition', competitionType: 'league', season: 'Season 2' }, state = { ...defaultScreenState(view), leagueMenu: 'table' }
       const before = await browser.page(seedApplication(fixture, view, state), width)
       await before.navigate(servers.before.url); await before.waitFor('!!document.querySelector(".app-content table")')
@@ -161,7 +161,7 @@ async function bounds(page) {
       assert(!overviewHeadings.includes('Matches'), 'Overview must not mount Match History')
       const overviewTop = await playerPage.evaluate('document.querySelector(".app-content").scrollTop=650; new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(document.querySelector(".app-content").scrollTop))))')
       const sticky = await playerPage.evaluate(`(()=>{const back=document.querySelector('.detail-back'),tabs=document.querySelector(${JSON.stringify('[aria-label="Player detail section"]')}),b=back.getBoundingClientRect(),t=tabs.getBoundingClientRect(),button=back.querySelector('button'),r=button.getBoundingClientRect();return {backTop:b.top,backBottom:b.bottom,tabTop:t.top,hit:document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.closest('button')===button}})()`)
-      assert(sticky.backTop >= -1 && sticky.backTop <= 1 && sticky.tabTop >= sticky.backBottom - 1 && sticky.hit)
+      assert(sticky.backBottom < 0 && Math.abs(sticky.tabTop) <= 1 && !sticky.hit)
       const toMatchesMs = await click(playerPage, '[aria-label="Player detail section"] button:nth-child(2)')
       await playerPage.waitFor(`document.querySelector(${JSON.stringify(selectedPlayerTab)})?.textContent==='Matches'`)
       assert.equal(await playerPage.evaluate('document.querySelector(".app-content").scrollTop'), 0)
@@ -187,10 +187,10 @@ async function bounds(page) {
       await teamPage.navigate(servers.after.url); await teamPage.waitFor('!!document.querySelector(".detail-back")')
       await teamPage.evaluate('document.querySelector(".app-content").scrollTop=300; new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
       const teamSticky = await teamPage.evaluate(`(()=>{const b=document.querySelector('.detail-back').getBoundingClientRect(),t=document.querySelector(${JSON.stringify('[aria-label="Team detail section"]')}).getBoundingClientRect();return {backTop:b.top,backBottom:b.bottom,tabTop:t.top}})()`)
-      assert(teamSticky.backTop >= -1 && teamSticky.backTop <= 1 && teamSticky.tabTop >= teamSticky.backBottom - 1)
+      assert(teamSticky.backBottom < 0 && Math.abs(teamSticky.tabTop) <= 1)
       results.push({ area: 'team-back', width, sticky: teamSticky }); await teamPage.close()
     }
-    fs.mkdirSync(path.dirname(output), { recursive: true }); fs.writeFileSync(output, JSON.stringify({ browser: path.basename(browser.executable), method: 'Real production app, synthetic localStorage seed, isolated incognito contexts, actual DOM clicks/keyboard at 320/375/390px; baseline League geometry compared exactly. No real user profile/storage or physical device.', cases: results.length, errors: browser.exceptions, results }, null, 2) + '\n')
+    fs.mkdirSync(path.dirname(output), { recursive: true }); fs.writeFileSync(output, JSON.stringify({ browser: path.basename(browser.executable), method: 'Real production app, synthetic localStorage seed, isolated incognito contexts, actual DOM clicks/keyboard at 320/375/390px mobile and 1280px desktop; baseline League geometry compared exactly. No real user profile/storage or physical device.', cases: results.length, errors: browser.exceptions, results }, null, 2) + '\n')
     assert.equal(browser.exceptions.length, 0, JSON.stringify(browser.exceptions))
     console.log(JSON.stringify({ output, cases: results.length, errors: browser.exceptions.length }))
   } finally { try { if (browser) await browser.close() } finally { await Promise.all(Object.values(servers).map(server => server.close())) } }

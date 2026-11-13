@@ -15,6 +15,7 @@ export function RankingRow({ rank, player, team, value, movement = null, onClick
 export function useMetricSwipe<T extends string>(values: readonly T[], value: T, onChange: (value: T) => void) {
   const start = useRef<{ x: number; y: number } | null>(null)
   return {
+    'data-edge-swipe': 'ignore',
     onTouchStart: (event: React.TouchEvent) => { const touch = event.touches[0]; if (touch) start.current = { x: touch.clientX, y: touch.clientY } },
     onTouchEnd: (event: React.TouchEvent) => {
       const point = start.current; const touch = event.changedTouches[0]; start.current = null
@@ -24,6 +25,7 @@ export function useMetricSwipe<T extends string>(values: readonly T[], value: T,
       const current = values.indexOf(value); const next = horizontal < 0 ? current + 1 : current - 1
       if (next >= 0 && next < values.length) onChange(values[next])
     },
+    onTouchCancel: () => { start.current = null },
   }
 }
 

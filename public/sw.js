@@ -36,13 +36,19 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   if (event.request.mode === 'navigate') {
     event.respondWith(fetch(event.request).then(response => {
-      if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(APP_SHELL, response.clone()));
+      if (response.ok) {
+        const cachedResponse = response.clone();
+        event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(APP_SHELL, cachedResponse)));
+      }
       return response;
     }).catch(() => caches.match(APP_SHELL)));
     return;
   }
   event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
-    if (response.ok && new URL(event.request.url).origin === self.location.origin) caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
+    if (response.ok && new URL(event.request.url).origin === self.location.origin) {
+      const cachedResponse = response.clone();
+      event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(event.request, cachedResponse)));
+    }
     return response;
   })));
 });

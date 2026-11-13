@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 .superpowers/v255/
+.superpowers/sdd/v268/
 *.local
 .env
 .env.*
