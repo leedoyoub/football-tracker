@@ -62,7 +62,7 @@ test('settled Home and Player Detail retain v2.5.8 markup around canonical award
       '../engine/latestChanges': require('../src/engine/latestChanges.ts'),
     }) : h(baseline, name, store)
     if (name === 'HomeScreen') assertSelection(require('../src/engine/awards.ts').seasonAwards('Season 1', store.teams, store.players, store.matches, store.competitionStates), 'season', 'Season 1', store.teams, store.players, store.matches, store.competitionStates)
-    const expected = renderToStaticMarkup(originalHarness.render(props)).replace(/(<summary class="cursor-pointer text-zinc-400">)Rating Details · [A-Z]+ · \d+&#x27;(<\/summary>)/g, '$1Rating Details$2').replace('positions under 10% are hidden.', 'all played positions.').replace('100% · ', '100.0% · ').replace('official 40% eligibility', 'minimum 50% playing time')
+    let expected = renderToStaticMarkup(originalHarness.render(props)).replace(/(<summary class="cursor-pointer text-zinc-400">)Rating Details · [A-Z]+ · \d+&#x27;(<\/summary>)/g, '$1Rating Details$2').replace('positions under 10% are hidden.', 'all played positions.').replace('100% · ', '100.0% · ').replace('official 40% eligibility', 'minimum 50% playing time')
     let rendered = renderToStaticMarkup(h(root, name, store).render(props))
     if (name === 'HomeScreen') {
       // v2.6.8 marks the existing horizontal metric gesture as an edge-Back
@@ -76,12 +76,25 @@ test('settled Home and Player Detail retain v2.5.8 markup around canonical award
       // complete prior section content, order, stats and rows remain compared.
       const matchesHtml = renderToStaticMarkup(h(root, name, store).render({ ...props, screenState: { ...props.screenState, tab: 'matches' } }))
       const marker = '<section><h2 class="mb-2 text-sm font-semibold">Matches</h2>'
-      const history = matchesHtml.slice(matchesHtml.indexOf(marker), matchesHtml.lastIndexOf('</section>') + '</section>'.length)
+      let history = matchesHtml.slice(matchesHtml.indexOf(marker), matchesHtml.lastIndexOf('</section>') + '</section>'.length)
       assert.ok(history.startsWith(marker)); assert.ok(history.includes('Rating Details'))
+      // v2.6.9 adds only the official MOM badge treatment in these match rows.
+      // Restore its prior tone for parity, retaining every numeric rating and
+      // all row/Rating Details markup; v269-player separately verifies policy.
+      history = history.replace(/<b class="text-blue-300">([\d.]+) ★<\/b>/g, (_, rating) => `<b class="${require('../src/components/ui.tsx').ratingTone(Number(rating))}">${rating}</b>`)
       rendered = rendered.replace('class="detail-page px-4 pb-8 pt-6"', 'class="px-4 pb-8 pt-6"')
         .replace(/<div class="detail-back [^]*?<\/button><\/div>/, '<button type="button" class="mb-3 text-xs font-semibold text-emerald-400">Back</button>')
         .replace(/<div role="tablist" aria-label="Player detail section"[^]*?<\/div><div class="mt-4">/, '')
         .replace(/<\/div><\/div>$/, `${history}</div>`)
+      // Normalize only the approved Recent Form interaction surface. Every
+      // point, numeric label, color, geometry and the three averages/trend
+      // remain in the byte comparison. Only duplicate lower controls disappear.
+      const recentForm = /<section class="mb-4 rounded-2xl bg-zinc-900 p-3"><div class="flex items-end justify-between"><div><h2 class="text-sm font-semibold">Recent Form<\/h2>[^]*?<\/section>/
+      expected = expected.replace(recentForm, section => section.replace(/<div class="mt-3 flex gap-1\.5"><button type="button" aria-label="Open match with rating [^]*?<\/div>/, ''))
+      rendered = rendered.replace(recentForm, section => section
+        .replace('role="group" aria-label="All ', 'role="img" aria-label="All ')
+        .replace(/<g role="button" tabindex="0" class="cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300" aria-label="[^"]+">/g, '<g>')
+        .replace(/<rect x="[\d.-]+" y="[\d.-]+" width="28" height="32" fill="transparent"><\/rect>/g, ''))
     }
     const actual = unchangedPlayerMarkup(rendered)
     const original = unchangedPlayerMarkup(expected)

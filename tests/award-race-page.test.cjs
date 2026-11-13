@@ -7,7 +7,7 @@ const { awardRacePresentationRows, awardTeamPerformanceLabel } = require('../src
 const { defaultScreenState, navigateBrowseEntry, popNavigationEntry, createNavigationEntry } = require('../src/lib/navigation.ts')
 const { loadLastNavigationEntry, LAST_ROUTE_STORAGE_KEY } = require('../src/lib/lastRoute.ts')
 
-test('Award Race presentation preserves official ranks after position and team filters', () => {
+test('Award Race recalculates position ranks before applying the team display filter', () => {
   const players = [{ id: 'a', name: 'A', position: 'ST', teamId: 'X' }, { id: 'b', name: 'B', position: 'ST', teamId: 'X' }, { id: 'c', name: 'C', position: 'CM', teamId: 'X' }]
   const candidates = [
     { playerId: 'a', teamId: 'X', selectionScore: 9, average: 7 },
@@ -17,7 +17,8 @@ test('Award Race presentation preserves official ranks after position and team f
   ]
   const games = [{ id: 'm', season: 'S1', competitionType: 'league', date: '2026-01-01', duration: 90, teamId: 'Y', homeTeamId: 'Y', awayTeamId: 'O', appearances: [{ playerId: 'b', teamId: 'Y', role: 'starter', position: 'LCAM' }], events: [] }]
   const rows = awardRacePresentationRows(candidates, players, games, 'S1', 'league', 'cam', 'Y')
-  assert.deepEqual(rows.map(row => [row.candidate.playerId, row.rank, row.position]), [['b', 2, 'CAM']])
+  assert.deepEqual(rows.map(row => [row.candidate.playerId, row.rank, row.position]), [['b', 1, 'CAM']])
+  assert.deepEqual(awardRacePresentationRows(candidates, players, games, 'S1', 'league', 'all', 'Y').map(row => [row.candidate.playerId, row.rank]), [['b', 2]])
   assert.equal(rows[0].candidate.average, 8)
 })
 
@@ -45,6 +46,6 @@ test('Award Race route uses the existing navigation stack and defaults to its so
 test('Award Race last route restores valid filters and drops stale saved values', () => {
   const state = { teams: [{ id: 'X', name: 'X' }], players: [], matches: [{ id: 'm', season: 'S1', appearances: [], events: [] }] }
   const read = (screenState) => loadLastNavigationEntry(state, { getItem: key => key === LAST_ROUTE_STORAGE_KEY ? JSON.stringify({ version: 2, view: { name: 'award-race', season: 'S1', competitionType: 'cup' }, screenState }) : null })
-  assert.deepEqual(read({ name: 'award-race', season: 'S1', scope: 'champions', positionFilter: 'cb', teamId: 'X' }).screenState, { name: 'award-race', season: 'S1', scope: 'champions', positionFilter: 'cb', teamId: 'X' })
-  assert.deepEqual(read({ name: 'award-race', season: 'missing', scope: 'bogus', positionFilter: 'bogus', teamId: 'missing' }).screenState, { name: 'award-race', season: 'S1', scope: 'cup', positionFilter: 'all', teamId: null })
+  assert.deepEqual(read({ name: 'award-race', season: 'S1', scope: 'champions', positionFilter: 'cb', teamId: 'X' }).screenState, { name: 'award-race', season: 'S1', scope: 'champions', positionFilter: 'cb', teamId: 'X', positionFilters: ['cb'], teamIds: ['X'] })
+  assert.deepEqual(read({ name: 'award-race', season: 'missing', scope: 'bogus', positionFilter: 'bogus', teamId: 'missing' }).screenState, { name: 'award-race', season: 'S1', scope: 'cup', positionFilter: 'all', teamId: null, positionFilters: [], teamIds: [] })
 })

@@ -3,7 +3,7 @@ import { draftContext, isResumableDraft } from './draftLifecycle'
 import { createNavigationEntry, defaultScreenState, normalizePlayerScreenState } from './navigation'
 import { normalizeCompetitionScreenState } from './competitionScreenState'
 import { rankTrendMetricOptions } from '../engine/playerRankTrend'
-import { scopedPositionFamilyByPlayer } from '../engine/positionScope'
+import { normalizePositionFilters, scopedPositionFamilyByPlayer } from '../engine/positionScope'
 import { matchCompetitionType } from '../engine/competitionContext'
 import { normalizeAwardRecordId } from '../engine/awardRecords'
 
@@ -71,7 +71,7 @@ export function validRestoredView(value: unknown, state: AppState): View | null 
     case 'comparison':
       return { name: 'comparison', ...(hasPlayer(view.leftId) ? { leftId: view.leftId } : {}), ...(hasPlayer(view.rightId) ? { rightId: view.rightId } : {}), ...(season(view.season) ? { season: season(view.season) } : {}), ...(scope(view.competitionType) ? { competitionType: view.competitionType } : {}) }
     case 'records-leaderboard':
-      return { name: 'records-leaderboard', category: ['player', 'team', 'combination'].includes(view.category) ? view.category : 'player', leaderboardId: typeof view.leaderboardId === 'string' && view.leaderboardId ? normalizeAwardRecordId(view.leaderboardId) : 'rating', ...(scope(view.competition) ? { competition: view.competition } : {}), ...(positionFilters.has(view.positionFilter ?? '') ? { positionFilter: view.positionFilter } : {}), seasonIds: Array.isArray(view.seasonIds) ? view.seasonIds.filter(hasSeason) : [], teamIds: Array.isArray(view.teamIds) ? view.teamIds.filter(hasTeam) : [] }
+      return { name: 'records-leaderboard', category: ['player', 'team', 'combination'].includes(view.category) ? view.category : 'player', leaderboardId: typeof view.leaderboardId === 'string' && view.leaderboardId ? normalizeAwardRecordId(view.leaderboardId) : 'rating', ...(scope(view.competition) ? { competition: view.competition } : {}), ...(positionFilters.has(view.positionFilter ?? '') ? { positionFilter: view.positionFilter } : {}), positionFilters: normalizePositionFilters(view.positionFilters ?? view.positionFilter), seasonIds: Array.isArray(view.seasonIds) ? [...new Set(view.seasonIds.filter(hasSeason))] : [], teamIds: Array.isArray(view.teamIds) ? [...new Set(view.teamIds.filter(hasTeam))] : [] }
     case 'latest-changes':
       return { name: 'latest-changes', ...(season(view.season) ? { season: season(view.season) } : {}) }
     case 'season-highlight':
@@ -122,6 +122,8 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
   const validSeason = (season: unknown) => typeof season === 'string' && state.matches.some(match => match.season === season)
   const seasonIds = (ids: unknown) => Array.isArray(ids) ? [...new Set(ids.filter(validSeason))] as string[] : []
   const teamIds = (ids: unknown) => Array.isArray(ids) ? [...new Set(ids.filter(id => typeof id === 'string' && state.teams.some(team => team.id === id)))] as string[] : []
+  const positions = normalizePositionFilters(saved.positionFilters ?? saved.positionFilter)
+  const rankingTeams = teamIds(Array.isArray(saved.teamIds) ? saved.teamIds : [saved.teamId])
   const leagueDay = (day: unknown) => Number.isInteger(day) && (day as number) >= 1 && (day as number) <= 30 ? day as number : null
   if (view.name === 'home') {
     const base = fallback as ScreenStateByView['home']
@@ -139,12 +141,12 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
   }
   if (view.name === 'global-ranking') {
     const base = fallback as ScreenStateByView['global-ranking']
-    return { ...base, metric: validMetric(saved.metric) ? saved.metric as typeof base.metric : base.metric, scope: validScope(saved.scope) ? saved.scope as typeof base.scope : base.scope, positionFilter: validPosition(saved.positionFilter) ? saved.positionFilter as typeof base.positionFilter : base.positionFilter, teamId: typeof saved.teamId === 'string' && state.teams.some(team => team.id === saved.teamId) ? saved.teamId : null }
+    return { ...base, metric: validMetric(saved.metric) ? saved.metric as typeof base.metric : base.metric, scope: validScope(saved.scope) ? saved.scope as typeof base.scope : base.scope, positionFilter: validPosition(saved.positionFilter) ? saved.positionFilter as typeof base.positionFilter : base.positionFilter, teamId: rankingTeams[0] ?? null, positionFilters: positions, teamIds: rankingTeams }
   }
   if (view.name === 'award-race') {
     const base = fallback as ScreenStateByView['award-race']
     const awardScope = saved.awardScope === 'first-half' || saved.awardScope === 'second-half' ? saved.awardScope : base.awardScope
-    return { ...base, ...(awardScope ? { awardScope } : {}), season: validSeason(saved.season) ? saved.season as string : base.season, scope: awardScope ? 'league' : validScope(saved.scope) ? saved.scope as typeof base.scope : base.scope, positionFilter: validPosition(saved.positionFilter) ? saved.positionFilter as typeof base.positionFilter : base.positionFilter, teamId: typeof saved.teamId === 'string' && state.teams.some(team => team.id === saved.teamId) ? saved.teamId : null }
+    return { ...base, ...(awardScope ? { awardScope } : {}), season: validSeason(saved.season) ? saved.season as string : base.season, scope: awardScope ? 'league' : validScope(saved.scope) ? saved.scope as typeof base.scope : base.scope, positionFilter: validPosition(saved.positionFilter) ? saved.positionFilter as typeof base.positionFilter : base.positionFilter, teamId: rankingTeams[0] ?? null, positionFilters: positions, teamIds: rankingTeams }
   }
   if (view.name === 'comparison') {
     const base = fallback as ScreenStateByView['comparison']
@@ -153,7 +155,7 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
   }
   if (view.name === 'records-leaderboard') {
     const base = fallback as ScreenStateByView['records-leaderboard']
-    return { ...base, competition: validScope(saved.competition) ? saved.competition as typeof base.competition : base.competition, positionFilter: validPosition(saved.positionFilter) ? saved.positionFilter as typeof base.positionFilter : base.positionFilter, filterSeasonIds: seasonIds(saved.filterSeasonIds), filterTeamIds: teamIds(saved.filterTeamIds) }
+    return { ...base, competition: validScope(saved.competition) ? saved.competition as typeof base.competition : base.competition, positionFilter: validPosition(saved.positionFilter) ? saved.positionFilter as typeof base.positionFilter : base.positionFilter, positionFilters: positions, filterSeasonIds: seasonIds(saved.filterSeasonIds), filterTeamIds: teamIds(saved.filterTeamIds) }
   }
   if (view.name === 'records') {
     const base = fallback as ScreenStateByView['records']
@@ -161,6 +163,7 @@ function restoredScreenState(view: View, value: unknown, state: AppState): Scree
       category: ['player', 'combination', 'team', 'history', 'insights', 'integrity'].includes(saved.category as string) ? saved.category as typeof base.category : base.category,
       competition: validScope(saved.competition) ? saved.competition as typeof base.competition : base.competition,
       positionFilter: validPosition(saved.positionFilter) ? saved.positionFilter as typeof base.positionFilter : base.positionFilter,
+      positionFilters: positions,
       filterSeasonIds: seasonIds(saved.filterSeasonIds), filterTeamIds: teamIds(saved.filterTeamIds),
       combinationPosition: ['attack', 'midfield', 'defence'].includes(saved.combinationPosition as string) ? saved.combinationPosition as typeof base.combinationPosition : base.combinationPosition,
       combinationPlayers: [2, 3, 4].includes(saved.combinationPlayers as number) ? saved.combinationPlayers as typeof base.combinationPlayers : base.combinationPlayers,

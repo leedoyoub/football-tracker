@@ -134,3 +134,27 @@ test('single-select menu closes on selection and restores trigger focus', () => 
     assert.equal(menu.focusCount(), 1)
   } finally { menu.close() }
 })
+
+test('option multi-menu toggles without closing, resets All and keeps checkbox keyboard focus', () => {
+  const filename = path.resolve(__dirname, '../src/components/CompactMultiFilterMenu.tsx')
+  let values = []
+  const menu = mountMenu(filename, { values, options: [{ value: 'st-ss', label: 'ST/SS' }, { value: 'lw-rw', label: 'LW/RW' }], label: 'Position', title: 'Position', allLabel: 'All', onChange: next => { values = next; menu.update({ values }) } })
+  try {
+    let ui = menu.render(); ui.trigger.props.onClick(); ui = menu.render()
+    assert.equal(ui.items[0].props['aria-checked'], true)
+    ui.items[1].props.onClick(); ui = menu.render()
+    ui.items[2].props.onClick(); ui = menu.render()
+    assert.deepEqual(values, ['st-ss', 'lw-rw'])
+    assert.equal(ui.trigger.props['aria-expanded'], true)
+    assert.deepEqual(ui.items.map(item => item.props.role), ['menuitemcheckbox', 'menuitemcheckbox', 'menuitemcheckbox'])
+    ui.items[1].props.onClick(); ui = menu.render()
+    assert.deepEqual(values, ['lw-rw'])
+    ui.menu.props.onKeyDown({ key: 'End', preventDefault() {} })
+    assert.equal(menu.focusedItemIndex(), 2)
+    ui.items[0].props.onClick(); ui = menu.render()
+    assert.deepEqual(values, [])
+    assert.equal(ui.items[0].props['aria-checked'], true)
+    menu.emit('pointerdown', { target: 'outside' })
+    assert.equal(menu.render().menu, undefined)
+  } finally { menu.close() }
+})

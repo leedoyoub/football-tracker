@@ -83,19 +83,36 @@ test('position and award families share minute analysis across equal scopes and 
   } finally { timeline.creditedPositionSegments = original }
 })
 
-test('Records analyzes each rated player-match goal totals and each player streak only once', () => {
+test('Records classifies each match once and reuses rated appearance facts for goal types and streaks', () => {
   const s = performanceFixture(1); const games = s.matches.slice(0, 32)
   const goals = require('../src/engine/goalTypes.ts'); const insights = require('../src/engine/seasonInsights.ts')
+  const { newestMatches } = require('../src/engine/matchChronology.ts')
+  const { buildPlayerRecordLeaderboards } = require('../src/engine/playerRecords.ts')
   const originalGoals = goals.goalTypeTotals; const originalStreaks = insights.playerStreaks
-  let goalCalls = 0; let streakCalls = 0
+  const originalClassify = goals.classifyGoalTypes
+  let goalCalls = 0; let streakCalls = 0; let classifyCalls = 0; let result
   goals.goalTypeTotals = (...args) => { goalCalls++; return originalGoals(...args) }
   insights.playerStreaks = (...args) => { streakCalls++; return originalStreaks(...args) }
+  goals.classifyGoalTypes = (...args) => { classifyCalls++; return originalClassify(...args) }
   try {
-    require('../src/engine/playerRecords.ts').buildPlayerRecordLeaderboards(s.players, games)
-    const perPlayer = s.players.map(p => games.filter(m => rating.ratePlayerMatch(m, p)).length)
-    assert.equal(goalCalls, perPlayer.reduce((sum, n) => sum + n, 0))
-    assert.equal(streakCalls, perPlayer.filter(n => n > 0).length)
-  } finally { goals.goalTypeTotals = originalGoals; insights.playerStreaks = originalStreaks }
+    result = buildPlayerRecordLeaderboards(s.players, games)
+    assert.equal(classifyCalls, games.length, 'all players share one goal classification per match')
+    assert.equal(goalCalls, 0, 'goal-type groups project the shared classification')
+    assert.equal(streakCalls, 0, 'streak groups reuse already rated appearance facts')
+    assert.deepEqual(buildPlayerRecordLeaderboards(s.players, games), result)
+    assert.deepEqual(buildPlayerRecordLeaderboards(s.players, games, {}, ['scoring-streak']), result.filter(group => group.id === 'scoring-streak'))
+    assert.equal(classifyCalls, games.length, 'revisit and metric selection reuse the same football facts')
+  } finally { goals.goalTypeTotals = originalGoals; insights.playerStreaks = originalStreaks; goals.classifyGoalTypes = originalClassify }
+  const expected = s.players.map(player => {
+    const rated = games.filter(match => rating.ratePlayerMatch(match, player))
+    const totals = rated.map(match => originalGoals(match, player.id, match.appearances.find(row => row.playerId === player.id).teamId))
+    const streaks = originalStreaks(player, newestMatches(rated))
+    return { id: player.id, ...Object.fromEntries(['gameWinning', 'comeback', 'equalizer', 'opening', 'stoppageTime'].map(key => [key, totals.reduce((sum, row) => sum + row[key], 0)])), ...Object.fromEntries(['goodRating', 'goals', 'goalContributions'].map(key => [key, streaks.find(row => row.key === key).best])) }
+  })
+  for (const [id, key] of [['game-winning-goals', 'gameWinning'], ['comeback-goals', 'comeback'], ['equalizers', 'equalizer'], ['opening-goals', 'opening'], ['stoppage-time-goals', 'stoppageTime'], ['good-streak', 'goodRating'], ['scoring-streak', 'goals'], ['ga-streak', 'goalContributions']]) {
+    const rows = result.find(group => group.id === id).rows
+    assert.deepEqual(new Map(rows.map(row => [row.playerId, row.numeric])), new Map(expected.filter(row => row[key] > 0).map(row => [row.id, row[key]])), `${id} retains canonical goal totals/streak values`)
+  }
 })
 
 test('Chemistry repeats reuse the combination calculation without touching timeline facts', () => {

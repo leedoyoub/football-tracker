@@ -47,6 +47,6 @@ test('competition and global ranking screens delegate titles to rankingTitle', (
 
   assert(competitionScreen.includes("rankingTitle('league')"))
   assert(competitionScreen.includes('rankingTitle(type)'))
-  assert(globalRankingScreen.includes('rankingTitle(scope, Boolean(teamId))'))
+  assert(globalRankingScreen.includes('rankingTitle(scope, Boolean(teamIds.length))'))
   assert(homeScreen.includes('title="Global Ranking"'))
 })

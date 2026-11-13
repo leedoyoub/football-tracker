@@ -1,6 +1,8 @@
 import type { CompetitionState, Match, Player, Team } from '../types'
 import { officialAwardSeasons, officialSeasonModel, type OfficialAwardEvent, type TeamSeasonResult, awardEventDetail } from './officialAwards'
 import { positionFilterFamilies } from './positionScope'
+import { historicalRankingTeams, playerInRankingTeams } from './rankingPresentation'
+import { recordsScopedMatches } from './recordsScope'
 import type { RecordsLeaderboardGroup, RecordsLeaderboardRow, RecordsScope } from '../screens/recordsLeaderboards'
 
 type Metric = { id: string; title: string; accepts: (event: OfficialAwardEvent) => boolean }
@@ -46,8 +48,9 @@ function ranked(rows: Omit<RecordsLeaderboardRow, 'rank'>[], ascending = false):
   return rows.sort((a, b) => (ascending ? a.numeric - b.numeric : b.numeric - a.numeric) || a.id.localeCompare(b.id)).map((row, i) => { if (previous !== row.numeric) rank = i + 1; previous = row.numeric; return { ...row, rank } })
 }
 export function awardRecordGroups(teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], scope: RecordsScope, selectedIds?: string[]): RecordsLeaderboardGroup[] {
-  const families = positionFilterFamilies(scope.positionFilter)
-  const events = officialAwardSeasons(matches, states).filter(season => !scope.seasons.length || scope.seasons.includes(season)).flatMap(season => officialSeasonModel(teams, players, matches, states, season).events).filter(e => (scope.competition === 'all' || e.competition === scope.competition) && (!scope.teamIds.length || scope.teamIds.includes(e.teamId)) && (!families.length || e.position && families.includes(e.position)))
+  const families = positionFilterFamilies(scope.positionFilters ?? scope.positionFilter)
+  const events = officialAwardSeasons(matches, states).filter(season => !scope.seasons.length || scope.seasons.includes(season)).flatMap(season => officialSeasonModel(teams, players, matches, states, season).events).filter(e => (scope.competition === 'all' || e.competition === scope.competition) && (!families.length || e.position && families.includes(e.position)))
+  const membership = scope.teamIds.length ? historicalRankingTeams(recordsScopedMatches(matches, { ...scope, teamIds: [] }, 'player')) : undefined
   const byPlayer = new Map<string, OfficialAwardEvent[]>()
   for (const event of events) { const list = byPlayer.get(event.playerId) ?? []; list.push(event); byPlayer.set(event.playerId, list) }
   const byId = new Map(players.map(player => [player.id, player]))
@@ -56,7 +59,7 @@ export function awardRecordGroups(teams: Team[], players: Player[], matches: Mat
     if (!selected.length) return []
     const player = byId.get(id)
     return [{ id, name: player?.displayName ?? player?.name ?? `Historical player ${id}`, numeric: selected.length, value: String(selected.length), detail: selected.map(e => awardEventDetail(e, teams)).join(' · ') }]
-  })) }))
+  })).filter(row => !membership || playerInRankingTeams(row.id, scope.teamIds, membership)) }))
 }
 
 export function teamHistoryRecordGroups(teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], scope: RecordsScope): RecordsLeaderboardGroup[] {

@@ -21,13 +21,21 @@ export function positionFamily(position?: string): PositionFamily | undefined {
   return value as PositionFamily
 }
 
-export function positionFilterFamilies(key: PositionFilterKey): PositionFamily[] {
+export function normalizePositionFilters(value: unknown): PositionFilterKey[] {
+  const keys = new Set(['st-ss', 'lw-rw', 'cam', 'lm-rm', 'cm', 'cdm', 'lb-rb', 'cb', 'gk'])
+  const values = Array.isArray(value) ? value : [value]
+  if (values.includes('all')) return []
+  return [...new Set(values.map(key => key === 'fb' ? 'lb-rb' : key).filter(key => typeof key === 'string' && keys.has(key)))] as PositionFilterKey[]
+}
+
+export function positionFilterFamilies(key: PositionFilterKey | readonly PositionFilterKey[]): PositionFamily[] {
+  if (Array.isArray(key)) return [...new Set(normalizePositionFilters(key).flatMap(value => positionFilterFamilies(value)))]
   if (key === 'all') return []
   if (key === 'st-ss') return ['ST', 'SS']
   if (key === 'lw-rw') return ['LW', 'RW']
   if (key === 'lm-rm') return ['LM', 'RM']
   if (key === 'lb-rb' || key === 'fb') return ['LB', 'RB']
-  return [key.toUpperCase() as PositionFamily]
+  return [(key as PositionFilterKey).toUpperCase() as PositionFamily]
 }
 
 function inScope(match: Match, scope: PositionScope) {

@@ -32,10 +32,12 @@ test('PositionFilter visibly identifies its active filter in the compact trigger
 })
 
 test('position filter is applied before ranking Top N on Home and Global Ranking', () => {
-  for (const file of ['HomeScreen.tsx', 'GlobalRankingScreen.tsx']) {
+  for (const file of ['HomeScreen.tsx']) {
     const source = fs.readFileSync(require.resolve(`../src/screens/${file}`), 'utf8')
     assert.match(source, /positions:\s*positionFilterFamilies\(screenState\.positionFilter\)/)
   }
+  const global = fs.readFileSync(require.resolve('../src/screens/GlobalRankingScreen.tsx'), 'utf8')
+  assert.match(global, /rankGlobalRankingRows\(population, players, metric\)/)
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert.match(home, /rankGlobalRankingRows\(rankingIndex, players, metric\)\.slice\(0, 10\)/)
   assert(!home.includes('new Map(RANKING_METRICS.map'), 'Home must not eagerly rank every metric')
@@ -126,10 +128,10 @@ test('v2.6.1 keeps package, lockfile, app version, rating revision, and storage 
   const { APP_VERSION } = require('../src/config.ts')
   const { RATING_ENGINE_REVISION } = require('../src/engine/ratingRevision.ts')
   const repository = fs.readFileSync(require.resolve('../src/lib/repository.ts'), 'utf8')
-  assert.equal(APP_VERSION, '2.6.8')
-  assert.equal(require('../package.json').version, '2.6.8')
-  assert.equal(require('../package-lock.json').version, '2.6.8')
-  assert.equal(require('../package-lock.json').packages[''].version, '2.6.8')
+  assert.equal(APP_VERSION, '2.6.9')
+  assert.equal(require('../package.json').version, '2.6.9')
+  assert.equal(require('../package-lock.json').version, '2.6.9')
+  assert.equal(require('../package-lock.json').packages[''].version, '2.6.9')
   assert.equal(RATING_ENGINE_REVISION, 13)
   assert(repository.includes("STORAGE_KEY = 'football-tracker-v1'"))
 })

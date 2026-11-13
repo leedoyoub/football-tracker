@@ -21,10 +21,10 @@ const match = (id, date, competitionType, events, season = 'Season 1') => ({
 test('v2.6.7 release metadata uses rating revision 13', () => {
   const packageJson = require('../package.json')
   const lockfile = require('../package-lock.json')
-  assert.equal(packageJson.version, '2.6.8')
-  assert.equal(lockfile.version, '2.6.8')
-  assert.equal(lockfile.packages[''].version, '2.6.8')
-  assert.equal(APP_VERSION, '2.6.8')
+  assert.equal(packageJson.version, '2.6.9')
+  assert.equal(lockfile.version, '2.6.9')
+  assert.equal(lockfile.packages[''].version, '2.6.9')
+  assert.equal(APP_VERSION, '2.6.9')
   assert.equal(RATING_ENGINE_REVISION, 13)
 })
 

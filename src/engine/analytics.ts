@@ -41,8 +41,8 @@ function teamIntervals(match: Match, playerId: string, teamId: string): Interval
   return appearance ? creditedPositionSegments(match, appearance).map(segment => ({ start: segment.enter, end: segment.exit, position: segment.position })) : []
 }
 
-function sharedIntervals(match: Match, playerIds: string[], teamId: string, roles: Record<string, RoleCheck> = {}): Interval[] {
-  const intervals = playerIds.map(id => teamIntervals(match, id, teamId))
+function sharedIntervals(playerIds: string[], intervalsFor: (playerId: string) => Interval[], roles: Record<string, RoleCheck> = {}): Interval[] {
+  const intervals = playerIds.map(intervalsFor)
   if (intervals.some(items => !items.length)) return []
   const boundaries = [...new Set(intervals.flatMap(items => items.flatMap(item => [item.start, item.end])))].sort((a, b) => a - b)
   const shared: Interval[] = []
@@ -71,8 +71,8 @@ function playersOnPitchForEvent(match: Match, playerIds: string[], teamId: strin
   })
 }
 
-function buildCombination(match: Match, playerIds: string[], teamId: string, roles: Record<string, RoleCheck>, playersById: Map<string, Player>): Omit<CombinationStats, 'key' | 'kind' | 'playerIds' | 'teamId' | 'eligible'> | null {
-  const overlap = sharedIntervals(match, playerIds, teamId, roles)
+function buildCombination(match: Match, playerIds: string[], teamId: string, roles: Record<string, RoleCheck>, playersById: Map<string, Player>, intervalsFor: (playerId: string) => Interval[]): Omit<CombinationStats, 'key' | 'kind' | 'playerIds' | 'teamId' | 'eligible'> | null {
+  const overlap = sharedIntervals(playerIds, intervalsFor, roles)
   const togetherMinutes = minutes(overlap)
   if (!togetherMinutes) return null
   const appearances = playerIds.flatMap(playerId => { const appearance = match.appearances.find(item => item.playerId === playerId && item.teamId === teamId); return appearance ? [appearance] : [] })
@@ -105,11 +105,20 @@ function buildCombinationStats(players: Player[], matches: Match[], filter: Anal
   for (const match of matches.filter(match => isScoped(match, filter))) for (const teamId of teamIds(match)) {
     if (filter.teamId && teamId !== filter.teamId) continue
     const appearances = match.appearances.filter(appearance => appearance.teamId === teamId)
-    const available = (check: RoleCheck) => appearances.filter(appearance => teamIntervals(match, appearance.playerId, teamId).some(interval => check(interval.position))).map(appearance => appearance.playerId)
+    // Availability and every candidate overlap read the same credited intervals.
+    // Keep this map local to this match/team query so edits need no new cache
+    // invalidation and duplicate IDs retain teamIntervals' first-appearance rule.
+    const intervalsByPlayer = new Map<string, Interval[]>()
+    const intervalsFor = (playerId: string) => {
+      let intervals = intervalsByPlayer.get(playerId)
+      if (!intervals) { intervals = teamIntervals(match, playerId, teamId); intervalsByPlayer.set(playerId, intervals) }
+      return intervals
+    }
+    const available = (check: RoleCheck) => appearances.filter(appearance => intervalsFor(appearance.playerId).some(interval => check(interval.position))).map(appearance => appearance.playerId)
     const add = (ids: string[], roles: Record<string, RoleCheck>) => {
       const unique = [...new Set(ids)]
       if (unique.length !== ids.length) return
-      const entry = buildCombination(match, ids, teamId, roles, playersById)
+      const entry = buildCombination(match, ids, teamId, roles, playersById, intervalsFor)
       if (!entry) return
       const key = `${teamId}:${ids.slice().sort().join(':')}`; const previous = totals.get(key)
       if (!previous) { totals.set(key, { key, kind, playerIds: ids.slice().sort(), teamId, ...entry, eligible: false }); return }

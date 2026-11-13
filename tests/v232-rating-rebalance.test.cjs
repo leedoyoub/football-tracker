@@ -21,8 +21,8 @@ function suppressionFixture(position, saves) {
 }
 
 test('v2.6.7 release metadata and revision-13 table contain exactly the approved changes', () => {
-  assert.equal(APP_VERSION, '2.6.8')
-  assert.equal(require('../package.json').version, '2.6.8')
+  assert.equal(APP_VERSION, '2.6.9')
+  assert.equal(require('../package.json').version, '2.6.9')
   assert.equal(RATING_ENGINE_REVISION, 13)
   const expected = { LM: [.05, .25], RM: [.05, .25], CM: [.07, .30], LCM: [.07, .30], RCM: [.07, .30], CDM: [.06, .80], LDM: [.06, .80], RDM: [.06, .80] }
   for (const [position, values] of Object.entries(expected)) assert.deepEqual([POSITION_RULES[position].teamGoal, POSITION_RULES[position].suppressionMax], values, position)

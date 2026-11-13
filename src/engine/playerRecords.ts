@@ -1,15 +1,16 @@
 import type { CompetitionType, Match, Player, PositionFilterKey } from '../types'
-import { matchCompetitionType } from './competition'
 import { isGoodRating } from './constants'
-import { newestMatches } from './matchChronology'
+import { newestMatches, oldestMatches } from './matchChronology'
 import { positionFilterFamilies, scopedPositionFamilyByPlayer } from './positionScope'
 import { getMatchManOfTheMatch, ratePlayerMatch } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
-import { playerStreaks } from './seasonInsights'
-import { goalTypeTotals } from './goalTypes'
-import { matchesWithPlayerAppearance, playerGoalkeeperFacts, playerGoalEvents, playerAssistEvents } from './playerMatchFacts'
+import { classifyGoalTypes, type GoalTypeTotals } from './goalTypes'
+import { playerAppearanceMatchIndex, playerGoalkeeperFacts, playerGoalEvents, playerAssistEvents, isPlayerGoalEvent } from './playerMatchFacts'
 import { buildGlobalRankingData, rankGlobalRankingRows } from './stats'
 import type { DefensiveRankingMetric } from './defensiveRanking'
+import { recordsScopedMatches } from './recordsScope'
+import { arrayItemRevision } from './arrayItemRevision'
+import { historicalRankingTeams, playerInRankingTeams } from './rankingPresentation'
 
 export type PlayerRecordLeaderboardId =
   | 'goals' | 'assists' | 'ga' | 'matches-scored-in' | 'matches-ga' | 'braces' | 'hat-tricks'
@@ -21,7 +22,7 @@ export type PlayerRecordLeaderboardId =
 
 export type PlayerRecordRow = { playerId: string; numeric: number; value: string; detail: string; rank: number }
 export type PlayerRecordGroup = { id: PlayerRecordLeaderboardId; title: string; rows: PlayerRecordRow[] }
-export type PlayerRecordScope = { seasons?: string[]; teamIds?: string[]; competition?: CompetitionType | 'all'; positionFilter?: PositionFilterKey }
+export type PlayerRecordScope = { seasons?: string[]; teamIds?: string[]; competition?: CompetitionType | 'all'; positionFilter?: PositionFilterKey; positionFilters?: PositionFilterKey[] }
 
 type PlayerRecordFacts = {
   playerId: string; appearances: number; goals: number; assists: number; matchesScoredIn: number; matchesGA: number; braces: number; hatTricks: number
@@ -32,6 +33,7 @@ type PlayerRecordFacts = {
 }
 
 const cache = new WeakMap<Match[], WeakMap<Player[], Map<string, PlayerRecordGroup[]>>>()
+const factsCache = new WeakMap<Match[], WeakMap<Player[], Map<string, PlayerRecordFacts[]>>>()
 
 function rank(rows: Omit<PlayerRecordRow, 'rank'>[]): PlayerRecordRow[] {
   let prior: number | undefined
@@ -44,59 +46,98 @@ function rank(rows: Omit<PlayerRecordRow, 'rank'>[]): PlayerRecordRow[] {
 }
 
 function scopeKey(scope: PlayerRecordScope) {
-  return `${RATING_ENGINE_REVISION}|${(scope.seasons ?? []).slice().sort().join(',')}|${(scope.teamIds ?? []).slice().sort().join(',')}|${scope.competition ?? 'all'}|${scope.positionFilter ?? 'all'}`
+  return JSON.stringify([RATING_ENGINE_REVISION, (scope.seasons ?? []).slice().sort(), (scope.teamIds ?? []).slice().sort(), scope.competition ?? 'all', positionFilterFamilies(scope.positionFilters ?? scope.positionFilter ?? 'all').sort()])
 }
 
 function selectedMatches(matches: Match[], scope: PlayerRecordScope) {
-  return matches.filter(match => (!scope.seasons?.length || scope.seasons.includes(match.season)) && (!scope.competition || scope.competition === 'all' || matchCompetitionType(match) === scope.competition))
+  return recordsScopedMatches(matches, { seasons: scope.seasons ?? [], competition: scope.competition ?? 'all', teamIds: [] }, 'player')
 }
 
-function buildFacts(players: Player[], matches: Match[], scope: PlayerRecordScope): PlayerRecordFacts[] {
+function buildFacts(players: Player[], matches: Match[], scope: PlayerRecordScope, selectedIds?: string[]): PlayerRecordFacts[] {
   const selected = selectedMatches(matches, scope)
-  const allowedFamilies = new Set(positionFilterFamilies(scope.positionFilter ?? 'all'))
-  const historicalFamilies = allowedFamilies.size ? scopedPositionFamilyByPlayer(players, selected, { teams: scope.teamIds }) : undefined
-  const momByMatch = new Map(selected.map(match => [match.id, getMatchManOfTheMatch(match, players)]))
-  return players.flatMap(player => {
-    if (allowedFamilies.size && !allowedFamilies.has(historicalFamilies?.get(player.id)!)) return []
-    const games = newestMatches(matchesWithPlayerAppearance(player.id, selected).filter(match => !scope.teamIds?.length || match.appearances.some(appearance => appearance.playerId === player.id && scope.teamIds!.includes(appearance.teamId))))
-    const rated = games.flatMap(match => {
-      const appearance = match.appearances.find(item => item.playerId === player.id && (!scope.teamIds?.length || scope.teamIds.includes(item.teamId)))
+  const needs = (id: string) => !selectedIds || selectedIds.includes(id)
+  const needsGoalTypes = ['game-winning-goals', 'comeback-goals', 'equalizers', 'opening-goals', 'stoppage-time-goals'].some(needs)
+  const needsGoalkeeper = needs('saves') || needs('clean-sheets')
+  const needsStreaks = ['good-streak', 'scoring-streak', 'ga-streak'].some(needs)
+  let byPlayers = factsCache.get(selected); if (!byPlayers) { byPlayers = new WeakMap(); factsCache.set(selected, byPlayers) }
+  let byCapability = byPlayers.get(players); if (!byCapability) { byCapability = new Map(); byPlayers.set(players, byCapability) }
+  const key = JSON.stringify([RATING_ENGINE_REVISION, arrayItemRevision(players), needs('mom'), needsGoalTypes, needsGoalkeeper, needsStreaks])
+  const cached = byCapability.get(key) ?? byCapability.get(JSON.stringify([RATING_ENGINE_REVISION, arrayItemRevision(players), true, true, true, true]))
+  if (cached) return cached
+  const momByMatch = new Map(needs('mom') ? selected.map(match => [match.id, getMatchManOfTheMatch(match, players)]) : [])
+  const appearanceMatches = playerAppearanceMatchIndex(selected)
+  const classified = new Map<Match, ReturnType<typeof classifyGoalTypes>>()
+  const goalTypesFor = (match: Match, appearance: Match['appearances'][number]) => {
+    const totals: GoalTypeTotals = { opening: 0, equalizer: 0, goAhead: 0, leadExtending: 0, deficitReducing: 0, gameWinning: 0, comeback: 0, stoppageTime: 0 }
+    if (!needsGoalTypes) return totals
+    let rows = classified.get(match)
+    if (!rows) { rows = classifyGoalTypes(match); classified.set(match, rows) }
+    for (const row of rows) if (row.teamId === appearance.teamId && isPlayerGoalEvent(match, appearance, row.event)) for (const tag of row.tags) totals[tag]++
+    return totals
+  }
+  const result = players.flatMap(player => {
+    const games = newestMatches([...(appearanceMatches.get(player.id) ?? [])])
+    // Preserve playerStreaks' oldestMatches(newestMatches(source)) ordering,
+    // including insertion-order ties in legacy same-date records.
+    const rated = (needsStreaks ? oldestMatches(games) : games).flatMap(match => {
+      const appearance = match.appearances.find(item => item.playerId === player.id)
       if (!appearance) return []
       const rating = ratePlayerMatch(match, player)
       if (!rating) return []
       const goals = playerGoalEvents(match, appearance).length
       const assists = playerAssistEvents(match, appearance).length
-      const goalkeeper = playerGoalkeeperFacts(match, appearance)
-      return [{ match, teamId: appearance.teamId, rating, goals, assists, saves: goalkeeper.saves, cleanSheet: goalkeeper.cleanSheet, goalTypes: goalTypeTotals(match, player.id, appearance.teamId) }]
+      const goalkeeper = needsGoalkeeper ? playerGoalkeeperFacts(match, appearance) : undefined
+      return [{ match, rating, goals, assists, saves: goalkeeper?.saves ?? 0, cleanSheet: goalkeeper?.cleanSheet ?? false, goalTypes: goalTypesFor(match, appearance) }]
     })
     if (!rated.length) return []
     const count = (predicate: (row: typeof rated[number]) => boolean) => rated.filter(predicate).length
     const sum = (metric: (row: typeof rated[number]) => number) => rated.reduce((total, row) => total + metric(row), 0)
-    const streaks = playerStreaks(player, games)
-    const streak = (key: 'goodRating' | 'goals' | 'goalContributions') => streaks.find(row => row.key === key)?.best ?? 0
-    const goalTypes = (key: keyof ReturnType<typeof goalTypeTotals>) => rated.reduce((total, row) => total + row.goalTypes[key], 0)
+    const streak = (passes: (row: typeof rated[number]) => boolean) => {
+      if (!needsStreaks) return 0
+      let best = 0, current = 0
+      for (const row of rated) { current = passes(row) ? current + 1 : 0; best = Math.max(best, current) }
+      return best
+    }
+    const goalTypes = (key: keyof GoalTypeTotals) => rated.reduce((total, row) => total + row.goalTypes[key], 0)
     return [{
       playerId: player.id, appearances: rated.length,
       goals: sum(row => row.goals), assists: sum(row => row.assists), matchesScoredIn: count(row => row.goals >= 1), matchesGA: count(row => row.goals + row.assists >= 1), braces: count(row => row.goals >= 2), hatTricks: count(row => row.goals >= 3),
       fourGoalGames: count(row => row.goals >= 4), threeAssistGames: count(row => row.assists >= 3), fourGAGames: count(row => row.goals + row.assists >= 4), mom: count(row => momByMatch.get(row.match.id) === player.id),
       goodRatings: count(row => isGoodRating(row.rating.raw)), eightRatings: count(row => row.rating.raw >= 8), nineRatings: count(row => row.rating.raw >= 9), tenRatings: count(row => row.rating.raw === 10),
-      cleanSheets: count(row => row.cleanSheet), saves: sum(row => row.saves), goodStreak: streak('goodRating'), scoringStreak: streak('goals'), gaStreak: streak('goalContributions'),
+      cleanSheets: count(row => row.cleanSheet), saves: sum(row => row.saves), goodStreak: streak(row => isGoodRating(row.rating.rating)), scoringStreak: streak(row => row.goals > 0), gaStreak: streak(row => row.goals + row.assists > 0),
       highestRating: Math.max(...rated.map(row => row.rating.raw)), highestGoals: Math.max(...rated.map(row => row.goals)), highestAssists: Math.max(...rated.map(row => row.assists)), highestGA: Math.max(...rated.map(row => row.goals + row.assists)),
       gameWinningGoals: goalTypes('gameWinning'), comebackGoals: goalTypes('comeback'), equalizers: goalTypes('equalizer'), openingGoals: goalTypes('opening'), stoppageTimeGoals: goalTypes('stoppageTime'),
     }]
   })
+  if (byCapability.size >= 32) byCapability.delete(byCapability.keys().next().value!)
+  byCapability.set(key, result)
+  return result
 }
 
 /** One engine-owned catalog supplies Records UI and Match Changes ranking identities. */
-export function buildPlayerRecordLeaderboards(players: Player[], matches: Match[], scope: PlayerRecordScope = {}): PlayerRecordGroup[] {
+export function buildPlayerRecordLeaderboards(players: Player[], matches: Match[], scope: PlayerRecordScope = {}, selectedIds?: string[]): PlayerRecordGroup[] {
   let byPlayers = cache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); cache.set(matches, byPlayers) }
   let byScope = byPlayers.get(players); if (!byScope) { byScope = new Map(); byPlayers.set(players, byScope) }
-  const key = scopeKey(scope)
+  const key = JSON.stringify([arrayItemRevision(matches), arrayItemRevision(players), scopeKey(scope), selectedIds?.slice().sort() ?? null])
   const cached = byScope.get(key); if (cached) return cached
-  const facts = buildFacts(players, matches, scope)
+  if (scope.teamIds?.length) {
+    const official = buildPlayerRecordLeaderboards(players, matches, { ...scope, teamIds: [] }, selectedIds)
+    const membership = historicalRankingTeams(selectedMatches(matches, scope))
+    const result = official.map(group => ({ ...group, rows: group.rows.filter(row => playerInRankingTeams(row.playerId, scope.teamIds!, membership)) }))
+    if (byScope.size >= 32) byScope.delete(byScope.keys().next().value!)
+    byScope.set(key, result)
+    return result
+  }
+  const needs = (id: string) => !selectedIds || selectedIds.includes(id)
   const selected = selectedMatches(matches, scope)
-  const rankingIndex = buildGlobalRankingData(players, selected, { seasons: [], teams: scope.teamIds ?? [], positions: positionFilterFamilies(scope.positionFilter ?? 'all') }, 'rating')
-  const defensiveGroup = (id: PlayerRecordLeaderboardId, title: string, metric: DefensiveRankingMetric): PlayerRecordGroup => {
+  const allowedFamilies = new Set(positionFilterFamilies(scope.positionFilters ?? scope.positionFilter ?? 'all'))
+  const historicalFamilies = allowedFamilies.size ? scopedPositionFamilyByPlayer(players, selected, {}) : undefined
+  const allFacts = !selectedIds || selectedIds.some(id => !['lowest-sot-90', 'lowest-defender-ga-90', 'lowest-gk-ga-90'].includes(id)) ? buildFacts(players, matches, scope, selectedIds) : []
+  const facts = allowedFamilies.size ? allFacts.filter(row => { const family = historicalFamilies?.get(row.playerId); return family !== undefined && allowedFamilies.has(family) }) : allFacts
+  let rankingIndex: ReturnType<typeof buildGlobalRankingData> | undefined
+  const defensiveGroup = (id: PlayerRecordLeaderboardId, title: string, metric: DefensiveRankingMetric): PlayerRecordGroup | undefined => {
+    if (!needs(id)) return undefined
+    rankingIndex ??= buildGlobalRankingData(players, selected, { seasons: [], teams: [], positions: positionFilterFamilies(scope.positionFilters ?? scope.positionFilter ?? 'all') }, 'rating')
     let previous: number | undefined
     let previousRank = 0
     const rows = rankGlobalRankingRows(rankingIndex, players, metric).map((row, index): PlayerRecordRow => {
@@ -109,13 +150,13 @@ export function buildPlayerRecordLeaderboards(players: Player[], matches: Match[
     })
     return { id, title, rows }
   }
-  const group = (id: PlayerRecordLeaderboardId, title: string, metric: (row: PlayerRecordFacts) => number, suffix = '', detail?: (row: PlayerRecordFacts) => string): PlayerRecordGroup => ({
+  const group = (id: PlayerRecordLeaderboardId, title: string, metric: (row: PlayerRecordFacts) => number, suffix = '', detail?: (row: PlayerRecordFacts) => string): PlayerRecordGroup | undefined => !needs(id) ? undefined : ({
     id, title, rows: rank(facts.map(row => {
       const numeric = metric(row)
       return { playerId: row.playerId, numeric, value: id === 'highest-rating' ? numeric.toFixed(2) : `${numeric}${suffix}`, detail: detail?.(row) ?? `${row.appearances} apps` }
     })),
   })
-  const result: PlayerRecordGroup[] = [
+  const result = [
     group('goals', 'All-time Goals', row => row.goals, ' goals'), group('assists', 'All-time Assists', row => row.assists, ' assists'), group('ga', 'All-time G+A', row => row.goals + row.assists, ' G+A'),
     group('matches-scored-in', 'Most Matches Scored In', row => row.matchesScoredIn), group('matches-ga', 'Most Matches with G+A', row => row.matchesGA), group('braces', 'Most Braces', row => row.braces), group('hat-tricks', 'Most Hat-tricks', row => row.hatTricks),
     group('four-goals', 'Most 4+ Goal Games', row => row.fourGoalGames), group('three-assists', 'Most 3+ Assist Games', row => row.threeAssistGames), group('four-ga', 'Most 4+ G+A Games', row => row.fourGAGames),
@@ -125,7 +166,7 @@ export function buildPlayerRecordLeaderboards(players: Player[], matches: Match[
     group('game-winning-goals', 'Most Game-Winning Goals', row => row.gameWinningGoals, ' goals'), group('comeback-goals', 'Most Comeback Goals', row => row.comebackGoals, ' goals'), group('equalizers', 'Most Equalizers', row => row.equalizers, ' goals'), group('opening-goals', 'Most Opening Goals', row => row.openingGoals, ' goals'), group('stoppage-time-goals', 'Most Stoppage-Time Goals', row => row.stoppageTimeGoals, ' goals'),
     group('highest-rating', 'Highest Match Rating', row => row.highestRating, '', row => `${row.highestRating.toFixed(2)} canonical raw rating`), group('highest-goals', 'Most Goals in a Match', row => row.highestGoals, ' goals'),
     group('highest-assists', 'Most Assists in a Match', row => row.highestAssists, ' assists'), group('highest-ga', 'Most G+A in a Match', row => row.highestGA, ' G+A'),
-  ]
+  ].filter((group): group is PlayerRecordGroup => Boolean(group))
   if (byScope.size >= 32) byScope.delete(byScope.keys().next().value!)
   byScope.set(key, result)
   return result

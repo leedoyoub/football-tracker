@@ -120,7 +120,10 @@ test('v266 legacy Cup stage state never calculates stage XI and retains official
 })
 
 test('v266 official scoring, publication, Team History, shared race and pitch remain byte-equivalent to v265', () => {
-  for (const file of ['engine/awards.ts', 'engine/awardEvaluation.ts', 'engine/awardRules.ts', 'engine/officialAwards.ts', 'engine/awardPolicy.ts', 'engine/rating.ts', 'engine/ratingRevision.ts', 'engine/competition.ts', 'engine/teamHistorySelection.ts', 'components/Pitch.tsx', 'components/awardBestXIProps.ts', 'components/AwardBestXI.tsx', 'components/AwardRacePanel.tsx', 'screens/AwardRaceScreen.tsx']) {
+  // v269 extends the full Race screen's presentation filters; independent
+  // unfiltered screen row/candidate parity is checked in v269-ranking.
+  // All official scoring, panel, pitch and qualification source locks stay exact.
+  for (const file of ['engine/awards.ts', 'engine/awardEvaluation.ts', 'engine/awardRules.ts', 'engine/officialAwards.ts', 'engine/awardPolicy.ts', 'engine/rating.ts', 'engine/ratingRevision.ts', 'engine/competition.ts', 'engine/teamHistorySelection.ts', 'components/Pitch.tsx', 'components/awardBestXIProps.ts', 'components/AwardBestXI.tsx', 'components/AwardRacePanel.tsx']) {
     const old = execFileSync('git', ['show', `5347394:src/${file}`], { encoding: 'utf8' }).replaceAll('\r', '')
     const current = fs.readFileSync(path.join(root, 'src', file), 'utf8').replaceAll('\r', '')
     // v268 indexes historical registrations once; the entire shared scoring,

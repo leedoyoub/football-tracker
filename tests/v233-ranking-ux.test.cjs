@@ -10,9 +10,10 @@ test('Cup and Champions previews are compact Top 10 routes to their canonical Gl
   for (const removed of ['RankingFilterButton', 'compareMode', 'viewAllMetric', 'rankingTeamIds', 'Show Top 10']) assert.equal(preview.includes(removed), false, `${removed} must not remain in compact previews`)
 })
 
-test('Global Ranking owns a source-level team filter', () => {
+test('Global Ranking owns a display-only team filter after official ranking', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/GlobalRankingScreen.tsx'), 'utf8')
   assert(source.includes('label="Global Ranking team"'))
-  assert(source.includes('teams: teamId ? [teamId] : []'))
-  assert(source.includes('onChange={setTeamId}'))
+  assert(source.includes('teams: [], positions: []'))
+  assert(source.includes('playerInRankingTeams(row.playerId, teamIds, membership)'))
+  assert(source.includes('onChange={setTeamIds}'))
 })

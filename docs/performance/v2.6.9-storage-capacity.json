@@ -1,0 +1,22 @@
+{
+  "method": "Native Chromium localStorage, fresh isolated context per unchanged existing fixture, no quota override/compression/in-memory storage shim. Same serialized fixture applies to both releases. Failing setItem must preserve the previous value. This is capacity validation, not a performance speed claim.",
+  "results": [
+    {
+      "seasons": 2,
+      "matches": 1152,
+      "jsonUtf8Bytes": 4477717,
+      "jsonCodeUnits": 4477716,
+      "saved": true
+    },
+    {
+      "seasons": 6,
+      "matches": 3456,
+      "jsonUtf8Bytes": 13345997,
+      "jsonCodeUnits": 13345996,
+      "saved": false,
+      "error": "QuotaExceededError",
+      "message": "Failed to execute 'setItem' on 'Storage': Setting the value of 'football-tracker-v1' exceeded the quota.",
+      "previousPreserved": true
+    }
+  ]
+}

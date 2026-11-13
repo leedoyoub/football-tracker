@@ -215,7 +215,7 @@ test('historical Match and Player Detail actually render the same current-engine
       screenState: { ...defaultScreenState({ name: 'player', id: p.id }), tab: 'matches' },
       onStateChange() {}, onNavigate() {}, onBack() {},
     }))
-    assert.match(matchHtml, />5\.9</); assert.match(matchesHtml, />5\.9</); assert.match(playerHtml, />5\.94</)
+    assert.match(matchHtml, />5\.9</); assert.match(matchesHtml, /class="text-blue-300">5\.9 ★</); assert.match(playerHtml, />5\.94</)
   } finally { if (previous) require.cache[path] = previous; else delete require.cache[path] }
 })
 test('live history accepts stoppage-time subs and validates goals in saved order', () => {

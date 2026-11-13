@@ -1,0 +1,94 @@
+{
+  "method": "Real isolated Chromium, unchanged 2-season fixture, selected season has 36 Matches. Functional checks, not performance timing.",
+  "results": [
+    {
+      "width": 320,
+      "dom": {
+        "cards": 36,
+        "elements": 427,
+        "details": 36
+      },
+      "momBadges": 26,
+      "normalBadges": 10,
+      "horizontalScroll": {
+        "before": 486,
+        "after": 403
+      },
+      "touchTapExactMatch": true,
+      "mouseAndKeyboardExactMatches": true,
+      "bounds": {
+        "viewport": 320,
+        "body": 320,
+        "client": 320,
+        "scroll": 320
+      }
+    },
+    {
+      "width": 375,
+      "dom": {
+        "cards": 36,
+        "elements": 427,
+        "details": 36
+      },
+      "momBadges": 26,
+      "normalBadges": 10,
+      "horizontalScroll": {
+        "before": 459,
+        "after": 394
+      },
+      "touchTapExactMatch": true,
+      "mouseAndKeyboardExactMatches": true,
+      "bounds": {
+        "viewport": 375,
+        "body": 375,
+        "client": 375,
+        "scroll": 375
+      }
+    },
+    {
+      "width": 390,
+      "dom": {
+        "cards": 36,
+        "elements": 427,
+        "details": 36
+      },
+      "momBadges": 26,
+      "normalBadges": 10,
+      "horizontalScroll": {
+        "before": 451,
+        "after": 386
+      },
+      "touchTapExactMatch": true,
+      "mouseAndKeyboardExactMatches": true,
+      "bounds": {
+        "viewport": 390,
+        "body": 390,
+        "client": 390,
+        "scroll": 390
+      }
+    },
+    {
+      "width": 1280,
+      "dom": {
+        "cards": 36,
+        "elements": 427,
+        "details": 36
+      },
+      "momBadges": 26,
+      "normalBadges": 10,
+      "horizontalScroll": {
+        "before": 422,
+        "after": 357
+      },
+      "touchTapExactMatch": true,
+      "mouseAndKeyboardExactMatches": true,
+      "bounds": {
+        "viewport": 1280,
+        "body": 1280,
+        "client": 448,
+        "scroll": 448
+      }
+    }
+  ],
+  "runtimeErrors": []
+}

@@ -1,0 +1,166 @@
+{
+  "method": "Production isolated Chromium, unchanged 2-season fixture, functional UI checks at 320/375/390/1280px; not a timing benchmark.",
+  "results": [
+    {
+      "width": 320,
+      "kind": "global-ranking",
+      "multiSelect": true,
+      "keyboardFocus": true,
+      "reset": true,
+      "reload": true,
+      "playerBack": true,
+      "bounds": true
+    },
+    {
+      "width": 320,
+      "kind": "award-race",
+      "multiSelect": true,
+      "keyboardFocus": true,
+      "reset": true,
+      "reload": true,
+      "playerBack": true,
+      "bounds": true
+    },
+    {
+      "width": 320,
+      "kind": "records",
+      "multiSelect": true,
+      "keyboardFocus": true,
+      "reset": true,
+      "reload": true,
+      "playerBack": true,
+      "bounds": true
+    },
+    {
+      "width": 320,
+      "kind": "records-leaderboard",
+      "multiSelect": true,
+      "keyboardFocus": true,
+      "reset": true,
+      "reload": true,
+      "playerBack": true,
+      "bounds": true
+    },
+    {
+      "width": 375,
+      "kind": "global-ranking",
+      "multiSelect": true,
+      "keyboardFocus": true,
+      "reset": true,
+      "reload": true,
+      "playerBack": true,
+      "bounds": true
+    },
+    {
+      "width": 375,
+      "kind": "award-race",
+      "multiSelect": true,
+      "keyboardFocus": true,
+      "reset": true,
+      "reload": true,
+      "playerBack": true,
+      "bounds": true
+    },
+    {
+      "width": 375,
+      "kind": "records",
+      "multiSelect": true,
+      "keyboardFocus": true,
+      "reset": true,
+      "reload": true,
+      "playerBack": true,
+      "bounds": true
+    },
+    {
+      "width": 375,
+      "kind": "records-leaderboard",
+      "multiSelect": true,
+      "keyboardFocus": true,
+      "reset": true,
+      "reload": true,
+      "playerBack": true,
+      "bounds": true
+    },
+    {
+      "width": 390,
+      "kind": "global-ranking",
+      "multiSelect": true,
+      "keyboardFocus": true,
+      "reset": true,
+      "reload": true,
+      "playerBack": true,
+      "bounds": true
+    },
+    {
+      "width": 390,
+      "kind": "award-race",
+      "multiSelect": true,
+      "keyboardFocus": true,
+      "reset": true,
+      "reload": true,
+      "playerBack": true,
+      "bounds": true
+    },
+    {
+      "width": 390,
+      "kind": "records",
+      "multiSelect": true,
+      "keyboardFocus": true,
+      "reset": true,
+      "reload": true,
+      "playerBack": true,
+      "bounds": true
+    },
+    {
+      "width": 390,
+      "kind": "records-leaderboard",
+      "multiSelect": true,
+      "keyboardFocus": true,
+      "reset": true,
+      "reload": true,
+      "playerBack": true,
+      "bounds": true
+    },
+    {
+      "width": 1280,
+      "kind": "global-ranking",
+      "multiSelect": true,
+      "keyboardFocus": true,
+      "reset": true,
+      "reload": true,
+      "playerBack": true,
+      "bounds": true
+    },
+    {
+      "width": 1280,
+      "kind": "award-race",
+      "multiSelect": true,
+      "keyboardFocus": true,
+      "reset": true,
+      "reload": true,
+      "playerBack": true,
+      "bounds": true
+    },
+    {
+      "width": 1280,
+      "kind": "records",
+      "multiSelect": true,
+      "keyboardFocus": true,
+      "reset": true,
+      "reload": true,
+      "playerBack": true,
+      "bounds": true
+    },
+    {
+      "width": 1280,
+      "kind": "records-leaderboard",
+      "multiSelect": true,
+      "keyboardFocus": true,
+      "reset": true,
+      "reload": true,
+      "playerBack": true,
+      "bounds": true
+    }
+  ],
+  "runtimeErrors": []
+}

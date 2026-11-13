@@ -120,7 +120,15 @@ test('all Records catalogs and Season Recap equal v2.6.7 for filter scopes and h
     const result = []
     for (const selectedScope of selectedScopes) for (const category of ['player', 'team', 'combination']) for (const section of category === 'combination' ? ['performance'] : ['performance', 'awards']) {
       const input = { ...currentState, states: currentState.competitionStates, category, section, scope: selectedScope }
-      const before = baselineRecords(input), after = recordsLeaderboardGroups(input)
+      // v2.6.9 intentionally makes player team selection display-only. Keep
+      // independent official equality for the full ranking and project its
+      // historical membership instead of preserving the former renumbering.
+      let before = baselineRecords(category === 'player' ? { ...input, scope: { ...selectedScope, teamIds: [] } } : input)
+      if (category === 'player' && selectedScope.teamIds.length) {
+        const ids = new Set(currentState.matches.filter(match => (!selectedScope.seasons.length || selectedScope.seasons.includes(match.season)) && (selectedScope.competition === 'all' || match.competitionType === selectedScope.competition)).flatMap(match => match.appearances.filter(row => selectedScope.teamIds.includes(row.teamId)).map(row => row.playerId)))
+        before = before.map(group => ({ ...group, rows: group.rows.filter(row => ids.has(row.id)) }))
+      }
+      const after = recordsLeaderboardGroups(input)
       assert.deepEqual(after, before, `${label} ${category}/${section} ${JSON.stringify(selectedScope)}`)
       if (selectedScope === scope) result.push(after)
     }

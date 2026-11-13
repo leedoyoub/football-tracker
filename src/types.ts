@@ -215,7 +215,7 @@ export type View =
   | { name: 'award-race'; season?: string; competitionType?: CompetitionType | 'all'; awardScope?: 'first-half' | 'second-half' }
   | { name: 'results' }
   | { name: 'records' }
-  | { name: 'records-leaderboard'; category: Extract<RecordsCategory, 'player' | 'team' | 'combination'>; leaderboardId: string; competition?: CompetitionType | 'all'; positionFilter?: PositionFilterKey; seasonIds?: string[]; teamIds?: string[] }
+  | { name: 'records-leaderboard'; category: Extract<RecordsCategory, 'player' | 'team' | 'combination'>; leaderboardId: string; competition?: CompetitionType | 'all'; positionFilter?: PositionFilterKey; positionFilters?: PositionFilterKey[]; seasonIds?: string[]; teamIds?: string[] }
   | { name: 'standings' }
   | { name: 'season-recap'; season: string }
   | { name: 'season-highlight'; season: string; kind: 'awards' | 'monthly' | 'review' | 'news' }
@@ -266,14 +266,15 @@ export interface ScreenStateByView {
     historyFocusedTeamId: string | null
     historyPlotScrollLeft: number | null
   }
-  'global-ranking': { name: 'global-ranking'; metric: RankSort; scope: CompetitionType | 'all'; positionFilter: PositionFilterKey; teamId: string | null }
-  'award-race': { name: 'award-race'; season: string | null; scope: CompetitionType | 'all'; awardScope?: 'first-half' | 'second-half'; positionFilter: PositionFilterKey; teamId: string | null }
+  'global-ranking': { name: 'global-ranking'; metric: RankSort; scope: CompetitionType | 'all'; positionFilter: PositionFilterKey; teamId: string | null; positionFilters?: PositionFilterKey[]; teamIds?: string[] }
+  'award-race': { name: 'award-race'; season: string | null; scope: CompetitionType | 'all'; awardScope?: 'first-half' | 'second-half'; positionFilter: PositionFilterKey; teamId: string | null; positionFilters?: PositionFilterKey[]; teamIds?: string[] }
   results: { name: 'results' }
   records: {
     name: 'records'
     category: RecordsCategory
     competition: CompetitionType | 'all'
     positionFilter: PositionFilterKey
+    positionFilters?: PositionFilterKey[]
     filterSeasonIds: string[]
     filterTeamIds: string[]
     combinationPosition?: 'attack' | 'midfield' | 'defence'
@@ -294,6 +295,7 @@ export interface ScreenStateByView {
     leaderboardId: string
     competition: CompetitionType | 'all'
     positionFilter: PositionFilterKey
+    positionFilters?: PositionFilterKey[]
     filterSeasonIds: string[]
     filterTeamIds: string[]
   }

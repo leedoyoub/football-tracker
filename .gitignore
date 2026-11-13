@@ -12,6 +12,7 @@ dist
 dist-ssr
 .superpowers/v255/
 .superpowers/sdd/v268/
+.superpowers/sdd/v269/
 *.local
 .env
 .env.*

@@ -1,0 +1,163 @@
+{
+  "checkedAt": "2026-11-13T12:13:56.546Z",
+  "baseline": "6be9bf45d08983cb6f37003f7c9685981abda3c7",
+  "versions": {
+    "config": "2.6.9",
+    "package": "2.6.9",
+    "lock": "2.6.9",
+    "lockRoot": "2.6.9"
+  },
+  "existingWorkPreserved": true,
+  "featureSourceChangesDuringRecovery": [],
+  "checks": [
+    {
+      "name": "typescript",
+      "exitCode": 0,
+      "startedAt": "2026-11-13T11:53:13.3017802Z",
+      "finishedAt": "2026-11-13T11:53:19.1546916Z",
+      "log": "v269-recovery-typescript.log"
+    },
+    {
+      "name": "lint",
+      "exitCode": 0,
+      "startedAt": "2026-11-13T11:53:19.3188033Z",
+      "finishedAt": "2026-11-13T11:53:20.2507405Z",
+      "log": "v269-recovery-lint.log"
+    },
+    {
+      "name": "build",
+      "exitCode": 0,
+      "startedAt": "2026-11-13T11:53:20.2658680Z",
+      "finishedAt": "2026-11-13T11:53:31.5452279Z",
+      "log": "v269-recovery-build.log"
+    },
+    {
+      "name": "cpu",
+      "exitCode": 0,
+      "startedAt": "2026-11-13T11:53:31.5452279Z",
+      "finishedAt": "2026-11-13T11:56:56.6781166Z",
+      "log": "v269-recovery-cpu.log"
+    },
+    {
+      "name": "ranking-ui",
+      "exitCode": 0,
+      "startedAt": "2026-11-13T12:04:10.7254820Z",
+      "finishedAt": "2026-11-13T12:05:03.1641726Z",
+      "log": "v269-recovery-browser-ranking-ui.log"
+    },
+    {
+      "name": "player-ui",
+      "exitCode": 0,
+      "startedAt": "2026-11-13T12:05:03.2785820Z",
+      "finishedAt": "2026-11-13T12:05:21.2678783Z",
+      "log": "v269-recovery-browser-player-ui.log"
+    },
+    {
+      "name": "existing-ui",
+      "exitCode": 0,
+      "startedAt": "2026-11-13T12:05:21.2678783Z",
+      "finishedAt": "2026-11-13T12:06:24.5269946Z",
+      "log": "v269-recovery-browser-existing-ui.log"
+    },
+    {
+      "name": "swipe-ui",
+      "exitCode": 0,
+      "startedAt": "2026-11-13T12:06:24.5269946Z",
+      "finishedAt": "2026-11-13T12:08:23.9116131Z",
+      "log": "v269-recovery-browser-swipe-ui.log"
+    },
+    {
+      "name": "storage",
+      "exitCode": 0,
+      "startedAt": "2026-11-13T12:08:23.9451544Z",
+      "finishedAt": "2026-11-13T12:08:29.3983898Z",
+      "log": "v269-recovery-browser-storage.log"
+    },
+    {
+      "name": "offline",
+      "exitCode": 0,
+      "startedAt": "2026-11-13T12:08:29.3983898Z",
+      "finishedAt": "2026-11-13T12:08:37.3707916Z",
+      "log": "v269-recovery-browser-offline.log"
+    },
+    {
+      "name": "tests",
+      "command": "npm test",
+      "exitCode": 0,
+      "tests": 1371,
+      "passed": 1371,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "name": "startup",
+      "command": "node tests/v269-startup.browser.cjs",
+      "exitCode": 0,
+      "samples": 11
+    },
+    {
+      "name": "global",
+      "command": "node --expose-gc tests/v269-global.bench.cjs",
+      "exitCode": 0
+    },
+    {
+      "name": "records-restored",
+      "command": "node --expose-gc tests/v269-records.bench.cjs (combination workflows)",
+      "exitCode": 0
+    },
+    {
+      "name": "diff",
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "lint": {
+    "errors": 0,
+    "warnings": 44
+  },
+  "ui": {
+    "ranking-ui": 16,
+    "player-ui": 4,
+    "existing-ui": 36,
+    "swipe-ui": 71
+  },
+  "runtimeErrors": 0,
+  "officialEquivalence": "Independent complete baseline comparisons passed in tests and all comparable benchmark phases. Intentional team-filter behavior compared with archived full-population rank projection.",
+  "review": {
+    "independent": true,
+    "critical": 0,
+    "important": 0,
+    "minor": 0,
+    "declined": 0
+  },
+  "performance": {
+    "samples": 11,
+    "engineAndSSR": [
+      "v2.6.9-global.json",
+      "v2.6.9-records.json",
+      "v2.6.9-derived.json",
+      "v2.6.9-cpu.json"
+    ],
+    "browser": "v2.6.9-startup.json",
+    "reused": [
+      "v2.6.8 historical reports",
+      "v2.6.9-derived.json",
+      "unchanged Records player measurements"
+    ]
+  },
+  "environmentNotes": [
+    "Initial restricted-browser CDP failure; final isolated browser checks and benchmark passed in escalated execution.",
+    "Windows temporary profile cleanup can be deferred. User profiles and live user DB untouched."
+  ],
+  "limitations": [
+    "Physical iOS/Safari/Android and installed PWA not tested.",
+    "Native localStorage six-season quota unchanged; previous saved value preserved.",
+    "Some cold and p95 paths did not improve; no unsupported performance claim."
+  ],
+  "deployment": {
+    "target": "https://leedoyoub.github.io/football-tracker/",
+    "workflow": "https://github.com/leedoyoub/football-tracker/actions/workflows/deploy.yml",
+    "verification": "Checked after committing and pushing; see matching commit workflow and final task report."
+  }
+}

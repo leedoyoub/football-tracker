@@ -11,5 +11,5 @@ test('v2.2.13 puts 7.2+ Matches immediately after MOM and uses requested visible
   assert(home.includes('title="Global Ranking"'))
   assert(competition.includes("rankingTitle('league')"))
   assert(competition.includes('rankingTitle(type)'))
-  assert(global.includes('rankingTitle(scope, Boolean(teamId))'))
+  assert(global.includes('rankingTitle(scope, Boolean(teamIds.length))'))
 })

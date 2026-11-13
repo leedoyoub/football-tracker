@@ -31,16 +31,25 @@ test('Global Ranking keeps a selected position label visible', () => {
   assert.match(html, />ST\/SS <span/)
 })
 
-test('Global Ranking keeps empty team filtering mapped to null while showing Team', () => {
-  const source = fs.readFileSync(require.resolve('../src/screens/GlobalRankingScreen.tsx'), 'utf8')
-  assert.match(source, /const setTeamId = \(next: string \| null\) => onStateChange\(\{ \.\.\.screenState, teamId: next \}\)/)
-  assert.match(source, /<TeamFilter value=\{teamId\} teams=\{teams\} onChange=\{setTeamId\} label="Global Ranking team" \/>/)
+test('Global Ranking clears all team IDs while preserving the legacy null value', () => {
+  const { screenHarness, nodes } = require('./helpers/v259-harness.cjs')
+  const { defaultScreenState } = require('../src/lib/navigation.ts')
+  const path = require('node:path'), teams = [{ id: 'rma', shortName: 'RMA', name: 'Real Madrid' }]
+  const harness = screenHarness(path.resolve(__dirname, '..'), 'screens/GlobalRankingScreen.tsx', 'GlobalRankingScreen', { players: [], matches: [], teams })
+  let screenState = { ...defaultScreenState({ name: 'global-ranking' }), teamId: 'rma', teamIds: ['rma'] }
+  const tree = harness.render({ season: 'S1', screenState, onStateChange: next => { screenState = next }, onNavigate() {}, onBack() {} })
+  const filter = nodes(tree, node => node.type?.name === 'TeamFilter')[0]
+  filter.props.onChange([])
+  assert.equal(screenState.teamId, null)
+  assert.deepEqual(screenState.teamIds, [])
 })
 
 test('Global Ranking keeps selected team display labels intact', () => {
-  const source = fs.readFileSync(require.resolve('../src/screens/GlobalRankingScreen.tsx'), 'utf8')
-  assert.match(source, /<TeamFilter value=\{teamId\} teams=\{teams\} onChange=\{setTeamId\} label="Global Ranking team" \/>/)
-  assert.equal(/<select[^>]*global-ranking-team/.test(source), false)
+  const teams = [{ id: 'rma', shortName: 'RMA', name: 'Real Madrid' }, { id: 'liv', shortName: 'Liverpool', name: 'Liverpool' }]
+  const render = values => renderToStaticMarkup(React.createElement(TeamFilter, { values, teams, onChange() {}, label: 'Global Ranking team' }))
+  assert.match(render(['rma']), />RMA <span/)
+  assert.match(render(['rma', 'liv']), />Team \(2\) <span/)
+  assert.match(render([]), />Team <span/)
 })
 
 test('Global Ranking Team filter shares the compact menu contract and keeps null as all teams', () => {

@@ -1,0 +1,868 @@
+{
+  "browser": "chrome.exe",
+  "method": "Real production app, synthetic localStorage seed, isolated incognito contexts, actual DOM clicks/keyboard at 320/375/390px mobile and 1280px desktop; baseline League geometry compared exactly. No real user profile/storage or physical device.",
+  "cases": 36,
+  "errors": [],
+  "results": [
+    {
+      "area": "league",
+      "width": 320,
+      "geometry": {
+        "width": 288,
+        "height": 900.5,
+        "columns": [
+          24,
+          60,
+          24,
+          24,
+          24,
+          24,
+          44,
+          32,
+          32
+        ],
+        "font": "11px",
+        "rowHeight": 54
+      },
+      "metricDirections": 16,
+      "sortFrameMs": [
+        35.5,
+        29.200000002980232,
+        29.600000001490116,
+        30.099999997764826,
+        44.900000002235174,
+        23.5,
+        21.299999997019768,
+        24,
+        20.100000001490116,
+        18.899999998509884,
+        31.900000002235174,
+        30.199999999254942,
+        22.199999999254942,
+        28.799999997019768,
+        28.899999998509884,
+        17
+      ],
+      "resetFrameMs": 17.800000000745058,
+      "officialReset": true,
+      "formScopeReset": true,
+      "keyboard": true,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "cup",
+      "width": 320,
+      "mode": "partial",
+      "statuses": 16,
+      "originalSurvivalLines": 1,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        106,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "cup",
+      "width": 320,
+      "mode": "complete",
+      "statuses": 16,
+      "originalSurvivalLines": 1,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        106,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "cup",
+      "width": 320,
+      "mode": "draw",
+      "statuses": 16,
+      "originalSurvivalLines": 1,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        106,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "cup",
+      "width": 320,
+      "mode": "replay",
+      "statuses": 16,
+      "originalSurvivalLines": 0,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        106,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "cup",
+      "width": 320,
+      "mode": "champion",
+      "statuses": 16,
+      "originalSurvivalLines": 0,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        106,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "match-metadata",
+      "width": 320,
+      "dialogBounds": {
+        "left": 16,
+        "right": 304,
+        "scroll": 288,
+        "client": 288,
+        "viewport": 320
+      },
+      "canonicalChampionsToLeagueSave": false,
+      "offlinePrimaryAndIndexedDB": false,
+      "cancelledWithoutDurableChanges": true,
+      "eventsPreserved": true
+    },
+    {
+      "area": "player-tabs",
+      "width": 320,
+      "sticky": {
+        "backTop": -626,
+        "backBottom": -582,
+        "tabTop": 0,
+        "hit": false
+      },
+      "overviewTop": 650,
+      "matchesTop": 420,
+      "tabFilterAndScrollRoundTrip": true,
+      "toMatchesMs": 68.69999999925494,
+      "toOverviewMs": 27.399999998509884,
+      "bounds": {
+        "client": 320,
+        "scroll": 320,
+        "body": 320,
+        "viewport": 320
+      }
+    },
+    {
+      "area": "team-back",
+      "width": 320,
+      "sticky": {
+        "backTop": -276,
+        "backBottom": -232,
+        "tabTop": 0
+      }
+    },
+    {
+      "area": "league",
+      "width": 375,
+      "geometry": {
+        "width": 343,
+        "height": 900.5,
+        "columns": [
+          24,
+          115,
+          24,
+          24,
+          24,
+          24,
+          44,
+          32,
+          32
+        ],
+        "font": "11px",
+        "rowHeight": 54
+      },
+      "metricDirections": 16,
+      "sortFrameMs": [
+        33.5,
+        21.199999999254942,
+        23.800000000745058,
+        29,
+        31.400000002235174,
+        25.599999997764826,
+        32.30000000074506,
+        17.800000000745058,
+        19.300000000745058,
+        29.400000002235174,
+        22.300000000745058,
+        28.399999998509884,
+        18.900000002235174,
+        29,
+        32.30000000074506,
+        30.400000002235174
+      ],
+      "resetFrameMs": 30.699999999254942,
+      "officialReset": true,
+      "formScopeReset": true,
+      "keyboard": true,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "cup",
+      "width": 375,
+      "mode": "partial",
+      "statuses": 16,
+      "originalSurvivalLines": 1,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        161,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "cup",
+      "width": 375,
+      "mode": "complete",
+      "statuses": 16,
+      "originalSurvivalLines": 1,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        161,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "cup",
+      "width": 375,
+      "mode": "draw",
+      "statuses": 16,
+      "originalSurvivalLines": 1,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        161,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "cup",
+      "width": 375,
+      "mode": "replay",
+      "statuses": 16,
+      "originalSurvivalLines": 0,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        161,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "cup",
+      "width": 375,
+      "mode": "champion",
+      "statuses": 16,
+      "originalSurvivalLines": 0,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        161,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "match-metadata",
+      "width": 375,
+      "dialogBounds": {
+        "left": 16,
+        "right": 359,
+        "scroll": 343,
+        "client": 343,
+        "viewport": 375
+      },
+      "canonicalChampionsToLeagueSave": false,
+      "offlinePrimaryAndIndexedDB": false,
+      "cancelledWithoutDurableChanges": true,
+      "eventsPreserved": true
+    },
+    {
+      "area": "player-tabs",
+      "width": 375,
+      "sticky": {
+        "backTop": -626,
+        "backBottom": -582,
+        "tabTop": 0,
+        "hit": false
+      },
+      "overviewTop": 650,
+      "matchesTop": 420,
+      "tabFilterAndScrollRoundTrip": true,
+      "toMatchesMs": 314.80000000074506,
+      "toOverviewMs": 23.100000001490116,
+      "bounds": {
+        "client": 375,
+        "scroll": 375,
+        "body": 375,
+        "viewport": 375
+      }
+    },
+    {
+      "area": "team-back",
+      "width": 375,
+      "sticky": {
+        "backTop": -276,
+        "backBottom": -232,
+        "tabTop": 0
+      }
+    },
+    {
+      "area": "league",
+      "width": 390,
+      "geometry": {
+        "width": 358,
+        "height": 900.5,
+        "columns": [
+          24,
+          130,
+          24,
+          24,
+          24,
+          24,
+          44,
+          32,
+          32
+        ],
+        "font": "11px",
+        "rowHeight": 54
+      },
+      "metricDirections": 16,
+      "sortFrameMs": [
+        20.5,
+        32.30000000074506,
+        21.400000002235174,
+        22,
+        29.899999998509884,
+        22.599999997764826,
+        29.5,
+        16.5,
+        17.799999997019768,
+        24.800000000745058,
+        25.399999998509884,
+        27.5,
+        26.600000001490116,
+        23,
+        25.399999998509884,
+        28.800000000745058
+      ],
+      "resetFrameMs": 26.800000000745058,
+      "officialReset": true,
+      "formScopeReset": true,
+      "keyboard": true,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "cup",
+      "width": 390,
+      "mode": "partial",
+      "statuses": 16,
+      "originalSurvivalLines": 1,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        176,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "cup",
+      "width": 390,
+      "mode": "complete",
+      "statuses": 16,
+      "originalSurvivalLines": 1,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        176,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "cup",
+      "width": 390,
+      "mode": "draw",
+      "statuses": 16,
+      "originalSurvivalLines": 1,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        176,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "cup",
+      "width": 390,
+      "mode": "replay",
+      "statuses": 16,
+      "originalSurvivalLines": 0,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        176,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "cup",
+      "width": 390,
+      "mode": "champion",
+      "statuses": 16,
+      "originalSurvivalLines": 0,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        176,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "match-metadata",
+      "width": 390,
+      "dialogBounds": {
+        "left": 16,
+        "right": 374,
+        "scroll": 358,
+        "client": 358,
+        "viewport": 390
+      },
+      "canonicalChampionsToLeagueSave": true,
+      "offlinePrimaryAndIndexedDB": true,
+      "cancelledWithoutDurableChanges": false,
+      "eventsPreserved": true
+    },
+    {
+      "area": "player-tabs",
+      "width": 390,
+      "sticky": {
+        "backTop": -626,
+        "backBottom": -582,
+        "tabTop": 0,
+        "hit": false
+      },
+      "overviewTop": 650,
+      "matchesTop": 420,
+      "tabFilterAndScrollRoundTrip": true,
+      "toMatchesMs": 51.399999998509884,
+      "toOverviewMs": 28.300000000745058,
+      "bounds": {
+        "client": 390,
+        "scroll": 390,
+        "body": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "area": "team-back",
+      "width": 390,
+      "sticky": {
+        "backTop": -276,
+        "backBottom": -232,
+        "tabTop": 0
+      }
+    },
+    {
+      "area": "league",
+      "width": 1280,
+      "geometry": {
+        "width": 416,
+        "height": 900.5,
+        "columns": [
+          24,
+          188,
+          24,
+          24,
+          24,
+          24,
+          44,
+          32,
+          32
+        ],
+        "font": "11px",
+        "rowHeight": 54
+      },
+      "metricDirections": 16,
+      "sortFrameMs": [
+        23.399999998509884,
+        16.300000000745058,
+        20.199999999254942,
+        13.399999998509884,
+        8,
+        19.799999997019768,
+        26.799999997019768,
+        27.600000001490116,
+        4.5,
+        20.100000001490116,
+        20.799999997019768,
+        23.799999997019768,
+        20,
+        13.700000002980232,
+        16.800000000745058,
+        27.700000002980232
+      ],
+      "resetFrameMs": 26.899999998509884,
+      "officialReset": true,
+      "formScopeReset": true,
+      "keyboard": true,
+      "bounds": {
+        "client": 448,
+        "scroll": 448,
+        "body": 1280,
+        "viewport": 1280
+      }
+    },
+    {
+      "area": "cup",
+      "width": 1280,
+      "mode": "partial",
+      "statuses": 16,
+      "originalSurvivalLines": 1,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        234,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 448,
+        "scroll": 448,
+        "body": 1280,
+        "viewport": 1280
+      }
+    },
+    {
+      "area": "cup",
+      "width": 1280,
+      "mode": "complete",
+      "statuses": 16,
+      "originalSurvivalLines": 1,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        234,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 448,
+        "scroll": 448,
+        "body": 1280,
+        "viewport": 1280
+      }
+    },
+    {
+      "area": "cup",
+      "width": 1280,
+      "mode": "draw",
+      "statuses": 16,
+      "originalSurvivalLines": 1,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        234,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 448,
+        "scroll": 448,
+        "body": 1280,
+        "viewport": 1280
+      }
+    },
+    {
+      "area": "cup",
+      "width": 1280,
+      "mode": "replay",
+      "statuses": 16,
+      "originalSurvivalLines": 0,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        234,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 448,
+        "scroll": 448,
+        "body": 1280,
+        "viewport": 1280
+      }
+    },
+    {
+      "area": "cup",
+      "width": 1280,
+      "mode": "champion",
+      "statuses": 16,
+      "originalSurvivalLines": 0,
+      "statusPreserved": true,
+      "columns": [
+        24,
+        234,
+        20,
+        42,
+        44,
+        26,
+        26
+      ],
+      "iconWidth": 20,
+      "bounds": {
+        "client": 448,
+        "scroll": 448,
+        "body": 1280,
+        "viewport": 1280
+      }
+    },
+    {
+      "area": "match-metadata",
+      "width": 1280,
+      "dialogBounds": {
+        "left": 416,
+        "right": 864,
+        "scroll": 448,
+        "client": 448,
+        "viewport": 1280
+      },
+      "canonicalChampionsToLeagueSave": false,
+      "offlinePrimaryAndIndexedDB": false,
+      "cancelledWithoutDurableChanges": true,
+      "eventsPreserved": true
+    },
+    {
+      "area": "player-tabs",
+      "width": 1280,
+      "sticky": {
+        "backTop": -626,
+        "backBottom": -582,
+        "tabTop": 0,
+        "hit": false
+      },
+      "overviewTop": 650,
+      "matchesTop": 420,
+      "tabFilterAndScrollRoundTrip": true,
+      "toMatchesMs": 52.69999999925494,
+      "toOverviewMs": 28.600000001490116,
+      "bounds": {
+        "client": 448,
+        "scroll": 448,
+        "body": 1280,
+        "viewport": 1280
+      }
+    },
+    {
+      "area": "team-back",
+      "width": 1280,
+      "sticky": {
+        "backTop": -276,
+        "backBottom": -232,
+        "tabTop": 0
+      }
+    }
+  ]
+}

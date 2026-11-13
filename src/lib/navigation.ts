@@ -1,5 +1,6 @@
 import type { NavigationEntry, ScreenStateByView, View } from '../types'
 import { defaultCompetitionScreenState } from './competitionScreenState'
+import { normalizePositionFilters } from '../engine/positionScope'
 
 export function defaultScreenState<V extends View>(view: V): ScreenStateByView[V['name']] {
   let state: ScreenStateByView[keyof ScreenStateByView]
@@ -10,7 +11,7 @@ export function defaultScreenState<V extends View>(view: V): ScreenStateByView[V
     case 'global-ranking': state = { name: 'global-ranking', metric: view.rankingMetric ?? 'rating', scope: view.competitionType ?? 'all', positionFilter: 'all', teamId: view.teamId ?? null }; break
     case 'award-race': state = { name: 'award-race', season: view.season ?? null, scope: view.awardScope ? 'league' : view.competitionType ?? 'all', ...(view.awardScope ? { awardScope: view.awardScope } : {}), positionFilter: 'all', teamId: null }; break
     case 'records': state = { name: 'records', category: 'player', competition: 'all', positionFilter: 'all', filterSeasonIds: [], filterTeamIds: [], combinationPosition: 'attack', combinationPlayers: 2, combinationMetric: 'starts', bestUnitId: 'best-unit:attack:2:goals', historyPanel: null, historySeason: null, historyBlock: null, historyAwardScope: 'league' }; break
-    case 'records-leaderboard': state = { name: 'records-leaderboard', category: view.category, leaderboardId: view.leaderboardId, competition: view.competition ?? 'all', positionFilter: view.positionFilter ?? 'all', filterSeasonIds: view.seasonIds ?? [], filterTeamIds: view.teamIds ?? [] }; break
+    case 'records-leaderboard': state = { name: 'records-leaderboard', category: view.category, leaderboardId: view.leaderboardId, competition: view.competition ?? 'all', positionFilter: view.positionFilter ?? 'all', positionFilters: normalizePositionFilters(view.positionFilters ?? view.positionFilter), filterSeasonIds: view.seasonIds ?? [], filterTeamIds: [...new Set(view.teamIds ?? [])] }; break
     case 'comparison': state = { name: 'comparison', leftId: view.leftId ?? null, rightId: view.rightId ?? null, season: view.season ?? null, competition: view.competitionType ?? 'all', teamId: null }; break
     case 'team': state = { name: 'team', tab: 'overview', bestPlayersSeason: null, bestPlayersCompetition: 'all', bestPlayersMetric: 'rating', matchesCompetition: 'all', playersCompetition: 'all', historyCompetition: 'all', historyMenu: 'honors', historySeason: null, historyRecordsMode: 'season', historyExpandedRecords: [], historyDisclosures: [] }; break
     case 'players': state = { name: 'players', search: '', filters: { seasons: [], teams: [], positions: [] } }; break

@@ -21,7 +21,7 @@ const { performanceFixture } = require('./helpers/v255-fixture.cjs')
       await page.close()
     }
     assert.equal(browser.exceptions.length, 0)
-    fs.writeFileSync('docs/performance/v2.6.8-storage-capacity.json', JSON.stringify({ method: 'Native Chromium localStorage, fresh isolated context per unchanged existing fixture, no quota override/compression/in-memory storage shim. Same serialized fixture applies to both releases. Failing setItem must preserve the previous value. This is capacity validation, not a performance speed claim.', results }, null, 2) + '\n')
+    fs.writeFileSync(process.argv[2] || 'docs/performance/v2.6.8-storage-capacity.json', JSON.stringify({ method: 'Native Chromium localStorage, fresh isolated context per unchanged existing fixture, no quota override/compression/in-memory storage shim. Same serialized fixture applies to both releases. Failing setItem must preserve the previous value. This is capacity validation, not a performance speed claim.', results }, null, 2) + '\n')
     console.log(JSON.stringify(results))
   } finally { try { if (browser) await browser.close() } finally { await server.close() } }
 })().catch(error => { console.error(error); process.exitCode = 1 })

@@ -1,7 +1,7 @@
 import { DetailBack } from '../components/DetailBack'
 import { SegmentedControl } from '../components/SeasonUI'
 import { DeferredAnalysis } from '../components/DeferredAnalysis'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 import { PlayerAvatar } from '../components/PlayerAvatar'
 import { TeamIdentityAction } from '../components/EntityActions'
 import { formatDate, playerFullName, ratingTone } from '../components/ui'
@@ -73,7 +73,7 @@ export function PlayerDetailScreen({ playerId, season, screenState, onStateChang
     <div className="mb-4 min-w-0 space-y-2"><CompactFilterMenu value={selectedSeason} options={seasons.map(item => ({ value: item, label: item }))} onChange={setSelectedSeason} label="Player detail season" popupAlign="start" /><RankingMetricTabs value={competition} options={competitions} onChange={setCompetition} label="Player detail competition" /></div>
     <SegmentedControl sticky label="Player detail section" value={tab} onChange={tab => onStateChange({ ...screenState, tab })} options={[{ value: 'overview', label: 'Overview' }, { value: 'matches', label: 'Matches' }]} />
     <div className="mt-4">{tab === 'matches'
-      ? <PlayerMatches player={player} scopedMatches={playerScopedMatches} onNavigate={onNavigate} />
+      ? <PlayerMatches player={player} players={players} scopedMatches={playerScopedMatches} onNavigate={onNavigate} />
       : <PlayerOverview player={player} players={players} teams={teams} matches={matches} competitionStates={competitionStates} selectedSeason={selectedSeason} competition={competition} playerScopedMatches={playerScopedMatches} screenState={screenState} onStateChange={onStateChange} onNavigate={onNavigate} />}</div>
   </div>
 }
@@ -101,9 +101,9 @@ function PlayerOverview({ player, players, teams, matches, competitionStates, se
   </>
 }
 
-function PlayerMatches({ player, scopedMatches, onNavigate }: { player: Player; scopedMatches: Match[]; onNavigate: (view: View) => void }) {
+function PlayerMatches({ player, players, scopedMatches, onNavigate }: { player: Player; players: Player[]; scopedMatches: Match[]; onNavigate: (view: View) => void }) {
   const history = useMemo(() => playerAppearanceMatches(player, scopedMatches), [player, scopedMatches])
-  return <section><h2 className="mb-2 text-sm font-semibold">Matches</h2><p className="mb-2 text-[10px] text-zinc-500">Actual appearances in the selected scope.</p><div className="space-y-2">{history.map(match => <MatchRow key={match.id} match={match} player={player} onNavigate={onNavigate} />)}{!history.length && <p className="text-xs text-zinc-500">No matches in this scope.</p>}</div></section>
+  return <section><h2 className="mb-2 text-sm font-semibold">Matches</h2><p className="mb-2 text-[10px] text-zinc-500">Actual appearances in the selected scope.</p><div className="space-y-2">{history.map(match => <MatchRow key={match.id} match={match} player={player} momId={getMatchManOfTheMatch(match, players)} onNavigate={onNavigate} />)}{!history.length && <p className="text-xs text-zinc-500">No matches in this scope.</p>}</div></section>
 }
 
 function SavedPlayerMatches({ playerId, matches, onNavigate }: { playerId: string; matches: Match[]; onNavigate: (view: View) => void }) {
@@ -129,6 +129,11 @@ function AppsMetric({ apps, starts, subs }: { apps: number; starts: number; subs
 function RankedMetric({ label, value: content, ranks }: { label: string; value: string | number; ranks: { overall: number | null; position: number | null; team: number | null } }) { const rank = (item: number | null) => item ? `#${item}` : '—'; return <div className="rounded-xl bg-black/20 px-2 py-2 text-center"><b className="block text-sm tabular-nums">{content}</b><small className="block text-[9px] uppercase text-zinc-500">{label}</small><div className="mt-1 grid grid-cols-3 gap-0.5 text-[8px] text-zinc-400"><span aria-label={`Overall rank ${rank(ranks.overall)}`}>{rank(ranks.overall)}</span><span aria-label={`Position-family rank ${rank(ranks.position)}`}>{rank(ranks.position)}</span><span aria-label={`Team rank ${rank(ranks.team)}`}>{rank(ranks.team)}</span></div></div> }
 function RecentForm({ form, playerId, players, teams, onNavigate }: { form: ReturnType<typeof playerForm>; playerId: string; players: Player[]; teams: { id: string; name: string; shortName: string }[]; onNavigate: (view: View) => void }) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const gesture = useRef<{ pointerId: number; x: number; y: number; scrollLeft: number; dragged: boolean } | null>(null)
+  const trackPointer = (event: PointerEvent<HTMLDivElement>) => {
+    const start = gesture.current
+    if (start && (event.pointerId !== start.pointerId || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8 || Math.abs(event.currentTarget.scrollLeft - start.scrollLeft) > 4)) start.dragged = true
+  }
   const width = trendPlotWidth(form.points.length)
   const values = form.points.map(row => row.rating.raw)
   const min = Math.min(5, ...values); const max = Math.max(9, ...values)
@@ -143,14 +148,23 @@ function RecentForm({ form, playerId, players, teams, onNavigate }: { form: Retu
   return <section className="mb-4 rounded-2xl bg-zinc-900 p-3">
     <div className="flex items-end justify-between"><div><h2 className="text-sm font-semibold">Recent Form</h2><p className="text-[10px] text-zinc-500">Player Form · {form.points.length} actual appearances</p></div><span className="text-[10px] text-zinc-500">Good {GOOD_RATING_THRESHOLD}+</span></div>
     <div className="mt-3 grid grid-cols-3 gap-1.5">{metric(form.count === 5 ? 'Last 5 avg' : 'Last ' + (form.count || 5) + ' avg', value(form.recentAverage))}{metric('Season avg', value(form.average))}{metric('Trend', form.delta === null ? '—' : (form.delta > 0 ? '↑ +' : form.delta < 0 ? '↓ ' : '→ ') + value(form.delta))}</div>
-    {form.points.length > 0 && <div ref={scrollRef} className="no-scrollbar mt-3 overflow-x-auto overscroll-x-contain" aria-label="Recent Form horizontal plot">
-      <svg width={width} height={82} role="img" aria-label={'All ' + form.points.length + ' raw match ratings, older to newer'} className="block">
+    {form.points.length > 0 && <div ref={scrollRef} className="no-scrollbar mt-3 overflow-x-auto overscroll-x-contain" aria-label="Recent Form horizontal plot"
+      onPointerDownCapture={event => { gesture.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, scrollLeft: event.currentTarget.scrollLeft, dragged: false } }}
+      onPointerMoveCapture={trackPointer} onPointerUpCapture={trackPointer}
+      onPointerCancelCapture={() => { if (gesture.current) gesture.current.dragged = true }}
+      onScroll={event => { if (gesture.current && Math.abs(event.currentTarget.scrollLeft - gesture.current.scrollLeft) > 4) gesture.current.dragged = true }}>
+      <svg width={width} height={82} role="group" aria-label={'All ' + form.points.length + ' raw match ratings, older to newer'} className="block">
         <line x1={18} x2={width - 18} y1={form.average === null ? 60 : y(form.average)} y2={form.average === null ? 60 : y(form.average)} stroke="#52525b" strokeDasharray="3 3" />
         {form.points.length > 1 && <polyline fill="none" stroke="#34d399" strokeWidth="2" points={values.map((rating, index) => x(index) + ',' + y(rating)).join(' ')} />}
-        {form.points.map((row, index) => <g key={row.match.id}><circle cx={x(index)} cy={y(row.rating.raw)} r="3" fill="#34d399" /><text x={x(index)} y={y(row.rating.raw) - 7} textAnchor="middle" fontSize="9" fontWeight="700" fill={recentFormLabelColor(row.rating.rating, getMatchManOfTheMatch(row.match, players) === playerId)}>{row.rating.rating.toFixed(1)}</text><title>{opponent(row.match) + ' · ' + row.rating.raw.toFixed(2) + ' · ' + matchCompetitionType(row.match)}</title></g>)}
+        {form.points.map((row, index) => <g key={row.match.id} role="button" tabIndex={0} className="cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300"
+          aria-label={row.match.date + ' · ' + opponent(row.match) + ' · Open match with rating ' + row.rating.rating.toFixed(1)}
+          onClick={event => { if (event.detail === 0 || !gesture.current?.dragged) onNavigate({ name: 'match', id: row.match.id }) }}
+          onKeyDown={event => { if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) { event.preventDefault(); onNavigate({ name: 'match', id: row.match.id }) } }}>
+          <rect x={x(index) - 14} y={y(row.rating.raw) - 22} width={28} height={32} fill="transparent" />
+          <circle cx={x(index)} cy={y(row.rating.raw)} r="3" fill="#34d399" /><text x={x(index)} y={y(row.rating.raw) - 7} textAnchor="middle" fontSize="9" fontWeight="700" fill={recentFormLabelColor(row.rating.rating, getMatchManOfTheMatch(row.match, players) === playerId)}>{row.rating.rating.toFixed(1)}</text><title>{opponent(row.match) + ' · ' + row.rating.raw.toFixed(2) + ' · ' + matchCompetitionType(row.match)}</title></g>)}
       </svg>
     </div>}
-    <div className="mt-3 flex gap-1.5">{form.recent.slice().reverse().map(row => <button type="button" aria-label={'Open match with rating ' + row.rating.rating.toFixed(1)} onClick={() => onNavigate({ name: 'match', id: row.match.id })} key={row.match.id} className={'grid min-h-11 flex-1 place-items-center rounded-lg text-xs font-black ' + ratingTone(row.rating.rating)}>{row.rating.rating.toFixed(1)}</button>)}{!form.count && <span className="text-xs text-zinc-500">No actual appearances in this scope.</span>}</div>
+    {!form.count && <p className="mt-3 text-xs text-zinc-500">No actual appearances in this scope.</p>}
   </section>
 }
 
@@ -212,7 +226,7 @@ function CareerMilestones({ player, players, matches }: { player: Player; player
 function RoleImpact({ data, impact }: { data: PlayerDerived; impact: ReturnType<typeof substituteImpact> }) { const typicalEntry = impact.summary.apps ? Math.round(impact.appearances.reduce((sum, row) => sum + row.entryMinute, 0) / impact.summary.apps) : null; return <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Role Impact</h2><div className="mt-3 grid grid-cols-2 gap-2 text-xs">{([['Starter', data.starter], ['Substitute', data.substitute]] as const).map(([label, row]) => <div key={label} className="rounded-xl bg-black/20 p-2.5"><b>{label}</b><div className="mt-2 grid grid-cols-2 gap-1">{metric('Apps', row.apps)}{metric('Avg rating', value(row.averageRating))}{metric('Goals/90', value(row.goalsPer90))}{metric('Assists/90', value(row.assistsPer90))}{metric('G+A/90', value(row.gaPer90))}</div></div>)}</div>{impact.summary.apps > 0 && <details className="mt-3 rounded-xl bg-black/20 p-2.5 text-xs"><summary className="cursor-pointer font-bold">Substitute impact · typical entry {typicalEntry}'</summary><div className="mt-2 grid grid-cols-3 gap-1.5">{metric('On-pitch GF', impact.summary.goalsFor)}{metric('On-pitch GA', impact.summary.goalsAgainst)}{metric('On-pitch GD', `${impact.summary.goalDifference > 0 ? '+' : ''}${impact.summary.goalDifference}`)}{metric('GD/90', value(impact.summary.gdPer90))}{metric('G+A/90', value(impact.summary.gaPer90))}{metric('Sub apps', impact.summary.apps)}</div><div className="mt-2 space-y-1">{impact.appearances.map(row => <p key={row.match.id} className="rounded-lg bg-zinc-900 px-2 py-1.5">{row.entryMinute}' · entry {row.scoreAtEntry.home}-{row.scoreAtEntry.away} · final {row.finalScore.home}-{row.finalScore.away} · GF {row.goalsFor}, GA {row.goalsAgainst}</p>)}</div></details>}</section> }
 function GoalTypes({ data }: { data: PlayerDerived }) { const base = [['opening', 'Opening'], ['equalizer', 'Equalizer'], ['goAhead', 'Go-Ahead'], ['leadExtending', 'Lead-Extending'], ['deficitReducing', 'Deficit-Reducing']] as const; const special = [['gameWinning', 'Game Winners'], ['comeback', 'Comeback Goals'], ['stoppageTime', 'Stoppage-Time Goals']] as const; const row = ([key, label]: readonly [keyof PlayerDerived['goalTypes'], string]) => <div key={key} className="flex justify-between rounded-lg bg-black/20 px-2 py-2"><span>{label}</span><b>{data.goalTypes[key]}</b></div>; return <section className="mb-4 rounded-2xl bg-zinc-900 p-3"><h2 className="text-sm font-semibold">Goal Types</h2><p className="mt-1 text-[10px] text-zinc-500">Base types are exclusive; special goals may overlap.</p><h3 className="mt-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Base</h3><div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">{base.map(row)}</div><h3 className="mt-3 border-t border-white/10 pt-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Special Goals</h3><div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">{special.map(row)}</div></section> }
 function ChemistryCard({ title, text }: { title: string; text: string }) { return <div className="rounded-xl bg-black/20 p-2.5"><b>{title}</b><p className="mt-1 text-zinc-400">{text}</p></div> }
-function MatchRow({ match, player, onNavigate }: { match: Match; player: Player; onNavigate: (view: View) => void }) {
+function MatchRow({ match, player, momId, onNavigate }: { match: Match; player: Player; momId?: string; onNavigate: (view: View) => void }) {
   const appearance = match.appearances.find(a => a.playerId === player.id)
   const rating = appearance ? ratePlayerMatch(match, player) : null
   const score = matchScore(match)
@@ -224,7 +238,7 @@ function MatchRow({ match, player, onNavigate }: { match: Match; player: Player;
       <div className="flex gap-2">
         <span className="text-xs" title={appearance && !appearance.matchPosition && !appearance.positionHistory?.length && !match.kickoffLineup?.some(slot => slot.playerId === player.id) && !match.events.some(event => event.type === 'sub' && event.playerInId === player.id) ? 'Registered position fallback' : undefined}>{appearance ? representativeMatchPosition(match, appearance) : '--'}</span>
         <span className="text-xs">{rating ? `${rating.minutes}'` : '--\''}</span>
-        <b className={rating ? ratingTone(rating.rating) : 'text-zinc-500'}>{rating ? rating.rating.toFixed(1) : '--'}</b>
+        <b className={rating ? momId === player.id ? 'text-blue-300' : ratingTone(rating.rating) : 'text-zinc-500'}>{rating ? rating.rating.toFixed(1) + (momId === player.id ? ' ★' : '') : '--'}</b>
       </div>
     </button>
     <div className="mt-1 flex gap-2 text-xs">

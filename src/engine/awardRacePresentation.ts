@@ -5,6 +5,7 @@ import type { CompetitionSeasonStatus } from './competition'
 import { matchCompetitionType } from './competitionContext'
 import { positionFilterFamilies, scopedPositionFamilyByPlayer, type PositionFamily } from './positionScope'
 import { isRecordedForTeam } from './matchPerspective'
+import { historicalRankingTeams, playerInRankingTeams } from './rankingPresentation'
 
 /** A race is a player leaderboard; official award candidates retain team stints. */
 export function awardRaceCandidates(candidates: AwardCandidate[]): AwardCandidate[] {
@@ -19,12 +20,16 @@ export function awardRaceCandidates(candidates: AwardCandidate[]): AwardCandidat
 export type AwardRacePresentationRow = { candidate: AwardCandidate; rank: number; position: PositionFamily | undefined }
 
 /** Official positions are fixed before the two presentation-only filters run. */
-export function awardRacePresentationRows(candidates: AwardCandidate[], players: Player[], matches: Match[], season: string, competition: CompetitionType | 'all', positionFilter: PositionFilterKey = 'all', teamId: string | null = null): AwardRacePresentationRow[] {
+export function awardRacePresentationRows(candidates: AwardCandidate[], players: Player[], matches: Match[], season: string, competition: CompetitionType | 'all', positionFilter: PositionFilterKey | PositionFilterKey[] = 'all', teamId: string | string[] | null = null): AwardRacePresentationRow[] {
   const scoped = matches.filter(match => match.season === season && (competition === 'all' || matchCompetitionType(match) === competition))
   const families = scopedPositionFamilyByPlayer(players, scoped, { fallback: 'none' })
   const allowed = new Set(positionFilterFamilies(positionFilter))
-  return awardRaceCandidates(candidates).map((candidate, index) => ({ candidate, rank: index + 1, position: families.get(candidate.playerId) }))
-    .filter(row => (!teamId || row.candidate.teamId === teamId) && (!allowed.size || row.position && allowed.has(row.position)))
+  const membership = historicalRankingTeams(scoped)
+  const teamIds = Array.isArray(teamId) ? teamId : teamId ? [teamId] : []
+  return awardRaceCandidates(candidates).map(candidate => ({ candidate, position: families.get(candidate.playerId) }))
+    .filter(row => !allowed.size || row.position && allowed.has(row.position))
+    .map((row, index) => ({ ...row, rank: index + 1 }))
+    .filter(row => playerInRankingTeams(row.candidate.playerId, teamIds, membership))
 }
 
 /** Abbreviate canonical team progress for Award Race rows; bonuses stay internal. */
