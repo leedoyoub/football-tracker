@@ -1,3 +1,4 @@
+import { MOM_POLICY_REVISION } from './momPolicy'
 import type { Best11Slot, CompetitionType, Match, Player, Position, Team } from '../types'
 import { isGoodRating } from './constants'
 import { playerAssistEvents, playerGoalEvents } from './playerMatchFacts'
@@ -190,7 +191,7 @@ export function currentPlayerRankingSnapshots(players: Player[], matches: Match[
   if (!byPlayers) { byPlayers = new WeakMap(); currentPlayerSnapshotsCache.set(matches, byPlayers) }
   let bySeason = byPlayers.get(players)
   if (!bySeason) { bySeason = new Map(); byPlayers.set(players, bySeason) }
-  const key = `${RATING_ENGINE_REVISION}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${season}`
+  const key = `${RATING_ENGINE_REVISION}:${MOM_POLICY_REVISION}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${season}`
   const existing = bySeason.get(key)
   if (existing) return existing
   const games = competitionMatches(matches, season, 'league')
@@ -302,7 +303,7 @@ export function buildSeasonAnalytics(teams: Team[], players: Player[], matches: 
   let byPlayers = cache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); cache.set(matches, byPlayers) }
   let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
   let bySeason = byTeams.get(teams); if (!bySeason) { bySeason = new Map(); byTeams.set(teams, bySeason) }
-  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${season}`
+  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${MOM_POLICY_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${season}`
   const existing = bySeason.get(key); if (existing) return existing
   const { leagueMatches, currentMatchDay, leagueSnapshots, latestCompletedMatchDay } = buildLeagueHistory(teams, players, matches, season)
   const playerSnapshots = buildPlayerSnapshots(players, leagueMatches)

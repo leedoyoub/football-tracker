@@ -4,6 +4,7 @@ import { newestMatches, oldestMatches } from './matchChronology'
 import { positionFilterFamilies, scopedPositionFamilyByPlayer } from './positionScope'
 import { getMatchManOfTheMatch, ratePlayerMatch } from './rating'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
+import { MOM_POLICY_REVISION } from './momPolicy'
 import { classifyGoalTypes, type GoalTypeTotals } from './goalTypes'
 import { playerAppearanceMatchIndex, playerGoalkeeperFacts, playerGoalEvents, playerAssistEvents, isPlayerGoalEvent } from './playerMatchFacts'
 import { buildGlobalRankingData, rankGlobalRankingRows } from './stats'
@@ -64,8 +65,8 @@ function buildFacts(players: Player[], matches: Match[], scope: PlayerRecordScop
   let byPlayers = factsCache.get(selected); if (!byPlayers) { byPlayers = new WeakMap(); factsCache.set(selected, byPlayers) }
   let byCapability = byPlayers.get(players); if (!byCapability) { byCapability = new Map(); byPlayers.set(players, byCapability) }
   const revision = [RATING_ENGINE_REVISION, arrayItemRevision(players)]
-  const key = JSON.stringify([...revision, needs('mom'), needsGoalTypes, needsGoalkeeper, needsStreaks, needsRatings])
-  const cached = byCapability.get(key) ?? byCapability.get(JSON.stringify([...revision, true, true, true, true, true]))
+  const key = JSON.stringify([...revision, needs('mom') ? MOM_POLICY_REVISION : null, needsGoalTypes, needsGoalkeeper, needsStreaks, needsRatings])
+  const cached = byCapability.get(key) ?? byCapability.get(JSON.stringify([...revision, MOM_POLICY_REVISION, true, true, true, true]))
   if (cached) return cached
   const momByMatch = new Map(needs('mom') ? selected.map(match => [match.id, getMatchManOfTheMatch(match, players)]) : [])
   const appearanceMatches = playerAppearanceMatchIndex(selected)
@@ -123,7 +124,8 @@ function buildFacts(players: Player[], matches: Match[], scope: PlayerRecordScop
 export function buildPlayerRecordLeaderboards(players: Player[], matches: Match[], scope: PlayerRecordScope = {}, selectedIds?: string[]): PlayerRecordGroup[] {
   let byPlayers = cache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); cache.set(matches, byPlayers) }
   let byScope = byPlayers.get(players); if (!byScope) { byScope = new Map(); byPlayers.set(players, byScope) }
-  const key = JSON.stringify([arrayItemRevision(matches), arrayItemRevision(players), scopeKey(scope), selectedIds?.slice().sort() ?? null])
+  const momRevision = !selectedIds || selectedIds.includes('mom') ? MOM_POLICY_REVISION : null
+  const key = JSON.stringify([arrayItemRevision(matches), arrayItemRevision(players), scopeKey(scope), momRevision, selectedIds?.slice().sort() ?? null])
   const cached = byScope.get(key); if (cached) return cached
   if (scope.teamIds?.length) {
     const official = buildPlayerRecordLeaderboards(players, matches, { ...scope, teamIds: [] }, selectedIds)

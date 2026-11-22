@@ -1,3 +1,4 @@
+import { MOM_POLICY_REVISION } from './momPolicy'
 import type { Best11Slot, ChampionsStage, CompetitionState, CompetitionType, CupStage, Match, Player, Team } from '../types'
 import { competitionMatches, competitionSeasonStatus, leagueCompetition, type CompetitionSeasonStatus } from './competition'
 import { buildGlobalRankingData, type GlobalLeaderboardRow } from './stats'
@@ -350,7 +351,7 @@ export function seasonAwards(season: string, teams: Team[], players: Player[], m
   if (!byStates) { byStates = new WeakMap(); byMatches.set(matches, byStates) }
   let bySeason = byStates.get(states)
   if (!bySeason) { bySeason = new Map(); byStates.set(states, bySeason) }
-  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}:${season}`
+  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${MOM_POLICY_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}:${season}`
   const existing = bySeason.get(key)
   if (existing?.revision === RATING_ENGINE_REVISION) return existing.value
   const value = computeSeasonAwards(season, teams, players, matches, states, model)
@@ -375,7 +376,7 @@ export function awardResultForScope(scope: AwardScope, season: string, teams: Te
   let byMatches = byPlayers.get(players); if (!byMatches) { byMatches = new WeakMap(); byPlayers.set(players, byMatches) }
   let byStates = byMatches.get(matches); if (!byStates) { byStates = new WeakMap(); byMatches.set(matches, byStates) }
   let values = byStates.get(states); if (!values) { values = new Map(); byStates.set(states, values) }
-  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}:${season}:${scope}`
+  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${MOM_POLICY_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}:${season}:${scope}`
   if (values.has(key)) return values.get(key)
   let result: CanonicalAwardResult | undefined
   if (scope === 'league' || scope === 'cup' || scope === 'champions') {

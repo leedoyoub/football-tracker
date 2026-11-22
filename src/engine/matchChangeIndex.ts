@@ -1,3 +1,4 @@
+import { MOM_POLICY_REVISION } from './momPolicy'
 import type { CompetitionState, Match, MatchChangePayload, Player, Team } from '../types'
 import { oldestMatches } from './matchChronology'
 import { matchCompetitionType } from './competitionContext'
@@ -22,7 +23,7 @@ function crossedMultiples(before: number, after: number, step: number, start = s
 }
 const name = (players: ReadonlyMap<string, Player>, id: string) => players.get(id)?.displayName ?? players.get(id)?.name ?? 'Player'
 const scopeName = (type: ReturnType<typeof matchCompetitionType>) => type === 'league' ? 'League' : type === 'cup' ? 'Cup' : 'Champions'
-type CachedIndex = { revision: number; matchRevision: number; playerRevision: number; value: Map<string, GroupedMatchChange[]> }
+type CachedIndex = { revision: number; momRevision: number; matchRevision: number; playerRevision: number; value: Map<string, GroupedMatchChange[]> }
 let cache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], CachedIndex>>>>()
 
 function add(groups: Map<string, GroupedMatchChange>, matchId: string, players: ReadonlyMap<string, Player>, playerId: string | undefined, id: string, label: string, kind: MatchChangePayload['kind']) {
@@ -94,9 +95,9 @@ function resolveMatchChangeIndex(players: Player[], teams: Team[], matches: Matc
   let byStates = byTeams.get(teams); if (!byStates) { byStates = new WeakMap(); byTeams.set(teams, byStates) }
   const current = byStates.get(states)
   const matchRevision = arrayItemRevision(matches), playerRevision = arrayItemRevision(players)
-  if (current?.revision === RATING_ENGINE_REVISION && current.matchRevision === matchRevision && current.playerRevision === playerRevision) return { value: current.value, cached: true }
+  if (current?.revision === RATING_ENGINE_REVISION && current.momRevision === MOM_POLICY_REVISION && current.matchRevision === matchRevision && current.playerRevision === playerRevision) return { value: current.value, cached: true }
   const value = measureInDevelopment('MatchChangeIndex cold build', () => uncached(players, matches))
-  byStates.set(states, { revision: RATING_ENGINE_REVISION, matchRevision, playerRevision, value })
+  byStates.set(states, { revision: RATING_ENGINE_REVISION, momRevision: MOM_POLICY_REVISION, matchRevision, playerRevision, value })
   return { value, cached: false }
 }
 

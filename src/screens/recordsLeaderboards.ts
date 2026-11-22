@@ -5,6 +5,7 @@ import { awardRecordGroups, teamHistoryRecordGroups } from '../engine/awardRecor
 import { scopedIndividualAwardEvents, teamIndividualAwardRecordGroups } from '../engine/teamAwardRecords'
 import { AWARD_POLICY_REVISION } from '../engine/officialAwards'
 import { RATING_ENGINE_REVISION } from '../engine/ratingRevision'
+import { MOM_POLICY_REVISION } from '../engine/momPolicy'
 import { isPlayerAssistEvent, isPlayerGoalEvent } from '../engine/playerMatchFacts'
 import { orderedEvents, scoringTeamId } from '../engine/timeline'
 import { teamMetrics } from '../engine/teamMetrics'
@@ -74,7 +75,7 @@ export function recordsLeaderboardGroups(input: RecordsInput): RecordsLeaderboar
     let byPlayers = cache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); cache.set(matches, byPlayers) }
     let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
     let byScope = byTeams.get(teams); if (!byScope) { byScope = new Map(); byTeams.set(teams, byScope) }
-    const key = `${AWARD_POLICY_REVISION}:${scopeKey(input)}`, cached = byScope.get(key); if (cached) return cached
+    const key = `${AWARD_POLICY_REVISION}:${MOM_POLICY_REVISION}:${scopeKey(input)}`, cached = byScope.get(key); if (cached) return cached
     let groups = category === 'player' ? awardRecordGroups(teams, players, matches, states, scope, selectedIds) : [
       ...(!selectedIds || selectedIds.some(id => id.startsWith('history-')) ? teamHistoryRecordGroups(teams, players, matches, states, scope) : []),
       ...(!selectedIds || selectedIds.some(id => id.startsWith('team-awards')) ? teamIndividualAwardRecordGroups(scopedIndividualAwardEvents(teams, players, matches, states, scope), teams, selectedIds) : []),
@@ -90,7 +91,8 @@ export function recordsLeaderboardGroups(input: RecordsInput): RecordsLeaderboar
   if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
   let byScope = byTeams.get(teams)
   if (!byScope) { byScope = new Map(); byTeams.set(teams, byScope) }
-  const key = scopeKey(input)
+  const momRevision = category === 'player' && (!selectedIds || selectedIds.includes('mom')) ? MOM_POLICY_REVISION : ''
+  const key = `${momRevision}:${scopeKey(input)}`
   const cached = byScope.get(key)
   if (cached) return cached
   let groups: RecordsLeaderboardGroup[]

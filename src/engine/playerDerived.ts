@@ -1,3 +1,5 @@
+import { MOM_POLICY_REVISION } from './momPolicy'
+import { arrayItemRevision } from './arrayItemRevision'
 import type { Appearance, CompetitionType, Match, Player, Position, RatingBreakdown } from '../types'
 import { GOOD_RATING_THRESHOLD, isGoodRating } from './constants'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
@@ -70,7 +72,7 @@ export function derivePlayerScope(player: Player, players: Player[], matches: Ma
   if (!byPlayers) { byPlayers = new WeakMap(); cache.set(matches, byPlayers) }
   let byScope = byPlayers.get(players)
   if (!byScope) { byScope = new Map(); byPlayers.set(players, byScope) }
-  const key = `${RATING_ENGINE_REVISION}:${scopeKey(scope)}`; let byPlayer = byScope.get(key)
+  const key = `${RATING_ENGINE_REVISION}:${MOM_POLICY_REVISION}:${arrayItemRevision(matches)}:${arrayItemRevision(players)}:${scopeKey(scope)}`; let byPlayer = byScope.get(key)
   if (!byPlayer) {
     if (byScope.size >= 32) byScope.delete(byScope.keys().next().value!)
     byPlayer = new Map(); byScope.set(key, byPlayer)

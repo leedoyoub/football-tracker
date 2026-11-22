@@ -1,3 +1,4 @@
+import { MOM_POLICY_REVISION } from './momPolicy'
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
 import { selectTeamHistoryBestXI } from './teamHistorySelection'
 import { arrayItemRevision } from './arrayItemRevision'
@@ -99,7 +100,7 @@ export function teamHistoryHonors(teams: Team[], players: Player[], matches: Mat
   let byMatches = byPlayers.get(players); if (!byMatches) { byMatches = new WeakMap(); byPlayers.set(players, byMatches) }
   let byStates = byMatches.get(matches); if (!byStates) { byStates = new WeakMap(); byMatches.set(matches, byStates) }
   let byScope = byStates.get(states); if (!byScope) { byScope = new Map(); byStates.set(states, byScope) }
-  const key = JSON.stringify([teamId, competition, AWARD_POLICY_REVISION, RATING_ENGINE_REVISION, arrayItemRevision(teams), arrayItemRevision(players), arrayItemRevision(matches), arrayItemRevision(states)])
+  const key = JSON.stringify([teamId, competition, AWARD_POLICY_REVISION, RATING_ENGINE_REVISION, MOM_POLICY_REVISION, arrayItemRevision(teams), arrayItemRevision(players), arrayItemRevision(matches), arrayItemRevision(states)])
   const cached = byScope.get(key); if (cached) return cached
   const result = buildTeamHonors(teams, players, matches, states, teamId, competition)
   if (byScope.size >= 48) byScope.delete(byScope.keys().next().value!)

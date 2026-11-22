@@ -134,7 +134,13 @@ test('v266 official scoring, publication, Team History, shared race and pitch re
       assert(start >= 0)
       return source.slice(start)
     }
-    assert.equal(file === 'engine/awardEvaluation.ts' ? sharedScoring(current) : current, file === 'engine/awardEvaluation.ts' ? sharedScoring(old) : old, file)
+    const policyIndependent = source => {
+      const withoutCachePolicy = source.replace("import { MOM_POLICY_REVISION } from './momPolicy'\n", '').replaceAll('${MOM_POLICY_REVISION}:', '')
+      if (file === 'engine/awardEvaluation.ts') return sharedScoring(withoutCachePolicy)
+      if (file === 'engine/rating.ts') return withoutCachePolicy.replace('policyRevision: number; ', '').split('export function getMatchManOfTheMatch')[0]
+      return withoutCachePolicy
+    }
+    assert.equal(policyIndependent(current), policyIndependent(old), file)
   }
 })
 

@@ -1,3 +1,4 @@
+import { MOM_POLICY_REVISION } from './momPolicy'
 import type { Appearance, CompetitionType, Match, Player } from '../types'
 import { buildGlobalRankingData, type GlobalLeaderboardRow } from './stats'
 import { rankAwardCandidates, type AwardCandidate } from './awardRules'
@@ -119,7 +120,7 @@ const factsCache = new WeakMap<Player[], WeakMap<Match[], WeakMap<Match[], Scope
 export function evaluateOfficialCandidates(players: Player[], games: Match[], seasonGames: Match[], bonusFor: (type: CompetitionType, teamId: string) => number, weights: Partial<Record<CompetitionType, number>>, scopeRows?: GlobalLeaderboardRow[]): AwardCandidate[] {
   let byGames = factsCache.get(players); if (!byGames) { byGames = new WeakMap(); factsCache.set(players, byGames) }
   let bySeason = byGames.get(games); if (!bySeason) { bySeason = new WeakMap(); byGames.set(games, bySeason) }
-  const revision = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${arrayItemRevision(players)}:${arrayItemRevision(games)}:${arrayItemRevision(seasonGames)}`
+  const revision = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${MOM_POLICY_REVISION}:${arrayItemRevision(players)}:${arrayItemRevision(games)}:${arrayItemRevision(seasonGames)}`
   let facts = bySeason.get(seasonGames)
   if (!facts || facts.revision !== revision) {
     facts = { rows: scopeRows ?? buildGlobalRankingData(players, games, { seasons: [], teams: [], positions: [] }, 'rating'), families: scopedAwardFamilyByPlayer(players, games, {}), participation: scopeParticipation(players, games, seasonGames), evaluated: new Map(), revision }

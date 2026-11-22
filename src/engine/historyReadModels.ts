@@ -1,3 +1,4 @@
+import { MOM_POLICY_REVISION } from './momPolicy'
 import { officialAwardsForSeason, officialSeasonModel } from './officialAwards'
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
 import { awardResultForScope, sharedStatAwardWinners, type AwardScope, type CanonicalAwardResult, type seasonAwards, type awardsForCompetition } from './awards'
@@ -38,7 +39,7 @@ let awardsCache: AwardsCache = new WeakMap()
 let scopedAwardCache: WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], Map<string, CanonicalAwardResult | undefined>>>>> = new WeakMap()
 let monthlyCache: MonthlyCache = new WeakMap()
 const diagnostics = { timelineBuilds: 0, awardBuilds: 0, monthlyBuilds: 0 }
-const sourceKey = (teams: Team[], players: Player[], matches: Match[], states: CompetitionState[] = []) => `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}`
+const sourceKey = (teams: Team[], players: Player[], matches: Match[], states: CompetitionState[] = []) => `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${MOM_POLICY_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}`
 
 function seasons(matches: Match[], states: CompetitionState[]) {
   return [...new Set([...matches.map(match => match.season), ...states.map(state => state.season)])]

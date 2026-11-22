@@ -1,3 +1,4 @@
+import { MOM_POLICY_REVISION } from './momPolicy'
 import { matchScore, ratePlayerMatch } from './rating'
 import { playerSeasonStats } from './stats'
 import { seasonAwards } from './awards'
@@ -158,7 +159,7 @@ export function seasonRecap(players: Player[], matches: Match[], season: string,
   let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
   let byStates = byTeams.get(teams); if (!byStates) { byStates = new WeakMap(); byTeams.set(teams, byStates) }
   let bySeason = byStates.get(states); if (!bySeason) { bySeason = new Map(); byStates.set(states, bySeason) }
-  const key = JSON.stringify([RATING_ENGINE_REVISION, AWARD_POLICY_REVISION, arrayItemRevision(matches), arrayItemRevision(players), arrayItemRevision(teams), arrayItemRevision(states), season])
+  const key = JSON.stringify([RATING_ENGINE_REVISION, MOM_POLICY_REVISION, AWARD_POLICY_REVISION, arrayItemRevision(matches), arrayItemRevision(players), arrayItemRevision(teams), arrayItemRevision(states), season])
   const cached = bySeason.get(key)
   if (cached && cached.xiLeaders === xiLeaders) return cached.recap
   const seasonMatches = matches.filter(match => match.season === season)

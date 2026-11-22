@@ -1,3 +1,4 @@
+import { MOM_POLICY_REVISION } from './momPolicy'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { AWARD_POLICY_REVISION } from './awardPolicy'
 import { arrayItemRevision } from './arrayItemRevision'
@@ -49,7 +50,7 @@ export function deriveLatestChanges(players: Player[], teams: Team[], matches: M
   let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
   let byStates = byTeams.get(teams); if (!byStates) { byStates = new WeakMap(); byTeams.set(teams, byStates) }
   let bySeason = byStates.get(states); if (!bySeason) { bySeason = new Map(); byStates.set(states, bySeason) }
-  const key = `${AWARD_POLICY_REVISION}:${arrayItemRevision(players)}:${arrayItemRevision(teams)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}:${season ?? ''}`
+  const key = `${AWARD_POLICY_REVISION}:${MOM_POLICY_REVISION}:${arrayItemRevision(players)}:${arrayItemRevision(teams)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}:${season ?? ''}`
   const cached = bySeason.get(key)
   if (cached?.revision === RATING_ENGINE_REVISION) return cached.value
   const value = prepared(deriveFootballEvents(players, teams, matches, states, { includeAllRanking: true, includeMatchPerformance: false }), matches, season)

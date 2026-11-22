@@ -1,3 +1,4 @@
+import { MOM_POLICY_REVISION } from './momPolicy'
 import type {
   Best11Slot,
   CompetitionType,
@@ -337,7 +338,7 @@ export function buildGlobalRankingData(
   filters: { seasons: string[], teams: string[], positions: (Position | PositionFamily)[] },
   _metric: LeaderboardMetric,
 ): GlobalLeaderboardRow[] {
-  const sourceKey = `${RATING_ENGINE_REVISION}:${arrayItemRevision(matches)}:${arrayItemRevision(players)}|${filters.seasons.slice().sort().join(',')}|${filters.teams.slice().sort().join(',')}|`
+  const sourceKey = `${RATING_ENGINE_REVISION}:${MOM_POLICY_REVISION}:${arrayItemRevision(matches)}:${arrayItemRevision(players)}|${filters.seasons.slice().sort().join(',')}|${filters.teams.slice().sort().join(',')}|`
   const cacheKey = sourceKey + filters.positions.slice().sort().join(',')
   let byPlayers = competitionStatsCache.get(matches)
   if (!byPlayers) { byPlayers = new WeakMap(); competitionStatsCache.set(matches, byPlayers) }
@@ -678,7 +679,7 @@ export function unifiedBestEleven(
   if (!byPlayers) { byPlayers = new WeakMap(); bestElevenCache.set(matches, byPlayers) }
   let byScope = byPlayers.get(players)
   if (!byScope) { byScope = new Map(); byPlayers.set(players, byScope) }
-  const cacheKey = `${RATING_ENGINE_REVISION}:${season}:${recentOnly ? 'recent' : 'season'}`
+  const cacheKey = `${RATING_ENGINE_REVISION}:${MOM_POLICY_REVISION}:${arrayItemRevision(matches)}:${arrayItemRevision(players)}:${season}:${recentOnly ? 'recent' : 'season'}`
   const cached = byScope.get(cacheKey)
   if (cached) return cached
   const candidates = unifiedCandidates(players, matches, season, recentOnly)

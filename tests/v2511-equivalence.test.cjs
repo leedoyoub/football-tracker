@@ -77,8 +77,8 @@ test('unmodified competition rules, constants and repository remain source ident
     }
     assert.equal(normalize(path.join(baseline.root, 'src', file)), normalize(path.join(baseline.directory, 'src', file)), file)
   }
-  // REV13 calculation and all its role/goal/save helpers precede rateMatch.
-  const calculation = filename => fs.readFileSync(filename, 'utf8').replaceAll('\r\n', '\n').split('export function rateMatch')[0].split('export function clampRating')[1]
+  // REV13 calculations precede the match read model and its MOM cache.
+  const calculation = filename => fs.readFileSync(filename, 'utf8').replaceAll('\r\n', '\n').split('type MatchRatings')[0].split('export function clampRating')[1]
   assert(calculation(path.join(baseline.root, 'src/engine/rating.ts')).length > 1000)
   // The full rating/MOM behavior is also independently compared for every fixture match.
   assert.equal(calculation(path.join(baseline.root, 'src/engine/rating.ts')), calculation(path.join(baseline.directory, 'src/engine/rating.ts')))

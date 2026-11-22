@@ -1,4 +1,5 @@
 import { selectMomCandidate } from './momSelection'
+import { MOM_POLICY_REVISION } from './momPolicy'
 import type { Appearance, Match, MatchEvent, Player, Position, RatingBreakdown } from '../types'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 export { RATING_ENGINE_REVISION } from './ratingRevision.ts'
@@ -244,7 +245,7 @@ function calculatePlayerMatch(match: Match, player: Player): RatingBreakdown | n
   return breakdown
 }
 
-type MatchRatings = { revision: number; rows: RatingBreakdown[]; mom?: { matchId: string; playerId: string | undefined } }
+type MatchRatings = { revision: number; rows: RatingBreakdown[]; mom?: { matchId: string; policyRevision: number; playerId: string | undefined } }
 const matchRatingsCache = new WeakMap<ReturnType<typeof normalizeMatchTimeline>, WeakMap<Player[], MatchRatings>>()
 const rosterIndex = new WeakMap<Player[], Map<string, { player: Player; order: number }[]>>()
 
@@ -284,12 +285,24 @@ function momEventCount(match: Match, playerId: string, key: 'playerId' | 'assist
 /** Uses the same effective match position exposed by the authoritative rating breakdown. */
 export function getMatchManOfTheMatch(match: Match, players: Player[]): string | undefined {
   const entry = matchRatings(match, players)
-  if (entry.mom?.matchId === match.id) return entry.mom.playerId
-  const playerId = selectMomCandidate(entry.rows.map(rating => ({
+  if (entry.mom?.matchId === match.id && entry.mom.policyRevision === MOM_POLICY_REVISION) return entry.mom.playerId
+  let leaders: RatingBreakdown[] = []
+  for (const row of entry.rows) {
+    const best = leaders[0]
+    if (!best || row.raw > best.raw ||
+      (row.raw === MAX_RATING && best.raw === MAX_RATING && row.preClamp > best.preClamp)) {
+      leaders = [row]
+    } else if (row.raw === best.raw && (row.raw !== MAX_RATING || row.preClamp === best.preClamp)) {
+      leaders.push(row)
+    }
+  }
+  // Only exact leaders need the existing position and event tie-breaks. Keep
+  // the full ordered multiset for legacy rosters with repeated player IDs.
+  const playerId = leaders.length < 2 ? leaders[0]?.playerId : selectMomCandidate(leaders.map(rating => ({
     playerId: rating.playerId, average: rating.raw, position: rating.position, minutes: rating.minutes,
     goals: momEventCount(match, rating.playerId, 'playerId'),
     assists: momEventCount(match, rating.playerId, 'assistPlayerId'),
   })), match.id)
-  entry.mom = { matchId: match.id, playerId }
+  entry.mom = { matchId: match.id, policyRevision: MOM_POLICY_REVISION, playerId }
   return playerId
 }

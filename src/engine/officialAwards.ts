@@ -1,3 +1,4 @@
+import { MOM_POLICY_REVISION } from './momPolicy'
 import type { CompetitionState, CompetitionType, Match, Player, Team } from '../types'
 import { currentStaticTeams } from '../data/teams'
 import { awardsForCompetition, awardResultForScope, isLeagueHalfFinalized, seasonAwards, type AwardWinner, type CompetitionAwards } from './awards'
@@ -37,7 +38,7 @@ export function officialSeasonModel(teams: Team[], players: Player[], matches: M
   let byMatches = byPlayers.get(players); if (!byMatches) { byMatches = new WeakMap(); byPlayers.set(players, byMatches) }
   let byStates = byMatches.get(matches); if (!byStates) { byStates = new WeakMap(); byMatches.set(matches, byStates) }
   let bySeason = byStates.get(states); if (!bySeason) { bySeason = new Map(); byStates.set(states, bySeason) }
-  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}:${season}`
+  const key = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${MOM_POLICY_REVISION}:${arrayItemRevision(teams)}:${arrayItemRevision(players)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}:${season}`
   const cached = bySeason.get(key); if (cached) return cached
   const tournamentTeams = currentStaticTeams(teams)
   const status = competitionSeasonStatus(tournamentTeams, matches, season, players, states.find(state => state.kind === 'champions-draw' && state.season === season))

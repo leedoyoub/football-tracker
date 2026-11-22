@@ -1,3 +1,4 @@
+import { MOM_POLICY_REVISION } from './momPolicy'
 import { competitionHistory, cupCompetition, championsCompetition, CHAMPIONS_ROUNDS, matchCompetitionType } from './competition'
 import { awardResultForScope, competitionAwardResult, isLeagueHalfFinalized } from './awards'
 import { matchesForAwardScope } from './awardScopes'
@@ -407,7 +408,7 @@ function newsEntry(players: Player[], teams: Team[], matches: Match[], states: C
   let byStates = byTeams.get(teams)
   if (!byStates) { byStates = new WeakMap(); byTeams.set(teams, byStates) }
   let cached = byStates.get(states)
-  const sourceRevision = `${arrayItemRevision(players)}:${arrayItemRevision(teams)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}`
+  const sourceRevision = `${MOM_POLICY_REVISION}:${arrayItemRevision(players)}:${arrayItemRevision(teams)}:${arrayItemRevision(matches)}:${arrayItemRevision(states)}`
   if (!cached || cached.revision !== RATING_ENGINE_REVISION || cached.awardRevision !== AWARD_POLICY_REVISION || cached.sourceRevision !== sourceRevision) { cached = { revision: RATING_ENGINE_REVISION, awardRevision: AWARD_POLICY_REVISION, sourceRevision, playerMilestones: new Map() }; byStates.set(states, cached) }
   return cached
 }

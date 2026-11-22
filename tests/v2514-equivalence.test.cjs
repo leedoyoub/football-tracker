@@ -18,7 +18,7 @@ test('v2.5.13 full News, Latest Changes, official Awards and Records survive edi
     for (const season of ['Season 1', 'Season 2']) assertOfficialAwardPolicy(current.officialSeasonModel(s.teams, s.players, matches, s.competitionStates, season), old.officialSeasonModel(s.teams, s.players, matches, s.competitionStates, season), s.players, matches, season, s.teams, s.competitionStates)
   }
 })
-test('unmodified rating, competition, durability and scroll sources remain identical', () => {
+test('rating calculations, competition, durability and scroll sources remain identical', () => {
   // v2.6.1 explicitly changes award ties and extends types/navigation for History.
   // Their preserved behavior is checked by v261-equivalence and navigation tests.
   // v2.6.5 explicitly changes awardRules' derived candidate fields; independent
@@ -32,6 +32,11 @@ test('unmodified rating, competition, durability and scroll sources remain ident
     const read = root => fs.readFileSync(path.join(root, 'src', file), 'utf8').replaceAll('\r\n', '\n')
       // v2.6.2 permits progress values to wrap inside the same-sized cards.
       .replaceAll('<dd className="min-w-0 text-right font-bold text-zinc-100">', '<dd className="font-bold text-zinc-100">')
-    assert.equal(read(b.root), read(b.directory), file)
+    // v2.6.12 intentionally changes only the match MOM selection and its cache.
+    const invariant = source => file === 'engine/rating.ts' ? source
+      .replace("import { MOM_POLICY_REVISION } from './momPolicy'\n", '')
+      .replace('policyRevision: number; ', '')
+      .split('export function getMatchManOfTheMatch')[0] : source
+    assert.equal(invariant(read(b.root)), invariant(read(b.directory)), file)
   }
 })
