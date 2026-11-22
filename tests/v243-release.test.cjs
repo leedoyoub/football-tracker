@@ -21,10 +21,10 @@ const match = (id, date, competitionType, events, season = 'Season 1') => ({
 test('v2.6.7 release metadata uses rating revision 13', () => {
   const packageJson = require('../package.json')
   const lockfile = require('../package-lock.json')
-  assert.equal(packageJson.version, '2.6.10')
-  assert.equal(lockfile.version, '2.6.10')
-  assert.equal(lockfile.packages[''].version, '2.6.10')
-  assert.equal(APP_VERSION, '2.6.10')
+  assert.equal(packageJson.version, '2.6.11')
+  assert.equal(lockfile.version, '2.6.11')
+  assert.equal(lockfile.packages[''].version, '2.6.11')
+  assert.equal(APP_VERSION, '2.6.11')
   assert.equal(RATING_ENGINE_REVISION, 13)
 })
 
@@ -148,13 +148,13 @@ test('award candidate calculation indexes team matches once and season analytics
 
 test('SOT edits allow a temporary HT greater than FT, preserve the draft, and validate before durable save', () => {
   const screen = fs.readFileSync(require.resolve('../src/screens/NewMatchScreen.tsx'), 'utf8')
-  const apply = screen.slice(screen.indexOf('function applyOpponentSot'), screen.indexOf('function changeHalftimeOpponentSot'))
-  const save = screen.slice(screen.indexOf('async function save()'), screen.indexOf('return ('))
-  assert.match(apply, /setOpponentSotDraft\(next\)/)
+  const apply = screen.slice(screen.indexOf('function changeOpponentSot'), screen.indexOf('saveDraftMatch(draftCheckpoint)'))
+  const save = screen.slice(screen.indexOf('async function save('), screen.indexOf('function acceptMetadata'))
+  assert.match(apply, /setOpponentSotDraft\(current =>/)
   assert.doesNotMatch(apply, /validateManualOpponentSot/)
   assert.match(screen, /saveDraftMatch\(draftCheckpoint\)/)
   assert.match(save, /const manualSot = validateManualOpponentSot\(finalMatchData, selectedTeamId\)/)
-  assert.ok(save.indexOf("manualSot.kind === 'invalid'") < save.indexOf('saveMatchDurably(finalMatchData)'))
+  assert.match(save, /manualSot.kind === 'invalid'[\s\S]*?saveMatchDurably\(matchToSave\)/)
   assert.match(save, /setSaveError\(manualSot.message\)[\s\S]*?return false/)
   assert.match(save, /onComplete\(\{ name: 'match', id: draftId \}\)/)
 })

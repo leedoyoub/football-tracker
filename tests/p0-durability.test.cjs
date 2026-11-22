@@ -77,11 +77,11 @@ test('queued saves recover after rejection and resolve the latest snapshot in or
 
 test('match editor waits for durable save, preserves a failed form, and exposes explicit feedback', () => {
   const editor = fs.readFileSync(require.resolve('../src/screens/NewMatchScreen.tsx'), 'utf8')
-  assert(editor.includes('await saveMatchDurably(finalMatchData)'))
+  assert(editor.includes('await saveMatchDurably(matchToSave)'))
   assert(editor.includes('Save failed. Your match was not safely stored. Please retry.'))
   // Finalization sanitizes only the matching checkpoint in Store. Edit Cancel
   // must never clear an unrelated draft (behavior covered in v267 metadata tests).
-  assert(editor.indexOf('await saveMatchDurably(finalMatchData)') < editor.indexOf("onComplete({ name: 'match', id: draftId })"))
+  assert(editor.indexOf('await saveMatchDurably(matchToSave)') < editor.indexOf("onComplete({ name: 'match', id: draftId })"))
 })
 
 test('integration: durable save failure does not block the next serialized save', async () => {

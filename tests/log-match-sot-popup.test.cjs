@@ -65,5 +65,5 @@ test('new-match finalization requires the SOT popup values without changing lega
 test('End Match keeps missing or invalid SOT guidance actionable inside its modal', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/NewMatchScreen.tsx'), 'utf8')
   assert(source.includes('OPEN SOT'), 'End Match should offer a direct route back to the sole SOT editor after SOT validation fails')
-  assert(source.includes("setFinishStage(null); setSotOpen(true)"), 'opening SOT should close End Match rather than leave modal state stacked')
+  assert(source.includes("closeFinish(); setSotOpen(true)") && /const closeFinish = \(\) => \{[^}]*setFinishStage\(null\)/.test(source), 'opening SOT should close End Match rather than leave modal state stacked')
 })

@@ -31,3 +31,11 @@ export function updateHalftimeOpponentSot(state: OpponentSotDraftState, halftime
 export function updateFulltimeOpponentSot(state: OpponentSotDraftState, fulltimeOpponentSot: string): OpponentSotDraftState {
   return { ...state, fulltimeOpponentSot, fulltimeOpponentSotAutoLinked: false }
 }
+
+export function stepOpponentSot(state: OpponentSotDraftState, field: 'halftimeOpponentSot' | 'fulltimeOpponentSot', direction: -1 | 1): OpponentSotDraftState {
+  const value = state[field]
+  if (direction < 0 && (value === '' || Number(value) <= 0)) return state
+  const next = Number(value) + direction
+  if (!Number.isSafeInteger(next)) return state
+  return field === 'halftimeOpponentSot' ? updateHalftimeOpponentSot(state, String(next)) : updateFulltimeOpponentSot(state, String(next))
+}

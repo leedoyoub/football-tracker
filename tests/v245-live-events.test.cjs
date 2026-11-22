@@ -25,7 +25,7 @@ function editor(run, match = fixture()) {
   const Module = require('node:module'), React = require('react'), originalLoad = Module._load
   let cells = [], cursor = 0
   const hook = initial => { const index = cursor++; if (!(index in cells)) cells[index] = typeof initial === 'function' ? initial() : initial; return [cells[index], value => { cells[index] = typeof value === 'function' ? value(cells[index]) : value }] }
-  const hooks = { ...React, useState: hook, useRef: value => hook(() => ({ current: value }))[0], useMemo: fn => fn(), useEffect() {} }
+  const hooks = { ...React, useState: hook, useRef: value => hook(() => ({ current: value }))[0], useMemo: fn => fn(), useCallback: fn => fn, useEffect() {} }
   Module._load = function(name, parent, main) {
     if (name === 'react') return hooks
     if (name === '../store') return { useStore: () => ({ teams: [{ id: 'T', name: 'T', shortName: 'T' }, { id: 'O', name: 'O', shortName: 'O' }], players, matches: [], draftMatch: match, competitionStates: [], saveDraftMatch() {}, clearDraftMatch() {} }) }

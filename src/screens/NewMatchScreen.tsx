@@ -1,7 +1,7 @@
 import { getMostRecentMatchLineup } from '../engine/recentLineup'
 import { nextTimelineSequence, orderedEventList } from '../engine/timeline'
 import { eligibleAtEvent, previewGoalEvent, tacticalAssignmentsAtMoment, tacticalPreviewSlots } from '../engine/tacticalHistory'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FORMATION_SLOTS, Pitch, UNIVERSAL_TACTICAL_SLOTS } from '../components/Pitch'
 import { calculateFormation, kickoffFormation } from '../engine/formation'
 import { seasonGoalContributions } from '../engine/seasonGoalContributions'
@@ -23,7 +23,9 @@ import { PlayerAvatar } from '../components/PlayerAvatar'
 
 import { draftRestoreFailureReason, restoreDraft } from '../lib/editorRestore'
 import { validateManualOpponentSot } from '../engine/opponentSot'
-import { initialOpponentSotDraft, updateFulltimeOpponentSot, updateHalftimeOpponentSot, type OpponentSotDraftState } from './opponentSotWorkflow'
+import { initialOpponentSotDraft, stepOpponentSot, updateFulltimeOpponentSot, updateHalftimeOpponentSot, type OpponentSotDraftState } from './opponentSotWorkflow'
+import { playerSaveCount } from '../engine/playerMatchFacts'
+import { editGoalkeeperSaveTotal } from './goalkeeperSaveEditor'
 import { rebuildLiveHistory } from './liveHistory'
 import { positionRank } from '../lib/positionOrder'
 import { historicalPlayerLabel } from '../lib/historicalPlayerDisplay'
@@ -42,6 +44,10 @@ const localCalendarDate = () => {
 const parseOpponentSot = (value: string) => value.trim() === '' ? undefined : Number(value)
 const sameAssignments = (a: Record<string, string>, b: Record<string, string>) =>
   Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([slot, id]) => b[slot] === id)
+const slotPositions = Object.fromEntries(UNIVERSAL_TACTICAL_SLOTS.map(slot => [slot.slot, slot.matchPosition]))
+const emptySelection: Record<string, 'in' | 'out'> = {}
+const ignorePitchClick = () => {}
+const LivePitch = memo(Pitch)
 
 type NewMatchScreenProps = {
   teamId?: string
@@ -60,10 +66,15 @@ export function NewMatchScreen(props: NewMatchScreenProps) {
   const { teams, players, matches, draftMatch, clearDraftMatch } = useStore()
   const [freshCheckpointId] = useState(() => crypto.randomUUID())
   const editingMatch = props.editingMatchId ? matches.find(match => match.id === props.editingMatchId) : undefined
-  if (props.editingMatchId && !editingMatch) return <div className="p-6 text-sm text-red-400">Match unavailable. Edit was not started.</div>
   // Editing restores the durable match explicitly. Normal creation restores
   // only a lifecycle-valid draft and never a completed Match by accident.
   const resumableDraft = !props.editingMatchId && isResumableDraft({ matches, draftMatch }) ? draftMatch : undefined
+  const mode = editorLifecycleMode({ editingMatch, draft: resumableDraft, resumeRequested: props.resumeDraft })
+  const sourceMatch = mode === 'fresh' ? undefined : mode === 'edit' ? editingMatch : resumableDraft
+  const selectedTeamId = props.teamId ?? sourceMatch?.teamId ?? sourceMatch?.homeTeamId ?? teams[0]?.id ?? ''
+  const restored = useMemo(() => sourceMatch && (sourceMatch.teamId ?? sourceMatch.homeTeamId) === selectedTeamId
+    ? restoreDraft(sourceMatch, players, mode === 'resume') : null, [sourceMatch, selectedTeamId, players, mode])
+  if (props.editingMatchId && !editingMatch) return <div className="p-6 text-sm text-red-400">Match unavailable. Edit was not started.</div>
   const ownsFreshCheckpoint = isFreshCheckpointForSession(resumableDraft, freshCheckpointId)
   const requested = props.teamId ? { teamId: props.teamId, season: props.requestedSeason, competitionType: props.competitionType } : undefined
   const conflict = resumableDraft && requested && !draftMatchesContext(resumableDraft, {
@@ -75,12 +86,8 @@ export function NewMatchScreen(props: NewMatchScreenProps) {
     const context = draftContext(resumableDraft)!
     return <div className="space-y-4 p-6"><h1 className="text-xl font-black">Unfinished match found</h1><p className="text-sm text-zinc-400">{conflict ? `${context.season} · ${context.competitionType} differs from the match you requested.` : `${context.season} · ${context.competitionType} is ready to resume.`}</p><button type="button" onClick={() => props.onReplace({ name: 'new-match', ...context, resumeDraft: true })} className="w-full rounded-xl bg-emerald-500 p-3 font-black text-black">Resume Draft</button><button type="button" onClick={clearDraftMatch} className="w-full rounded-xl border border-zinc-600 p-3 font-black">Discard Draft &amp; Start New</button><button type="button" onClick={props.onBack} className="w-full p-3 text-sm text-zinc-400">Cancel</button></div>
   }
-  const mode = editorLifecycleMode({ editingMatch, draft: resumableDraft, resumeRequested: props.resumeDraft })
-  const sourceMatch = mode === 'fresh' ? undefined : mode === 'edit' ? editingMatch : resumableDraft
-  const selectedTeamId = props.teamId ?? sourceMatch?.teamId ?? sourceMatch?.homeTeamId ?? teams[0]?.id ?? ''
-  const restored = sourceMatch && (sourceMatch.teamId ?? sourceMatch.homeTeamId) === selectedTeamId ? restoreDraft(sourceMatch, players, mode === 'resume') : null
   if ((mode === 'resume' || mode === 'edit') && !restored) return <div role="alert" className="p-6 text-sm text-red-400">Match recovery failed. {draftRestoreFailureReason(sourceMatch, mode === 'resume')} The saved draft was not changed.</div>
-  return <MatchEditor {...props} freshCheckpointId={freshCheckpointId} mode={mode} sourceMatch={sourceMatch} selectedTeamId={selectedTeamId} restored={restored} />
+  return <MatchEditor key={sourceMatch?.id ?? freshCheckpointId} {...props} freshCheckpointId={freshCheckpointId} mode={mode} sourceMatch={sourceMatch} selectedTeamId={selectedTeamId} restored={restored} />
 }
 
 function MatchEditor({
@@ -109,7 +116,9 @@ function MatchEditor({
   const nextMatch = useMemo(() => getNextMatchDayForTeam(selectedTeamId, matches, completedSeasons, competitionType, requestedSeason), [selectedTeamId, matches, completedSeasons, competitionType, requestedSeason])
   const season = mode === 'edit' && metadata ? metadata.assignment.season : mode === 'fresh' ? requestedSeason ?? nextMatch.season : sourceMatch!.season
   const [date, setDate] = useState(() => mode === 'fresh' ? localCalendarDate() : sourceMatch!.date)
-  const [opponentSotDraft, setOpponentSotDraft] = useState(() => initialOpponentSotDraft(sourceMatch, mode === 'fresh'))
+  const [opponentSotDraft, setOpponentSotDraft] = useState(() => initialOpponentSotDraft(mode === 'edit' && sourceMatch
+    ? { halftimeOpponentSot: sourceMatch.halftimeOpponentSot, fulltimeOpponentSot: sourceMatch.fulltimeOpponentSot }
+    : sourceMatch, mode === 'fresh'))
   const { halftimeOpponentSot, fulltimeOpponentSot, fulltimeOpponentSotAutoLinked } = opponentSotDraft
   const recentLineup = useMemo(() => restored ? null : getMostRecentMatchLineup(matches, selectedTeamId), [restored, matches, selectedTeamId]);
 
@@ -130,7 +139,7 @@ function MatchEditor({
   const [frozenAssignment, setFrozenAssignment] = useState(() => mode === 'fresh' ? undefined : sourceMatch ? assignmentSnapshotForMatch(sourceMatch) : undefined)
   const matchDay = mode === 'edit' && metadata ? metadata.assignment.matchDay : frozenAssignment?.matchDay ?? proposalMatchDay
   const proposedSnapshot = useMemo(() => freezeCompetitionAssignment({ competitionType, season, teamId: selectedTeamId, stage: proposedAssignment.stage, pairingId: proposedAssignment.pairingId, seriesGame: proposedAssignment.seriesGame, opponentTeamId: proposedAssignment.opponentTeamId, matchDay }), [competitionType, season, selectedTeamId, proposedAssignment, matchDay])
-  const activeAssignment = mode === 'edit' && metadata ? metadata.assignment : activeEditorIdentity(mode, sourceMatch, frozenAssignment ?? proposedSnapshot)
+  const activeAssignment = useMemo(() => mode === 'edit' && metadata ? metadata.assignment : activeEditorIdentity(mode, sourceMatch, frozenAssignment ?? proposedSnapshot), [mode, sourceMatch, frozenAssignment, proposedSnapshot, metadata])
   const acceptedAssignment = mode === 'edit' && metadata ? activeAssignment : frozenAssignment
   const assignment = acceptedAssignment ? { available: true, stage: acceptedAssignment.stage, pairingId: acceptedAssignment.pairingId, seriesGame: acceptedAssignment.seriesGame, opponentTeamId: acceptedAssignment.opponentTeamId, message: formatCompetitionContext(acceptedAssignment) } : proposedAssignment
   const opponentId = mode === 'fresh' ? activeAssignment.opponentTeamId ?? `opponent:${draftId}` : recordedOpponentId(sourceMatch!)
@@ -185,17 +194,18 @@ function MatchEditor({
   }, [selectedTeamId, players, recentLineup, representative])
 
   const homeSquad = useMemo(() => players.filter((p) => (p.teamIds ?? [p.teamId]).includes(selectedTeamId)), [players, selectedTeamId])
+  const sourceAppearances = sourceMatch?.appearances
   const draftPlayers = useMemo(() => {
-    if (mode === 'fresh' || !sourceMatch) return homeSquad
-    const historicalIds = new Set(sourceMatch.appearances.filter(appearance => appearance.teamId === selectedTeamId).map(appearance => appearance.playerId))
+    if (!sourceAppearances) return homeSquad
+    const historicalIds = new Set(sourceAppearances.filter(appearance => appearance.teamId === selectedTeamId).map(appearance => appearance.playerId))
     const historical = [...historicalIds].flatMap(id => players.find(player => player.id === id) ?? [])
     return [...historical, ...homeSquad.filter(player => !historicalIds.has(player.id))]
-  }, [mode, sourceMatch, homeSquad, players, selectedTeamId])
-  const draftRosterIds = useMemo(() => [...new Set([...(sourceMatch?.appearances.filter(row => row.teamId === selectedTeamId).map(row => row.playerId) ?? []), ...draftPlayers.map(player => player.id)])], [sourceMatch, selectedTeamId, draftPlayers])
+  }, [sourceAppearances, homeSquad, players, selectedTeamId])
+  const draftRosterIds = useMemo(() => [...new Set([...(sourceAppearances?.filter(row => row.teamId === selectedTeamId).map(row => row.playerId) ?? []), ...draftPlayers.map(player => player.id)])], [sourceAppearances, selectedTeamId, draftPlayers])
   const seasonStats = useMemo(() => seasonGoalContributions(draftPlayers, matches, season, selectedTeamId, competitionType), [draftPlayers, matches, season, selectedTeamId, competitionType])
   const activeDraft = substitutionDraft ?? matchDraft
   // Visual feedback comes only from the current selection and unconfirmed draft.
-  const substitutionSelection: Record<string, 'in' | 'out'> = {}
+  const substitutionSelection: Record<string, 'in' | 'out'> = substitutionDraft ? {} : emptySelection
   const startingSelection: Record<string, 'in' | 'out'> | undefined = activePlayer ? { [activePlayer.id]: 'out' } : undefined
   const pendingSubs = substitutionDraft?.events.filter((event): event is Extract<MatchEvent, { type: 'sub' }> => event.type === 'sub' && !matchDraft.events.some(saved => saved.id === event.id)) ?? []
   if (liveEvent === 'substitution' && substitutionDraft) {
@@ -212,27 +222,20 @@ function MatchEditor({
       if (id) substitutionSelection[id] = subSelection.group === 'starting' ? 'out' : 'in'
     }
   }
-  const liveSlots = UNIVERSAL_TACTICAL_SLOTS
-    .map((slot) => ({ ...slot, playerId: activeDraft.slotAssignments[slot.slot] ?? null, teamId: selectedTeamId, avgRating: 0, matches: 0 }))
-  const liveCounts = liveGoalAssistCounts(matchDraft.events, editingEventId, liveEvent === 'goal' ? liveScorerId : undefined, liveEvent === 'goal' ? liveAssistId : undefined)
-  const liveStats = Object.fromEntries(draftRosterIds.map(id => [id, liveCounts.get(id) ?? { goals: 0, assists: 0 }]))
+  const liveSlots = useMemo(() => UNIVERSAL_TACTICAL_SLOTS
+    .map((slot) => ({ ...slot, playerId: activeDraft.slotAssignments[slot.slot] ?? null, teamId: selectedTeamId, avgRating: 0, matches: 0 })),
+  [activeDraft.slotAssignments, selectedTeamId])
+  const liveStats = useMemo(() => {
+    const counts = liveGoalAssistCounts(matchDraft.events, editingEventId, liveEvent === 'goal' ? liveScorerId : undefined, liveEvent === 'goal' ? liveAssistId : undefined)
+    return Object.fromEntries(draftRosterIds.map(id => [id, counts.get(id) ?? { goals: 0, assists: 0 }]))
+  }, [matchDraft.events, editingEventId, liveEvent, liveScorerId, liveAssistId, draftRosterIds])
   const minuteIsValid = /^\d{1,2}$/.test(draftMinute) && liveMinute >= 0 && liveMinute <= 99
+  const editedGoal = editingEventId ? matchDraft.events.find((event): event is Extract<MatchEvent, { type: 'goal' }> => event.id === editingEventId && event.type === 'goal') : undefined
+  const keepsUnattributedGoal = editedGoal !== undefined && editedGoal.playerId === undefined && !liveScorerId
 
   function openLiveEvent(type: NonNullable<typeof liveEvent>) {
-    pendingMoves.current = []; pendingBase.current = null
-    setPendingMoveCount(0)
-    setHistoryError('')
-    setEditingEventId(null)
+    cancelLiveEvent()
     setLiveEvent(type)
-    setDraftMinute('')
-    setAppliedMinute(null)
-    setAssistChosen(false)
-    setSubSelection(null)
-    setSubstitutionError('')
-    setSubstitutionDraft(null)
-    setLiveScorerId('')
-    setLiveAssistId('')
-    setLiveCauseId('')
     setLivePicker(type === 'conceded' ? 'minute' : 'scorer')
     if (type === 'substitution') {
       setSubstitutionDraft({ slotAssignments: { ...matchDraft.slotAssignments }, homeBench: [...matchDraft.homeBench], events: [...matchDraft.events], positionHistories: { ...matchDraft.positionHistories }, checkpoint: { slotAssignments: matchDraft.slotAssignments, homeBench: matchDraft.homeBench } })
@@ -244,15 +247,15 @@ function MatchEditor({
     const id = crypto.randomUUID()
     const writeEvent = (event: MatchEvent) => setMatchDraft(prev => ({ ...prev, events: editingEventId ? prev.events.map((e) => e.id === editingEventId ? { ...e, ...event, sequence: e.sequence } : e) : [...prev.events, { ...event, sequence: nextTimelineSequence(prev.events, prev.positionHistories) }] }))
     const minute = Number(draftMinute); if (!Number.isInteger(minute) || minute < 0 || minute > 99) return
-    setAppliedMinute(minute)
-    const eligibleNow = new Set(eligibleAt(minute).map(appearance => appearance.playerId))
+    const eligibleNow = liveEvent === 'substitution' ? [] : eligibleAt(minute)
     if (liveEvent === 'goal') {
-      if (!liveScorerId || !assistChosen || !eligibleNow.has(liveScorerId) || (liveAssistId && (!eligibleNow.has(liveAssistId) || liveScorerId === liveAssistId))) return
-      const existingGoal = editingEventId ? matchDraft.events.find((event): event is Extract<MatchEvent, { type: 'goal' }> => event.id === editingEventId && event.type === 'goal') : undefined
-      writeEvent({ ...existingGoal, id: editingEventId ?? id, type: 'goal', minute, teamId: selectedTeamId, playerId: liveScorerId || undefined, assistPlayerId: liveScorerId ? liveAssistId || undefined : undefined, goalType: existingGoal?.goalType ?? 'normal' })
+      if (!assistChosen || (!keepsUnattributedGoal && !eligibleNow.includes(liveScorerId)) ||
+        (liveAssistId && (!eligibleNow.includes(liveAssistId) || liveScorerId === liveAssistId))) return
+      writeEvent({ ...editedGoal, id: editingEventId ?? id, type: 'goal', minute, teamId: selectedTeamId, playerId: liveScorerId || undefined,
+        assistPlayerId: liveAssistId || undefined, ...(editedGoal ? {} : { goalType: 'normal' }) })
     } else if (liveEvent === 'conceded') {
-      if (liveCauseId && !eligibleNow.has(liveCauseId)) return
-      writeEvent({ id: editingEventId ?? id, type: 'goal', minute, teamId: opponentId, playerId: undefined, concededGoalCausePlayerId: liveCauseId || undefined })
+      if (liveCauseId && !eligibleNow.includes(liveCauseId)) return
+      writeEvent({ ...editedGoal, id: editingEventId ?? id, type: 'goal', minute, teamId: opponentId, concededGoalCausePlayerId: liveCauseId || undefined })
     } else if (substitutionDraft) {
       const finalDraft = replayPendingMoves(minute)
       if (!finalDraft || !canConfirmSubstitution(finalDraft, matchDraft)) return
@@ -260,13 +263,7 @@ function MatchEditor({
       setMatchDraft(prev => ({ ...prev, slotAssignments: confirmed.slotAssignments, homeBench: confirmed.homeBench, events: confirmed.events, positionHistories: confirmed.positionHistories }))
     }
     if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) document.activeElement.blur()
-    setDraftMinute(''); setLiveScorerId(''); setLiveAssistId(''); setLiveCauseId(''); setAssistChosen(false)
-    setLiveEvent(null)
-    setEditingEventId(null)
-    setSubstitutionDraft(null)
-    setSubSelection(null)
-    setSubstitutionError('')
-    pendingMoves.current = []; pendingBase.current = null; setPendingMoveCount(0)
+    cancelLiveEvent()
   }
 
   function cancelLiveEvent() {
@@ -279,13 +276,20 @@ function MatchEditor({
     setLiveScorerId('')
     setLiveAssistId('')
     setLiveCauseId('')
+    setDraftMinute('')
+    setAppliedMinute(null)
+    setAssistChosen(false)
+    setLivePicker('scorer')
+    setSubEdit(null)
+    setSubEditMinute('')
+    setHistoryError('')
   }
 
   function editLiveEvent(event: MatchEvent) {
-    if (event.type === 'sub') { setSubEdit(event); setSubEditMinute(String(event.minute)); setHistoryError(''); return }
     cancelLiveEvent()
-    setEditingEventId(event.id)
+    if (event.type === 'sub') { setSubEdit(event); setSubEditMinute(String(event.minute)); return }
     if (event.type === 'save') return
+    setEditingEventId(event.id)
     setDraftMinute(String(event.minute))
     setAppliedMinute(event.minute)
     if (event.teamId === selectedTeamId) {
@@ -325,7 +329,6 @@ function MatchEditor({
     if (correctEvents(matchDraft.events.map(e => e.id === subEdit.id ? { ...subEdit, minute } : e), histories)) setSubEdit(null)
   }
 
-  const slotPositions = Object.fromEntries(UNIVERSAL_TACTICAL_SLOTS.map(slot => [slot.slot, slot.matchPosition]))
   const playerPositions = Object.fromEntries([...draftPlayers.map(player => [player.id, player.position]), ...(sourceMatch?.appearances.filter(row => row.teamId === selectedTeamId).map(row => [row.playerId, row.position]) ?? [])])
   const isGoalkeeperPlayer = (id: string | undefined) => id !== undefined && playerPositions[id] === 'GK'
 
@@ -394,23 +397,31 @@ function MatchEditor({
     ? sourceMatch?.kickoffLineup : kickoffSnapshot
   const kickoffFormationName = kickoffSnapshot.length ? kickoffFormation(kickoffSnapshot) : activeFormationName
   const kickoffIsValid = validateKickoffLineup(kickoffSnapshot).valid && isGoalkeeperPlayer(startingSnapshot.GK) && Object.values(startingSnapshot).filter(isGoalkeeperPlayer).length === 1
+  const editRestore = mode === 'edit' ? restored : null
   const appearances: Appearance[] = useMemo(() => {
-    // Metadata-only edits retain raw history, including missing roster IDs.
-    if (mode === 'edit' && sourceMatch && restored && sameRawFootballValue(matchDraft, restored.draft) && sameAssignments(startingSnapshot, restored.starters) && sameRawFootballValue(startingBenchSnapshot, restored.bench)) return sourceMatch.appearances
+    // Score, saves and metadata edits retain raw appearances. Only lineup
+    // and tactical edits need to rebuild the saved appearance list.
+    if (sourceAppearances && editRestore &&
+      sameAssignments(startingSnapshot, editRestore.starters) &&
+      sameRawFootballValue(startingBenchSnapshot, editRestore.bench) &&
+      sameAssignments(matchDraft.slotAssignments, editRestore.draft.slotAssignments) &&
+      sameRawFootballValue(matchDraft.homeBench, editRestore.draft.homeBench) &&
+      sameRawFootballValue(matchDraft.positionHistories, editRestore.draft.positionHistories) &&
+      sameRawFootballValue(matchDraft.events.filter(e => e.type === 'sub'), editRestore.draft.events.filter(e => e.type === 'sub'))) return sourceAppearances
     const res: Appearance[] = []
     const source = lineupLocked ? startingSnapshot : matchDraft.slotAssignments
     Object.entries(source).forEach(([slotId, id]) => {
           if (!id) return
           const slot = UNIVERSAL_TACTICAL_SLOTS.find((item) => item.slot === slotId)
           const p = draftPlayers.find((x) => x.id === id)
-          const historical = sourceMatch?.appearances.find(item => item.playerId === id)
+          const historical = sourceAppearances?.find(item => item.playerId === id)
           res.push({ ...historical, playerId: id, teamId: selectedTeamId, position: historical?.position ?? p?.position ?? 'CM', matchPosition: slot?.matchPosition, role: 'starter' })
     })
     const enteredSubs = matchDraft.events.filter((event): event is Extract<MatchEvent, { type: 'sub' }> => event.type === 'sub' && event.teamId === selectedTeamId)
     for (const event of enteredSubs) {
       if (res.some(appearance => appearance.playerId === event.playerInId)) continue
       const player = draftPlayers.find(item => item.id === event.playerInId)
-      const historical = sourceMatch?.appearances.find(item => item.playerId === event.playerInId)
+      const historical = sourceAppearances?.find(item => item.playerId === event.playerInId)
       if (historical || player) res.push({ ...historical, playerId: event.playerInId, teamId: selectedTeamId, position: historical?.position ?? player!.position, matchPosition: event.position, role: 'bench' })
     }
     // Before kickoff the editable bench is the match-day bench; after kickoff
@@ -418,37 +429,47 @@ function MatchEditor({
     for (const id of (lineupLocked ? startingBenchSnapshot : matchDraft.homeBench)) {
       if (res.some(a => a.playerId === id)) continue
       const player = draftPlayers.find(p => p.id === id)
-      const historical = sourceMatch?.appearances.find(item => item.playerId === id)
+      const historical = sourceAppearances?.find(item => item.playerId === id)
       if (historical || player) res.push({ ...historical, playerId: id, teamId: selectedTeamId, position: historical?.position ?? player!.position, role: 'bench' })
     }
     // The editor history is authoritative, including an intentionally empty
     // history after deleting the last tactical move. Other fixture sides stay raw.
     return [...res.map(appearance => ({ ...appearance, positionHistory: matchDraft.positionHistories[appearance.playerId] })),
-      ...(sourceMatch?.appearances.filter(appearance => appearance.teamId !== selectedTeamId) ?? [])]
-  }, [mode, restored, selectedTeamId, draftPlayers, sourceMatch, matchDraft, startingSnapshot, startingBenchSnapshot, lineupLocked])
+      ...(sourceAppearances?.filter(appearance => appearance.teamId !== selectedTeamId) ?? [])]
+  }, [editRestore, selectedTeamId, draftPlayers, sourceAppearances, matchDraft, startingSnapshot, startingBenchSnapshot, lineupLocked])
 
-  const eventMatch: Match = { id: draftId, season, matchDay, date, duration: 90, homeTeamId, awayTeamId, appearances, events: matchDraft.events }
+  const duration = sourceMatch?.duration ?? 90
+  const eventMatch = useMemo<Match>(() => ({ id: draftId, season, matchDay, date, duration, homeTeamId, awayTeamId, appearances, events: matchDraft.events }),
+    [draftId, season, matchDay, date, duration, homeTeamId, awayTeamId, appearances, matchDraft.events])
+  const score = useMemo(() => matchScore(eventMatch), [eventMatch])
   const liveBenchIds = activeDraft.homeBench.filter(Boolean)
-  function previewAt(minute: number) {
-    return previewGoalEvent(eventMatch, matchDraft.positionHistories, minute, liveEvent === 'conceded' ? opponentId : selectedTeamId, editingEventId)
-  }
-  function eligibleAt(minute: number) {
-    const { match, event } = previewAt(minute)
-    return eligibleAtEvent(match, event)
-  }
-  // A draft (including an empty draft) never changes the committed preview.
-  const eventPreviewMinute = appliedMinute
-  const eligibleAppearances = eventPreviewMinute !== null ? eligibleAt(eventPreviewMinute) : appearances.filter(a => liveSlots.some(slot => slot.playerId === a.playerId))
-  const eligibleGoalIds = eligibleAppearances.map(a => a.playerId)
-  const goalSlots = (() => {
-    if (eventPreviewMinute === null) return liveSlots
-    const { match, event } = previewAt(eventPreviewMinute)
+  const previewTeamId = liveEvent === 'conceded' ? opponentId : selectedTeamId
+  const goalEditing = liveEvent === 'goal' || liveEvent === 'conceded'
+  const previewAt = useMemo(() => {
+    let cached: (ReturnType<typeof previewGoalEvent> & { minute: number; eligibleIds: string[] }) | undefined
+    return (minute: number) => {
+      if (cached?.minute === minute) return cached
+      const projected = previewGoalEvent(eventMatch, matchDraft.positionHistories, minute, previewTeamId, editingEventId)
+      cached = { ...projected, minute, eligibleIds: eligibleAtEvent(projected.match, projected.event).map(appearance => appearance.playerId) }
+      return cached
+    }
+  }, [eventMatch, matchDraft.positionHistories, previewTeamId, editingEventId])
+  // Applying a valid minute and drawing the pitch read the same projection.
+  const preview = goalEditing && appliedMinute !== null ? previewAt(appliedMinute) : null
+  const eligibleAt = (minute: number) => previewAt(minute).eligibleIds
+  const eligibleGoalIds = useMemo(() => {
+    if (!goalEditing) return []
+    return preview?.eligibleIds ?? appearances.filter(a => liveSlots.some(slot => slot.playerId === a.playerId)).map(a => a.playerId)
+  }, [goalEditing, preview, appearances, liveSlots])
+  const goalSlots = useMemo(() => {
+    if (!preview) return liveSlots
+    const { match, event } = preview
+    const eligible = new Set(eligibleGoalIds)
     try {
       const assignments = tacticalAssignmentsAtMoment(startingSnapshot, match.events, matchDraft.positionHistories, slotPositions, event)
-      const eligible = new Set(eligibleGoalIds)
       return tacticalPreviewSlots(assignments, selectedTeamId).filter(slot => slot.playerId && eligible.has(slot.playerId))
-    } catch { return liveSlots.filter(slot => slot.playerId && eligibleGoalIds.includes(slot.playerId)) }
-  })()
+    } catch { return liveSlots.filter(slot => slot.playerId && eligible.has(slot.playerId)) }
+  }, [preview, liveSlots, eligibleGoalIds, startingSnapshot, matchDraft.positionHistories, selectedTeamId])
   function chooseScorer(id: string) {
     if (!eligibleGoalIds.includes(id)) return
     setLiveScorerId(id); setLiveAssistId(''); setAssistChosen(false); setLivePicker('assist')
@@ -458,14 +479,14 @@ function MatchEditor({
     setLiveAssistId(id); setAssistChosen(true); setLivePicker('minute')
   }
   function applyMinute(value: string) {
-    if (!/^\d{1,2}$/.test(value)) return
+    if (!liveEvent || !/^\d{1,2}$/.test(value)) return
     const minute = Number(value)
     if (!Number.isInteger(minute) || minute < 0 || minute > 99) return
     setAppliedMinute(minute)
-    if (liveEvent === 'substitution' && value !== '') replayPendingMoves(minute)
-    if (liveCauseId && value !== '' && !eligibleAt(minute).some(a => a.playerId === liveCauseId)) setLiveCauseId('')
-    if (liveEvent === 'goal' && value !== '') {
-      const ids = eligibleAt(minute).map(a => a.playerId)
+    if (liveEvent === 'substitution') replayPendingMoves(minute)
+    if (liveEvent === 'conceded' && liveCauseId && !eligibleAt(minute).includes(liveCauseId)) setLiveCauseId('')
+    if (liveEvent === 'goal' && liveScorerId) {
+      const ids = eligibleAt(minute)
       if (liveScorerId && !ids.includes(liveScorerId)) {
         setLiveScorerId(''); setLiveAssistId(''); setAssistChosen(false); setLivePicker('scorer')
       } else if (liveAssistId && !ids.includes(liveAssistId)) {
@@ -481,21 +502,26 @@ function MatchEditor({
   }
 
   const startingGoalkeeperId = startingSnapshot.GK
-  const totalSavesEvent = matchDraft.events.find((event): event is Extract<MatchEvent, { type: 'save' }> => event.type === 'save' && event.teamId === selectedTeamId && event.playerId === startingGoalkeeperId)
-  const totalSaves = totalSavesEvent ? String(totalSavesEvent.count ?? 0) : ''
+  const startingGoalkeeper = appearances.find(row => row.playerId === startingGoalkeeperId && row.teamId === selectedTeamId)
+  const totalSaves = useMemo(() => {
+    if (!startingGoalkeeper) return ''
+    const count = playerSaveCount(eventMatch, startingGoalkeeper)
+    const recordedZero = matchDraft.events.some(event => event.type === 'save' && event.teamId === selectedTeamId && event.playerId === startingGoalkeeperId && event.count === 0)
+    return count || recordedZero ? String(count) : ''
+  }, [eventMatch, startingGoalkeeper, matchDraft.events, selectedTeamId, startingGoalkeeperId])
   function changeTotalSaves(value: string) {
-    if (!/^\d*$/.test(value) || !startingGoalkeeperId || substitutionDraft) return
+    if (!/^\d+$/.test(value) || !startingGoalkeeper || substitutionDraft) return
     const count = Number(value)
     if (!Number.isSafeInteger(count)) return
     setMatchDraft(prev => {
-      const existing = prev.events.find((event): event is Extract<MatchEvent, { type: 'save' }> => event.type === 'save' && event.teamId === selectedTeamId && event.playerId === startingGoalkeeperId)
-      const event: MatchEvent = { id: existing?.id ?? crypto.randomUUID(), type: 'save', teamId: selectedTeamId, playerId: startingGoalkeeperId, count }
-      return { ...prev, events: value === '' ? prev.events.filter(item => item !== existing) : existing ? prev.events.map(item => item === existing ? event : item) : [...prev.events, event] }
+      const match = prev.events === eventMatch.events ? eventMatch : { ...eventMatch, events: prev.events }
+      const events = editGoalkeeperSaveTotal(match, startingGoalkeeper, count, () => crypto.randomUUID())
+      return events === prev.events ? prev : { ...prev, events }
     })
   }
 
   const finalMatchData = useMemo<Match>(() => {
-    const { competitionPairingId: _pairing, competitionSeriesGame: _series, ...source } = sourceMatch ?? {}
+    const { competitionPairingId: _pairing, competitionSeriesGame: _series, fulltimeOpponentSotAutoLinked: _autoLinked, ...source } = sourceMatch ?? {}
     return {
       ...source,
       id: draftId,
@@ -512,19 +538,11 @@ function MatchEditor({
   }, [draftId, season, activeAssignment, matchDay, date, kickoffFormationName, unchangedKickoff, mode, metadata, sourceMatch, homeTeamId, awayTeamId, selectedTeamId, opponentName, halftimeOpponentSot, fulltimeOpponentSot, appearances, matchDraft.events, savedKickoffSnapshot])
   const draftCheckpoint = useMemo<Match>(() => ({ ...finalMatchData, kickoffLineup: lineupLocked ? savedKickoffSnapshot : sourceMatch?.kickoffLineup && restored && sameAssignments(matchDraft.slotAssignments, restored.starters) ? sourceMatch.kickoffLineup : kickoffFromAssignments(matchDraft.slotAssignments, false), fulltimeOpponentSotAutoLinked: fulltimeOpponentSotAutoLinked }), [finalMatchData, savedKickoffSnapshot, lineupLocked, sourceMatch, restored, matchDraft.slotAssignments, fulltimeOpponentSotAutoLinked])
 
-  function applyOpponentSot(next: OpponentSotDraftState) {
-    setOpponentSotDraft(next)
+  function changeOpponentSot(field: 'halftimeOpponentSot' | 'fulltimeOpponentSot', value: string | -1 | 1) {
+    if (typeof value === 'string' && (!/^\d*$/.test(value) || !Number.isSafeInteger(Number(value)))) return
+    setOpponentSotDraft(current => typeof value === 'number' ? stepOpponentSot(current, field, value)
+      : field === 'halftimeOpponentSot' ? updateHalftimeOpponentSot(current, value) : updateFulltimeOpponentSot(current, value))
     setSaveError('')
-  }
-
-  function changeHalftimeOpponentSot(value: string) {
-    if (!/^\d*$/.test(value)) return
-    applyOpponentSot(updateHalftimeOpponentSot(opponentSotDraft, value))
-  }
-
-  function changeFulltimeOpponentSot(value: string) {
-    if (!/^\d*$/.test(value)) return
-    applyOpponentSot(updateFulltimeOpponentSot(opponentSotDraft, value))
   }
 
   useEffect(() => {
@@ -532,8 +550,8 @@ function MatchEditor({
     saveDraftMatch(draftCheckpoint)
   }, [draftReady, mode, draftCheckpoint, saveDraftMatch, sourceMatch, restored])
 
-  async function save(): Promise<boolean> {
-    if (savingRef.current || liveEvent || !kickoffIsValid) return false
+  async function save(total?: string): Promise<boolean> {
+    if (savingRef.current || liveEvent || subEdit || !kickoffIsValid) return false
     if (mode === 'edit' && originalEditSource.current) {
       const latest = matches.find(match => match.id === originalEditSource.current!.id)
       if (!latest || !sameRawMatch(originalEditSource.current, latest)) {
@@ -548,7 +566,8 @@ function MatchEditor({
       savingRef.current = false
       return false
     }
-    if (mode !== 'edit' && (finalMatchData.halftimeOpponentSot === undefined || finalMatchData.fulltimeOpponentSot === undefined)) {
+    const sotChanged = finalMatchData.halftimeOpponentSot !== sourceMatch?.halftimeOpponentSot || finalMatchData.fulltimeOpponentSot !== sourceMatch?.fulltimeOpponentSot
+    if ((mode !== 'edit' || sotChanged) && (finalMatchData.halftimeOpponentSot === undefined || finalMatchData.fulltimeOpponentSot === undefined)) {
       setSaveError('Enter 1H and Full Match SOT in the Log Match SOT control before finishing.')
       savingRef.current = false
       return false
@@ -559,9 +578,14 @@ function MatchEditor({
       savingRef.current = false
       return false
     }
+    const events = total !== undefined && startingGoalkeeper
+      ? editGoalkeeperSaveTotal(finalMatchData, startingGoalkeeper, Number(total), () => crypto.randomUUID())
+      : finalMatchData.events
+    const matchToSave = events === finalMatchData.events ? finalMatchData : { ...finalMatchData, events }
+    if (matchToSave !== finalMatchData) setMatchDraft(current => ({ ...current, events }))
     setSaveStatus('Saving…')
     try {
-      const result = await saveMatchDurably(finalMatchData)
+      const result = await saveMatchDurably(matchToSave)
       if (result.superseded) {
         savingRef.current = false
         setSaveStatus('Newer changes superseded these saved details. Reopen the match to continue.')
@@ -596,7 +620,7 @@ function MatchEditor({
         <h1 className="text-2xl font-bold">Log Match</h1>
         <button type="button" aria-label={mode === 'edit' ? 'Edit match details' : 'Match details'} disabled={mode !== 'edit' || Boolean(liveEvent) || saveStatus === 'Saving…'} onClick={() => setMetadataOpen(true)} className="mb-2 flex w-full min-w-0 items-center justify-between gap-3 rounded-xl bg-zinc-900 px-3 py-2 text-left">
           <div className="min-w-0"><p className="text-sm font-bold leading-tight text-zinc-300">{competitionContextParts(activeAssignment).primary}</p><p className="mt-0.5 text-xs font-black leading-tight text-emerald-400">{competitionContextParts(activeAssignment).secondary}</p></div>
-          <p aria-label="Live score" className="shrink-0 text-right text-xl font-black tabular-nums text-white">{matchScore(eventMatch).home} - {matchScore(eventMatch).away}</p>
+          <p aria-label="Live score" className="shrink-0 text-right text-xl font-black tabular-nums text-white">{score.home} - {score.away}</p>
       </button>
       </div>
 
@@ -620,9 +644,9 @@ function MatchEditor({
 
         {step === 1 && <LiveMatchStep
           teams={teams} substitutionSelection={substitutionSelection} pendingSubs={pendingSubs}
-          goalReady={!!liveScorerId && assistChosen && eligibleGoalIds.includes(liveScorerId) && (!liveAssistId || eligibleGoalIds.includes(liveAssistId))} assistChosen={assistChosen}
+          goalReady={assistChosen && (keepsUnattributedGoal || eligibleGoalIds.includes(liveScorerId)) && (!liveAssistId || eligibleGoalIds.includes(liveAssistId))} assistChosen={assistChosen}
           representative={representative} slots={liveEvent === 'goal' || liveEvent === 'conceded' ? goalSlots : liveSlots} players={draftPlayers} benchPlayerIds={liveBenchIds} appearances={appearances} stats={liveStats} events={activeDraft.events}
-          totalSaves={totalSaves} onTotalSaves={changeTotalSaves} opponentSot={opponentSotDraft} onHalftimeOpponentSot={changeHalftimeOpponentSot} onFulltimeOpponentSot={changeFulltimeOpponentSot} sotError={saveError.includes('SOT') ? saveError : ''} hasStartingGoalkeeper={!!startingGoalkeeperId} subOutId={subSelection ? (subSelection.group === 'starting' ? activeDraft.slotAssignments[subSelection.id] : subSelection.id) : ''} substitutionError={substitutionError}
+          totalSaves={totalSaves} onTotalSaves={changeTotalSaves} opponentSot={opponentSotDraft} onOpponentSot={changeOpponentSot} sotError={saveError.includes('SOT') ? saveError : ''} startingGoalkeeperId={startingGoalkeeperId} subOutId={subSelection ? (subSelection.group === 'starting' ? activeDraft.slotAssignments[subSelection.id] : subSelection.id) : ''} substitutionError={substitutionError}
           onSubSlot={(id) => selectSubstitutionTarget({ group: 'starting', id })}
           onSubBench={() => selectSubstitutionTarget({ group: 'substitute', id: '' })}
           onSubOut={(id) => { const slot = Object.keys(activeDraft.slotAssignments).find(slotId => activeDraft.slotAssignments[slotId] === id); if (slot) selectSubstitutionTarget({ group: 'starting', id: slot }) }}
@@ -642,20 +666,37 @@ function LiveMatchStep(props: {
   representative: Map<string, PositionFamily>;
   startingGoalkeeperName: string;
   goalReady: boolean; assistChosen: boolean; teams: Team[]; substitutionSelection: Record<string, 'in' | 'out'>; pendingSubs: Extract<MatchEvent, { type: 'sub' }>[]
-  totalSaves: string; onTotalSaves: (value: string) => void; opponentSot: OpponentSotDraftState; onHalftimeOpponentSot: (value: string) => void; onFulltimeOpponentSot: (value: string) => void; sotError: string; hasStartingGoalkeeper: boolean; subOutId: string; substitutionError: string; canConfirmSubstitutions: boolean
+  totalSaves: string; onTotalSaves: (value: string) => void; opponentSot: OpponentSotDraftState; onOpponentSot: (field: 'halftimeOpponentSot' | 'fulltimeOpponentSot', value: string | -1 | 1) => void; sotError: string; startingGoalkeeperId?: string; subOutId: string; substitutionError: string; canConfirmSubstitutions: boolean
   onSubOut: (id: string) => void; onSubIn: (id: string) => void; onSubSlot: (id: string) => void; onSubBench: () => void
   slots: Best11Slot[]; players: Player[]; benchPlayerIds: string[]; appearances: Appearance[]; stats: Record<string, { goals: number; assists: number }>; events: MatchEvent[]; selectedTeamId: string
   liveEvent: 'goal' | 'conceded' | 'substitution' | null; liveMinute: string; liveScorerId: string; liveAssistId: string; liveCauseId: string; livePicker: 'scorer' | 'assist' | 'cause' | 'minute'; validMinute: boolean
-  onOpen: (type: 'goal' | 'conceded' | 'substitution') => void; onSave: () => void; onCancel: () => void; onMinute: (value: string | number) => void; onCommitMinute: () => void; onScorer: (id: string) => void; onAssist: (id: string) => void; onCause: (id: string) => void; onPicker: (picker: 'scorer' | 'assist' | 'cause' | 'minute') => void; onPitchClick: (id: string) => void; onBack: () => void; onFinish: () => Promise<boolean>; onEditEvent: (event: MatchEvent) => void; onDeleteEvent: (event: MatchEvent) => void
+  onOpen: (type: 'goal' | 'conceded' | 'substitution') => void; onSave: () => void; onCancel: () => void; onMinute: (value: string | number) => void; onCommitMinute: () => void; onScorer: (id: string) => void; onAssist: (id: string) => void; onCause: (id: string) => void; onPicker: (picker: 'scorer' | 'assist' | 'cause' | 'minute') => void; onPitchClick: (id: string) => void; onBack: () => void; onFinish: (saves?: string) => Promise<boolean>; onEditEvent: (event: MatchEvent) => void; onDeleteEvent: (event: MatchEvent) => void
 }) {
   const [finishStage, setFinishStage] = useState<'saves' | null>(null)
   const [sotOpen, setSotOpen] = useState(false)
   const [finishing, setFinishing] = useState(false)
-  const [selectedEvent, setSelectedEvent] = useState<MatchEvent | null>(null)
+  const [saveText, setSaveText] = useState<string | null>(null)
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
+  const selectedEvent = selectedEventId ? props.events.find(event => event.id === selectedEventId) : undefined
+  const selectEvent = useCallback((event: MatchEvent) => {
+    if (event.type === 'save' && event.teamId === props.selectedTeamId && event.playerId === props.startingGoalkeeperId) setFinishStage('saves')
+    else setSelectedEventId(event.id)
+  }, [props.selectedTeamId, props.startingGoalkeeperId])
+  const commitSaveText = () => {
+    if (saveText) {
+      props.onTotalSaves(saveText)
+      setSaveText(null)
+    }
+  }
+  const closeFinish = () => {
+    commitSaveText()
+    setSaveText(null)
+    setFinishStage(null)
+  }
   const finishMatch = async () => {
     if (finishing) return
     setFinishing(true)
-    if (!await props.onFinish()) setFinishing(false)
+    if (!await props.onFinish(saveText ?? undefined)) setFinishing(false)
   }
   const eventName = props.liveEvent === 'conceded' ? 'Conceded Goal' : 'Goal'
   const playerName = (id: string) => historicalPlayerLabel(id, props.players.find((player) => player.id === id))
@@ -689,26 +730,43 @@ function LiveMatchStep(props: {
       </div>
     </div>}
     </div>
-    <section>{props.liveEvent === 'goal' && <p className="mb-3 text-sm font-bold text-emerald-300">{props.livePicker === 'scorer' ? '1. Select scorer on the pitch' : props.livePicker === 'assist' ? '2. Select assist on the pitch or No Assist' : '3. Enter minute and save'}</p>}<h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Starting XI</h2><Pitch compact goalSelection={props.liveEvent === 'goal' ? { ...(props.liveScorerId ? { [props.liveScorerId]: 'scorer' as const } : {}), ...(props.liveAssistId ? { [props.liveAssistId]: 'assist' as const } : {}) } : props.liveEvent === 'conceded' && props.liveCauseId ? { [props.liveCauseId]: 'fault' } : undefined} disabledPlayerIds={props.liveEvent === 'goal' && props.livePicker === 'assist' ? [props.liveScorerId] : undefined} slots={props.slots} players={props.players} teams={props.teams} substitutionSelection={props.substitutionSelection} statsByPlayer={props.stats} badgeMode="position" draggable={false} onEmptySlotClick={props.liveEvent === 'substitution' ? slot => props.onSubSlot(slot.slot) : undefined} onSlotClick={(slot) => { if (!slot.playerId) return; if (props.liveEvent === 'substitution') props.onSubOut(slot.playerId); else props.onPitchClick(slot.playerId) }} /></section>
+    <section>{props.liveEvent === 'goal' && <p className="mb-3 text-sm font-bold text-emerald-300">{props.livePicker === 'scorer' ? '1. Select scorer on the pitch' : props.livePicker === 'assist' ? '2. Select assist on the pitch or No Assist' : '3. Enter minute and save'}</p>}<h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Starting XI</h2><LivePitch compact goalSelection={props.liveEvent === 'goal' ? { ...(props.liveScorerId ? { [props.liveScorerId]: 'scorer' as const } : {}), ...(props.liveAssistId ? { [props.liveAssistId]: 'assist' as const } : {}) } : props.liveEvent === 'conceded' && props.liveCauseId ? { [props.liveCauseId]: 'fault' } : undefined} disabledPlayerIds={props.liveEvent === 'goal' && props.livePicker === 'assist' ? [props.liveScorerId] : undefined} slots={props.slots} players={props.players} teams={props.teams} substitutionSelection={props.substitutionSelection} statsByPlayer={props.stats} badgeMode="position" draggable={false} onEmptySlotClick={props.liveEvent === 'substitution' ? slot => props.onSubSlot(slot.slot) : undefined} onSlotClick={!props.liveEvent ? ignorePitchClick : (slot) => { if (!slot.playerId) return; if (props.liveEvent === 'substitution') props.onSubOut(slot.playerId); else props.onPitchClick(slot.playerId) }} /></section>
     {props.liveEvent === 'substitution' && <><RosterPlayerGroup representative={props.representative} title="Substitutes" group="substitute" team={props.teams.find(team => team.id === props.selectedTeamId)} selection={props.substitutionSelection} players={props.players} playerIds={props.benchPlayerIds} appearances={props.appearances} events={props.events} statsByPlayer={props.stats} onClick={props.onSubIn} /><BenchTapTarget onClick={props.onSubBench} /></>}
-    <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Event History</h2><button type="button" disabled={!!props.liveEvent || !props.events.some(e => e.type !== 'save')} onClick={() => { const events = props.events.filter(e => e.type !== 'save'); const event = events[events.length - 1]; if (event) props.onDeleteEvent(event) }} className="mb-2 text-xs font-bold text-emerald-400 disabled:opacity-40">UNDO LAST</button><div className="space-y-1.5">{orderedEventList(props.events).map((event) => <button type="button" disabled={!!props.liveEvent} onClick={() => event.type === 'save' ? setFinishStage('saves') : setSelectedEvent(event)} key={event.id} className="block w-full rounded-xl bg-zinc-900 px-3 py-2 text-left text-[11px]">{event.type !== 'save' && `${event.minute}' `}{event.type === 'goal' ? event.teamId === props.selectedTeamId ? `Goal${event.playerId ? `: ${playerName(event.playerId)}` : ' · Opponent own goal'}${event.assistPlayerId ? ` · Assist: ${playerName(event.assistPlayerId)}` : ''}` : `Conceded${event.concededGoalCausePlayerId ? ` · Cause: ${playerName(event.concededGoalCausePlayerId)}` : ''}` : event.type === 'sub' ? `Substitution: ${playerName(event.playerOutId)} → ${playerName(event.playerInId)}` : `Save: ${playerName(event.playerId)} × ${event.count ?? 1}`}</button>)}</div></section>
+    <section><h2 className="mb-2 text-xs font-black uppercase tracking-widest text-zinc-500">Event History</h2><button type="button" disabled={!!props.liveEvent || !props.events.some(e => e.type !== 'save')} onClick={() => { const events = props.events.filter(e => e.type !== 'save'); const event = events[events.length - 1]; if (event) props.onDeleteEvent(event) }} className="mb-2 text-xs font-bold text-emerald-400 disabled:opacity-40">UNDO LAST</button><EventHistoryRows events={props.events} players={props.players} teamId={props.selectedTeamId} disabled={!!props.liveEvent} onSelect={selectEvent} /></section>
     <div className="flex gap-2"><button type="button" onClick={props.onBack} className="flex-1 rounded-2xl bg-zinc-900 py-4 text-sm font-black">BACK</button><button type="button" disabled={!!props.liveEvent} onClick={() => setFinishStage('saves')} className="flex-2 rounded-2xl bg-emerald-500 py-4 text-sm font-black text-black shadow-xl">END MATCH</button></div>
     {finishStage && <div role="dialog" aria-modal="true" aria-label="End match" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="w-full max-w-sm space-y-3 rounded-xl bg-zinc-900 p-4">
-      <p className="font-bold">{props.startingGoalkeeperName || 'No starting goalkeeper'}</p><label className="flex items-center justify-between">Saves<input aria-label="Total saves" type="text" inputMode="numeric" pattern="[0-9]*" value={props.totalSaves} disabled={!props.hasStartingGoalkeeper || finishing} onChange={event => props.onTotalSaves(event.target.value)} className="w-20 rounded-lg bg-black p-2 text-base" /></label>{props.sotError && <><p role="alert" className="text-xs text-red-400">{props.sotError}</p><button type="button" onClick={() => { setFinishStage(null); setSotOpen(true) }} className="w-full rounded-lg bg-black p-2 text-xs font-black text-emerald-300">OPEN SOT</button></>}<button disabled={finishing || (props.hasStartingGoalkeeper && props.totalSaves === '')} onClick={finishMatch} className="w-full rounded-lg bg-emerald-500 p-3 text-xs font-black text-black disabled:opacity-40">{finishing ? 'SAVING…' : 'SAVE & FINISH MATCH'}</button>
-      <button onClick={() => setFinishStage(null)} className="w-full p-2 text-xs">CANCEL</button>
+      <p className="font-bold">{props.startingGoalkeeperName || 'No starting goalkeeper'}</p><label className="flex items-center justify-between">Saves<input aria-label="Total saves" type="text" inputMode="numeric" pattern="[0-9]*" value={saveText ?? props.totalSaves} disabled={!props.startingGoalkeeperId || finishing} onChange={event => {
+        const value = event.target.value
+        if (/^\d*$/.test(value) && Number.isSafeInteger(Number(value))) setSaveText(value)
+      }} onBlur={commitSaveText} className="w-20 rounded-lg bg-black p-2 text-base" /></label>{props.sotError && <><p role="alert" className="text-xs text-red-400">{props.sotError}</p><button type="button" onClick={() => { closeFinish(); setSotOpen(true) }} className="w-full rounded-lg bg-black p-2 text-xs font-black text-emerald-300">OPEN SOT</button></>}<button disabled={finishing || (!!props.startingGoalkeeperId && (saveText ?? props.totalSaves) === '')} onClick={finishMatch} className="w-full rounded-lg bg-emerald-500 p-3 text-xs font-black text-black disabled:opacity-40">{finishing ? 'SAVING…' : 'SAVE & FINISH MATCH'}</button>
+      <button onClick={closeFinish} className="w-full p-2 text-xs">CANCEL</button>
     </div></div>}
-    {sotOpen && <div role="dialog" aria-modal="true" aria-label="Opponent SOT" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="w-full max-w-sm space-y-3 rounded-xl bg-zinc-900 p-4"><h2 className="text-sm font-black">Opponent SOT</h2><SotValueControl label="1H SOT" value={props.opponentSot.halftimeOpponentSot} onChange={props.onHalftimeOpponentSot} /><SotValueControl label="Full Match SOT" value={props.opponentSot.fulltimeOpponentSot} onChange={props.onFulltimeOpponentSot} autoLinked={props.opponentSot.fulltimeOpponentSotAutoLinked} />{props.sotError && <p role="alert" className="text-xs text-red-400">{props.sotError}</p>}<button type="button" onClick={() => setSotOpen(false)} className="w-full rounded-lg bg-emerald-500 p-3 text-xs font-black text-black">DONE</button></div></div>}
-    {selectedEvent && <div role="dialog" aria-modal="true" aria-label="Event actions" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="flex w-full max-w-sm gap-2 rounded-xl bg-zinc-900 p-4"><button className="flex-1 p-3" onClick={() => { props.onEditEvent(selectedEvent); setSelectedEvent(null) }}>EDIT</button><button className="flex-1 p-3 text-red-400" onClick={() => { props.onDeleteEvent(selectedEvent); setSelectedEvent(null) }}>DELETE</button><button className="flex-1 p-3" onClick={() => setSelectedEvent(null)}>CANCEL</button></div></div>}
+    {sotOpen && <div role="dialog" aria-modal="true" aria-label="Opponent SOT" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="w-full max-w-sm space-y-3 rounded-xl bg-zinc-900 p-4"><h2 className="text-sm font-black">Opponent SOT</h2><SotValueControl label="1H SOT" value={props.opponentSot.halftimeOpponentSot} onChange={value => props.onOpponentSot('halftimeOpponentSot', value)} /><SotValueControl label="Full Match SOT" value={props.opponentSot.fulltimeOpponentSot} onChange={value => props.onOpponentSot('fulltimeOpponentSot', value)} autoLinked={props.opponentSot.fulltimeOpponentSotAutoLinked} />{props.sotError && <p role="alert" className="text-xs text-red-400">{props.sotError}</p>}<button type="button" onClick={() => setSotOpen(false)} className="w-full rounded-lg bg-emerald-500 p-3 text-xs font-black text-black">DONE</button></div></div>}
+    {selectedEvent && selectedEvent.type !== 'save' && <div role="dialog" aria-modal="true" aria-label="Event actions" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="flex w-full max-w-sm gap-2 rounded-xl bg-zinc-900 p-4"><button className="flex-1 p-3" onClick={() => { props.onEditEvent(selectedEvent); setSelectedEventId(null) }}>EDIT</button><button className="flex-1 p-3 text-red-400" onClick={() => { props.onDeleteEvent(selectedEvent); setSelectedEventId(null) }}>DELETE</button><button className="flex-1 p-3" onClick={() => setSelectedEventId(null)}>CANCEL</button></div></div>}
+    {selectedEvent?.type === 'save' && <div role="dialog" aria-modal="true" aria-label="Recorded save" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="w-full max-w-sm space-y-3 rounded-xl bg-zinc-900 p-4"><p className="text-sm font-bold">{playerName(selectedEvent.playerId)} · {selectedEvent.count ?? 1} saves</p><button type="button" onClick={() => setSelectedEventId(null)} className="w-full rounded-lg bg-black p-3 text-xs font-bold">CLOSE</button></div></div>}
   </div>
 }
 
-function SotValueControl({ label, value, onChange, autoLinked = false }: { label: string; value: string; onChange: (value: string) => void; autoLinked?: boolean }) {
-  const step = (direction: -1 | 1) => {
-    if (value === '') { if (direction > 0) onChange('1'); return }
-    const next = Math.max(0, Number(value) + direction)
-    if (Number.isSafeInteger(next)) onChange(String(next))
-  }
-  return <label className="flex items-center justify-between gap-3 text-sm font-bold"><span>{label}</span><span className="flex items-center gap-1"><button type="button" aria-label={`${label} decrease`} disabled={value === '' || value === '0'} onClick={() => step(-1)} className="h-9 w-9 rounded-lg bg-black text-lg disabled:opacity-30">−</button><input aria-label={label} type="text" inputMode="numeric" pattern="[0-9]*" value={value} onChange={event => onChange(event.target.value)} className="h-9 w-12 rounded-lg bg-black text-center text-base" /><button type="button" aria-label={`${label} increase`} onClick={() => step(1)} className="h-9 w-9 rounded-lg bg-black text-lg">+</button>{autoLinked && <span className="ml-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-black text-emerald-300">AUTO</span>}</span></label>
+const EventHistoryRows = memo(function EventHistoryRows({ events, players, teamId, disabled, onSelect }: {
+  events: MatchEvent[]; players: Player[]; teamId: string; disabled: boolean; onSelect: (event: MatchEvent) => void
+}) {
+  const labels = useMemo(() => {
+    const playerName = (id: string) => historicalPlayerLabel(id, players.find(player => player.id === id))
+    return orderedEventList(events).map(event => {
+      if (event.type === 'save') return { event, label: `Save: ${playerName(event.playerId)} × ${event.count ?? 1}` }
+      const time = `${event.minute}' `
+      if (event.type === 'sub') return { event, label: `${time}Substitution: ${playerName(event.playerOutId)} → ${playerName(event.playerInId)}` }
+      if (event.teamId !== teamId) return { event, label: `${time}Conceded${event.concededGoalCausePlayerId ? ` · Cause: ${playerName(event.concededGoalCausePlayerId)}` : ''}` }
+      const scorer = event.playerId ? `: ${playerName(event.playerId)}` : ' · Opponent own goal'
+      const assist = event.assistPlayerId ? ` · Assist: ${playerName(event.assistPlayerId)}` : ''
+      return { event, label: `${time}Goal${scorer}${assist}` }
+    })
+  }, [events, players, teamId])
+  return <div className="space-y-1.5">{labels.map(({ event, label }) => <button type="button" disabled={disabled} onClick={() => onSelect(event)} key={event.id} className="block w-full rounded-xl bg-zinc-900 px-3 py-2 text-left text-[11px]">{label}</button>)}</div>
+})
+
+function SotValueControl({ label, value, onChange, autoLinked = false }: { label: string; value: string; onChange: (value: string | -1 | 1) => void; autoLinked?: boolean }) {
+  return <div className="flex items-center justify-between gap-3 text-sm font-bold"><span>{label}</span><span className="flex items-center gap-1"><button type="button" aria-label={`${label} decrease`} disabled={value === '' || Number(value) === 0} onClick={() => onChange(-1)} className="h-9 w-9 rounded-lg bg-black text-lg disabled:opacity-30">−</button><input aria-label={label} type="text" inputMode="numeric" pattern="[0-9]*" value={value} onChange={event => onChange(event.target.value)} className="h-9 w-12 rounded-lg bg-black text-center text-base" /><button type="button" aria-label={`${label} increase`} onClick={() => onChange(1)} className="h-9 w-9 rounded-lg bg-black text-lg">+</button>{autoLinked && <span className="ml-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-black text-emerald-300">AUTO</span>}</span></div>
 }
 
 function BenchTapTarget({ onClick }: { onClick: () => void }) {

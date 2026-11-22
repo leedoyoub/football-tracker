@@ -1,6 +1,6 @@
 import type { Appearance, Match, Player } from '../types'
 import { oldestMatches } from './matchChronology'
-import { opponentSotExposure } from './opponentSot'
+import { opponentSotExposureForTeam } from './opponentSot'
 import { playerGoalEvents } from './playerMatchFacts'
 import { positionFamily, scopedPositionFamilyByPlayer, type PositionFamily } from './positionScope'
 import { teamPerspectiveScore } from './matchPerspective'
@@ -60,6 +60,29 @@ export function buildUnitRecords(players: Player[], matches: Match[], teamIds: s
     }
     for (const [teamId, appearances] of teamAppearances) {
       const segments = new Map(appearances.map(appearance => [appearance.playerId, creditedPositionSegments(match, appearance)]))
+      const exposeSot = opponentSotExposureForTeam(match, teamId)
+      const perspective = teamPerspectiveScore(match, teamId)
+      const ours = perspective?.goalsFor ?? 0
+      const against = perspective?.goalsAgainst ?? 0
+      const conceded = match.events.filter(event => event.type === 'goal' && event.minute <= 90 && scoringTeamId(match, event) !== teamId)
+      const goalCounts = new Map<Appearance, number>()
+      const concededOnPitch = new Map<Appearance, Set<Match['events'][number]>>()
+      const concededAtCenterBack = new Map<Appearance, Set<Match['events'][number]>>()
+      const goalsFor = (member: Appearance) => {
+        let value = goalCounts.get(member)
+        if (value === undefined) { value = playerGoalEvents(match, member).length; goalCounts.set(member, value) }
+        return value
+      }
+      const eligibleConceded = (member: Appearance, position: UnitPosition) => {
+        const cache = position === 'cb' ? concededAtCenterBack : concededOnPitch
+        let events = cache.get(member)
+        if (!events) {
+          events = new Set(conceded.filter(event => isOnPitchAtEvent(match, member, event) &&
+            (position !== 'cb' || positionFamily(matchPositionAtEvent(match, member, event)) === 'CB')))
+          cache.set(member, events)
+        }
+        return events
+      }
       const candidate = (position: UnitPosition) => appearances.filter(appearance => segments.get(appearance.playerId)?.length && (position === 'cb' ? segments.get(appearance.playerId)!.some(segment => positionFamily(segment.position) === 'CB') : groupOf(families.get(appearance.playerId)) === position)).sort((a, b) => a.playerId.localeCompare(b.playerId))
       for (const position of ['attack', 'midfield', 'defence', 'cb'] as const) {
         if (requested && ![2, 3, 4].some(size => requested.has(`${position}:${size}`))) continue
@@ -74,16 +97,14 @@ export function buildUnitRecords(players: Player[], matches: Match[], teamIds: s
             const key = `${position}:${teamId}:${playerIds.join(':')}`
             const row = totals.get(key) ?? { key, teamId, playerIds, position, size, starts: 0, minutes: 0, wins: 0, draws: 0, memberGoals: 0, teamGF: 0, teamGA: 0, intervalGA: 0, intervalSOT: 0 }
             row.minutes += minutes
-            row.intervalSOT += intervals.reduce((total, interval) => total + opponentSotExposure(match, teamId, interval.start, interval.end), 0)
-            row.intervalGA += match.events.filter(event => event.type === 'goal' && event.minute <= 90 && scoringTeamId(match, event) !== teamId && members.every(member => isOnPitchAtEvent(match, member, event) && (position !== 'cb' || positionFamily(matchPositionAtEvent(match, member, event)) === 'CB'))).length
+            row.intervalSOT += intervals.reduce((total, interval) => total + exposeSot(interval.start, interval.end), 0)
+            const memberConceded = members.map(member => eligibleConceded(member, position))
+            row.intervalGA += conceded.filter(event => memberConceded.every(events => events.has(event))).length
             if (members.every(member => member.role === 'starter' && segments.get(member.playerId)!.some(segment => segment.enter === 0 && (position !== 'cb' || positionFamily(segment.position) === 'CB')))) {
               row.starts++
-              const perspective = teamPerspectiveScore(match, teamId)
-              const ours = perspective?.goalsFor ?? 0
-              const against = perspective?.goalsAgainst ?? 0
               row.wins += Number(ours > against); row.draws += Number(ours === against)
               row.teamGF += ours; row.teamGA += against
-              row.memberGoals += members.reduce((total, member) => total + playerGoalEvents(match, member).length, 0)
+              row.memberGoals += members.reduce((total, member) => total + goalsFor(member), 0)
             }
             totals.set(key, row)
           }

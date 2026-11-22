@@ -36,11 +36,14 @@ export function validateManualOpponentSot(match: Match, teamId = trackedTeam(mat
   if (halftime === undefined || fulltime === undefined) return { kind: 'legacy' }
   if (!Number.isInteger(halftime) || halftime < 0 || !Number.isInteger(fulltime) || fulltime < 0) return { kind: 'invalid', message: 'Opponent SOT must be non-negative whole numbers.' }
   if (fulltime < halftime) return { kind: 'invalid', message: 'Full-time Opponent SOT cannot be lower than half-time Opponent SOT.' }
-  const goals = concededGoals(match, teamId)
-  const firstHalf = goals.filter(event => event.minute <= 45).length
-  const secondHalf = goals.length - firstHalf
+  let firstHalf = 0
+  let secondHalf = 0
+  for (const event of match.events) if (event.type === 'goal' && scoringTeamId(match, event) !== teamId) {
+    if (event.minute <= 45) firstHalf++
+    else secondHalf++
+  }
   if (halftime < firstHalf) return { kind: 'invalid', message: 'Half-time Opponent SOT cannot be lower than first-half goals conceded.' }
-  if (fulltime < goals.length) return { kind: 'invalid', message: 'Full-time Opponent SOT cannot be lower than goals conceded.' }
+  if (fulltime < firstHalf + secondHalf) return { kind: 'invalid', message: 'Full-time Opponent SOT cannot be lower than goals conceded.' }
   if (fulltime - halftime < secondHalf) return { kind: 'invalid', message: 'Second-half Opponent SOT cannot be lower than second-half goals conceded.' }
   return { kind: 'manual', halftime, fulltime }
 }
@@ -64,9 +67,21 @@ export function secondHalfOpponentSot(match: Match, teamId: string): number {
  * the position-aware helper below to preserve historic event attribution. */
 export function opponentSotExposure(match: Match, teamId: string, start: number, end: number): number {
   const manual = validateManualOpponentSot(match, teamId)
+  return exposureForInterval(manual, () => legacyOpponentSot(match, teamId), start, end)
+}
+
+/** Repeated intervals for the same match/team share the unchanged SOT facts. */
+export function opponentSotExposureForTeam(match: Match, teamId: string): (start: number, end: number) => number {
+  const manual = validateManualOpponentSot(match, teamId)
+  let legacy: number | undefined
+  const legacyTotal = () => legacy ??= legacyOpponentSot(match, teamId)
+  return (start, end) => exposureForInterval(manual, legacyTotal, start, end)
+}
+
+function exposureForInterval(manual: ManualOpponentSot, legacy: () => number, start: number, end: number): number {
   const clippedStart = Math.max(0, Math.min(90, start)); const clippedEnd = Math.max(0, Math.min(90, end))
   if (clippedEnd <= clippedStart) return 0
-  if (manual.kind !== 'manual') return legacyOpponentSot(match, teamId) * (clippedEnd - clippedStart) / 90
+  if (manual.kind !== 'manual') return legacy() * (clippedEnd - clippedStart) / 90
   return manual.halftime * overlap(clippedStart, clippedEnd, 0, 45) / 45 + (manual.fulltime - manual.halftime) * overlap(clippedStart, clippedEnd, 45, 90) / 45
 }
 
@@ -74,7 +89,7 @@ export function opponentSotExposure(match: Match, teamId: string, start: number,
  * manual exposure is always the canonical proportional half allocation. */
 export function opponentSotExposureForPositionSegment(match: Match, appearance: Appearance, position: Position, start: number, end: number): number {
   const manual = validateManualOpponentSot(match, appearance.teamId)
-  if (manual.kind === 'manual') return opponentSotExposure(match, appearance.teamId, start, end)
+  if (manual.kind === 'manual') return exposureForInterval(manual, () => 0, start, end)
   const saves = validTeamSaveEvents(match, appearance.teamId)
   const timedSaves = saves.filter(event => event.minute !== undefined && event.minute >= start && event.minute <= end && matchPositionAtEvent(match, appearance, event) === position).reduce((total, event) => total + saveEventCount(event), 0)
   const undatedSaves = saves.filter(event => event.minute === undefined).reduce((total, event) => total + saveEventCount(event), 0)

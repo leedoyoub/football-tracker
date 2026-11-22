@@ -1,4 +1,4 @@
-import type { AppState } from '../types';
+import type { Appearance, AppState } from '../types';
 import { validateManualOpponentSot } from '../engine/opponentSot';
 import { currentTeamIds } from './roster';
 import { matchPositionAtEvent, matchPositionSegments, normalizeMatchPosition } from '../engine/timeline';
@@ -56,24 +56,29 @@ export function validateState(state: any): state is AppState {
     }
     
     const eventIds = new Set<string>();
-    const appearancePlayerIds = new Set<string>();
+    const appearancesById = new Map<string, Appearance>();
     for (const appearance of match.appearances) {
       if (!appearance || typeof appearance !== 'object') return false;
       // Historical Match facts retain stable player IDs after a player is
       // deleted from the current roster. Never resolve or rewrite those IDs.
-      if (typeof appearance.playerId !== 'string' || !appearance.playerId || appearancePlayerIds.has(appearance.playerId)) return false;
+      if (typeof appearance.playerId !== 'string' || !appearance.playerId || appearancesById.has(appearance.playerId)) return false;
       if (appearance.teamId !== match.homeTeamId && appearance.teamId !== match.awayTeamId) return false;
       if (!normalizeMatchPosition(appearance.matchPosition ?? appearance.position)) return false;
       if (appearance.positionHistory !== undefined && (!Array.isArray(appearance.positionHistory) || appearance.positionHistory.some((change: { minute?: unknown; position?: unknown } | null) => !change || !Number.isFinite(change.minute) || Number(change.minute) < 0 || typeof change.position !== 'string' || !normalizeMatchPosition(change.position)))) return false;
       if (appearance.positionHistory?.some((change: { tacticalSlotId?: string }) => change.tacticalSlotId !== undefined && !tacticalSlotById[change.tacticalSlotId])) return false;
-      appearancePlayerIds.add(appearance.playerId);
+      appearancesById.set(appearance.playerId, appearance);
     }
+    const hasAppearance = (id: string, teamId: string) => appearancesById.get(id)?.teamId === teamId;
     if (match.kickoffLineup !== undefined) {
       if (!Array.isArray(match.kickoffLineup) || match.kickoffLineup.some((slot: FormationSlot | null) => !slot || typeof slot.id !== 'string' || !slot.id || slot.playerId !== null && (typeof slot.playerId !== 'string' || !slot.playerId))) return false;
       // Modern snapshots own tactical identities. Legacy snapshots can have
       // player IDs as slot IDs and retain their existing reconstruction route.
       const modern = match.kickoffLineup.some((slot: FormationSlot) => slot.ratingPosition !== undefined || slot.displayPosition !== undefined);
-      if (modern && (!validateKickoffLineup(match.kickoffLineup, false).valid || match.kickoffLineup.some((slot: FormationSlot) => slot.playerId && !match.appearances.some((row: { playerId: string; teamId: string; role: string }) => row.playerId === slot.playerId && row.teamId === (match.teamId ?? match.homeTeamId) && row.role === 'starter')))) return false;
+      if (modern && (!validateKickoffLineup(match.kickoffLineup, false).valid || match.kickoffLineup.some((slot: FormationSlot) => {
+        if (!slot.playerId) return false;
+        const row = appearancesById.get(slot.playerId);
+        return row?.teamId !== (match.teamId ?? match.homeTeamId) || row?.role !== 'starter';
+      }))) return false;
     }
     // Check events structure
     for (const event of match.events) {
@@ -82,15 +87,15 @@ export function validateState(state: any): state is AppState {
         eventIds.add(event.id);
         if (event.teamId !== match.homeTeamId && event.teamId !== match.awayTeamId) return false;
         if (event.type === 'goal') {
-          if (event.playerId !== undefined && !match.appearances.some((row: { playerId: string; teamId: string }) => row.playerId === event.playerId && row.teamId === event.teamId)) return false;
-          if (event.assistPlayerId !== undefined && (event.ownGoal || !match.appearances.some((row: { playerId: string; teamId: string }) => row.playerId === event.assistPlayerId && row.teamId === event.teamId))) return false;
+          if (event.playerId !== undefined && !hasAppearance(event.playerId, event.teamId)) return false;
+          if (event.assistPlayerId !== undefined && (event.ownGoal || !hasAppearance(event.assistPlayerId, event.teamId))) return false;
         } else if (event.type === 'sub') {
           if (event.playerInId === event.playerOutId) return false;
           if (event.tacticalSlotId !== undefined && !tacticalSlotById[event.tacticalSlotId]) return false;
-          if (!match.appearances.some((row: { playerId: string; teamId: string }) => row.playerId === event.playerInId && row.teamId === event.teamId) || !match.appearances.some((row: { playerId: string; teamId: string }) => row.playerId === event.playerOutId && row.teamId === event.teamId)) return false;
+          if (!hasAppearance(event.playerInId, event.teamId) || !hasAppearance(event.playerOutId, event.teamId)) return false;
         } else if (event.type === 'save') {
-          const appearance = match.appearances.find((row: { playerId: string; teamId: string }) => row.playerId === event.playerId && row.teamId === event.teamId);
-          if (!appearance || !(event.minute === undefined ? matchPositionSegments(match, appearance).some(segment => segment.position === 'GK') : matchPositionAtEvent(match, appearance, event) === 'GK')) return false;
+          const appearance = appearancesById.get(event.playerId);
+          if (!appearance || appearance.teamId !== event.teamId || !(event.minute === undefined ? matchPositionSegments(match, appearance).some(segment => segment.position === 'GK') : matchPositionAtEvent(match, appearance, event) === 'GK')) return false;
         } else return false;
     }
     if (validateManualOpponentSot(match, match.teamId ?? match.homeTeamId).kind === 'invalid') return false;

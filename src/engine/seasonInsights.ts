@@ -7,7 +7,7 @@ import { classifyGoalTypes } from './goalTypes'
 import type { CompetitionState, Match, MatchEvent, Player, Team } from '../types'
 import { oldestMatches } from './matchChronology'
 import { competitionIdentityForMatch, matchCompetitionType } from './competitionContext'
-import { playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts } from './playerMatchFacts'
+import { playerAppearanceMatchIndex, playerAssistEvents, playerGoalEvents, playerGoalkeeperFacts } from './playerMatchFacts'
 import { orderedEvents } from './timeline'
 import { arrayItemRevision } from './arrayItemRevision'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
@@ -161,14 +161,16 @@ export function seasonRecap(players: Player[], matches: Match[], season: string,
   const key = JSON.stringify([RATING_ENGINE_REVISION, AWARD_POLICY_REVISION, arrayItemRevision(matches), arrayItemRevision(players), arrayItemRevision(teams), arrayItemRevision(states), season])
   const cached = bySeason.get(key)
   if (cached && cached.xiLeaders === xiLeaders) return cached.recap
-  const stats = players.map(player => ({ player, stats: playerSeasonStats(player, players, matches, season) })).filter(row => row.stats.matches > 0)
+  const seasonMatches = matches.filter(match => match.season === season)
+  const stats = players.map(player => ({ player, stats: playerSeasonStats(player, players, seasonMatches, season) })).filter(row => row.stats.matches > 0)
   const pick = (rows: typeof stats, value: (row: typeof stats[number]) => number) => rows.slice().sort((a, b) => value(b) - value(a) || b.stats.minutes - a.stats.minutes)[0]
   const awardFor = (id: string, title: string, row: typeof stats[number] | undefined, detail: (row: typeof stats[number]) => string): SeasonAward | undefined => row && { id, title, playerIds: [row.player.id], detail: detail(row) }
   const filter = { season }
   const partnership = goalPartnerships(players, matches, filter)[0]
   const combination = (kind: Parameters<typeof combinationStats>[3]) => combinationStats(players, matches, filter, kind).find(row => row.eligible)
   const comboAward = (id: string, title: string, kind: Parameters<typeof combinationStats>[3], detail: (row: ReturnType<typeof combinationStats>[number]) => string): SeasonAward | undefined => { const row = combination(kind); return row ? { id, title, playerIds: row.playerIds, detail: detail(row) } : undefined }
-  const splits = new Map(stats.map(row => [row.player.id, starterSubstituteSplits(row.player, matches, filter)]))
+  const playerMatches = playerAppearanceMatchIndex(seasonMatches)
+  const splits = new Map(stats.map(row => [row.player.id, starterSubstituteSplits(row.player, playerMatches.get(row.player.id) ?? [], filter)]))
   const bestSub = pick(stats.filter(row => splits.get(row.player.id)!.substitute.apps >= 3), row => splits.get(row.player.id)!.substitute.averageRating)
   const xi = (xiLeaders ?? startingXILeaders(players, matches, season)).mostUsed
   const official = seasonAwards(season, teams, players, matches, states)
@@ -190,7 +192,7 @@ export function seasonRecap(players: Player[], matches: Match[], season: string,
     awardFor('substitute', 'Best Substitute', bestSub, row => `${splits.get(row.player.id)!.substitute.averageRating.toFixed(2)} as a substitute`),
     xi && { id: 'most-used-xi', title: 'Most Used XI', playerIds: xi.playerIds, detail: `${xi.matches} matches · ${(xi.winRate * 100).toFixed(0)}% wins` },
   ].filter((award): award is SeasonAward => Boolean(award))
-  const recap = { season, complete: isSeasonComplete(matches, season, states), matchDays: new Set(matches.filter(match => match.season === season && matchCompetitionType(match) === 'league').map(match => competitionIdentityForMatch(match).matchDay)).size, awards, bestXI }
+  const recap = { season, complete: isSeasonComplete(matches, season, states), matchDays: new Set(seasonMatches.filter(match => matchCompetitionType(match) === 'league').map(match => competitionIdentityForMatch(match).matchDay)).size, awards, bestXI }
   if (bySeason.size >= 16) bySeason.delete(bySeason.keys().next().value!)
   bySeason.set(key, { xiLeaders, recap })
   return recap

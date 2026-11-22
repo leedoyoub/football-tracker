@@ -15,6 +15,7 @@ let screenOwner
 const React = require('react')
 const screenHooks = {
   ...React,
+  useMemo(compute) { return compute() },
   useState(initial) {
     const index = screenOwner.cursor++
     if (!(index in screenOwner.state)) screenOwner.state[index] = typeof initial === 'function' ? initial() : initial

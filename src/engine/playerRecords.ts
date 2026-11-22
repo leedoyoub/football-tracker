@@ -11,6 +11,7 @@ import type { DefensiveRankingMetric } from './defensiveRanking'
 import { recordsScopedMatches } from './recordsScope'
 import { arrayItemRevision } from './arrayItemRevision'
 import { historicalRankingTeams, playerInRankingTeams } from './rankingPresentation'
+import { matchPositionSegments } from './timeline'
 
 export type PlayerRecordLeaderboardId =
   | 'goals' | 'assists' | 'ga' | 'matches-scored-in' | 'matches-ga' | 'braces' | 'hat-tricks'
@@ -59,10 +60,12 @@ function buildFacts(players: Player[], matches: Match[], scope: PlayerRecordScop
   const needsGoalTypes = ['game-winning-goals', 'comeback-goals', 'equalizers', 'opening-goals', 'stoppage-time-goals'].some(needs)
   const needsGoalkeeper = needs('saves') || needs('clean-sheets')
   const needsStreaks = ['good-streak', 'scoring-streak', 'ga-streak'].some(needs)
+  const needsRatings = ['good', 'eight', 'nine', 'ten', 'good-streak', 'highest-rating'].some(needs)
   let byPlayers = factsCache.get(selected); if (!byPlayers) { byPlayers = new WeakMap(); factsCache.set(selected, byPlayers) }
   let byCapability = byPlayers.get(players); if (!byCapability) { byCapability = new Map(); byPlayers.set(players, byCapability) }
-  const key = JSON.stringify([RATING_ENGINE_REVISION, arrayItemRevision(players), needs('mom'), needsGoalTypes, needsGoalkeeper, needsStreaks])
-  const cached = byCapability.get(key) ?? byCapability.get(JSON.stringify([RATING_ENGINE_REVISION, arrayItemRevision(players), true, true, true, true]))
+  const revision = [RATING_ENGINE_REVISION, arrayItemRevision(players)]
+  const key = JSON.stringify([...revision, needs('mom'), needsGoalTypes, needsGoalkeeper, needsStreaks, needsRatings])
+  const cached = byCapability.get(key) ?? byCapability.get(JSON.stringify([...revision, true, true, true, true, true]))
   if (cached) return cached
   const momByMatch = new Map(needs('mom') ? selected.map(match => [match.id, getMatchManOfTheMatch(match, players)]) : [])
   const appearanceMatches = playerAppearanceMatchIndex(selected)
@@ -82,12 +85,14 @@ function buildFacts(players: Player[], matches: Match[], scope: PlayerRecordScop
     const rated = (needsStreaks ? oldestMatches(games) : games).flatMap(match => {
       const appearance = match.appearances.find(item => item.playerId === player.id)
       if (!appearance) return []
-      const rating = ratePlayerMatch(match, player)
-      if (!rating) return []
+      const rating = needsRatings ? ratePlayerMatch(match, player) : null
+      // A rating requires a nonempty played position segment. Counting the
+      // same appearances needs no rating breakdown for event-only records.
+      if (needsRatings ? !rating : !matchPositionSegments(match, appearance).length) return []
       const goals = playerGoalEvents(match, appearance).length
       const assists = playerAssistEvents(match, appearance).length
       const goalkeeper = needsGoalkeeper ? playerGoalkeeperFacts(match, appearance) : undefined
-      return [{ match, rating, goals, assists, saves: goalkeeper?.saves ?? 0, cleanSheet: goalkeeper?.cleanSheet ?? false, goalTypes: goalTypesFor(match, appearance) }]
+      return [{ match, rawRating: rating?.raw ?? 0, displayRating: rating?.rating ?? 0, goals, assists, saves: goalkeeper?.saves ?? 0, cleanSheet: goalkeeper?.cleanSheet ?? false, goalTypes: goalTypesFor(match, appearance) }]
     })
     if (!rated.length) return []
     const count = (predicate: (row: typeof rated[number]) => boolean) => rated.filter(predicate).length
@@ -103,9 +108,9 @@ function buildFacts(players: Player[], matches: Match[], scope: PlayerRecordScop
       playerId: player.id, appearances: rated.length,
       goals: sum(row => row.goals), assists: sum(row => row.assists), matchesScoredIn: count(row => row.goals >= 1), matchesGA: count(row => row.goals + row.assists >= 1), braces: count(row => row.goals >= 2), hatTricks: count(row => row.goals >= 3),
       fourGoalGames: count(row => row.goals >= 4), threeAssistGames: count(row => row.assists >= 3), fourGAGames: count(row => row.goals + row.assists >= 4), mom: count(row => momByMatch.get(row.match.id) === player.id),
-      goodRatings: count(row => isGoodRating(row.rating.raw)), eightRatings: count(row => row.rating.raw >= 8), nineRatings: count(row => row.rating.raw >= 9), tenRatings: count(row => row.rating.raw === 10),
-      cleanSheets: count(row => row.cleanSheet), saves: sum(row => row.saves), goodStreak: streak(row => isGoodRating(row.rating.rating)), scoringStreak: streak(row => row.goals > 0), gaStreak: streak(row => row.goals + row.assists > 0),
-      highestRating: Math.max(...rated.map(row => row.rating.raw)), highestGoals: Math.max(...rated.map(row => row.goals)), highestAssists: Math.max(...rated.map(row => row.assists)), highestGA: Math.max(...rated.map(row => row.goals + row.assists)),
+      goodRatings: count(row => isGoodRating(row.rawRating)), eightRatings: count(row => row.rawRating >= 8), nineRatings: count(row => row.rawRating >= 9), tenRatings: count(row => row.rawRating === 10),
+      cleanSheets: count(row => row.cleanSheet), saves: sum(row => row.saves), goodStreak: streak(row => isGoodRating(row.displayRating)), scoringStreak: streak(row => row.goals > 0), gaStreak: streak(row => row.goals + row.assists > 0),
+      highestRating: Math.max(...rated.map(row => row.rawRating)), highestGoals: Math.max(...rated.map(row => row.goals)), highestAssists: Math.max(...rated.map(row => row.assists)), highestGA: Math.max(...rated.map(row => row.goals + row.assists)),
       gameWinningGoals: goalTypes('gameWinning'), comebackGoals: goalTypes('comeback'), equalizers: goalTypes('equalizer'), openingGoals: goalTypes('opening'), stoppageTimeGoals: goalTypes('stoppageTime'),
     }]
   })

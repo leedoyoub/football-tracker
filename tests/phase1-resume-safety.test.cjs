@@ -40,7 +40,7 @@ test('a restoration failure prevents resume mounting and cannot activate a draft
   const source = fs.readFileSync(require.resolve('../src/screens/NewMatchScreen.tsx'), 'utf8')
   assert(source.includes("if ((mode === 'resume' || mode === 'edit') && !restored)"))
   assert(source.includes("if (!draftReady || !editorSourceCanMount(mode, sourceMatch, restored)"))
-  assert(source.includes('initialOpponentSotDraft(sourceMatch, mode === \'fresh\')'))
+  assert.match(source, /initialOpponentSotDraft\(mode === 'edit'[\s\S]*?: sourceMatch, mode === 'fresh'\)/)
   assert(source.includes('fulltimeOpponentSotAutoLinked: fulltimeOpponentSotAutoLinked'))
   assert(source.includes('halftimeOpponentSot: parseOpponentSot(halftimeOpponentSot)'))
 })
@@ -50,7 +50,7 @@ test('the production NewMatch boundary returns recovery UI before MatchEditor ca
   const failedDraft = { ...draft, id: 'failed-draft', kickoffLineup: [kickoff[0], { ...kickoff[1], id: kickoff[0].id }] }
   const calls = { autosave: 0, clear: 0 }
   Module._load = function(name, parent, main) {
-    if (name === 'react') return { ...React, useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}] }
+    if (name === 'react') return { ...React, useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}], useMemo: compute => compute() }
     if (name === '../store') return { useStore: () => ({ teams: [{ id: 'A', name: 'A' }], players: [], matches: [], draftMatch: failedDraft, clearDraftMatch: () => { calls.clear++ }, saveDraftMatch: () => { calls.autosave++ } }) }
     return originalLoad.call(this, name, parent, main)
   }
