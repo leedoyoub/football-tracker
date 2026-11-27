@@ -3,6 +3,8 @@ const assert = require('node:assert/strict'), { test, after } = require('node:te
 const { baselineSource } = require('./helpers/v2513-baseline.cjs')
 const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const base = baselineSource(); after(base.cleanup)
+const { alignArchivedRatingInputs } = require('./helpers/rating-release-comparison.cjs')
+alignArchivedRatingInputs(base.directory)
 test('ranking facts establish chronological order once per scope rather than once per player', () => {
   const chronology = require('../src/engine/matchChronology.ts'), prior = chronology.oldestMatches
   const positions = require('../src/engine/positionScope.ts'), priorPositions = positions.scopedPositionFamilyByPlayer

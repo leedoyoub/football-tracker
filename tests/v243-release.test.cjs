@@ -21,11 +21,11 @@ const match = (id, date, competitionType, events, season = 'Season 1') => ({
 test('v2.6.7 release metadata uses rating revision 13', () => {
   const packageJson = require('../package.json')
   const lockfile = require('../package-lock.json')
-  assert.equal(packageJson.version, '2.6.12')
-  assert.equal(lockfile.version, '2.6.12')
-  assert.equal(lockfile.packages[''].version, '2.6.12')
-  assert.equal(APP_VERSION, '2.6.12')
-  assert.equal(RATING_ENGINE_REVISION, 13)
+  assert.equal(packageJson.version, '2.7.1')
+  assert.equal(lockfile.version, '2.7.1')
+  assert.equal(lockfile.packages[''].version, '2.7.1')
+  assert.equal(APP_VERSION, '2.7.1')
+  assert.equal(RATING_ENGINE_REVISION, 14)
 })
 
 test('contribution ordinals are scoped by season and competition and follow canonical chronology', () => {

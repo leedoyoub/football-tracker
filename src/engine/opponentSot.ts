@@ -88,11 +88,29 @@ function exposureForInterval(manual: ManualOpponentSot, legacy: () => number, st
 /** Legacy exposure preserves the old timed-save/goal position attribution;
  * manual exposure is always the canonical proportional half allocation. */
 export function opponentSotExposureForPositionSegment(match: Match, appearance: Appearance, position: Position, start: number, end: number): number {
-  const manual = validateManualOpponentSot(match, appearance.teamId)
-  if (manual.kind === 'manual') return exposureForInterval(manual, () => 0, start, end)
-  const saves = validTeamSaveEvents(match, appearance.teamId)
-  const timedSaves = saves.filter(event => event.minute !== undefined && event.minute >= start && event.minute <= end && matchPositionAtEvent(match, appearance, event) === position).reduce((total, event) => total + saveEventCount(event), 0)
-  const undatedSaves = saves.filter(event => event.minute === undefined).reduce((total, event) => total + saveEventCount(event), 0)
-  const goals = concededGoals(match, appearance.teamId).filter(event => event.minute >= start && event.minute <= end && matchPositionAtEvent(match, appearance, event) === position).length
-  return timedSaves + undatedSaves * overlap(start, end, 0, 90) / 90 + goals
+  return opponentSotExposureForPositions(match, appearance.teamId)(appearance, position, start, end)
+}
+
+/** Reuse the team's raw shot facts across the rated position spells. */
+export function opponentSotExposureForPositions(match: Match, teamId: string): (appearance: Appearance, position: Position, start: number, end: number) => number {
+  const manual = validateManualOpponentSot(match, teamId)
+  if (manual.kind === 'manual') return (_appearance, _position, start, end) => exposureForInterval(manual, () => 0, start, end)
+
+  const timedShots: { event: MatchEvent; count: number }[] = concededGoals(match, teamId).map(event => ({ event, count: 1 }))
+  let undatedSaves = 0
+  for (const event of validTeamSaveEvents(match, teamId)) {
+    const count = saveEventCount(event)
+    if (event.minute === undefined) undatedSaves += count
+    else timedShots.push({ event, count })
+  }
+  return (appearance, position, start, end) => {
+    let timedSaves = 0
+    let goals = 0
+    for (const { event, count } of timedShots) {
+      if (event.minute === undefined || event.minute < start || event.minute > end || matchPositionAtEvent(match, appearance, event) !== position) continue
+      if (event.type === 'goal') goals++
+      else timedSaves += count
+    }
+    return timedSaves + undatedSaves * overlap(start, end, 0, 90) / 90 + goals
+  }
 }

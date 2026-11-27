@@ -14,18 +14,18 @@ const near = (actual, expected) => assert(Math.abs(actual - expected) < 1e-10, `
 const player = (id, position, rating = 1) => ({ id, name: id, displayName: id, teamId: 'A', position, number: 1, rating })
 const appearance = player => ({ playerId: player.id, teamId: 'A', position: player.position, matchPosition: player.position, role: 'starter' })
 
-test('revision 13 has the approved balance table and result modifier', () => {
-  assert.equal(revision.RATING_ENGINE_REVISION, 13)
+test('revision 14 has the approved balance table and result modifier', () => {
+  assert.equal(revision.RATING_ENGINE_REVISION, 14)
   assert.equal(rating.GOALKEEPER_BASE_RATING, 7.1)
   for (const position of ['CB', 'LCB', 'RCB']) assert.equal(rating.POSITION_RULES[position].suppressionMax, 1.40)
   for (const position of ['LB', 'LWB', 'RB', 'RWB']) assert.equal(rating.POSITION_RULES[position].suppressionMax, 1)
-  for (const position of ['CDM', 'LDM', 'RDM']) assert.equal(rating.POSITION_RULES[position].suppressionMax, .80)
-  for (const position of ['CM', 'LCM', 'RCM']) assert.equal(rating.POSITION_RULES[position].suppressionMax, .30)
-  for (const position of ['LM', 'RM']) assert.equal(rating.POSITION_RULES[position].suppressionMax, .25)
+  for (const position of ['CDM', 'LDM', 'RDM']) assert.equal(rating.POSITION_RULES[position].suppressionMax, .85)
+  for (const position of ['CM', 'LCM', 'RCM']) assert.equal(rating.POSITION_RULES[position].suppressionMax, .25)
+  for (const position of ['LM', 'RM']) assert.equal(rating.POSITION_RULES[position].suppressionMax, .30)
   for (const position of ['CAM', 'GK', 'LW', 'RW', 'SS', 'ST', 'LST', 'RST']) assert.equal(rating.POSITION_RULES[position].suppressionMax, 0)
-  const teamGoal = { LW: .03, RW: .03, CAM: .04, LM: .05, RM: .05, CM: .07, LCM: .07, RCM: .07, CDM: .06, LDM: .06, RDM: .06, LB: .04, LWB: .04, RB: .04, RWB: .04 }
+  const teamGoal = { LW: .04, RW: .04, CAM: .02, LM: .05, RM: .05, CM: .07, LCM: .07, RCM: .07, CDM: .06, LDM: .06, RDM: .06, LB: .03, LWB: .03, RB: .03, RWB: .03 }
   for (const position of Object.keys(rating.POSITION_RULES)) assert.equal(rating.POSITION_RULES[position].teamGoal, teamGoal[position] ?? 0)
-  assert.deepEqual([.8, .6, .4, .2, 0].map(rating.saveBonusPerSave), [.30, .27, .25, .21, .17])
+  assert.deepEqual([.8, .6, .4, .2, 0].map(rating.saveBonusPerSave), [.35, .32, .29, .25, .20])
   const base = { id: 'result', season: 'S1', matchDay: 1, date: '2026-01-01', duration: 90, homeTeamId: 'A', awayTeamId: 'B', appearances: [], events: [] }
   assert.equal(rating.resultModifier({ ...base, events: [{ id: 'win', type: 'goal', minute: 1, teamId: 'A' }] }, 'A'), .1)
   assert.equal(rating.resultModifier(base, 'A'), 0)
@@ -53,10 +53,10 @@ test('historical v6 rating and MOM feed every derived stats surface, not saved f
   const rawFactsBefore = JSON.stringify(match)
   const defenderRating = rating.ratePlayerMatch(match, defender)
   const creatorRating = rating.ratePlayerMatch(match, creator)
-  near(defenderRating.raw, 6.5 + .1 + .05 + .25 / 90)
-  // The historical CAM's sole component is the revision-11 .04 team-goal
+  near(defenderRating.raw, 6.5 + .1 + .05 + .30 / 90)
+  // The historical CAM's sole component is the revision-14 .02 team-goal
   // coefficient (the recorded match has no saved rating authority).
-  near(creatorRating.raw, 6.64)
+  near(creatorRating.raw, 6.62)
   assert.equal(rating.getMatchManOfTheMatch(match, players), defender.id)
   assert.equal(JSON.stringify(match), rawFactsBefore)
 

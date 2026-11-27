@@ -81,11 +81,13 @@ test('Global Ranking applies every position/team combination to one union popula
 })
 test('Award Race unfiltered rows equal independent v268 and presentation filters preserve candidate fields', () => {
   const { baselineRoot } = require('./v269-derived-baseline.cjs')
+  const archived = baselineRoot()
+  require('./helpers/rating-release-comparison.cjs').alignArchivedRatingInputs(archived)
   const state = fixture(), initial = { ...defaultScreenState({ name: 'award-race' }), season: 'Season 1', scope: 'league' }
   const rowsFor = (h, screenState) => nodes(h.render({ screenState, onStateChange() {}, onNavigate() {}, onBack() {} }), n => n.type?.name === 'AwardRaceRows')[0]?.props.rows ?? []
   const current = screenHarness(root, 'screens/AwardRaceScreen.tsx', 'AwardRaceScreen', state)
   const all = rowsFor(current, initial)
-  const old = rowsFor(screenHarness(baselineRoot(), 'screens/AwardRaceScreen.tsx', 'AwardRaceScreen', state), initial)
+  const old = rowsFor(screenHarness(archived, 'screens/AwardRaceScreen.tsx', 'AwardRaceScreen', state), initial)
   assert(all.length > 0)
   assert.deepEqual(all, old)
   const selected = rowsFor(current, { ...initial, positionFilters: ['st-ss', 'lw-rw'], teamIds: [state.teams[0].id] })

@@ -7,6 +7,8 @@ const { baselineSource } = require('./helpers/v2511-baseline.cjs')
 const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const baseline = baselineSource()
 after(baseline.cleanup)
+const { alignArchivedRatingInputs, v2612Source } = require('./helpers/rating-release-comparison.cjs')
+alignArchivedRatingInputs(baseline.directory)
 const before = require(path.join(baseline.directory, 'src/engine/stats.ts'))
 const current = require('../src/engine/stats.ts')
 const { RANKING_METRICS } = require('../src/lib/rankingMetrics.ts')
@@ -78,9 +80,9 @@ test('unmodified competition rules, constants and repository remain source ident
     assert.equal(normalize(path.join(baseline.root, 'src', file)), normalize(path.join(baseline.directory, 'src', file)), file)
   }
   // REV13 calculations precede the match read model and its MOM cache.
-  const calculation = filename => fs.readFileSync(filename, 'utf8').replaceAll('\r\n', '\n').split('type MatchRatings')[0].split('export function clampRating')[1]
-  assert(calculation(path.join(baseline.root, 'src/engine/rating.ts')).length > 1000)
-  // The full rating/MOM behavior is also independently compared for every fixture match.
-  assert.equal(calculation(path.join(baseline.root, 'src/engine/rating.ts')), calculation(path.join(baseline.directory, 'src/engine/rating.ts')))
+  const calculation = source => source.replaceAll('\r\n', '\n').split('type MatchRatings')[0].split('export function clampRating')[1]
+  const previous = calculation(v2612Source('engine/rating.ts'))
+  assert(previous.length > 1000)
+  assert.equal(previous, calculation(fs.readFileSync(path.join(baseline.directory, 'src/engine/rating.ts'), 'utf8')))
   assert.deepEqual(RANKING_METRICS, require(path.join(baseline.directory, 'src/lib/rankingMetrics.ts')).RANKING_METRICS)
 })

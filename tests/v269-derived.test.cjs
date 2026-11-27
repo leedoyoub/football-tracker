@@ -4,6 +4,7 @@ const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const { sourceModule } = require('./helpers/v259-harness.cjs')
 const { baselineRoot } = require('./v269-derived-baseline.cjs')
 const root = path.resolve(__dirname, '..'), beforeRoot = baselineRoot()
+require('./helpers/rating-release-comparison.cjs').alignArchivedRatingInputs(beforeRoot)
 const source = (directory, file) => require(path.join(directory, 'src/engine', file + '.ts'))
 const kinds = ['duo', 'attack', 'midfield', 'cb', 'fullback', 'backFour']
 

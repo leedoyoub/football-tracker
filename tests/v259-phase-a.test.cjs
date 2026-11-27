@@ -17,6 +17,8 @@ if (!path.resolve(baseline).startsWith(path.resolve(os.tmpdir()) + path.sep)) th
 execFileSync('tar', ['-xf', '-', '-C', baseline], { input: execFileSync('git', ['archive', '090d6f07d7d9910b41fd1fbb05382dcf0d884258', 'src'], { cwd: root, maxBuffer: 16 * 1024 * 1024 }) })
 fs.symlinkSync(path.join(root, 'node_modules'), path.join(baseline, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir')
 after(() => fs.rmSync(baseline, { recursive: true, force: true }))
+const { alignArchivedRatingInputs } = require('./helpers/rating-release-comparison.cjs')
+alignArchivedRatingInputs(baseline)
 const noop = () => {}
 const props = { season: 'Season 1', onStateChange: noop, onNavigate: noop, onBack: noop }
 const harness = (name, store, base = root) => screenHarness(base, `screens/${name}.tsx`, name, store)

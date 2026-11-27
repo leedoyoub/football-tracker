@@ -14,8 +14,20 @@ function fixture(leftPosition, rightPosition, leftGoals = 10, rightGoals = 10, e
   return { players: [left, right], match: { id: `${leftPosition}:${rightPosition}`, season: 'S1', matchDay: 1, date: '2026-01-01', duration: 90, homeTeamId: 'A', awayTeamId: 'B', teamId: 'A', appearances: [left, right].map(item => ({ playerId: item.id, teamId: 'A', position: item.position, matchPosition: item.position, role: 'starter' })), events } }
 }
 function equalRawFixture(leftPosition, rightPosition) {
-  const value = fixture(leftPosition, rightPosition)
-  assert.deepEqual(rateMatch(value.match, value.players).map(row => row.raw), [10, 10])
+  const value = fixture(leftPosition, rightPosition, 0, 0)
+  const { match } = value
+  match.halftimeOpponentSot = 10
+  match.fulltimeOpponentSot = 20
+  if (leftPosition === 'GK') {
+    match.appearances[1].role = 'bench'
+    match.events = [
+      { id: 'against-1', type: 'goal', minute: 10, teamId: 'B' },
+      { id: 'against-2', type: 'goal', minute: 20, teamId: 'B' },
+      { id: 'in', type: 'sub', minute: 30, teamId: 'A', playerInId: 'right', playerOutId: 'replacement', position: rightPosition },
+    ]
+  }
+  const expected = leftPosition === 'GK' ? 6.2 : 6.5
+  assert.deepEqual(rateMatch(match, value.players).map(row => row.raw), [expected, expected])
   return value
 }
 

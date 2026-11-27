@@ -12,6 +12,8 @@ if (!path.resolve(baseline).startsWith(path.resolve(os.tmpdir()) + path.sep)) th
 execFileSync('tar', ['-xf', '-', '-C', baseline], { input: execFileSync('git', ['archive', '090d6f07d7d9910b41fd1fbb05382dcf0d884258', 'src'], { cwd: root, maxBuffer: 16 * 1024 * 1024 }) })
 fs.symlinkSync(path.join(root, 'node_modules'), path.join(baseline, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir')
 after(() => fs.rmSync(baseline, { recursive: true, force: true }))
+const { alignArchivedRatingInputs } = require('./helpers/rating-release-comparison.cjs')
+alignArchivedRatingInputs(baseline)
 const old = file => require(path.join(baseline, 'src', file))
 const trend = require('../src/engine/playerRankTrend.ts')
 const metrics = ['rating', 'goals', 'assists', 'g+a', 'sotAllowed', 'defenderGaPer90', 'cleanSheets', 'saves', 'goalkeeperGaPer90']

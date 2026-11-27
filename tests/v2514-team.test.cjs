@@ -5,6 +5,8 @@ const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const { screenHarness, nodes } = require('./helpers/v259-harness.cjs')
 const { renderToStaticMarkup } = require('react-dom/server')
 const b = baselineSource(); after(b.cleanup)
+const { alignArchivedRatingInputs } = require('./helpers/rating-release-comparison.cjs')
+alignArchivedRatingInputs(b.directory)
 const root = path.resolve(__dirname, '..'), noop = () => {}
 const oldCompetition = require(path.join(b.directory, 'src/engine/competition.ts'))
 const nav = require('../src/lib/navigation.ts')

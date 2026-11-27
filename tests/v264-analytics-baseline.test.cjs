@@ -17,6 +17,8 @@ verifyTemporary()
 after(() => { verifyTemporary(); fs.rmSync(directory, { recursive: true, force: true }) })
 execFileSync('tar', ['-xf', '-', '-C', directory], { input: execFileSync('git', ['archive', 'e97d391fc763f5f146cc116e25fb2aad60189fd9', 'src'], { cwd: root, maxBuffer: 16 * 1024 * 1024 }) })
 fs.symlinkSync(path.join(root, 'node_modules'), path.join(directory, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir')
+const { alignArchivedRatingInputs } = require('./helpers/rating-release-comparison.cjs')
+alignArchivedRatingInputs(directory)
 const baseline = require(path.join(directory, 'src/engine/seasonAnalytics.ts'))
 const baselineOfficial = require(path.join(directory, 'src/engine/officialAwards.ts'))
 

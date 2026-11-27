@@ -20,26 +20,26 @@ function suppressionFixture(position, saves) {
   return { subject, match: game([subject, keeper], saves ? [{ id: `save:${position}`, type: 'save', minute: 20, teamId: 'A', playerId: keeper.id, count: saves }] : []) }
 }
 
-test('v2.6.7 release metadata and revision-13 table contain exactly the approved changes', () => {
-  assert.equal(APP_VERSION, '2.6.12')
-  assert.equal(require('../package.json').version, '2.6.12')
-  assert.equal(RATING_ENGINE_REVISION, 13)
-  const expected = { LM: [.05, .25], RM: [.05, .25], CM: [.07, .30], LCM: [.07, .30], RCM: [.07, .30], CDM: [.06, .80], LDM: [.06, .80], RDM: [.06, .80] }
+test('v2.7.1 release metadata and revision-14 table contain exactly the approved changes', () => {
+  assert.equal(APP_VERSION, '2.7.1')
+  assert.equal(require('../package.json').version, '2.7.1')
+  assert.equal(RATING_ENGINE_REVISION, 14)
+  const expected = { LM: [.05, .30], RM: [.05, .30], CM: [.07, .25], LCM: [.07, .25], RCM: [.07, .25], CDM: [.06, .85], LDM: [.06, .85], RDM: [.06, .85] }
   for (const [position, values] of Object.entries(expected)) assert.deepEqual([POSITION_RULES[position].teamGoal, POSITION_RULES[position].suppressionMax], values, position)
-  assert.deepEqual([POSITION_RULES.ST.goal, POSITION_RULES.CB.suppressionMax, POSITION_RULES.GK.assist], [.9, 1.4, 1])
+  assert.deepEqual([POSITION_RULES.ST.goal, POSITION_RULES.CB.suppressionMax, POSITION_RULES.GK.assist], [.8, 1.4, 1])
 })
 
-test('revision-11 keeps the SOT curve and applies approved suppression ceilings', () => {
-  assert.equal(sotMultiplier(0), 1); assert.equal(sotMultiplier(3), .62); assert.equal(sotMultiplier(10), .20)
-  for (const [position, maximum] of [['LM', .25], ['RM', .25], ['CM', .30], ['LCM', .30], ['RCM', .30], ['CDM', .80], ['LDM', .80], ['RDM', .80]]) {
+test('revision 14 uses the linear SOT curve and applies approved suppression ceilings', () => {
+  assert.equal(sotMultiplier(0), 1); assert.equal(sotMultiplier(3), .7); assert.equal(sotMultiplier(10), 0)
+  for (const [position, maximum] of [['LM', .30], ['RM', .30], ['CM', .25], ['LCM', .25], ['RCM', .25], ['CDM', .85], ['LDM', .85], ['RDM', .85]]) {
     const zero = suppressionFixture(position, 0)
     const three = suppressionFixture(position, 3)
     near(ratePlayerMatch(zero.match, zero.subject).noConceded, maximum)
-    near(ratePlayerMatch(three.match, three.subject).noConceded, maximum * .62)
+    near(ratePlayerMatch(three.match, three.subject).noConceded, maximum * .7)
   }
 })
 
-test('revision-11 team-goal bonus excludes scorer and assister', () => {
+test('team-goal bonus excludes scorer and assister', () => {
   for (const [position, expected] of [['LM', .05], ['CM', .07], ['CDM', .06]]) {
     const subject = player(`subject:${position}`, position)
     const scorer = player(`scorer:${position}`, 'ST')

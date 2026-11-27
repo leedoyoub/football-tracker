@@ -100,6 +100,7 @@ function comparisonFixture() {
 // names, detail strings, group order or official recipients across every catalog.
 test('all Records catalogs and Season Recap equal v2.6.7 for filter scopes and historical mutations', () => {
   const archived = baselineRoot()
+  require('./helpers/rating-release-comparison.cjs').alignArchivedRatingInputs(archived)
   const baselineRecords = require(path.join(archived, 'src/screens/recordsLeaderboards.ts')).recordsLeaderboardGroups
   const baselineInsights = require(path.join(archived, 'src/engine/seasonInsights.ts'))
   const state = comparisonFixture()

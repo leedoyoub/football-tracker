@@ -4,6 +4,7 @@ const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const { sourceModule } = require('./helpers/v259-harness.cjs')
 const { baselineRoot } = require('./helpers/v268-baseline.cjs')
 const root = path.resolve(__dirname, '..'), beforeRoot = baselineRoot()
+require('./helpers/rating-release-comparison.cjs').alignArchivedRatingInputs(beforeRoot)
 const source = (directory, file) => require(path.join(directory, 'src/engine', file + '.ts'))
 
 test('official award participation visits selected historical team records without scanning every player against the league', () => {

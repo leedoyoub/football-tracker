@@ -18,21 +18,21 @@ function game(id, day, p, events = []) {
 }
 const filters = { seasons: ['S1'], teams: [], positions: [] }
 
-test('historical raw CDM match is revision-10 recomputed and crosses the existing 7.2 threshold', () => {
+test('historical raw CDM match is revision-14 recomputed and crosses the existing 7.2 threshold', () => {
   const p = player()
   const historical = game('historical', 1, p)
   const rawBefore = JSON.stringify(historical)
   const rating = ratePlayerMatch(historical, p)
   assert.equal(JSON.stringify(historical), rawBefore)
-  assert.equal(rating.raw, 7.3)
+  assert.equal(rating.raw, 7.35)
   assert(rating.raw >= GOOD_RATING_THRESHOLD)
   assert.notEqual(rating.raw, p.rating)
   const derived = derivePlayerScope(p, [p], [historical], { season: 'S1', competition: 'league' })
   const stats = aggregatePlayerStats(p, [p], [historical])
   const ranking = buildGlobalRankingData([p], [historical], filters, 'rating')[0]
   assert.strictEqual(derived.appearances[0].rating, rating)
-  assert.deepEqual([derived.goodMatches, derived.goodMatchRate, derived.averageRating], [1, 100, 7.3])
-  assert.deepEqual([stats.goodMatches, stats.avgRating, ranking.goodMatches, ranking.avgRating], [1, 7.3, 1, 7.3])
+  assert.deepEqual([derived.goodMatches, derived.goodMatchRate, derived.averageRating], [1, 100, 7.35])
+  assert.deepEqual([stats.goodMatches, stats.avgRating, ranking.goodMatches, ranking.avgRating], [1, 7.35, 1, 7.35])
 })
 
 test('canonical chronology drives current and longest 7.2+ streaks without inventing new semantics', () => {

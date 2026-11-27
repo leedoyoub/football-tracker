@@ -5,6 +5,8 @@ const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const { screenHarness, sourceModule } = require('./helpers/v259-harness.cjs')
 const { assertRecapAwardPolicy } = require('./helpers/v261-award-policy-comparison.cjs')
 const b = baselineSource(); after(b.cleanup); const root = path.resolve(__dirname, '..')
+const { alignArchivedRatingInputs } = require('./helpers/rating-release-comparison.cjs')
+alignArchivedRatingInputs(b.directory)
 test('Match Changes skips the unused catalog instead of reading each player for each match', () => {
   const s = performanceFixture(1); let reads = 0
   const players = s.players.map(p => ({ ...p, get id() { reads++; return p.id } }))

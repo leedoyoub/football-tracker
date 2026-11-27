@@ -5,6 +5,8 @@ const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const { assertOfficialAwardPolicy } = require('./helpers/v261-award-policy-comparison.cjs')
 const { sourceModule } = require('./helpers/v259-harness.cjs')
 const base = baselineSource(); after(base.cleanup)
+const { alignArchivedRatingInputs } = require('./helpers/rating-release-comparison.cjs')
+alignArchivedRatingInputs(base.directory)
 test('team history does not calculate player awards and selected groups do not build hidden metrics', () => {
   const s = performanceFixture(1), awards = require('../src/engine/awards.ts'), prior = awards.awardsForCompetition
   let calls = 0; awards.awardsForCompetition = (...args) => { calls++; return prior(...args) }

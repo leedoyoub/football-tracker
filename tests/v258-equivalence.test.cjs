@@ -15,6 +15,8 @@ const archive = execFileSync('git', ['archive', '53ea649b56741e7f50954e61023a19f
 execFileSync('tar', ['-xf', '-', '-C', baseline], { input: archive })
 fs.symlinkSync(path.join(root, 'node_modules'), path.join(baseline, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir')
 after(() => fs.rmSync(baseline, { recursive: true, force: true }))
+const { alignArchivedRatingInputs, assertRatingTransition, assertMomPolicy } = require('./helpers/rating-release-comparison.cjs')
+const previousRating = alignArchivedRatingInputs(baseline)
 const before = file => require(path.join(baseline, 'src', file))
 const current = file => require(path.join(root, 'src', file))
 function equal(file, name, ...args) { assertPolicyEquivalence(current(file)[name](...args), before(file)[name](...args), file, name, args) }
@@ -23,8 +25,8 @@ const s = performanceFixture()
 test('v2.5.7 equivalence: every saved rating/MOM and team score/ownership remains exact', () => {
   const snapshot = JSON.stringify(s)
   for (const match of s.matches) {
-    equal('engine/rating.ts', 'rateMatch', match, s.players)
-    equal('engine/rating.ts', 'getMatchManOfTheMatch', match, s.players)
+    assertRatingTransition(previousRating.rateMatch(match, s.players), current('engine/rating.ts').rateMatch(match, s.players))
+    assertMomPolicy(match, s.players, current('engine/rating.ts').getMatchManOfTheMatch(match, s.players))
     equal('engine/matchPerspective.ts', 'teamsCreditedWithResult', match)
     for (const teamId of before('engine/matchPerspective.ts').teamsCreditedWithResult(match)) equal('engine/matchPerspective.ts', 'teamPerspectiveScore', match, teamId)
   }

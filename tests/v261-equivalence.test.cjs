@@ -4,17 +4,16 @@ const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const { releaseBaseline } = require('./helpers/v261-baseline.cjs')
 const { assertSelection, withoutSelection } = require('./helpers/v265-award-policy-comparison.cjs')
 const b = releaseBaseline(); after(b.cleanup)
+const { alignArchivedRatingInputs, assertRatingTransition, assertMomPolicy } = require('./helpers/rating-release-comparison.cjs')
+const previousRating = alignArchivedRatingInputs(b.directory)
 const fixture = performanceFixture(1)
 const baseline = file => require(path.join(b.directory, 'src', file))
 
-test('v2.6.1 preserves every REV13 breakdown and MOM for sampled tactical, substitute and edited histories', () => {
-  const current = require('../src/engine/rating.ts'), old = baseline('engine/rating.ts')
+test('revision 14 preserves appearance and result facts and applies the same MOM policy to tactical, substitute and edited histories', () => {
+  const current = require('../src/engine/rating.ts')
   for (const original of fixture.matches.filter((_, i) => i % 19 === 0)) for (const match of [original, { ...original, events: original.events.filter(e => e.type !== 'goal') }]) {
-    for (const appearance of match.appearances) {
-      const player = fixture.players.find(p => p.id === appearance.playerId)
-      if (player) assert.deepEqual(current.ratePlayerMatch(match, player), old.ratePlayerMatch(match, player), `${match.id} ${player.id}`)
-    }
-    assert.equal(current.getMatchManOfTheMatch(match, fixture.players), old.getMatchManOfTheMatch(match, fixture.players), match.id)
+    assertRatingTransition(previousRating.rateMatch(match, fixture.players), current.rateMatch(match, fixture.players))
+    assertMomPolicy(match, fixture.players, current.getMatchManOfTheMatch(match, fixture.players))
   }
 })
 

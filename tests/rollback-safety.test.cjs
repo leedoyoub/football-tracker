@@ -19,12 +19,12 @@ test('startup and quota handling never remove existing recovery snapshots', () =
   assert.doesNotMatch(repository, /removeItem\(`\$\{EMERGENCY_PREFIX\}/)
 })
 
-test('the canonical local storage key and REV13 rating engine remain unchanged', () => {
+test('the canonical local storage key survives the revision-14 rating update', () => {
   const repository = fs.readFileSync('src/lib/repository.ts', 'utf8')
   const revision = fs.readFileSync('src/engine/ratingRevision.ts', 'utf8')
   const supabase = fs.readFileSync('src/lib/supabase.ts', 'utf8')
   assert.match(repository, /STORAGE_KEY\s*=\s*'football-tracker-v1'/)
-  assert.match(revision, /RATING_ENGINE_REVISION\s*=\s*13/)
+  assert.match(revision, /RATING_ENGINE_REVISION\s*=\s*14/)
   assert.match(supabase, /isCloudSyncEnabled\s*=\s*false/)
   assert.match(supabase, /isSupabaseConfigured\s*=\s*Boolean\(supabaseUrl\s*&&\s*supabaseAnonKey\)/)
 })

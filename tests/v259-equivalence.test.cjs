@@ -16,6 +16,8 @@ catch (cause) { throw new Error(`The independent v2.5.8 baseline ${ref} must exi
 execFileSync('tar', ['-xf', '-', '-C', baseline], { input: archive })
 fs.symlinkSync(path.join(root, 'node_modules'), path.join(baseline, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir')
 after(() => fs.rmSync(baseline, { recursive: true, force: true }))
+const { alignArchivedRatingInputs, assertRatingTransition, assertMomPolicy } = require('./helpers/rating-release-comparison.cjs')
+const previousRating = alignArchivedRatingInputs(baseline)
 const before = file => require(path.join(baseline, 'src', file))
 const current = file => require(path.join(root, 'src', file))
 const s = performanceFixture()
@@ -32,8 +34,8 @@ test('realistic benchmark history is accepted by the unchanged durable-state val
 
 test('v2.5.8 whole-object equivalence: every match rating, MOM, goal types, manual/legacy SOT and defence', () => {
   for (const match of s.matches) {
-    equal('engine/rating.ts', 'rateMatch', match, s.players)
-    equal('engine/rating.ts', 'getMatchManOfTheMatch', match, s.players)
+    assertRatingTransition(previousRating.rateMatch(match, s.players), current('engine/rating.ts').rateMatch(match, s.players))
+    assertMomPolicy(match, s.players, current('engine/rating.ts').getMatchManOfTheMatch(match, s.players))
     equal('engine/goalTypes.ts', 'classifyGoalTypes', match)
     equal('engine/opponentSot.ts', 'opponentSot', match, match.teamId)
     for (const appearance of match.appearances) equal('engine/defensiveRanking.ts', 'defensiveMatchFacts', match, appearance)

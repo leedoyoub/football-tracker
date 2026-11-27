@@ -52,7 +52,11 @@ test('the historical winner moves across leaderboards, player details, milestone
   }
   assert.deepEqual([old.striker.mom, old.keeper.mom], [0, 10])
   assert.deepEqual([current.striker.mom, current.keeper.mom], [10, 0])
-  assert.deepEqual(current.records.filter(group => group.id !== 'mom'), old.records.filter(group => group.id !== 'mom'))
+  const revisedRecords = structuredClone(old.records.filter(group => group.id !== 'mom'))
+  const defenderRecord = revisedRecords.find(group => group.id === 'highest-rating').rows.find(row => row.id === input.defender)
+  assert.equal(defenderRecord.numeric, 6.88)
+  Object.assign(defenderRecord, { numeric: 6.6, value: '6.60', detail: '6.60 canonical raw rating' })
+  assert.deepEqual(current.records.filter(group => group.id !== 'mom'), revisedRecords)
   for (const name of ['averageRating', 'goodMatchRate', 'goodMatches']) {
     assert.equal(current.striker[name], old.striker[name])
     assert.equal(current.keeper[name], old.keeper[name])
@@ -61,7 +65,7 @@ test('the historical winner moves across leaderboards, player details, milestone
 })
 
 test('competition, monthly, half-season and season awards use new MOM counts with the existing scoring and final tie policy', () => {
-  const { teams, players, matches, keeper, striker } = history(30)
+  const { teams, players, matches, keeper, striker, defender } = history(30)
   const full = cappedMomFixture().state
   const wholeLeague = [...matches, ...full.matches.filter(match => match.teamId !== teams[0].id && match.competitionType === 'league')]
   const states = [{ id: 'completed:1', kind: 'season-complete', season, teamIds: [teams[0].id] }]
@@ -89,7 +93,9 @@ test('competition, monthly, half-season and season awards use new MOM counts wit
   assert.equal(old.season.ballon.awardScore, current.season.ballon.awardScore)
   assert.equal(old.league.mvp.awardScore, current.league.mvp.awardScore)
   assert.equal(current.league.candidates.find(row => row.playerId === striker).mom, 30)
-  assert.deepEqual(old.season.bestXI, current.season.bestXI)
+  const defenderSlot = old.season.bestXI.find(slot => slot.playerId === defender)
+  assert.equal(defenderSlot.avgRating.toFixed(2), '6.88')
+  assert.deepEqual(current.season.bestXI, old.season.bestXI.map(slot => slot === defenderSlot ? { ...slot, avgRating: Array(30).fill(6.6).reduce((sum, value) => sum + value, 0) / 30 } : slot))
   assert.deepEqual(old.final, current.final)
   assert.equal(current.final.playerId, keeper)
 })

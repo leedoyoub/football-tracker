@@ -105,14 +105,14 @@ test('League, Cup and Champions navigation scopes resolve distinct player goal t
   }
 })
 
-test('REV13 preserves the striker reference rating and unrelated coefficients', () => {
+test('Revision 14 updates the striker reference rating and unrelated coefficients', () => {
   const striker = player('P', 'ST')
   const game = match('rating', '2026-01-01', [appearance('P', 'A', 'ST')], [goal('g')])
-  assert.equal(RATING_ENGINE_REVISION, 13)
-  assert.equal(POSITION_RULES.ST.goal, 0.9)
+  assert.equal(RATING_ENGINE_REVISION, 14)
+  assert.equal(POSITION_RULES.ST.goal, 0.8)
   assert.equal(POSITION_RULES.CB.suppressionMax, 1.4)
   assert.equal(POSITION_RULES.GK.assist, 1)
-  assert.equal(ratePlayerMatch(game, striker).raw, 7.5)
+  assert.equal(ratePlayerMatch(game, striker).raw, 6.5 + .1 + .8)
 })
 
 test('a field role clean match cannot create a goalkeeper clean sheet', () => {

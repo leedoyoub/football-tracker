@@ -25,13 +25,13 @@ test('conceded goals affect only the position segment in which they occurred', (
   const match = game([appearance(p, 'starter', { positionHistory: [{ minute: 60, position: 'CDM' }] })], [goal('late', 80)])
   const trace = tracePlayerMatchRating(match, p)
   assert.deepEqual(trace.suppressionIntervals.map(row => [row.position, row.minutes, row.sot90]), [['CB', 60, 0], ['CDM', 30, 3]])
-  near(trace.sotBonus, 1.4 * 60 / 90 + .8 * .62 * 30 / 90)
+  near(trace.sotBonus, 1.4 * 60 / 90 + .85 * .7 * 30 / 90)
 })
 
-test('fractional SOT values interpolate and preserve every integer table value', () => {
-  assert.deepEqual([0, 1, 2, 3, 5, 10].map(sotMultiplier), [1, .86, .73, .62, .45, .20])
-  near(sotMultiplier(2.5), .675)
-  near(sotMultiplier(4.7), .474)
+test('fractional SOT values follow the linear curve', () => {
+  assert.deepEqual([0, 1, 2, 3, 5, 10].map(sotMultiplier), [1, .9, .8, .7, .5, 0])
+  near(sotMultiplier(2.5), .75)
+  near(sotMultiplier(4.7), .53)
 })
 
 test('Team Best Players scope uses historical appearance team context through the canonical ranking selector', () => {

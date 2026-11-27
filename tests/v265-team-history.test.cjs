@@ -64,8 +64,8 @@ test('History rates each played match equally and keeps transferred player facts
   const cup = game(5, '4-4-2', [appearance('p', 'GK')], { competitionType: 'cup' })
   const result = teamHistoryBestXI(players, [...games, foreign, otherSeason, cup], { teamId: 'A', season: 'Season 1', competition: 'league' })
   const slot = result.bestXI.find(slot => slot.playerId === 'p')
-  // Drawn scoreless ST = 6.5; winning scored ST = 6.5 + .1 + .9 = 7.5.
-  assert(Math.abs(slot.avgRating - 7.0) < 1e-10)
+  // The scoreless draw is 6.50 and the winning scorer earns 7.40.
+  assert(Math.abs(slot.avgRating - 6.95) < 1e-10)
   assert.equal(slot.teamId, 'A')
   assert.equal(slot.matches, 2)
   assert.equal(result.teamMatches, 2)

@@ -5,6 +5,8 @@ const path = require('node:path')
 const { baselineRoot, root } = require('./helpers/v2611-baseline.cjs')
 const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const baseline = baselineRoot()
+const { alignArchivedRatingInputs } = require('./helpers/rating-release-comparison.cjs')
+alignArchivedRatingInputs(baseline)
 const from = (source, file) => require(path.join(source, 'src', file + '.ts'))
 
 test('timeline normalization and persisted-state acceptance match v2.6.10', () => {

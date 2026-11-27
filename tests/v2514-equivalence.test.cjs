@@ -5,6 +5,8 @@ const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const { assertOfficialAwardPolicy } = require('./helpers/v261-award-policy-comparison.cjs')
 const { assertPolicyEquivalence } = require('./helpers/v2512-policy-comparison.cjs')
 const b = baselineSource(); after(b.cleanup)
+const { alignArchivedRatingInputs, v2612Source } = require('./helpers/rating-release-comparison.cjs')
+alignArchivedRatingInputs(b.directory)
 test('v2.5.13 full News, Latest Changes, official Awards and Records survive edits, deletion and season scope', () => {
   const s = performanceFixture(2)
   const funcs = [['engine/news.ts', 'deriveFootballEvents'], ['engine/news.ts', 'majorNewsEvents'], ['engine/latestChanges.ts', 'deriveLatestChanges']]
@@ -37,6 +39,8 @@ test('rating calculations, competition, durability and scroll sources remain ide
       .replace("import { MOM_POLICY_REVISION } from './momPolicy'\n", '')
       .replace('policyRevision: number; ', '')
       .split('export function getMatchManOfTheMatch')[0] : source
-    assert.equal(invariant(read(b.root)), invariant(read(b.directory)), file)
+    // Check the fixed-code history up to the last release that used REV13.
+    const actual = file === 'engine/rating.ts' || file === 'engine/ratingRevision.ts' ? v2612Source(file) : read(b.root)
+    assert.equal(invariant(actual), invariant(read(b.directory)), file)
   }
 })

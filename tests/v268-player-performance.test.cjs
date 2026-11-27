@@ -1,6 +1,7 @@
 ﻿require('./helpers/register-ts.cjs')
 const assert = require('node:assert/strict'), { test } = require('node:test'), path = require('node:path')
 const { baselineRoot } = require('./helpers/v268-baseline.cjs')
+require('./helpers/rating-release-comparison.cjs').alignArchivedRatingInputs(baselineRoot())
 const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const { sourceModule, screenHarness, nodes } = require('./helpers/v259-harness.cjs')
 const root = path.resolve(__dirname, '..')
@@ -35,7 +36,7 @@ for (const duplicate of ['roster', 'match']) test(`Detail ranks preserve indepen
   const legacy = require(path.join(baselineRoot(), 'src/engine/playerDetailRanks.ts')), current = require('../src/engine/playerDetailRanks.ts')
   const before = legacy.playerDetailRankingScope(state.players, state.matches, 'Season 1', 'league')
   const after = current.playerDetailRankingScope(state.players, state.matches, 'Season 1', 'league')
-  if (duplicate === 'roster') assert.deepEqual(before.ranksFor(state.players[0].id, teamId).rating, { overall: 3, position: 2, team: 3 })
+  if (duplicate === 'roster') assert.deepEqual(before.ranksFor(state.players[0].id, teamId).rating, { overall: 2, position: 2, team: 2 })
   for (const player of state.players) for (const team of [undefined, teamId]) assert.deepEqual(after.ranksFor(player.id, team), before.ranksFor(player.id, team), `${duplicate}:${player.id}:${team}`)
 })
 

@@ -5,6 +5,7 @@ const { recordsLeaderboardGroups } = require('../src/screens/recordsLeaderboards
 const { buildPlayerRecordLeaderboards } = require('../src/engine/playerRecords.ts')
 const scope = { seasons: [], teamIds: [], competition: 'all', positionFilter: 'all' }
 const { baselineRoot } = require('./helpers/v269-records-baseline.cjs')
+require('./helpers/rating-release-comparison.cjs').alignArchivedRatingInputs(baselineRoot())
 const path = require('node:path')
 
 function fixture() {

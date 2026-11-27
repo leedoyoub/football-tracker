@@ -120,12 +120,14 @@ test('v266 legacy Cup stage state never calculates stage XI and retains official
 })
 
 test('v266 official scoring, publication, Team History, shared race and pitch remain byte-equivalent to v265', () => {
+  const { v2612Source } = require('./helpers/rating-release-comparison.cjs')
   // v269 extends the full Race screen's presentation filters; independent
   // unfiltered screen row/candidate parity is checked in v269-ranking.
   // All official scoring, panel, pitch and qualification source locks stay exact.
   for (const file of ['engine/awards.ts', 'engine/awardEvaluation.ts', 'engine/awardRules.ts', 'engine/officialAwards.ts', 'engine/awardPolicy.ts', 'engine/rating.ts', 'engine/ratingRevision.ts', 'engine/competition.ts', 'engine/teamHistorySelection.ts', 'components/Pitch.tsx', 'components/awardBestXIProps.ts', 'components/AwardBestXI.tsx', 'components/AwardRacePanel.tsx']) {
     const old = execFileSync('git', ['show', `5347394:src/${file}`], { encoding: 'utf8' }).replaceAll('\r', '')
-    const current = fs.readFileSync(path.join(root, 'src', file), 'utf8').replaceAll('\r', '')
+    const source = file === 'engine/rating.ts' || file === 'engine/ratingRevision.ts' ? v2612Source(file) : fs.readFileSync(path.join(root, 'src', file), 'utf8')
+    const current = source.replaceAll('\r', '')
     // v268 indexes historical registrations once; the entire shared scoring,
     // qualification, weighting, deduplication and tie-selection code stays exact.
     // The independent result check below also protects the changed input index.
@@ -145,7 +147,9 @@ test('v266 official scoring, publication, Team History, shared race and pitch re
 })
 
 test('v268 indexed participation preserves every official candidate field across scopes and historical edits', () => {
-  const baseline = require(path.join(require('./helpers/v268-baseline.cjs').baselineRoot(), 'src/engine/awardEvaluation.ts'))
+  const baselineRoot = require('./helpers/v268-baseline.cjs').baselineRoot()
+  require('./helpers/rating-release-comparison.cjs').alignArchivedRatingInputs(baselineRoot)
+  const baseline = require(path.join(baselineRoot, 'src/engine/awardEvaluation.ts'))
   const current = require('../src/engine/awardEvaluation.ts')
   const s = require('./helpers/v255-fixture.cjs').performanceFixture(1)
   const compare = label => {

@@ -11,9 +11,10 @@ import {
   matchPositionSegments,
   pitchWindow,
   normalizeMatchTimeline,
+  REGULATION_MINUTES,
   scoringTeamId,
 } from './timeline.ts'
-import { opponentSot, opponentSotExposureForPositionSegment } from './opponentSot.ts'
+import { opponentSot, opponentSotExposureForPositions } from './opponentSot.ts'
 import { playerSaveCount } from './playerMatchFacts.ts'
 
 export { creditedMinutesPlayed, creditedPitchIntervals, creditedPositionSegments, hasPitchAppearance, isOnPitchAtEvent, matchPositionAt, matchPositionAtEvent, matchPositionSegments, normalizeMatchPosition, normalizePositionFamily, pitchWindow, scoringTeamId } from './timeline.ts'
@@ -23,39 +24,41 @@ export const GOALKEEPER_BASE_RATING = 7.1
 export const MIN_RATING = 3.0
 export const MAX_RATING = 10.0
 
-type PositionRules = { goal: number; assist: number; teamGoal: number; suppressionMax: number; conceded: number }
-const RULE = (goal: number, assist: number, teamGoal: number, suppressionMax: number, conceded: number): PositionRules => ({ goal, assist, teamGoal, suppressionMax, conceded })
+type PositionRules = { goal: number; assist: number; teamGoal: number; conceded: number; suppressionMax: number }
+const rule = (goal: number, assist: number, teamGoal: number, conceded: number, suppressionMax: number): PositionRules => ({ goal, assist, teamGoal, conceded, suppressionMax })
+
+const striker = rule(.80, .50, 0, 0, 0)
+const winger = rule(1, .65, .04, 0, 0)
+const wideMidfielder = rule(1.05, .65, .05, -.10, .30)
+const centralMidfielder = rule(1.05, .65, .07, -.08, .25)
+const defensiveMidfielder = rule(1.15, .70, .06, -.15, .85)
+const fullback = rule(1.25, .70, .03, -.25, 1)
+const centreBack = rule(1.35, .75, 0, -.35, 1.40)
 
 /** Finalized values. This table is intentionally data-only. */
 export const POSITION_RULES: Record<Position, PositionRules> = {
-  ST: RULE(.90, .55, 0, 0, 0), LST: RULE(.90, .55, 0, 0, 0), RST: RULE(.90, .55, 0, 0, 0),
-  SS: RULE(.90, .55, 0, 0, 0), LW: RULE(1, .65, .03, 0, 0), RW: RULE(1, .65, .03, 0, 0), CAM: RULE(1, .65, .04, 0, 0),
-  LM: RULE(1.05, .65, .05, .25, -.10), RM: RULE(1.05, .65, .05, .25, -.10),
-  CM: RULE(1.05, .65, .07, .30, -.10), LCM: RULE(1.05, .65, .07, .30, -.10), RCM: RULE(1.05, .65, .07, .30, -.10),
-  CDM: RULE(1.15, .70, .06, .80, -.12), LDM: RULE(1.15, .70, .06, .80, -.12), RDM: RULE(1.15, .70, .06, .80, -.12),
-  LB: RULE(1.25, .70, .04, 1, -.25), LWB: RULE(1.25, .70, .04, 1, -.25), RB: RULE(1.25, .70, .04, 1, -.25), RWB: RULE(1.25, .70, .04, 1, -.25),
-  CB: RULE(1.35, .75, 0, 1.40, -.35), LCB: RULE(1.35, .75, 0, 1.40, -.35), RCB: RULE(1.35, .75, 0, 1.40, -.35),
-  GK: RULE(1.50, 1, 0, 0, -.30),
+  ST: striker, LST: striker, RST: striker, SS: striker,
+  LW: winger, RW: winger, CAM: rule(1, .65, .02, 0, 0),
+  LM: wideMidfielder, RM: wideMidfielder,
+  CM: centralMidfielder, LCM: centralMidfielder, RCM: centralMidfielder,
+  CDM: defensiveMidfielder, LDM: defensiveMidfielder, RDM: defensiveMidfielder,
+  LB: fullback, LWB: fullback, RB: fullback, RWB: fullback,
+  CB: centreBack, LCB: centreBack, RCB: centreBack,
+  GK: rule(1.50, 1, 0, -.30, 0),
 }
 
-export const SOT_MULTIPLIERS = [1, .86, .73, .62, .53, .45, .38, .32, .27, .23] as const
-/** Preserves the historic table at integer SOT values while smoothly handling
- * interval-normalised fractional SOT/90 values. */
-export function sotMultiplier(opponentSOT: number): number {
-  if (!Number.isFinite(opponentSOT) || opponentSOT <= 0) return SOT_MULTIPLIERS[0]
-  if (opponentSOT >= 10) return .20
-  const lower = Math.floor(opponentSOT)
-  const fraction = opponentSOT - lower
-  const start = SOT_MULTIPLIERS[lower] ?? .20
-  const end = SOT_MULTIPLIERS[lower + 1] ?? .20
-  return start + (end - start) * fraction
+export function sotMultiplier(opponentSotPer90: number): number {
+  return opponentSotPer90 > 0 ? Math.max(0, 1 - .10 * opponentSotPer90) : 1
 }
+
+const SAVE_BONUS_POINTS = [.20, .25, .29, .32, .35] as const
 export function saveBonusPerSave(saveRate: number): number {
-  if (saveRate >= .8) return .30
-  if (saveRate >= .6) return .27
-  if (saveRate >= .4) return .25
-  if (saveRate >= .2) return .21
-  return .17
+  if (!(saveRate > 0)) return SAVE_BONUS_POINTS[0]
+  if (saveRate >= .8) return SAVE_BONUS_POINTS[4]
+  const point = saveRate * 5
+  const lower = Math.min(3, Math.floor(point))
+  const start = SAVE_BONUS_POINTS[lower]
+  return start + (SAVE_BONUS_POINTS[lower + 1] - start) * (point - lower)
 }
 export function clampRating(value: number): number { return Math.min(MAX_RATING, Math.max(MIN_RATING, value)) }
 
@@ -116,7 +119,7 @@ export type PlayerMatchRatingTrace = {
   result: number
   componentSum: number
   preClamp: number
-  suppressionIntervals: { enter: number; exit: number; position: Position; minutes: number; bonus: number }[]
+  suppressionIntervals: ReturnType<typeof suppressionByInterval>
   raw: number
   clamped: number
   display: string
@@ -163,7 +166,7 @@ export function tracePlayerMatchRating(match: Match, player: Player): PlayerMatc
     result: rating.result,
     componentSum,
     preClamp: rating.preClamp,
-    suppressionIntervals: suppressionByInterval(match, appearance),
+    suppressionIntervals: suppressionByInterval(appearance, matchPositionSegments(match, appearance), exposureForTeam(match, ratingCacheEntry(match), appearance.teamId)),
     raw: rating.raw,
     clamped: rating.rating,
     display: rating.rating.toFixed(1),
@@ -174,28 +177,62 @@ export function tracePlayerMatchRating(match: Match, player: Player): PlayerMatc
   }
 }
 
-/** One raw-data-only rating calculation for every screen and award. */
-const ratingCache = new WeakMap<ReturnType<typeof normalizeMatchTimeline>, { revision: number; ratings: Map<string, RatingBreakdown | null> }>()
-export function ratePlayerMatch(match: Match, player: Player, revision = RATING_ENGINE_REVISION): RatingBreakdown | null {
+type MatchRatings = { rows: RatingBreakdown[]; mom?: { policyRevision: number; playerId: string | undefined } }
+type RatingCacheEntry = Pick<Match, 'id' | 'homeTeamId' | 'awayTeamId' | 'teamId' | 'halftimeOpponentSot' | 'fulltimeOpponentSot'> & {
+  revision: number
+  ratings: Map<string, RatingBreakdown | null>
+  byPlayers: WeakMap<Player[], MatchRatings>
+  exposureByTeam: Map<string, ReturnType<typeof opponentSotExposureForPositions>>
+}
+
+/** Both match and player queries depend on SOT and team facts in addition to the timeline. */
+const ratingCache = new WeakMap<ReturnType<typeof normalizeMatchTimeline>, RatingCacheEntry>()
+function ratingCacheEntry(match: Match, revision = RATING_ENGINE_REVISION): RatingCacheEntry {
   const timeline = normalizeMatchTimeline(match)
-  let entry = ratingCache.get(timeline)
-  if (!entry || entry.revision !== revision) { entry = { revision, ratings: new Map() }; ratingCache.set(timeline, entry) }
-  const ratings = entry.ratings
-  if (ratings.has(player.id)) return ratings.get(player.id)!
-  const rating = calculatePlayerMatch(match, player)
-  ratings.set(player.id, rating)
+  const { id, homeTeamId, awayTeamId, teamId, halftimeOpponentSot, fulltimeOpponentSot } = match
+  const cached = ratingCache.get(timeline)
+  if (cached?.revision === revision && cached.id === id && cached.homeTeamId === homeTeamId && cached.awayTeamId === awayTeamId && cached.teamId === teamId && Object.is(cached.halftimeOpponentSot, halftimeOpponentSot) && Object.is(cached.fulltimeOpponentSot, fulltimeOpponentSot)) return cached
+  const entry = { revision, id, homeTeamId, awayTeamId, teamId, halftimeOpponentSot, fulltimeOpponentSot, ratings: new Map(), byPlayers: new WeakMap(), exposureByTeam: new Map() }
+  ratingCache.set(timeline, entry)
+  return entry
+}
+
+function exposureForTeam(match: Match, cache: RatingCacheEntry, teamId: string) {
+  let exposure = cache.exposureByTeam.get(teamId)
+  if (!exposure) {
+    exposure = opponentSotExposureForPositions(match, teamId)
+    cache.exposureByTeam.set(teamId, exposure)
+  }
+  return exposure
+}
+
+/** One raw-data-only rating calculation for every screen and award. */
+export function ratePlayerMatch(match: Match, player: Player, revision = RATING_ENGINE_REVISION): RatingBreakdown | null {
+  return cachedPlayerRating(match, player, ratingCacheEntry(match, revision))
+}
+
+function cachedPlayerRating(match: Match, player: Player, cache: RatingCacheEntry) {
+  if (cache.ratings.has(player.id)) return cache.ratings.get(player.id)!
+  const rating = calculatePlayerMatch(match, player, cache)
+  cache.ratings.set(player.id, rating)
   return rating
 }
 
-function suppressionByInterval(match: Match, appearance: Appearance) {
-  const segments = matchPositionSegments(match, appearance)
-  const totalMinutes = creditedMinutesPlayed(match, appearance)
-  return segments.map(row => {
-    const minutes = creditedPositionSegments(match, appearance).filter(segment => segment.position === row.position && segment.enter >= row.enter && segment.exit <= row.exit).reduce((total, segment) => total + segment.exit - segment.enter, 0)
-    const exposure = opponentSotExposureForPositionSegment(match, appearance, row.position, row.enter, row.exit)
-    const sot90 = minutes > 0 ? exposure * 90 / minutes : 0
+function suppressionByInterval(appearance: Appearance, segments: ReturnType<typeof matchPositionSegments>, exposureForPosition: ReturnType<typeof opponentSotExposureForPositions>) {
+  // Tactical labels can split a continuous spell in the same role. Sum its
+  // exposure before applying the floor, and count a boundary event only once.
+  const spells: typeof segments = []
+  for (const segment of segments) {
+    const last = spells[spells.length - 1]
+    if (last?.position === segment.position && last.exit === segment.enter) last.exit = segment.exit
+    else spells.push({ ...segment })
+  }
+  return spells.map(row => {
+    const minutes = Math.max(0, Math.min(REGULATION_MINUTES, row.exit) - row.enter)
+    const exposure = minutes > 0 ? exposureForPosition(appearance, row.position, row.enter, row.exit) : 0
+    const sot90 = minutes > 0 ? exposure * REGULATION_MINUTES / minutes : 0
     const multiplier = sotMultiplier(sot90)
-    return { ...row, minutes, sot90, multiplier, bonus: POSITION_RULES[row.position].suppressionMax * multiplier * minutes / Math.max(90, totalMinutes) }
+    return { ...row, minutes, sot90, multiplier, bonus: POSITION_RULES[row.position].suppressionMax * multiplier * minutes / REGULATION_MINUTES }
   })
 }
 
@@ -207,7 +244,7 @@ function effectivePosition(segments: ReturnType<typeof matchPositionSegments>): 
   return [...minutes.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0]
 }
 
-function calculatePlayerMatch(match: Match, player: Player): RatingBreakdown | null {
+function calculatePlayerMatch(match: Match, player: Player, cache: RatingCacheEntry): RatingBreakdown | null {
   const appearance = match.appearances.find(item => item.playerId === player.id)
   if (!appearance) return null
   const window = pitchWindow(match, appearance)
@@ -223,7 +260,9 @@ function calculatePlayerMatch(match: Match, player: Player): RatingBreakdown | n
   const teamGoals = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && scoringTeamId(match, event) === teamId && isOnPitchAtEvent(match, appearance, event) && event.playerId !== player.id && event.assistPlayerId !== player.id)
   const concededGoals = match.events.filter((event): event is Extract<MatchEvent, { type: 'goal' }> => event.type === 'goal' && scoringTeamId(match, event) !== teamId && isOnPitchAtEvent(match, appearance, event))
   const caused = concededGoals.filter(event => event.concededGoalCausePlayerId === player.id || (event.ownGoal && event.playerId === player.id)).length
-  const suppression = suppressionByInterval(match, appearance).reduce((total, row) => total + row.bonus, 0)
+  const suppression = segments.some(segment => segment.enter < REGULATION_MINUTES && POSITION_RULES[segment.position].suppressionMax > 0)
+    ? suppressionByInterval(appearance, segments, exposureForTeam(match, cache, teamId)).reduce((total, row) => total + row.bonus, 0)
+    : 0
   const goalkeeperSaves = playerSaveCount(match, appearance)
   const goalkeeperConceded = concededGoals.filter(event => matchPositionAtEvent(match, appearance, event) === 'GK').length
   const saveRate = goalkeeperSaves + goalkeeperConceded ? goalkeeperSaves / (goalkeeperSaves + goalkeeperConceded) : 0
@@ -245,16 +284,12 @@ function calculatePlayerMatch(match: Match, player: Player): RatingBreakdown | n
   return breakdown
 }
 
-type MatchRatings = { revision: number; rows: RatingBreakdown[]; mom?: { matchId: string; policyRevision: number; playerId: string | undefined } }
-const matchRatingsCache = new WeakMap<ReturnType<typeof normalizeMatchTimeline>, WeakMap<Player[], MatchRatings>>()
 const rosterIndex = new WeakMap<Player[], Map<string, { player: Player; order: number }[]>>()
 
 function matchRatings(match: Match, players: Player[]): MatchRatings {
-  const timeline = normalizeMatchTimeline(match)
-  let byPlayers = matchRatingsCache.get(timeline)
-  if (!byPlayers) { byPlayers = new WeakMap(); matchRatingsCache.set(timeline, byPlayers) }
-  const cached = byPlayers.get(players)
-  if (cached?.revision === RATING_ENGINE_REVISION) return cached
+  const cache = ratingCacheEntry(match)
+  const cached = cache.byPlayers.get(players)
+  if (cached) return cached
   let roster = rosterIndex.get(players)
   if (!roster) {
     roster = new Map()
@@ -268,9 +303,9 @@ function matchRatings(match: Match, players: Player[]): MatchRatings {
   // callers), while never rating players absent from this Match.
   const participants = [...new Set(match.appearances.map(appearance => appearance.playerId))]
     .flatMap(id => roster.get(id) ?? []).sort((left, right) => left.order - right.order)
-  const rows = participants.map(({ player }) => ratePlayerMatch(match, player)).filter((row): row is RatingBreakdown => row !== null)
-  const entry = { revision: RATING_ENGINE_REVISION, rows }
-  byPlayers.set(players, entry)
+  const rows = participants.map(({ player }) => cachedPlayerRating(match, player, cache)).filter((row): row is RatingBreakdown => row !== null)
+  const entry = { rows }
+  cache.byPlayers.set(players, entry)
   return entry
 }
 
@@ -285,7 +320,7 @@ function momEventCount(match: Match, playerId: string, key: 'playerId' | 'assist
 /** Uses the same effective match position exposed by the authoritative rating breakdown. */
 export function getMatchManOfTheMatch(match: Match, players: Player[]): string | undefined {
   const entry = matchRatings(match, players)
-  if (entry.mom?.matchId === match.id && entry.mom.policyRevision === MOM_POLICY_REVISION) return entry.mom.playerId
+  if (entry.mom?.policyRevision === MOM_POLICY_REVISION) return entry.mom.playerId
   let leaders: RatingBreakdown[] = []
   for (const row of entry.rows) {
     const best = leaders[0]
@@ -303,6 +338,6 @@ export function getMatchManOfTheMatch(match: Match, players: Player[]): string |
     goals: momEventCount(match, rating.playerId, 'playerId'),
     assists: momEventCount(match, rating.playerId, 'assistPlayerId'),
   })), match.id)
-  entry.mom = { matchId: match.id, policyRevision: MOM_POLICY_REVISION, playerId }
+  entry.mom = { policyRevision: MOM_POLICY_REVISION, playerId }
   return playerId
 }

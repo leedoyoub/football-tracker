@@ -19,8 +19,8 @@ const teams = [{ id: 'A', name: 'A', shortName: 'A' }, { id: 'B', name: 'B', sho
 const game = { id: 'm1', season: 'S1', competitionType: 'league', competitionStage: 'regular', matchDay: 1, date: '2026-01-01', duration: 90, homeTeamId: 'A', awayTeamId: 'B', teamId: 'A', appearances: players.map(app), events: [{ id: 'goal', type: 'goal', minute: 20, teamId: 'A', assistPlayerId: cam.id }] }
 const filters = { seasons: ['S1'], teams: [], positions: [] }
 
-test('revision-10 rating changes propagate through canonical MOM, rankings, Best XI, Records and history', () => {
-  assert.equal(ratePlayerMatch(game, cdm).raw.toFixed(2), '7.46')
+test('revision-14 rating changes propagate through canonical MOM, rankings, Best XI, Records and history', () => {
+  assert.equal(ratePlayerMatch(game, cdm).raw.toFixed(2), '7.51')
   assert.equal(ratePlayerMatch(game, cam).raw, 7.25)
   assert.equal(getMatchManOfTheMatch(game, players), cdm.id)
   const rows = buildGlobalRankingData(players, [game], filters, 'rating')
@@ -34,7 +34,7 @@ test('revision-10 rating changes propagate through canonical MOM, rankings, Best
   assert.equal(historyTimelineForSeason(teams, players, [game], [], 'S1').rating.playerId, cdm.id)
 })
 
-test('revision-10 candidate remains the canonical rating leader for every scope and current/season Best XI', () => {
+test('revision-14 candidate remains the canonical rating leader for every scope and current/season Best XI', () => {
   const matches = ['league', 'cup', 'champions'].map((competitionType, index) => ({
     ...game,
     id: `${competitionType}-ranking`,
@@ -57,7 +57,7 @@ test('revision-10 candidate remains the canonical rating leader for every scope 
   assert.equal(unifiedBestEleven(players, matches, 'S1').slots.find(slot => slot.slot === 'LCM').playerId, cdm.id)
 })
 
-test('revision-10 canonical average feeds finalized monthly award winner and monthly Best XI', () => {
+test('revision-14 canonical average feeds finalized monthly award winner and monthly Best XI', () => {
   const matches = [1, 2, 3].map(day => ({
     ...game,
     id: `monthly-${day}`,
@@ -72,7 +72,7 @@ test('revision-10 canonical average feeds finalized monthly award winner and mon
   assert.equal(award.statsByPlayer[cdm.id].avgRating, buildGlobalRankingData(players, matches, filters, 'rating').find(row => row.playerId === cdm.id).avgRating)
 })
 
-test('competition MVP and season Ballon selectors consume the canonical revision-10 average', () => {
+test('competition MVP and season Ballon selectors consume the canonical revision-14 average', () => {
   const competition = require('../src/engine/competition.ts')
   const original = competition.competitionSeasonStatus
   competition.competitionSeasonStatus = () => ({
