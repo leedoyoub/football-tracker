@@ -1,94 +1,135 @@
-import { AWARD_DETAIL_METRICS, AWARD_SUMMARY_METRIC_IDS } from '../engine/awardRecords'
-import { SegmentedControl } from '../components/SeasonUI'
 import { useMemo } from 'react'
+import { CompactFilterMenu } from '../components/CompactFilterMenu'
 import { CompetitionScopeSelector } from '../components/CompetitionScopeSelector'
 import { PlayerIdentityAction, TeamIdentityAction } from '../components/EntityActions'
-import { CombinationPairIdentity } from '../components/CombinationPairIdentity'
+import { FindPartner } from '../components/FindPartner'
 import { PositionFilter } from '../components/PositionFilter'
-import { TeamFilter } from '../components/TeamFilter'
+import { RecordPreview } from '../components/RecordRows'
 import { RecordsSeasonFilter } from '../components/RecordsSeasonFilter'
-import { CompactFilterMenu } from '../components/CompactFilterMenu'
-import { auditDataIntegrity } from '../engine/integrity'
+import { TeamFilter } from '../components/TeamFilter'
 import { playerForm } from '../engine/seasonInsights'
 import { teamMetrics } from '../engine/teamMetrics'
 import { recordsScopedMatches } from '../engine/recordsScope'
 import { normalizePositionFilters } from '../engine/positionScope'
 import { seasonsFromMatches } from '../engine/stats'
-import { playerFullName } from '../components/ui'
 import { useStore } from '../store'
-import type { CompetitionState, CompetitionType, Match, Player, RecordsCategory, ScreenStateByView, Team, View } from '../types'
+import type { Match, Player, ScreenStateByView, Team, View } from '../types'
+import { HallOfFame } from './HallOfFame'
 import { RecordsHistory } from './RecordsHistory'
-import { emptyFilters, type RankingFilters } from './RankingFilters'
-import { combinationBestUnitOptions, recordsLeaderboardGroups, type RecordsLeaderboardGroup, type RecordsLeaderboardKind, type RecordsLeaderboardRow } from './recordsLeaderboards'
-type Category = RecordsCategory
-const tabs: [Category, string, string][] = [['player', 'Player', '⚽'], ['combination', 'Combination', '🤝'], ['team', 'Team', '🛡️'], ['history', 'History', '🏆'], ['insights', 'Insights', '📈'], ['integrity', 'Data Integrity', '✓']]
+import { archiveMenus, combinationRecordSections, playerRecordSections, teamRecordSections } from './recordSections'
+import { combinationBestUnitOptions, EMPTY_COMPETITION_STATES, recordsLeaderboardGroups, type RecordsLeaderboardKind, type RecordsScope } from './recordsLeaderboards'
 
-export function RecordsScreen({ season, screenState, onStateChange, onNavigate }: { season: string; screenState: ScreenStateByView['records']; onStateChange: (state: ScreenStateByView['records']) => void; onNavigate: (view: View) => void }) {
-  const { players, teams, matches, competitionStates = [] } = useStore()
+type RecordsState = ScreenStateByView['records']
+type Props = { screenState: RecordsState; onStateChange: (state: RecordsState) => void; onNavigate: (view: View) => void }
+const hallPanels = ['overview', 'career', 'legendary', 'breakers']
+const emptyAnalytics: NonNullable<RecordsState['analyticsFilters']> = { seasonIds: [], teamIds: [], competition: 'all' }
+
+export function RecordsScreen({ screenState, onStateChange, onNavigate }: Props) {
+  const { players, teams, matches, competitionStates = EMPTY_COMPETITION_STATES } = useStore()
   const { category, competition } = screenState
-  const patchState = (patch: Partial<ScreenStateByView['records']>) => onStateChange({ ...screenState, ...patch })
-  const filters: RankingFilters = { ...emptyFilters, seasons: screenState.filterSeasonIds, teams: screenState.filterTeamIds }
-  const filtersApply = category === 'player' || category === 'combination' || category === 'team'
-  const seasons = useMemo(() => seasonsFromMatches(matches), [matches])
-  return <div className="px-4 pb-8 pt-6"><div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div><h1 className="text-2xl font-semibold">Records</h1><p className="text-[10px] text-zinc-500">Leaders, partnerships and football history</p></div><div className="flex shrink-0 flex-wrap justify-end gap-1.5">{filtersApply && <RecordsSeasonFilter value={screenState.filterSeasonIds} seasons={seasons} onChange={filterSeasonIds => patchState({ filterSeasonIds })} />}{category === 'player' && <PositionFilter values={screenState.positionFilters ?? normalizePositionFilters(screenState.positionFilter)} onChange={positionFilters => patchState({ positionFilters, positionFilter: positionFilters[0] ?? 'all' })} label="Player Records position" />}{filtersApply && <TeamFilter values={screenState.filterTeamIds} teams={teams} onChange={filterTeamIds => patchState({ filterTeamIds })} label="Records team" />}</div></div>{category !== 'history' && <div className="sticky top-0 z-20 -mx-4 mb-3 border-y border-white/5 bg-black/95 px-4 py-2"><CompetitionScopeSelector value={competition} onChange={value => patchState({ competition: value })} /></div>}<div className="no-scrollbar mb-5 mt-3 flex gap-1 overflow-x-auto rounded-xl bg-zinc-900 p-1">{tabs.map(([id, label, icon]) => <button key={id} type="button" onClick={() => patchState({ category: id })} className={`shrink-0 rounded-lg px-3 py-2 text-[10px] font-bold ${category === id ? 'bg-emerald-500 text-black' : 'text-zinc-400'}`}><span aria-hidden="true">{icon}</span> {label}</button>)}</div>
-    {(['player', 'combination', 'team'] as Category[]).includes(category) && <RecordsRankingPreviews category={category as RecordsLeaderboardKind} players={players} teams={teams} matches={matches} states={competitionStates} filters={filters} competition={competition} positionFilter={screenState.positionFilter} screenState={screenState} onSelectionChange={patchState} onNavigate={onNavigate} />}
-    {category === 'history' && <RecordsHistory players={players} teams={teams} matches={matches} states={competitionStates} competition={competition} panel={screenState.historyPanel === 'awards' ? 'awards' : 'timeline'} openSeason={screenState.historySeason} awardScope={screenState.historyAwardScope} onPanel={panel => patchState({ historyPanel: panel, historyBlock: null })} onSeason={value => patchState({ historySeason: value, historyBlock: null })} onAwardScope={value => patchState({ historyAwardScope: value })} onPlayerOpen={id => onNavigate({ name: 'player', id })} />}
-    {category === 'insights' && <InsightsRecords season={season} players={players} teams={teams} matches={recordsScopedMatches(matches, { seasons: filters.seasons, teamIds: filters.teams, competition }, 'insights')} onNavigate={onNavigate} />}
-    {category === 'integrity' && <IntegrityRecords players={players} teams={teams} matches={matches} states={competitionStates} onNavigate={onNavigate} />}
+  const patch = (next: Partial<RecordsState>) => onStateChange({ ...screenState, ...next })
+  const section = (key: keyof NonNullable<RecordsState['sections']>, id: string) => patch({ sections: { ...screenState.sections, [key]: id } })
+  const seasons = useMemo(() => [...new Set([...seasonsFromMatches(matches), ...competitionStates.map(state => state.season)])], [matches, competitionStates])
+  const analytics = screenState.analyticsFilters ?? emptyAnalytics
+  const scope: RecordsScope = useMemo(() => ({
+    seasons: category === 'analytics' ? analytics.seasonIds : screenState.filterSeasonIds,
+    teamIds: category === 'analytics' ? analytics.teamIds : screenState.filterTeamIds,
+    competition: category === 'analytics' ? analytics.competition : competition,
+    positionFilter: screenState.positionFilter, positionFilters: screenState.positionFilters, rankMode: screenState.rankMode ?? 'filtered',
+  }), [analytics, competition, category, screenState.filterSeasonIds, screenState.filterTeamIds, screenState.positionFilter, screenState.positionFilters, screenState.rankMode])
+  const showTeamFilter = category === 'player' || category === 'team' || category === 'combination' || category === 'analytics'
+  const showScope = showTeamFilter || category === 'history'
+  const title = archiveMenus.find(menu => menu.id === category)?.title ?? 'Records'
+  const patchAnalytics = (next: Partial<typeof analytics>) => patch({ analyticsFilters: { ...analytics, ...next } })
+
+  return <div className="px-4 pb-8 pt-5">
+    {category !== 'index' && <button type="button" onClick={() => patch({ category: 'index' })} className="min-h-9 text-xs font-semibold text-emerald-300">‹ Records</button>}
+    <h1 className="mb-3 text-2xl font-semibold">{title}</h1>
+    {category === 'index' && <nav aria-label="Records archive" className="grid gap-2 sm:grid-cols-2">
+      {archiveMenus.map(menu => <button key={menu.id} type="button" onClick={() => patch({ category: menu.id })} className="flex min-h-16 items-center justify-between gap-3 rounded-xl border border-white/5 bg-zinc-900 px-3 py-2 text-left hover:border-emerald-400/40">
+        <span><strong className="block text-sm">{menu.title}</strong><span className="mt-0.5 block text-xs text-zinc-400">{menu.detail}</span></span><span aria-hidden="true" className="text-lg text-emerald-300">›</span>
+      </button>)}
+    </nav>}
+    {showScope && <div className="mb-3 flex flex-wrap items-center gap-1.5" aria-label={`${title} filters`}>
+      <RecordsSeasonFilter value={scope.seasons} seasons={seasons} onChange={seasonIds => category === 'analytics' ? patchAnalytics({ seasonIds }) : patch({ filterSeasonIds: seasonIds })} />
+      {category === 'player' && <PositionFilter values={scope.positionFilters ?? normalizePositionFilters(scope.positionFilter)} onChange={positionFilters => patch({ positionFilters, positionFilter: positionFilters[0] ?? 'all' })} label="Player Records position" />}
+      {showTeamFilter && <TeamFilter values={scope.teamIds} teams={teams} onChange={teamIds => category === 'analytics' ? patchAnalytics({ teamIds }) : patch({ filterTeamIds: teamIds })} label={`${title} team`} />}
+      {category !== 'history' && <CompetitionScopeSelector value={scope.competition} onChange={competition => category === 'analytics' ? patchAnalytics({ competition }) : patch({ competition })} />}
+    </div>}
+    {(category === 'player' || category === 'team' || category === 'combination') && <RankingPreviews category={category} scope={scope} screenState={screenState} onPatch={patch} onSection={id => section(category, id)} onNavigate={onNavigate} />}
+    {category === 'hall' && <HallOfFame players={players} teams={teams} matches={matches} states={competitionStates} panel={hallPanels.includes(screenState.sections?.hall ?? '') ? screenState.sections!.hall! : 'overview'} careerPlayerId={screenState.careerPlayerId} onPanel={id => section('hall', id)} onCareerPlayer={id => patch({ careerPlayerId: id })} onNavigate={onNavigate} />}
+    {category === 'history' && <RecordsHistory players={players} teams={teams} matches={matches} states={competitionStates} seasonIds={scope.seasons}
+      competition={screenState.historyCompetition ?? 'all'} onCompetition={historyCompetition => patch({ historyCompetition })}
+      panel={screenState.historyPanel === 'awards' ? 'awards' : 'timeline'} openSeason={screenState.historySeason} awardScope={screenState.historyAwardScope}
+      onPanel={value => patch({ historyPanel: value })} onSeason={value => patch({ historySeason: value })} onAwardScope={value => patch({ historyAwardScope: value })}
+      onNavigate={onNavigate} onPlayerOpen={id => onNavigate({ name: 'player', id })} />}
+    {category === 'analytics' && <AnalyticsRecords players={players} teams={teams} matches={matches} scope={scope} onNavigate={onNavigate} />}
   </div>
 }
 
-function RecordsRankingPreviews({ category, players, teams, matches, states, filters, competition, positionFilter, screenState, onSelectionChange, onNavigate }: { category: RecordsLeaderboardKind; players: Player[]; teams: Team[]; matches: Match[]; states: CompetitionState[]; filters: RankingFilters; competition: CompetitionType | 'all'; positionFilter: ScreenStateByView['records']['positionFilter']; screenState: ScreenStateByView['records']; onSelectionChange: (patch: Partial<ScreenStateByView['records']>) => void; onNavigate: (view: View) => void }) {
-  const selectedTogether = `together:${screenState.combinationPosition ?? 'attack'}:${screenState.combinationPlayers ?? 2}:${screenState.combinationMetric ?? 'starts'}`
-  const selectedBest = screenState.bestUnitId ?? 'best-unit:attack:2:goals'
-  const awardDetails = AWARD_DETAIL_METRICS.map(metric => ({ id: 'awards-' + metric.id, title: metric.title }))
-  const selectedAward = awardDetails.some(metric => metric.id === screenState.awardMetricId) ? screenState.awardMetricId! : 'awards-first-half-mvp'
-  const groups = useMemo(() => recordsLeaderboardGroups({ category, players, teams, matches, states, section: screenState.recordsMode ?? 'performance', scope: { seasons: filters.seasons, teamIds: filters.teams, competition, positionFilter, positionFilters: screenState.positionFilters }, ...(category === 'player' && screenState.recordsMode === 'awards' ? { selectedIds: [...AWARD_SUMMARY_METRIC_IDS.map(id => 'awards-' + id), selectedAward] } : {}), ...(category === 'combination' ? { selectedIds: ['goal-combinations', 'mutual-goal-combinations', 'both-scored', 'both-ga', 'duo-ga', selectedTogether, selectedBest, 'cb-suppression', 'cb-ga'] } : {}) }), [category, players, teams, matches, states, screenState.recordsMode, filters.seasons, filters.teams, competition, positionFilter, screenState.positionFilters, selectedTogether, selectedBest, selectedAward])
+function RankingPreviews({ category, scope, screenState, onPatch, onSection, onNavigate }: { category: RecordsLeaderboardKind; scope: RecordsScope; screenState: RecordsState; onPatch: (value: Partial<RecordsState>) => void; onSection: (id: string) => void; onNavigate: (view: View) => void }) {
+  const { players, teams, matches, competitionStates = EMPTY_COMPETITION_STATES } = useStore()
+  const sections = category === 'player' ? playerRecordSections : category === 'team' ? teamRecordSections : combinationRecordSections
+  const current = sections.find(part => part.id === screenState.sections?.[category]) ?? sections[0]
+  const position = screenState.combinationPosition ?? 'attack'
+  const size = screenState.combinationPlayers ?? 2
+  const metric = screenState.combinationMetric ?? 'starts'
+  const unit = screenState.bestUnitId ?? combinationBestUnitOptions[0].id
+  const chosen = 'records' in current ? current.records : current.id === 'together' ? [`together:${position}:${size}:${metric}`] : current.id === 'units' ? [unit] : []
+  const section = ['awards', 'trophies'].includes(current.id) || category === 'team' && current.id === 'season' ? 'awards' : 'performance'
+  const groups = chosen.length ? recordsLeaderboardGroups({ category, section, scope, players, teams, matches, states: competitionStates, selectedIds: [...chosen] }) : []
+  const byId = new Map(groups.map(group => [group.id, group]))
   const playerById = useMemo(() => new Map(players.map(player => [player.id, player])), [players])
   const teamById = useMemo(() => new Map(teams.map(team => [team.id, team])), [teams])
-  const card = (group: RecordsLeaderboardGroup) => <section key={group.id} className="mb-5"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-semibold">{group.title}</h2>{group.rows.length > 3 && <button type="button" onClick={() => onNavigate({ name: 'records-leaderboard', category, leaderboardId: group.id, competition, positionFilter, positionFilters: screenState.positionFilters, seasonIds: filters.seasons, teamIds: filters.teams })} className="secondary-view-all">View All</button>}</div><div className="overflow-hidden rounded-xl bg-zinc-900">{group.rows.slice(0, 3).map(row => <div key={row.id} className="grid min-h-11 grid-cols-[28px_1fr_auto] items-center gap-2 border-b border-white/5 px-3 text-xs last:border-0"><b className="text-zinc-500">#{row.rank}</b><RecordIdentity row={row} playerById={playerById} teamById={teamById} onNavigate={onNavigate} /><b className="text-emerald-300">{row.value}</b></div>)}</div></section>
-  if (category !== 'combination') {
-    const awards = screenState.recordsMode === 'awards'
-    if (category === 'team' && awards) {
-      const history = groups.filter(group => group.id.startsWith('history-'))
-      const individual = groups.find(group => group.id === 'team-awards-individual')
-      const kinds = groups.filter(group => group.id.startsWith('team-awards:'))
-      const open = screenState.teamAwardKindsOpen ?? false
-      return <section aria-label="Records leaderboard previews">
-        <div className="mb-4"><SegmentedControl label="Records view" value="awards" onChange={value => onSelectionChange({ recordsMode: value as 'performance' | 'awards' })} options={[{ value: 'performance', label: 'Performance' }, { value: 'awards', label: 'Honors & History' }]} /></div>
-        {([{ title: 'Championships', start: 0, end: 4 }, { title: 'Runner-ups & Finals', start: 4, end: 11 }, { title: 'Best Season Records', start: 11, end: 17 }]).map(category => <div key={category.title} className="mb-6"><h2 className="mb-3 text-base font-semibold">{category.title}</h2>{history.slice(category.start, category.end).map(card)}</div>)}
-        <h2 className="mb-3 text-base font-semibold">Individual Awards</h2>
-        {individual && card(individual)}
-        <button type="button" aria-expanded={open} aria-controls="team-award-kinds" onClick={() => onSelectionChange({ teamAwardKindsOpen: !open })} className="mb-3 flex min-h-11 w-full items-center justify-between rounded-xl bg-zinc-900 px-3 text-left text-xs font-semibold"><span>By award type <span className="text-zinc-500">({kinds.length})</span></span><span className="text-emerald-300">{open ? 'Hide −' : 'Show +'}</span></button>
-        {open && <div id="team-award-kinds">{kinds.map(card)}{!kinds.length && <p className="py-3 text-xs text-zinc-500">No finalized individual awards in this scope.</p>}</div>}
-      </section>
-    }
-    const primary = category === 'player' ? groups.filter(group => AWARD_SUMMARY_METRIC_IDS.some(id => group.id === 'awards-' + id)) : groups.filter(g => ['history-titles', 'history-runner-ups', 'history-finals'].includes(g.id))
-    const details = groups.filter(g => !primary.includes(g))
-    const selected = details.find(g => g.id === screenState.awardMetricId) ?? details[0]
-    return <section aria-label="Records leaderboard previews"><div className="mb-4"><SegmentedControl label="Records view" value={awards ? 'awards' : 'performance'} onChange={value => onSelectionChange({ recordsMode: value as 'performance' | 'awards' })} options={[{ value: 'performance', label: 'Performance' }, { value: 'awards', label: category === 'player' ? 'Awards' : 'Honors & History' }]} /></div>{awards ? <>{primary.map(card)}{selected && <><div className="mb-3"><CompactFilterMenu label="Detailed honor record" value={selected.id} options={(category === 'player' ? awardDetails : details).map(g => ({ value: g.id, label: g.title }))} onChange={awardMetricId => onSelectionChange({ awardMetricId })} menuClassName="max-h-64 overflow-y-auto overscroll-contain" popupAlign="start" /></div>{card(selected)}</>}</> : groups.map(card)}</section>
-  }
-  const choose = (label: string, value: string | number, options: { value: string | number; label: string }[], onChange: (value: string) => void) => <CompactFilterMenu value={String(value)} options={options.map(option => ({ value: String(option.value), label: option.label }))} onChange={onChange} label={`Combination ${label.toLowerCase()}`} menuClassName="max-h-64 overflow-y-auto overscroll-contain" popupAlign="start" />
+  const matchById = useMemo(() => new Map(matches.map(match => [match.id, match])), [matches])
+  const picker = (label: string, value: string, options: { value: string; label: string }[], onChange: (value: string) => void) =>
+    <CompactFilterMenu label={label} value={value} options={options} onChange={onChange} popupAlign="start" menuClassName="max-h-64 overflow-y-auto overscroll-contain" />
   return <section aria-label="Records leaderboard previews">
-    <h2 className="mb-3 text-base font-semibold">Goal Partnerships</h2>{groups.slice(0, 5).map(card)}
-    <h2 className="mb-3 text-base font-semibold">Together</h2><div className="mb-3 flex flex-wrap gap-2">{choose('Position', screenState.combinationPosition ?? 'attack', [{ value: 'attack', label: 'Attack' }, { value: 'midfield', label: 'Midfield' }, { value: 'defence', label: 'Defence' }], value => onSelectionChange({ combinationPosition: value as 'attack' | 'midfield' | 'defence' }))}{choose('Players', screenState.combinationPlayers ?? 2, [2, 3, 4].map(value => ({ value, label: `${value} Players` })), value => onSelectionChange({ combinationPlayers: Number(value) as 2 | 3 | 4 }))}{choose('Metric', screenState.combinationMetric ?? 'starts', [{ value: 'starts', label: 'Starts' }, { value: 'minutes', label: 'Minutes' }, { value: 'ppg', label: 'PPG' }], value => onSelectionChange({ combinationMetric: value as 'starts' | 'minutes' | 'ppg' }))}</div>{groups.filter(group => group.id === selectedTogether).map(card)}
-    <h2 className="mb-3 text-base font-semibold">Best Units</h2><div className="mb-3">{choose('Best unit', selectedBest, combinationBestUnitOptions.map(group => ({ value: group.id, label: group.title })), value => onSelectionChange({ bestUnitId: value }))}</div>{groups.filter(group => group.id === selectedBest).map(card)}
-    <h2 className="mb-3 text-base font-semibold">Defensive Partnerships</h2>{groups.filter(group => group.id === 'cb-suppression' || group.id === 'cb-ga').map(card)}
+    <div className="no-scrollbar mb-3 flex gap-1 overflow-x-auto rounded-xl bg-zinc-900 p-1" aria-label="Record categories">
+      {sections.map(part => <button key={part.id} type="button" aria-pressed={current.id === part.id} onClick={() => onSection(part.id)} className={`min-h-10 shrink-0 rounded-lg px-3 text-xs font-semibold ${current.id === part.id ? 'bg-emerald-500 text-black' : 'text-zinc-300'}`}>{part.title}</button>)}
+    </div>
+    {category === 'combination' && current.id === 'together' && <div className="mb-3 flex flex-wrap gap-1.5">
+      {picker('Combination position', position, [{ value: 'attack', label: 'Attack' }, { value: 'midfield', label: 'Midfield' }, { value: 'defence', label: 'Defence' }], value => onPatch({ combinationPosition: value as RecordsState['combinationPosition'] }))}
+      {picker('Combination players', String(size), ['2', '3', '4'].map(value => ({ value, label: `${value} players` })), value => onPatch({ combinationPlayers: Number(value) as RecordsState['combinationPlayers'] }))}
+      {picker('Combination metric', metric, [{ value: 'starts', label: 'Starts' }, { value: 'minutes', label: 'Minutes' }, { value: 'ppg', label: 'PPG' }], value => onPatch({ combinationMetric: value as RecordsState['combinationMetric'] }))}
+    </div>}
+    {category === 'combination' && current.id === 'units' && <div className="mb-3">{picker('Best unit', unit, combinationBestUnitOptions.map(item => ({ value: item.id, label: item.title })), bestUnitId => onPatch({ bestUnitId }))}</div>}
+    {current.id === 'find' ? <FindPartner players={players} teams={teams} matches={matches} scope={scope} playerId={screenState.partnerPlayerId} onPlayerChange={partnerPlayerId => onPatch({ partnerPlayerId })} onNavigate={onNavigate} />
+      : <div className="space-y-2">{chosen.map(id => {
+        const group = byId.get(id)
+        return group ? <RecordPreview key={id} group={group} players={playerById} teams={teamById} matches={matchById} scope={scope} onNavigate={onNavigate} /> : null
+      })}</div>}
   </section>
 }
 
-function RecordIdentity({ row, playerById, teamById, onNavigate }: { row: RecordsLeaderboardRow; playerById: Map<string, Player>; teamById: Map<string, Team>; onNavigate: (view: View) => void }) {
-  if (row.combinationPair) return <span className="min-w-0 overflow-hidden"><CombinationPairIdentity pair={row.combinationPair} playerById={playerById} onNavigate={onNavigate} />{row.detail !== 'Combination record' && <small className="block truncate text-[9px] text-zinc-500">{row.detail}</small>}</span>
-  if (row.playerIds) return <span className="min-w-0 overflow-hidden"><span className="flex min-w-0 items-center gap-1 overflow-hidden">{row.playerIds.map(id => { const player = playerById.get(id); return <PlayerIdentityAction key={id} player={player} onNavigate={player ? playerId => onNavigate({ name: 'player', id: playerId }) : undefined} className="min-w-0 truncate text-left font-semibold" avatarClassName="hidden">{player?.displayName ?? player?.name ?? 'Unknown player'}</PlayerIdentityAction> })}</span><small className="block truncate text-[9px] text-zinc-500">{row.detail}</small></span>
-  const team = teamById.get(row.id)
-  if (team) return <span className="min-w-0" title={row.detail}><TeamIdentityAction team={team} onNavigate={teamId => onNavigate({ name: 'team', id: teamId })} className="min-w-0 truncate text-left font-semibold">{team.name}</TeamIdentityAction><small className="block truncate text-[9px] text-zinc-500">{row.detail}</small></span>
-  const player = playerById.get(row.id)
-  return <span className="min-w-0" title={row.detail}><PlayerIdentityAction player={player} onNavigate={player ? playerId => onNavigate({ name: 'player', id: playerId }) : undefined} className="min-w-0 truncate text-left font-semibold" avatarClassName="hidden">{row.name}</PlayerIdentityAction><small className="block truncate text-[9px] text-zinc-500">{row.detail}</small></span>
+function AnalyticsRecords({ players, teams, matches, scope, onNavigate }: { players: Player[]; teams: Team[]; matches: Match[]; scope: RecordsScope; onNavigate: (view: View) => void }) {
+  const { seasons, teamIds, competition } = scope
+  const chart = useMemo(() => {
+    const games = recordsScopedMatches(matches, { seasons, teamIds, competition }, 'insights')
+    const teamRows = teams.filter(team => !teamIds.length || teamIds.includes(team.id)).map(team => ({ team, ...teamMetrics(team, games) })).filter(row => row.played)
+    teamRows.sort((a, b) => b.form.filter(outcome => outcome === 'W').length - a.form.filter(outcome => outcome === 'W').length || b.ppg - a.ppg)
+    const selected = teamIds.length ? new Set(teamIds) : undefined
+    const playerRows = players.map(player => ({ player, form: playerForm(player, games, selected) })).filter(row => row.form.ratings.length >= 3).sort((a, b) => b.form.last5Average - a.form.last5Average)
+    return { teams: teamRows.slice(0, 5), players: playerRows.slice(0, 5) }
+  }, [seasons, teamIds, competition, teams, players, matches])
+  return <div className="space-y-5">
+    <section><h2 className="mb-2 text-sm font-semibold">Recent Team Form</h2>
+      {!chart.teams.length && <p className="text-xs text-zinc-500">No recorded matches in this scope.</p>}
+      <div className="grid gap-2">{chart.teams.map(row => <div key={row.team.id} className="rounded-xl bg-zinc-900 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <TeamIdentityAction team={row.team} onNavigate={id => onNavigate({ name: 'team', id })} className="min-w-0 font-semibold">{row.team.name}</TeamIdentityAction>
+          <div className="flex gap-1" aria-label="Last five results, newest first">{row.form.map((result, index) => <button key={row.games[index].id} onClick={() => onNavigate({ name: 'match', id: row.games[index].id })} type="button" className={`size-8 rounded font-bold ${result === 'W' ? 'bg-emerald-500/20 text-emerald-300' : result === 'L' ? 'bg-rose-500/20 text-rose-300' : 'bg-zinc-700 text-zinc-200'}`}>{result}</button>)}</div>
+        </div>
+        <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs tabular-nums">
+          {([[row.goals, 'GF/M'], [row.conceded, 'GA/M'], [row.opponentSot, 'Opponent SOT/M']] as const).map(([total, label]) => <div key={label} className="rounded bg-black/25 p-1.5">{(total / row.played).toFixed(2)}<small className="block text-zinc-400">{label}</small></div>)}
+        </div>
+      </div>)}</div>
+    </section>
+    <section><h2 className="mb-2 text-sm font-semibold">Recent Player Ratings</h2>
+      {!chart.players.length && <p className="text-xs text-zinc-500">No players with three rated matches in this scope.</p>}
+      <div className="space-y-2">{chart.players.map(({ player, form }) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-zinc-900 p-3 text-xs">
+        <PlayerIdentityAction player={player} onNavigate={id => onNavigate({ name: 'player', id })} className="min-w-0 font-semibold">{player.displayName ?? player.name}</PlayerIdentityAction>
+        <span className="shrink-0 text-emerald-300">Last 5 · {form.last5Average.toFixed(2)}</span>
+      </div>)}</div></section>
+  </div>
 }
-
-function InsightsRecords({ season, players, teams, matches, onNavigate }: { season: string; players: Player[]; teams: Team[]; matches: Match[]; onNavigate: (view: View) => void }) {
-  const insights = useMemo(() => { const games = matches.filter(match => match.season === season); const teamRows = teams.map(team => ({ team, ...teamMetrics(team, games) })).filter(row => row.games.length).sort((a, b) => b.form.filter(result => result === 'W').length - a.form.filter(result => result === 'W').length).slice(0, 5); const playerRows = players.map(player => ({ player, form: playerForm(player, games) })).filter(row => row.form.ratings.length >= 3).sort((a, b) => b.form.last5Average - a.form.last5Average).slice(0, 5); return { teams: teamRows, players: playerRows } }, [teams, players, matches, season])
-  return <><section className="mb-6"><h2 className="mb-2 text-sm font-semibold">Team Form · {season}</h2><div className="grid gap-2">{insights.teams.map(row => <div key={row.team.id} className="rounded-xl bg-zinc-900 p-3"><div className="flex justify-between text-xs"><b>{row.team.name}</b><span className="tracking-widest">{row.form.join(' ')}</span></div><div className="mt-2 grid grid-cols-3 gap-1 text-center text-[10px]"><span>{(row.goals / row.games.length).toFixed(2)}<small className="block text-zinc-500">GF/M</small></span><span>{(row.conceded / row.games.length).toFixed(2)}<small className="block text-zinc-500">GA/M</small></span><span>{(row.opponentSot / row.games.length).toFixed(2)}<small className="block text-zinc-500">SOT/M</small></span></div></div>)}</div></section><section><h2 className="mb-2 text-sm font-semibold">In-form Players</h2><div className="space-y-2">{insights.players.map(row => <button key={row.player.id} type="button" onClick={() => onNavigate({ name: 'player', id: row.player.id })} className="flex w-full justify-between rounded-xl bg-zinc-900 p-3 text-left text-xs"><b>{playerFullName(row.player)}</b><span className="text-emerald-300">Last 5 · {row.form.last5Average.toFixed(2)}</span></button>)}</div></section></>
-}
-
-function IntegrityRecords({ players, teams, matches, states, onNavigate }: { players: Player[]; teams: Team[]; matches: Match[]; states: CompetitionState[]; onNavigate: (view: View) => void }) { const integrity = useMemo(() => auditDataIntegrity(matches, players, teams, states), [matches, players, teams, states]); return <section><div className="rounded-2xl bg-zinc-900 p-4"><h2 className="text-sm font-semibold">Data Integrity</h2><p className="mt-1 text-[10px] text-zinc-500">Read-only diagnostics. No football data is changed.</p><p className="mt-3 text-xs">{integrity.issues.length ? `${integrity.errors} errors · ${integrity.warnings} warnings` : '✓ No issues found.'}</p></div>{integrity.issues.length > 0 && <div className="mt-3 space-y-2">{integrity.issues.map((issue, index) => <div key={`${issue.matchId ?? 'global'}-${index}`} className="rounded-xl bg-zinc-900 p-3 text-xs"><div className="flex items-center justify-between gap-3"><b className={issue.severity === 'error' ? 'text-rose-300' : issue.severity === 'warning' ? 'text-amber-300' : 'text-sky-300'}>{issue.severity.toUpperCase()}</b>{issue.matchId && <button type="button" onClick={() => onNavigate({ name: 'match', id: issue.matchId! })} className="text-[10px] text-emerald-300">Open match</button>}</div><p className="mt-1 text-zinc-300">{issue.message}</p></div>)}</div>}</section> }

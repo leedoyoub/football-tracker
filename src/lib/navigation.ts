@@ -1,6 +1,7 @@
 import type { NavigationEntry, ScreenStateByView, View } from '../types'
 import { defaultCompetitionScreenState } from './competitionScreenState'
 import { normalizePositionFilters } from '../engine/positionScope'
+import { loadRankingRankMode } from './rankingRankMode'
 
 export function defaultScreenState<V extends View>(view: V): ScreenStateByView[V['name']] {
   let state: ScreenStateByView[keyof ScreenStateByView]
@@ -8,10 +9,10 @@ export function defaultScreenState<V extends View>(view: V): ScreenStateByView[V
     case 'home': state = { name: 'home', leaderMetric: 'rating', positionFilter: 'all' }; break
     case 'latest-changes': state = { name: 'latest-changes' }; break
     case 'competition': state = defaultCompetitionScreenState(view.competitionType, view.rankingMetric); break
-    case 'global-ranking': state = { name: 'global-ranking', metric: view.rankingMetric ?? 'rating', scope: view.competitionType ?? 'all', positionFilter: 'all', teamId: view.teamId ?? null }; break
+    case 'global-ranking': state = { name: 'global-ranking', metric: view.rankingMetric ?? 'rating', scope: view.competitionType ?? 'all', rankMode: loadRankingRankMode(), positionFilter: 'all', teamId: view.teamId ?? null }; break
     case 'award-race': state = { name: 'award-race', season: view.season ?? null, scope: view.awardScope ? 'league' : view.competitionType ?? 'all', ...(view.awardScope ? { awardScope: view.awardScope } : {}), positionFilter: 'all', teamId: null }; break
-    case 'records': state = { name: 'records', category: 'player', competition: 'all', positionFilter: 'all', filterSeasonIds: [], filterTeamIds: [], combinationPosition: 'attack', combinationPlayers: 2, combinationMetric: 'starts', bestUnitId: 'best-unit:attack:2:goals', historyPanel: null, historySeason: null, historyBlock: null, historyAwardScope: 'league' }; break
-    case 'records-leaderboard': state = { name: 'records-leaderboard', category: view.category, leaderboardId: view.leaderboardId, competition: view.competition ?? 'all', positionFilter: view.positionFilter ?? 'all', positionFilters: normalizePositionFilters(view.positionFilters ?? view.positionFilter), filterSeasonIds: view.seasonIds ?? [], filterTeamIds: [...new Set(view.teamIds ?? [])] }; break
+    case 'records': state = { name: 'records', category: 'index', competition: 'all', positionFilter: 'all', filterSeasonIds: [], filterTeamIds: [], combinationPosition: 'attack', combinationPlayers: 2, combinationMetric: 'starts', bestUnitId: 'best-unit:attack:2:goals', historyPanel: null, historySeason: null, historyBlock: null, historyAwardScope: 'league' }; break
+    case 'records-leaderboard': state = { name: 'records-leaderboard', category: view.category, leaderboardId: view.leaderboardId, competition: view.competition ?? 'all', positionFilter: view.positionFilter ?? 'all', positionFilters: normalizePositionFilters(view.positionFilters ?? view.positionFilter), filterSeasonIds: view.seasonIds ?? [], filterTeamIds: [...new Set(view.teamIds ?? [])], rankMode: view.rankMode ?? 'filtered' }; break
     case 'comparison': state = { name: 'comparison', leftId: view.leftId ?? null, rightId: view.rightId ?? null, season: view.season ?? null, competition: view.competitionType ?? 'all', teamId: null }; break
     case 'team': state = { name: 'team', tab: 'overview', bestPlayersSeason: null, bestPlayersCompetition: 'all', bestPlayersMetric: 'rating', matchesCompetition: 'all', playersCompetition: 'all', historyCompetition: 'all', historyMenu: 'honors', historySeason: null, historyRecordsMode: 'season', historyExpandedRecords: [], historyDisclosures: [] }; break
     case 'players': state = { name: 'players', search: '', filters: { seasons: [], teams: [], positions: [] } }; break
@@ -58,7 +59,19 @@ export function pushNavigationEntry<V extends View>(entries: NavigationEntry[], 
 }
 
 export function popNavigationEntry(entries: NavigationEntry[]): NavigationEntry[] {
-  return entries.length > 1 ? entries.slice(0, -1) : [createNavigationEntry({ name: 'home' })]
+  if (entries.length > 1) return entries.slice(0, -1)
+  const entry = entries[0]
+  if (entry?.screenState.name === 'records-leaderboard') {
+    const { category, competition, positionFilter, positionFilters, filterSeasonIds, filterTeamIds, rankMode } = entry.screenState
+    const view = { name: 'records' } as const
+    return [createNavigationEntry(view, { ...defaultScreenState(view), category, competition, positionFilter, positionFilters, filterSeasonIds, filterTeamIds, rankMode })]
+  }
+  if (entry?.view.name === 'partnership') {
+    const view = { name: 'records' } as const
+    const { seasonIds, teamIds, teamId, competition } = entry.view
+    return [createNavigationEntry(view, { ...defaultScreenState(view), category: 'combination', filterSeasonIds: seasonIds ?? [], filterTeamIds: teamId ? [teamId] : teamIds ?? [], competition: competition ?? 'all' })]
+  }
+  return [createNavigationEntry({ name: 'home' })]
 }
 
 export function replaceNavigationEntry<V extends View>(entries: NavigationEntry[], view: V, screenState?: ScreenStateByView[V['name']]): NavigationEntry[] {

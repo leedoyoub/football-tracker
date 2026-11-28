@@ -2,12 +2,20 @@ import { useMemo } from 'react'
 import { Pitch } from '../components/Pitch'
 import { CompactFilterMenu } from '../components/CompactFilterMenu'
 import { RankingMetricTabs, RankingRow } from '../components/RankingRow'
+import { TeamIcon } from '../components/TeamIcon'
+import { TeamLink } from '../components/TeamLink'
 import { VirtualRankingList } from '../components/VirtualRankingList'
 import { COMPETITION_OPTIONS } from '../lib/competitionOptions'
+import { resultCompetitionLabel } from '../lib/competitionResults'
 import { historicalPlayerLabel } from '../lib/historicalPlayerDisplay'
 import { playerFullName } from '../components/ui'
+import { recordedTeamId } from '../engine/matchPerspective'
 import { officialAwardSeasons } from '../engine/officialAwards'
+import { recordsScopedMatches } from '../engine/recordsScope'
+import { bestTeamCompetitionResults, finalizedTeamPlacements } from '../engine/teamCompetitionResults'
+import { teamHistoricMatchRecords } from '../engine/teamHistoricMatches'
 import { teamAwardMomentLabel, teamHistoryBestXI, teamHistoryHonors, teamHistoryRecords, type TeamHistoryRecordRow } from '../engine/teamHistory'
+import { teamMetrics } from '../engine/teamMetrics'
 import type { CompetitionState, Match, Player, ScreenStateByView, Team, View } from '../types'
 
 type TeamHistoryProps = {
@@ -30,8 +38,21 @@ export function TeamHistory({ teamId, season, teams, players, matches, states, s
   const records = useMemo(() => menu === 'records' ? teamHistoryRecords(players, matches, { teamId, competition, season: recordsMode === 'all-time' ? null : selectedSeason }) : [], [menu, players, matches, teamId, competition, recordsMode, selectedSeason])
   const bestXI = useMemo(() => menu === 'best-xi' ? teamHistoryBestXI(players, matches, { teamId, competition, season: selectedSeason }) : undefined, [menu, players, matches, teamId, competition, selectedSeason])
   const byId = useMemo(() => new Map(players.map(player => [player.id, player])), [players])
+  const teamsById = useMemo(() => new Map(teams.map(team => [team.id, team])), [teams])
   const honorName = (id: string) => playerFullName(byId.get(id)).trim() || historicalPlayerLabel(id, byId.get(id)).trim() || historicalPlayerLabel(id)
-  const team = teams.find(item => item.id === teamId)
+  const team = teamsById.get(teamId)
+  const archive = useMemo(() => {
+    if (menu !== 'honors' || !team) return
+    const games = recordsScopedMatches(matches, { competition, seasons: [], teamIds: [] }, 'team')
+    const totals = teamMetrics(team, games)
+    const historic = teamHistoricMatchRecords(games, [teamId]).map(group => {
+      let best = -Infinity
+      for (const row of group.rows) best = Math.max(best, row.numeric)
+      return { id: group.id, title: group.title, rows: group.rows.filter(row => row.numeric === best).reverse() }
+    })
+    return { totals, historic }
+  }, [menu, team, matches, teamId, competition])
+  const bestResults = useMemo(() => menu === 'honors' ? bestTeamCompetitionResults(finalizedTeamPlacements(teams, players, matches, states), teamId, competition) : [], [menu, teams, players, matches, states, teamId, competition])
   const openPlayer = (id: string, awardSeason?: string) => onNavigate({ name: 'player', id, season: awardSeason ?? selectedSeason, competitionType: competition })
   const renderRecord = (row: TeamHistoryRecordRow) => <RankingRow rank={row.rank} player={byId.get(row.playerId)} team={team} positionLabel={row.position} value={String(row.value)} onClick={() => openPlayer(row.playerId)} />
   return <section className="mt-4 min-w-0" aria-label="Team History">
@@ -42,7 +63,27 @@ export function TeamHistory({ teamId, season, teams, players, matches, states, s
       {(menu === 'best-xi' || recordsMode === 'season') && <CompactFilterMenu label="Team History season" value={selectedSeason} options={(seasons.length ? seasons : [season]).map(value => ({ value, label: value }))} onChange={historySeason => onStateChange({ historySeason })} popupAlign="start" />}
     </div>}
     {menu === 'honors' && honors && <>
+      {archive && <section className="my-4 rounded-xl bg-zinc-900 p-3">
+        <h3 className="text-sm font-semibold">All-time Team Record</h3>
+        <dl className="mt-3 grid grid-cols-4 gap-1.5 text-center">
+          {([['Played', archive.totals.played], ['Won', archive.totals.wins], ['Drawn', archive.totals.draws], ['Lost', archive.totals.losses]] as const).map(([label, value]) => <div key={label} className="rounded-lg bg-black/25 p-2"><dt className="text-[10px] text-zinc-400">{label}</dt><dd className="font-bold tabular-nums">{value}</dd></div>)}
+        </dl>
+        {archive.totals.played > 0 && <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-zinc-800" aria-hidden="true">
+          {[[archive.totals.wins, 'bg-emerald-400'], [archive.totals.draws, 'bg-zinc-400'], [archive.totals.losses, 'bg-rose-400']].map(([value, color]) => <span key={color} className={String(color)} style={{ flex: value }} />)}
+        </div>}
+        <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs sm:grid-cols-3">
+          {([['Win Rate', archive.totals.played ? `${archive.totals.winRate.toFixed(1)}%` : '—'], ['PPG', archive.totals.played ? archive.totals.ppg.toFixed(2) : '—'], ['Goals For', archive.totals.goals], ['Goals Against', archive.totals.conceded], ['Goal Difference', archive.totals.goalDifference], ['Clean Sheets', archive.totals.cleanSheets]] as const).map(([label, value]) => <div key={label} className="flex items-center justify-between gap-1 rounded-lg bg-black/20 px-2 py-1.5"><dt className="text-zinc-400">{label}</dt><dd className="font-semibold tabular-nums">{value}</dd></div>)}
+        </dl>
+      </section>}
       <div className="my-4 grid grid-cols-3 gap-2 text-center">{[['Championships', honors.championships], ['Runner-ups', honors.runnerUps], ['Finals', honors.finals]].map(([label, value]) => <div key={label} className="rounded-xl bg-zinc-900 px-1 py-3"><b className="block text-lg">{value}</b><span className="text-[9px] uppercase text-zinc-500">{label}</span></div>)}</div>
+      <section className="my-4 rounded-xl bg-zinc-900 p-3">
+        <h3 className="text-sm font-semibold">Best Competition Results</h3>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">{bestResults.map(result => <article key={result.competition} className="min-w-0 rounded-lg bg-black/25 p-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-1"><h4 className="text-xs font-semibold">{competitionLabel[result.competition]}</h4><span className="text-[10px] text-zinc-400">{result.championships} {result.championships === 1 ? 'title' : 'titles'}</span></div>
+          <div className={`mt-1 text-xs ${result.label === 'Champion' ? 'font-bold text-amber-300' : 'text-zinc-300'}`}>{result.label ?? 'No finalized result'}</div>
+          {result.seasons.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{result.seasons.map(resultSeason => <button type="button" key={resultSeason} aria-label={`Open ${resultSeason} ${competitionLabel[result.competition]} result`} onClick={() => onNavigate({ name: 'competition', season: resultSeason, competitionType: result.competition })} className="min-h-9 rounded-md bg-emerald-950/70 px-2 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-900">{resultSeason}</button>)}</div>}
+        </article>)}</div>
+      </section>
       <section className="mb-4 overflow-hidden rounded-xl bg-zinc-900">
         <button type="button" className="flex min-h-12 w-full items-center justify-between gap-2 p-3 text-left text-sm font-semibold" aria-expanded={!disclosures.includes('season-history-closed')} onClick={() => toggle('season-history-closed')}>Season History <span className="text-zinc-500">{disclosures.includes('season-history-closed') ? '+' : '−'}</span></button>
         {!disclosures.includes('season-history-closed') && <div className="px-3 pb-3">{honors.seasonHistory.map(row => {
@@ -50,6 +91,27 @@ export function TeamHistory({ teamId, season, teams, players, matches, states, s
           return <div key={row.season} className="border-t border-white/5"><button type="button" className="flex min-h-11 w-full items-center justify-between gap-3 py-2 text-left text-xs font-bold" aria-expanded={seasonOpen} onClick={() => toggle(seasonKey)}>{row.season}<span className="text-zinc-500">{seasonOpen ? '−' : '+'}</span></button>{seasonOpen && <div className="pb-2">{row.results.map(result => <div key={result.competition} className="flex items-start justify-between gap-3 py-1 text-[11px]"><span className="text-zinc-500">{competitionLabel[result.competition]}</span><span className={`text-right ${result.result?.champion ? 'font-bold text-amber-300' : 'text-zinc-300'}`}>{result.status}</span></div>)}</div>}</div>
         })}{!honors.seasonHistory.length && <p className="text-xs text-zinc-500">No season history yet.</p>}</div>}
       </section>
+      {archive && <section className="my-4 rounded-xl bg-zinc-900 p-3">
+        <h3 className="text-sm font-semibold">Historic Matches</h3>
+        <div className="mt-2 divide-y divide-white/5">{archive.historic.map(group => {
+          const key = `historic:${group.id}`, expanded = disclosures.includes(key)
+          const visible = expanded ? group.rows : group.rows.slice(0, 1)
+          return <article key={group.id} className="py-2.5">
+            <h4 className="text-xs font-semibold">{group.title}{group.rows[0] && <span className="ml-2 text-emerald-300">{group.rows[0].numeric} {group.id === 'biggest-comeback' ? 'goal deficit' : group.rows[0].numeric === 1 ? 'goal' : 'goals'}</span>}</h4>
+            {visible.map(row => {
+              const opponent = teamsById.get(row.opponentId)
+              const opponentName = (recordedTeamId(row.match) === teamId ? row.match.opponentName : undefined) || opponent?.name || 'Opponent'
+              const score = `${row.goalsFor} : ${row.goalsAgainst}`
+              return <div key={row.match.id} className="mt-1.5 flex min-w-0 items-center justify-between gap-2 rounded-lg bg-black/25 px-2 py-1">
+                <div className="min-w-0 text-xs">{opponent ? <TeamLink team={opponent} onNavigate={id => onNavigate({ name: 'team', id })} /> : <span className="flex items-center gap-1.5 py-1 font-semibold"><TeamIcon className="h-5 w-5" /><span className="min-w-0 [overflow-wrap:anywhere]">{opponentName}</span></span>}<span className="block text-[10px] text-zinc-400">{row.match.season} · {resultCompetitionLabel(row.match)}</span></div>
+                <button type="button" className="min-h-10 shrink-0 rounded-md px-2 text-sm font-bold text-emerald-300 tabular-nums hover:bg-emerald-950" aria-label={`Open ${group.title} match against ${opponentName}, ${score}`} onClick={() => onNavigate({ name: 'match', id: row.match.id })}>{score}</button>
+              </div>
+            })}
+            {!visible.length && <p className="mt-1 text-[11px] text-zinc-500">No qualifying match.</p>}
+            {group.rows.length > 1 && <button type="button" className="mt-1 min-h-9 rounded-md px-1 text-[11px] font-semibold text-emerald-300" aria-expanded={expanded} aria-label={`${expanded ? 'Hide' : 'Show all'} ${group.rows.length} ${group.title} matches`} onClick={() => toggle(key)}>{expanded ? 'Show one match' : `View all ${group.rows.length} tied matches`}</button>}
+          </article>
+        })}</div>
+      </section>}
       <section className="overflow-hidden rounded-xl bg-zinc-900">
         <button type="button" className="flex min-h-12 w-full items-center justify-between gap-2 p-3 text-left text-sm font-semibold" aria-expanded={!disclosures.includes('individual-closed')} onClick={() => toggle('individual-closed')}>Individual Honors <span className="text-xs text-zinc-500">{honors.individual.reduce((sum, kind) => sum + kind.count, 0)} {disclosures.includes('individual-closed') ? '+' : '−'}</span></button>
         {!disclosures.includes('individual-closed') && <div className="px-3 pb-3">{honors.individual.map(kind => {

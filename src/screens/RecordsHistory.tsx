@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { historyAwardResultForScope, historySeasons, historyTimelineForSeason } from '../engine/historyReadModels'
 import { awardsForCompetition, seasonAwards, type AwardScope } from '../engine/awards'
 import { currentStaticTeams } from '../data/teams'
@@ -6,45 +6,77 @@ import type { CompetitionState, CompetitionType, Match, Player, Team } from '../
 import { playerFullName } from '../components/ui'
 import { AwardBestXI } from '../components/AwardBestXI'
 import { SegmentedControl } from '../components/SeasonUI'
+import { officialSeasonModel } from '../engine/officialAwards'
+import { TeamIdentityAction } from '../components/EntityActions'
+import { TeamIcon } from '../components/TeamIcon'
+import { CompetitionScopeSelector } from '../components/CompetitionScopeSelector'
+import { RecordPreview } from '../components/RecordRows'
+import { recordsLeaderboardGroups, EMPTY_RECORDS_SCOPE } from './recordsLeaderboards'
+import type { View } from '../types'
 
 type Props = { players: Player[]; teams: Team[]; matches: Match[]; states: CompetitionState[]; competition?: CompetitionType | 'all' }
-type ControlledProps = Props & { panel: 'timeline' | 'awards'; openSeason: string | null; awardScope: AwardScope; onPanel: (panel: 'timeline' | 'awards') => void; onSeason: (season: string | null) => void; onAwardScope: (scope: AwardScope) => void; onPlayerOpen: (id: string) => void }
+type ControlledProps = Props & { seasonIds?: string[]; panel: 'timeline' | 'awards'; openSeason: string | null; awardScope: AwardScope; onPanel: (panel: 'timeline' | 'awards') => void; onSeason: (season: string | null) => void; onAwardScope: (scope: AwardScope) => void; onCompetition?: (scope: CompetitionType | 'all') => void; onPlayerOpen: (id: string) => void; onNavigate?: (view: View) => void }
 const AWARD_SCOPES = [
   { value: 'first-half', label: 'First Half' }, { value: 'second-half', label: 'Second Half' },
   { value: 'league', label: 'League' }, { value: 'cup', label: 'Cup' },
   { value: 'champions', label: 'Champions' }, { value: 'season', label: 'Season' },
 ] as const
 
-export function RecordsHistory({ players, teams, matches, states, panel, openSeason, awardScope, onPanel, onSeason, onAwardScope, onPlayerOpen }: ControlledProps) {
-  const seasons = useMemo(() => historySeasons(matches, states).slice().reverse(), [matches, states])
+export function RecordsHistory({ players, teams, matches, states, seasonIds, panel, openSeason, awardScope, competition = 'all', onPanel, onSeason, onAwardScope, onCompetition, onPlayerOpen, onNavigate }: ControlledProps) {
+  const seasons = useMemo(() => historySeasons(matches, states).filter(season => !seasonIds?.length || seasonIds.includes(season)).reverse(), [matches, states, seasonIds])
   return <section aria-label="Records history">
     <div role="tablist" aria-label="History view" className="mb-4 flex w-fit rounded-xl bg-zinc-900 p-1">
       <button role="tab" aria-selected={panel === 'timeline'} type="button" onClick={() => onPanel('timeline')} className={`rounded-lg px-3 py-2 text-xs font-bold ${panel === 'timeline' ? 'bg-emerald-500 text-black' : 'text-zinc-400'}`}>Timeline</button>
       <button role="tab" aria-selected={panel === 'awards'} type="button" onClick={() => onPanel('awards')} className={`rounded-lg px-3 py-2 text-xs font-bold ${panel === 'awards' ? 'bg-emerald-500 text-black' : 'text-zinc-400'}`}>Awards</button>
     </div>
     {panel === 'awards' && <div className="mb-3"><SegmentedControl label="Award history scope" value={awardScope} options={[...AWARD_SCOPES]} columns={3} onChange={value => onAwardScope(value as AwardScope)} /></div>}
+    {panel === 'timeline' && onCompetition && <div className="mb-3"><CompetitionScopeSelector value={competition} onChange={onCompetition} /></div>}
     {panel === 'timeline'
-      ? <Timeline seasons={seasons} openSeason={openSeason} onToggle={onSeason} onPlayerOpen={onPlayerOpen} players={players} teams={teams} matches={matches} states={states} />
+      ? <Timeline seasons={seasons} openSeason={openSeason} onToggle={onSeason} onPlayerOpen={onPlayerOpen} onNavigate={onNavigate} players={players} teams={teams} matches={matches} states={states} competition={competition} />
       : <Awards seasons={seasons} openSeason={openSeason} awardScope={awardScope} onToggle={onSeason} onPlayerOpen={onPlayerOpen} players={players} teams={teams} matches={matches} states={states} />}
   </section>
 }
 
-function Timeline({ seasons, openSeason, onToggle, onPlayerOpen, players, teams, matches, states }: Props & { seasons: string[]; openSeason: string | null; onToggle: (season: string | null) => void; onPlayerOpen: (id: string) => void }) {
-  return <><h2 className="mb-2 text-sm font-semibold">Season Timeline</h2><div className="space-y-2">{seasons.map(season => <section key={season} className="rounded-2xl bg-zinc-900"><button type="button" onClick={() => onToggle(openSeason === season ? null : season)} className="flex min-h-12 w-full items-center justify-between px-3 text-left text-sm font-black"><span>{season}</span><span className="text-xs text-zinc-400">{openSeason === season ? 'Hide' : 'Open'}</span></button>{openSeason === season && <TimelineDetail season={season} onPlayerOpen={onPlayerOpen} players={players} teams={teams} matches={matches} states={states} />}</section>)}</div>{!seasons.length && <p className="text-xs text-zinc-500">No recorded seasons yet.</p>}</>
+function Timeline({ seasons, openSeason, onToggle, onPlayerOpen, onNavigate, players, teams, matches, states, competition }: Props & { seasons: string[]; openSeason: string | null; onToggle: (season: string | null) => void; onPlayerOpen: (id: string) => void; onNavigate?: (view: View) => void }) {
+  return <><h2 className="mb-2 text-sm font-semibold">Season Archive</h2><div className="space-y-2">{seasons.map(season => <section key={season} className="rounded-2xl bg-zinc-900"><button type="button" aria-expanded={openSeason === season} onClick={() => onToggle(openSeason === season ? null : season)} className="flex min-h-12 w-full items-center justify-between px-3 text-left text-sm font-black"><span>{season}</span><span className="text-xs text-zinc-400">{openSeason === season ? 'Hide' : 'Open'}</span></button>{openSeason === season && <TimelineDetail season={season} onPlayerOpen={onPlayerOpen} onNavigate={onNavigate} players={players} teams={teams} matches={matches} states={states} competition={competition} />}</section>)}</div>{!seasons.length && <p className="text-xs text-zinc-500">No recorded seasons yet.</p>}</>
 }
 
-function TimelineDetail({ season, onPlayerOpen, players, teams, matches, states }: Props & { season: string; onPlayerOpen: (id: string) => void }) {
-  const model = useMemo(() => historyTimelineForSeason(teams, players, matches, states, season), [teams, players, matches, states, season])
-  const teamName = (id?: string) => teams.find(team => team.id === id)?.name ?? '—'
-  const playerName = (id?: string) => id ? playerFullName(players.find(player => player.id === id)) : '—'
+function TimelineDetail({ season, onPlayerOpen, onNavigate, players, teams, matches, states, competition = 'all' }: Props & { season: string; onPlayerOpen: (id: string) => void; onNavigate?: (view: View) => void }) {
+  const model = useMemo(() => historyTimelineForSeason(teams, players, matches, states, season, competition), [teams, players, matches, states, season, competition])
+  const official = useMemo(() => officialSeasonModel(teams, players, matches, states, season), [teams, players, matches, states, season])
+  const scope = useMemo(() => ({ ...EMPTY_RECORDS_SCOPE, seasons: [season], competition }), [season, competition])
+  const groups = useMemo(() => recordsLeaderboardGroups({ category: 'team', teams, players, matches, states, scope, selectedIds: ['biggest-win', 'biggest-comeback', 'team-goals'] }), [teams, players, matches, states, scope])
+  const playerById = useMemo(() => new Map(players.map(player => [player.id, player])), [players])
+  const teamById = useMemo(() => new Map(teams.map(team => [team.id, team])), [teams])
+  const matchById = useMemo(() => new Map(matches.map(match => [match.id, match])), [matches])
+  const playerName = (id: string) => playerFullName(playerById.get(id))
+  const playerLinks = (ids: string[], value?: number | string) => ids.length ? <>{ids.map(id => <button key={id} type="button" onClick={() => onPlayerOpen(id)} className="block min-h-8 text-left text-emerald-300">{playerName(id)}</button>)}{value}</> : '—'
+  const competitions: CompetitionType[] = competition === 'all' ? ['league', 'cup', 'champions'] : [competition]
+  const xiTitle = competition === 'all' ? 'Season Best XI' : `${competition} Best XI`
+  const completed = competition === 'all' ? official.status.complete : competition === 'league' ? official.status.league.complete : Boolean(official.status[competition].championId)
   return <div className="border-t border-white/5 px-3 pb-3 pt-2">
-    <div className="grid grid-cols-3 gap-1 text-[10px]">
-      <Fact label="League" value={teamName(model.league)} /><Fact label="Cup" value={teamName(model.cup)} /><Fact label="Champions" value={teamName(model.champions)} />
-      <Fact label="Golden Boot" value={model.scorers.length ? `${model.scorers.map(winner => playerName(winner.playerId)).join(', ')} · ${model.scorers[0].goals}` : '—'} />
-      <Fact label="Assist Leader" value={model.assistLeaders.length ? `${model.assistLeaders.map(winner => playerName(winner.playerId)).join(', ')} · ${model.assistLeaders[0].assists}` : '—'} />
-      <Fact label="Best Rating" value={`${playerName(model.rating?.playerId)} · ${model.rating?.avgRating.toFixed(2) ?? '—'}`} />
+    <p className="mb-2 text-xs font-semibold text-zinc-400">{completed ? competition === 'all' ? 'Season complete' : 'Competition complete' : 'In progress'}</p>
+    <div className="mb-2 space-y-1">
+      {competitions.map(competition => {
+        const championId = official.status[competition].championId
+        const runnerUpId = official.teamResults.find(result => result.competition === competition && result.runnerUp)?.teamId
+        return <div key={competition} className="rounded-lg bg-black/30 p-2 text-xs">
+          <h3 className="mb-1 font-semibold capitalize">{competition}</h3>
+          {!championId ? <span className="text-zinc-400">Result pending</span> : <div className="flex flex-wrap gap-3">
+            {[['Champion', championId], ['Runner-up', runnerUpId]].flatMap(([label, id]) => id ? [<div key={label} className="text-[10px] text-zinc-400"><span className="block">{label}</span><TeamIdentityAction team={teamById.get(id)} onNavigate={teamId => onNavigate?.({ name: 'team', id: teamId })} className="flex min-h-8 items-center gap-1 text-zinc-200"><TeamIcon team={teamById.get(id)} className="size-5" />{teamById.get(id)?.name ?? id}</TeamIdentityAction></div>] : [])}
+          </div>}
+        </div>
+      })}
     </div>
-    {model.bestXI.length > 0 && <div className="mt-3 text-[10px] text-zinc-400"><b className="text-zinc-200">Team of the Season:</b> {model.bestXI.map(id => <button key={id} type="button" onClick={() => onPlayerOpen(id)} className="mr-2 py-1 text-emerald-300">{playerName(id)}</button>)}</div>}
+    <div className="grid grid-cols-3 gap-1 text-[10px]">
+      <Fact label="Golden Boot" value={playerLinks(model.scorers.map(winner => winner.playerId), model.scorers[0]?.goals)} />
+      <Fact label="Assist Leader" value={playerLinks(model.assistLeaders.map(winner => winner.playerId), model.assistLeaders[0]?.assists)} />
+      <Fact label="Best Rating" value={playerLinks(model.rating ? [model.rating.playerId] : [], model.rating?.avgRating.toFixed(2))} />
+    </div>
+    {model.bestXI.length > 0 && <div className="mt-3 text-[10px] text-zinc-400"><b className="capitalize text-zinc-200">{xiTitle}</b> {model.bestXI.map(id => <button key={id} type="button" onClick={() => onPlayerOpen(id)} className="mr-2 py-1 text-emerald-300">{playerName(id)}</button>)}</div>}
+    {onNavigate && groups.some(group => group.rows.length) && <div className="mt-3 space-y-1.5">
+      <h3 className="text-xs font-semibold">Team Records</h3>{groups.map(group => <RecordPreview key={group.id} group={group} players={playerById} teams={teamById} matches={matchById} scope={scope} onNavigate={onNavigate} />)}
+    </div>}
   </div>
 }
 
@@ -77,4 +109,4 @@ function AwardsDetail({ season, players, teams, matches, states, awardScope, onP
   </div>
 }
 
-function Fact({ label, value }: { label: string; value: string }) { return <div className="rounded-lg bg-black/30 p-2"><small className="block text-zinc-500">{label}</small><b className="mt-1 block break-words">{value}</b></div> }
+function Fact({ label, value }: { label: string; value: ReactNode }) { return <div className="rounded-lg bg-black/30 p-2"><small className="block text-zinc-500">{label}</small><div className="mt-1 break-words font-bold">{value}</div></div> }

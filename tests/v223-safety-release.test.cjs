@@ -12,7 +12,7 @@ const { leagueCompetition } = require('../src/engine/competition.ts')
 test('v2.2.4 retains the durable football namespace and isolates local-mode preference', () => {
   const repository = fs.readFileSync(require.resolve('../src/lib/repository.ts'), 'utf8')
   const auth = fs.readFileSync(require.resolve('../src/lib/auth.tsx'), 'utf8')
-  assert.equal(APP_VERSION, '2.7.1'); assert.equal(require('../package.json').version, '2.7.1'); assert.equal(RATING_ENGINE_REVISION, 14)
+  assert.equal(APP_VERSION, '2.8.0'); assert.equal(require('../package.json').version, '2.8.0'); assert.equal(RATING_ENGINE_REVISION, 14)
   assert(repository.includes("STORAGE_KEY = 'football-tracker-v1'"))
   assert(repository.includes('BACKUP_KEY') && repository.includes('EMERGENCY_PREFIX'))
   assert(!repository.includes('APP_VERSION'))

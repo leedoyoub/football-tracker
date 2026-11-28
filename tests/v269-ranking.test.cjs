@@ -14,7 +14,7 @@ test('position groups form one deduplicated union and normalize legacy fullbacks
 })
 test('Global team selection retains rank gaps, complete statistics and historical membership', () => {
   const state = fixture(), harness = screenHarness(root, 'screens/GlobalRankingScreen.tsx', 'GlobalRankingScreen', state)
-  let screenState = { ...defaultScreenState({ name: 'global-ranking' }), metric: 'goals', scope: 'league' }
+  let screenState = { ...defaultScreenState({ name: 'global-ranking' }), metric: 'goals', scope: 'league', rankMode: 'overall' }
   const render = () => { const tree = harness.render({ season: 'Season 1', screenState, onStateChange: s => { screenState = s }, onNavigate() {}, onBack() {} }); return nodes(tree, n => n.type?.name === 'VirtualRankingList')[0] }
   const all = render().props.rows
   screenState = { ...screenState, teamIds: [state.teams[0].id, state.teams[1].id] }
@@ -68,10 +68,10 @@ test('Global Ranking applies every position/team combination to one union popula
     [[], [], [['p0',1],['p1',2],['p2',3],['p3',4],['p4',5]]],
     [['st-ss'], [], [['p0',1],['p3',2]]],
     [['st-ss','lw-rw'], [], [['p0',1],['p2',2],['p3',3],['p4',4]]],
-    [[], ['B'], [['p1',2],['p3',4]]],
+    [[], ['B'], [['p1',1],['p3',2]]],
     [[], ['A','B'], [['p0',1],['p1',2],['p2',3],['p3',4],['p4',5]]],
-    [['st-ss'], ['B'], [['p3',2]]],
-    [['st-ss','lw-rw'], ['B','C'], [['p3',3]]],
+    [['st-ss'], ['B'], [['p3',1]]],
+    [['st-ss','lw-rw'], ['B','C'], [['p3',1]]],
   ]) {
     const screenState = { ...defaultScreenState({ name: 'global-ranking' }), metric: 'goals', positionFilters, teamIds }
     const tree = h.render({ season: 'S1', screenState, onStateChange() {}, onNavigate() {}, onBack() {} })
@@ -79,7 +79,7 @@ test('Global Ranking applies every position/team combination to one union popula
     assert.deepEqual(list.props.rows.map(r => [r.playerId,r.rank]), want, JSON.stringify([positionFilters,teamIds]))
   }
 })
-test('Award Race unfiltered rows equal independent v268 and presentation filters preserve candidate fields', () => {
+test('Award Race preserves archived candidate facts and admits the newly eligible short substitutes', () => {
   const { baselineRoot } = require('./v269-derived-baseline.cjs')
   const archived = baselineRoot()
   require('./helpers/rating-release-comparison.cjs').alignArchivedRatingInputs(archived)
@@ -89,7 +89,17 @@ test('Award Race unfiltered rows equal independent v268 and presentation filters
   const all = rowsFor(current, initial)
   const old = rowsFor(screenHarness(archived, 'screens/AwardRaceScreen.tsx', 'AwardRaceScreen', state), initial)
   assert(all.length > 0)
-  assert.deepEqual(all, old)
+  const archivedIds = new Set(old.map(row => row.candidate.playerId))
+  const withoutRank = ({ candidate, position }) => ({ candidate, position })
+  assert.deepEqual(all.filter(row => archivedIds.has(row.candidate.playerId)).map(withoutRank), old.map(withoutRank))
+  const added = all.filter(row => !archivedIds.has(row.candidate.playerId))
+  assert.deepEqual(added.map(row => row.candidate.playerId).sort(), state.teams.map(team => `${team.id}:11`).sort())
+  for (const { candidate } of added) {
+    assert.equal(candidate.appearances, 2)
+    assert.equal(candidate.minutes, 60)
+    assert.equal(candidate.availableMinutes, 180)
+  }
+  assert.deepEqual(all.map(row => row.rank), all.map((_, index) => index + 1))
   const selected = rowsFor(current, { ...initial, positionFilters: ['st-ss', 'lw-rw'], teamIds: [state.teams[0].id] })
   assert(selected.length > 0)
   for (const row of selected) assert.deepEqual(row.candidate, all.find(r => r.candidate.playerId === row.candidate.playerId).candidate)

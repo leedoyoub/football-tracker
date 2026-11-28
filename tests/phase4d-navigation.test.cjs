@@ -8,7 +8,7 @@ const navigation = require('../src/lib/navigation.ts')
 const entry = (view, state, scrollTop = 0) => navigation.createNavigationEntry(view, state, scrollTop)
 
 test('Team Detail Back restores the actual prior browse entry and only orphans fall back to Teams', () => {
-  const ranking = entry({ name: 'global-ranking', season: 'Season 4', competitionType: 'cup', rankingMetric: 'assists' }, { ...navigation.defaultScreenState({ name: 'global-ranking' }), metric: 'assists', scope: 'cup', positionFilter: 'cam', teamId: 'A', viewAll: true }, 481)
+  const ranking = entry({ name: 'global-ranking', season: 'Season 4', competitionType: 'cup', rankingMetric: 'assists' }, { ...navigation.defaultScreenState({ name: 'global-ranking' }), metric: 'assists', scope: 'cup', rankMode: 'overall', positionFilter: 'cam', positionFilters: ['cam', 'cm'], teamId: 'A', teamIds: ['A', 'B'] }, 481)
   const fromRanking = navigation.backFromTeamDetailEntries([ranking, entry({ name: 'team', id: 'A' })])
   assert.deepEqual(fromRanking, [ranking])
   assert.deepEqual(navigation.backFromTeamDetailEntries([entry({ name: 'team', id: 'A' })]).map(item => item.view), [{ name: 'teams' }])
@@ -40,7 +40,7 @@ test('new-match completion consumes its transient entry before browsing to the e
   assert.equal(typeof navigation.completeTransientWorkflowToBrowse, 'function')
   const ranking = entry(
     { name: 'global-ranking', season: 'Season 4', competitionType: 'cup', rankingMetric: 'assists' },
-    { ...navigation.defaultScreenState({ name: 'global-ranking' }), metric: 'assists', scope: 'cup', positionFilter: 'cam', teamId: 'A', viewAll: true },
+    { ...navigation.defaultScreenState({ name: 'global-ranking' }), metric: 'assists', scope: 'cup', rankMode: 'overall', positionFilter: 'cam', positionFilters: ['cam', 'cm'], teamId: 'A', teamIds: ['A', 'B'] },
     481,
   )
   const teamState = { ...navigation.defaultScreenState({ name: 'team', id: 'A' }), tab: 'matches', bestPlayersSeason: 'Season 3', bestPlayersCompetition: 'cup', bestPlayersMetric: 'saves', matchesCompetition: 'cup' }

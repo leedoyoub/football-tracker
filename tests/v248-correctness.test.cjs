@@ -249,11 +249,11 @@ test('last route keeps valid Competition panel selections and drops stale entity
   assert.deepEqual([restored.leagueMenu, restored.bestXiMode, restored.leagueAwardScope, restored.monthlyAwardBlock, restored.historyMatchday, restored.historyComparedTeamIds, restored.comparedPlayerIds], ['history', undefined, 'league', null, 3, ['A'], undefined])
 })
 
-test('Records Insights ignores hidden season and team filters, and team records use recorded identity', () => {
+test('Records Analytics applies its visible season and team filters, and team records use recorded identity', () => {
   const champion = game('champion', 'champions', 'A', 'B', 'A', 1, 3)
   const other = { ...game('other', 'league', 'B', 'B', 'A', 0, 0), season: 'Season 2' }
   const filters = { seasons: ['Season 2'], teamIds: ['B'], competition: 'all' }
-  assert.deepEqual(recordsScopedMatches([champion, other], filters, 'insights').map(match => match.id), ['champion', 'other'])
+  assert.deepEqual(recordsScopedMatches([champion, other], filters, 'insights').map(match => match.id), ['other'])
   assert.deepEqual(recordsScopedMatches([champion, other], { ...filters, seasons: [], competition: 'champions' }, 'team').map(match => match.id), [])
   assert.deepEqual(recordsScopedMatches([other], { seasons: [], teamIds: ['A'], competition: 'league' }, 'team').map(match => match.id), ['other'])
 })

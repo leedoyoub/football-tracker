@@ -36,7 +36,8 @@ test('official awards preserve unaffected v2.5.12 fields and record filters whil
       else {
         const retired = /^awards-(monthly|monthly-player|monthly-xi|finals|cup-final|champions-final|champions-round-player|champions-round-xi)$/
         const added = /^awards-(first-half|second-half)-(mvp|xi)$/
-        assert.deepEqual(actual.filter(group => !added.test(group.id)), original.filter(group => !retired.test(group.id)), 'every retained metric, aggregate, row, rank, filter and historical detail remains identical with archived events')
+        const expected = original.filter(group => !retired.test(group.id)).map(group => group.id === 'awards-season-mvp' ? { ...group, title: "Most Ballon d'Or" } : group)
+        assert.deepEqual(actual.filter(group => !added.test(group.id)), expected, 'every retained metric, aggregate, row, rank, filter and historical detail remains identical with archived events')
         assert(!actual.some(group => retired.test(group.id)))
         assert.deepEqual(actual.filter(group => added.test(group.id)).map(group => [group.id, group.rows]), ['first-half-mvp', 'first-half-xi', 'second-half-mvp', 'second-half-xi'].map(kind => [`awards-${kind}`, []]), 'new half metrics cannot invent recipients in an injected legacy event set')
       }

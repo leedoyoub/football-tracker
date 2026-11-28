@@ -25,7 +25,7 @@ test('legacy fb navigation value presents LB/RB and both filter families', () =>
 test('Records and related analytical selectors use the shared compact menus', () => {
   const records = fs.readFileSync(require.resolve('../src/screens/RecordsScreen.tsx'), 'utf8')
   const season = fs.readFileSync(require.resolve('../src/components/RecordsSeasonFilter.tsx'), 'utf8')
-  assert.match(records, /CompactFilterMenu value=\{String\(value\)\}/)
+  assert.match(records, /CompactFilterMenu label=\{label\} value=\{value\}/)
   assert.doesNotMatch(records, /<select/)
   assert.match(season, /CompactMultiFilterMenu/)
   assert.doesNotMatch(season, /<details/)

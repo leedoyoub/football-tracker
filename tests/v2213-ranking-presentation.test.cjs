@@ -2,9 +2,11 @@ const assert = require('node:assert/strict')
 const { test } = require('node:test')
 const fs = require('node:fs')
 
-test('v2.2.13 puts 7.2+ Matches immediately after MOM and uses requested visible ranking names', () => {
+test('the default order places Appearances before Minutes and keeps the 7.2+ Matches record', () => {
   const metrics = require('../src/lib/rankingMetrics.ts').RANKING_METRICS
-  assert.deepEqual(metrics.slice(4, 7).map(item => item.value), ['minutes', 'mom', 'goodMatches'])
+  assert.deepEqual(metrics.slice(4, 7).map(item => item.value), ['appearances', 'minutes', 'mom'])
+  const records = fs.readFileSync(require.resolve('../src/engine/playerRecords.ts'), 'utf8')
+  assert.match(records, /'good', 'Most 7\.2\+ Matches'/)
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   const competition = fs.readFileSync(require.resolve('../src/screens/CompetitionScreen.tsx'), 'utf8')
   const global = fs.readFileSync(require.resolve('../src/screens/GlobalRankingScreen.tsx'), 'utf8')

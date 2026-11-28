@@ -8,7 +8,7 @@ import { newestMatches } from './matchChronology'
 import { scopedPositionFamilyByPlayer, type PositionFamily } from './positionScope'
 import { matchesForAwardScope } from './awardScopes'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
-import { AWARD_POLICY_REVISION } from './awardPolicy'
+import { AWARD_POLICY_REVISION, BALLON_DOR_LABEL } from './awardPolicy'
 import { arrayItemRevision } from './arrayItemRevision'
 
 export { AWARD_POLICY_REVISION } from './awardPolicy'
@@ -103,7 +103,7 @@ export function officialSeasonModel(teams: Team[], players: Player[], matches: M
     }
     if (status.complete) {
       const award = seasonAwards(season, tournamentTeams, players, matches, states, status)
-      for (const [kind, label, winners] of [['mvp', 'Player of the Season', award.ballon ? [award.ballon] : []], ['scorer', 'Season Top Scorer', award.goldenBootWinners], ['assists', 'Season Assist King', award.assistLeaderWinners], ['gk', 'Goalkeeper of the Season', award.goalkeeper ? [award.goalkeeper] : []]] as const) {
+      for (const [kind, label, winners] of [['mvp', BALLON_DOR_LABEL, award.ballon ? [award.ballon] : []], ['scorer', 'Season Top Scorer', award.goldenBootWinners], ['assists', 'Season Assist King', award.assistLeaderWinners], ['gk', 'Goalkeeper of the Season', award.goalkeeper ? [award.goalkeeper] : []]] as const) {
         for (const winner of winners) add(`season-${kind}`, label, winner.playerId, 'all', games, winner.teamId)
       }
       for (const slot of award.bestXI) add('season-xi', 'Season Best XI', slot.playerId ?? undefined, 'all', games, slot.teamId)

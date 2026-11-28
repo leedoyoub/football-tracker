@@ -1,3 +1,4 @@
+import { BALLON_DOR_LABEL } from './awardPolicy'
 import type { CompetitionState, Match, Player, Team } from '../types'
 import { officialAwardSeasons, officialSeasonModel, type OfficialAwardEvent, type TeamSeasonResult, awardEventDetail } from './officialAwards'
 import { positionFilterFamilies } from './positionScope'
@@ -17,7 +18,7 @@ export const AWARD_RECORD_METRICS: Metric[] = [
   ...[
     ['first-half-mvp', 'First Half MVP'], ['first-half-xi', 'First Half Best XI'],
     ['second-half-mvp', 'Second Half MVP'], ['second-half-xi', 'Second Half Best XI'],
-    ['league-mvp', 'Player of the League'], ['cup-mvp', 'Player of the Cup'], ['champions-mvp', 'Player of the Tournament'], ['season-mvp', 'Player of the Season'],
+    ['league-mvp', 'Player of the League'], ['cup-mvp', 'Player of the Cup'], ['champions-mvp', 'Player of the Tournament'], ['season-mvp', BALLON_DOR_LABEL],
     ['league-gk', 'League Golden Gloves'], ['cup-gk', 'Goalkeeper of the Cup'], ['champions-gk', 'Goalkeeper of the Tournament'], ['season-gk', 'Goalkeeper of the Season'],
     ['league-xi', 'League Best XI'], ['cup-xi', 'Cup Best XI'], ['champions-xi', 'Champions Best XI'], ['season-xi', 'Season Best XI'],
   ].map(([id, title]) => ({ id, title: `Most ${title}`, accepts: (e: OfficialAwardEvent) => e.kind === id })),

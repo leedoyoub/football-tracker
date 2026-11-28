@@ -56,7 +56,8 @@ test('the historical winner moves across leaderboards, player details, milestone
   const defenderRecord = revisedRecords.find(group => group.id === 'highest-rating').rows.find(row => row.id === input.defender)
   assert.equal(defenderRecord.numeric, 6.88)
   Object.assign(defenderRecord, { numeric: 6.6, value: '6.60', detail: '6.60 canonical raw rating' })
-  assert.deepEqual(current.records.filter(group => group.id !== 'mom'), revisedRecords)
+  const { assertRecordCompatibility } = require('./helpers/v280-policy-compat.cjs')
+  assertRecordCompatibility(current.records.filter(group => group.id !== 'mom'), revisedRecords, { category: 'player', scope: { teamIds: [] } }, 'MOM propagation preserves unrelated record values')
   for (const name of ['averageRating', 'goodMatchRate', 'goodMatches']) {
     assert.equal(current.striker[name], old.striker[name])
     assert.equal(current.keeper[name], old.keeper[name])

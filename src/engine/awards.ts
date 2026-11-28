@@ -9,7 +9,7 @@ import { isRecordedForTeam } from './matchPerspective'
 import { newestMatches } from './matchChronology'
 import { selectMomCandidate } from './momSelection'
 import { ratePlayerMatch } from './rating'
-import { AWARD_POLICY_REVISION } from './awardPolicy'
+import { AWARD_POLICY_REVISION, BALLON_DOR_LABEL } from './awardPolicy'
 import { arrayItemRevision } from './arrayItemRevision'
 import { evaluateOfficialCandidates } from './awardEvaluation'
 import { leagueSlotCounts } from './leagueSlots'
@@ -386,7 +386,7 @@ export function awardResultForScope(scope: AwardScope, season: string, teams: Te
     if (scope === 'season') {
       const award = seasonAwards(season, teams, players, matches, states)
       const anchorMatch = newestMatches(seasonGames)[0]
-      if (anchorMatch && award.bestPlayerId) result = { scopeLabel: season, playerLabel: 'Player of the Season', teamLabel: 'Season Best XI', bestPlayerId: award.bestPlayerId, bestXI: award.bestXI, statsByPlayer: award.statsByPlayer, anchorMatch, complete: award.complete, candidates: award.candidates, individualAwards: { scorers: award.goldenBootWinners, assistLeaders: award.assistLeaderWinners, goalkeepers: award.goalkeeper ? [award.goalkeeper] : [] } }
+      if (anchorMatch && award.bestPlayerId) result = { scopeLabel: season, playerLabel: BALLON_DOR_LABEL, teamLabel: 'Season Best XI', bestPlayerId: award.bestPlayerId, bestXI: award.bestXI, statsByPlayer: award.statsByPlayer, anchorMatch, complete: award.complete, candidates: award.candidates, individualAwards: { scorers: award.goldenBootWinners, assistLeaders: award.assistLeaderWinners, goalkeepers: award.goalkeeper ? [award.goalkeeper] : [] } }
     } else {
       const start = scope === 'first-half' ? 1 : 16
       const games = matchesForAwardScope(matches, season, scope)

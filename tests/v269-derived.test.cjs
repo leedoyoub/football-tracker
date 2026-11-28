@@ -3,6 +3,8 @@ const test = require('node:test'), assert = require('node:assert/strict'), path 
 const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const { sourceModule } = require('./helpers/v259-harness.cjs')
 const { baselineRoot } = require('./v269-derived-baseline.cjs')
+const { assertRecapCompatibility } = require('./helpers/v280-policy-compat.cjs')
+const { assertNewsPolicy, assertLatestPolicy } = require('./helpers/v265-award-policy-comparison.cjs')
 const root = path.resolve(__dirname, '..'), beforeRoot = baselineRoot()
 require('./helpers/rating-release-comparison.cjs').alignArchivedRatingInputs(beforeRoot)
 const source = (directory, file) => require(path.join(directory, 'src/engine', file + '.ts'))
@@ -29,15 +31,16 @@ test('each combination query reads a recorded player interval once per match and
 function equalDerived(state, label, allEvents = true) {
   const args = [state.players, state.teams, state.matches, state.competitionStates]
   const current = source(root, 'news'), previous = source(beforeRoot, 'news')
-  assert.deepEqual(current.deriveNews(...args), previous.deriveNews(...args), `${label}: all News fields and ordering`)
+  assertNewsPolicy(current.deriveNews(...args), previous.deriveNews(...args), args)
   for (const includeAllRanking of allEvents ? [false, true] : [false]) for (const includeMatchPerformance of allEvents ? [false, true] : [true]) {
     const options = { includeAllRanking, includeMatchPerformance }
-    assert.deepEqual(current.deriveFootballEvents(...args, options), previous.deriveFootballEvents(...args, options), `${label}: events ${JSON.stringify(options)}`)
+    assertNewsPolicy(current.deriveFootballEvents(...args, options), previous.deriveFootballEvents(...args, options), args, 'deriveFootballEvents')
   }
   const season = state.matches.at(-1)?.season ?? 'Season 1'
-  for (const scope of [undefined, season]) assert.deepEqual(source(root, 'latestChanges').deriveLatestChanges(...args, scope), source(beforeRoot, 'latestChanges').deriveLatestChanges(...args, scope), `${label}: Latest Changes ${scope}`)
+  for (const scope of [undefined, season]) assertLatestPolicy(source(root, 'latestChanges').deriveLatestChanges(...args, scope), source(beforeRoot, 'latestChanges').deriveLatestChanges(...args, scope), [...args, scope])
   const recapArgs = [state.players, state.matches, season, state.competitionStates, state.teams]
-  assert.deepEqual(source(root, 'seasonInsights').seasonRecap(...recapArgs), source(beforeRoot, 'seasonInsights').seasonRecap(...recapArgs), `${label}: full Recap`)
+  const official = source(root, 'awards').seasonAwards(season, state.teams, state.players, state.matches, state.competitionStates)
+  assertRecapCompatibility(source(root, 'seasonInsights').seasonRecap(...recapArgs), source(beforeRoot, 'seasonInsights').seasonRecap(...recapArgs), official)
   assert.deepEqual(source(root, 'seasonInsights').startingXILeaders(state.players, state.matches, season), source(beforeRoot, 'seasonInsights').startingXILeaders(state.players, state.matches, season), `${label}: Starting XI`)
   for (const kind of kinds) assert.deepEqual(source(root, 'analytics').combinationStats(state.players, state.matches, { season }, kind), source(beforeRoot, 'analytics').combinationStats(state.players, state.matches, { season }, kind), `${label}: complete ${kind} rows`)
 }

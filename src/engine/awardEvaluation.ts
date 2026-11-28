@@ -10,6 +10,7 @@ import { competitionIdentityForMatch } from './competitionContext'
 import { arrayItemRevision } from './arrayItemRevision'
 import { AWARD_POLICY_REVISION } from './awardPolicy'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
+import { actualParticipation, officialParticipationThresholds } from './participation'
 
 type Participation = { minutes: number; availableMinutes: number; teamMinutes: Map<string, number> }
 const competitions = ['league', 'cup', 'champions'] as const
@@ -114,7 +115,7 @@ function scopeParticipation(players: Player[], games: Match[], seasonGames: Matc
 
 /** Shared individual facts are derived by stats/timeline, never by position-
  * specific averages. One player, one rank and one main award family per scope. */
-type ScopeFacts = { rows: GlobalLeaderboardRow[]; families: ReturnType<typeof scopedAwardFamilyByPlayer>; participation: ReturnType<typeof scopeParticipation>; evaluated: Map<string, AwardCandidate[]>; revision: string }
+type ScopeFacts = { rows: GlobalLeaderboardRow[]; families: ReturnType<typeof scopedAwardFamilyByPlayer>; participation: ReturnType<typeof scopeParticipation>; actual: ReturnType<typeof actualParticipation>; thresholds: ReturnType<typeof officialParticipationThresholds>; evaluated: Map<string, AwardCandidate[]>; revision: string }
 const factsCache = new WeakMap<Player[], WeakMap<Match[], WeakMap<Match[], ScopeFacts>>>()
 
 export function evaluateOfficialCandidates(players: Player[], games: Match[], seasonGames: Match[], bonusFor: (type: CompetitionType, teamId: string) => number, weights: Partial<Record<CompetitionType, number>>, scopeRows?: GlobalLeaderboardRow[]): AwardCandidate[] {
@@ -123,10 +124,10 @@ export function evaluateOfficialCandidates(players: Player[], games: Match[], se
   const revision = `${AWARD_POLICY_REVISION}:${RATING_ENGINE_REVISION}:${MOM_POLICY_REVISION}:${arrayItemRevision(players)}:${arrayItemRevision(games)}:${arrayItemRevision(seasonGames)}`
   let facts = bySeason.get(seasonGames)
   if (!facts || facts.revision !== revision) {
-    facts = { rows: scopeRows ?? buildGlobalRankingData(players, games, { seasons: [], teams: [], positions: [] }, 'rating'), families: scopedAwardFamilyByPlayer(players, games, {}), participation: scopeParticipation(players, games, seasonGames), evaluated: new Map(), revision }
+    facts = { rows: scopeRows ?? buildGlobalRankingData(players, games, { seasons: [], teams: [], positions: [] }, 'rating'), families: scopedAwardFamilyByPlayer(players, games, {}), participation: scopeParticipation(players, games, seasonGames), actual: actualParticipation(games), thresholds: officialParticipationThresholds(games), evaluated: new Map(), revision }
     bySeason.set(seasonGames, facts)
   }
-  const { rows, families, participation, evaluated } = facts
+  const { rows, families, participation, actual, thresholds, evaluated } = facts
   const teamIds = [...new Set(games.flatMap(match => match.appearances.map(a => a.teamId)))].sort()
   const scoreKey = JSON.stringify(competitions.map(type => [weights[type] ?? 0, ...teamIds.map(teamId => bonusFor(type, teamId))]))
   const cached = evaluated.get(scoreKey); if (cached) return cached
@@ -144,11 +145,12 @@ export function evaluateOfficialCandidates(players: Player[], games: Match[], se
     const facts = participation.get(row.playerId)
     const availableMinutes = facts ? competitions.reduce((sum, type) => sum + facts[type].availableMinutes, 0) : 0
     const family = families.get(row.playerId)
-    if (!family || !ratings.length || !availableMinutes || minutes < .5 * availableMinutes) return []
+    const played = actual.get(row.playerId)
+    if (!family || !ratings.length || !thresholds.teamMatches || !played || played.appearances < thresholds.appearances || played.minutes < thresholds.minutes) return []
     const average = ratings.reduce((sum, rating) => sum + rating.raw, 0) / ratings.length
     const teamPerformanceBonus = competitions.reduce((sum, type) => {
-      const part = facts![type]
-      if (!part.minutes || !part.availableMinutes) return sum
+      const part = facts?.[type]
+      if (!part?.minutes || !part.availableMinutes) return sum
       const weightedBase = [...part.teamMinutes].reduce((total, [teamId, played]) => total + bonusFor(type, teamId) * played, 0) / part.minutes
       return sum + (weights[type] ?? 0) * weightedBase * Math.min(1, part.minutes / part.availableMinutes)
     }, 0)

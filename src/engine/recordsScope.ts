@@ -15,10 +15,9 @@ export function recordsScopedMatches(matches: Match[], filters: RecordsMatchFilt
   if (cached) return cached
   const result = matches.filter(match => {
     if (filters.competition !== 'all' && matchCompetitionType(match) !== filters.competition) return false
-    if (category === 'insights') return true
     if (filters.seasons.length && !filters.seasons.includes(match.season)) return false
     if (!filters.teamIds.length) return true
-    if (category === 'team') return filters.teamIds.some(teamId => teamsCreditedWithResult(match).includes(teamId))
+    if (category === 'team' || category === 'insights') return filters.teamIds.some(teamId => teamsCreditedWithResult(match).includes(teamId))
     return filters.teamIds.some(teamId => match.appearances.some(appearance => appearance.teamId === teamId))
   })
   // A metric change must preserve the source identity used by the existing

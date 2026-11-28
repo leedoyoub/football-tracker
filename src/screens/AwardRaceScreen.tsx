@@ -11,6 +11,7 @@ import { matchCompetitionType } from '../engine/competitionContext'
 import { awardRacePresentationRows } from '../engine/awardRacePresentation'
 import { awardResultForScope, awardsForCompetition, seasonAwards } from '../engine/awards'
 import { matchesForAwardScope } from '../engine/awardScopes'
+import { BALLON_DOR_LABEL } from '../engine/awardPolicy'
 import { competitionSeasonStatus } from '../engine/competition'
 import { seasonsFromMatches } from '../engine/stats'
 import { currentStaticTeams } from '../data/teams'
@@ -42,9 +43,9 @@ export function AwardRaceScreen({ screenState, onStateChange, onNavigate, onBack
   const sectionId = 'award-race-leaderboard'
   return <div className="px-4 pb-8 pt-6">
     <button type="button" onClick={onBack} className="mb-3 min-h-9 px-1 text-xs font-semibold text-emerald-400">← Back</button>
-    <div id={sectionId} className="mb-3 flex items-center justify-between gap-2"><div><h1 className="text-2xl font-semibold">{halfScope === 'first-half' ? 'First Half Award Race' : halfScope === 'second-half' ? 'Second Half Award Race' : 'Award Race'}</h1><p className="text-[10px] text-zinc-500">{season}</p></div><CompetitionScopeSelector value={scope} onChange={value => patch({ scope: value as CompetitionType | 'all', awardScope: undefined })} /></div>
+    <div id={sectionId} className="mb-3 flex items-center justify-between gap-2"><div><h1 className="text-2xl font-semibold">{halfScope === 'first-half' ? 'First Half Award Race' : halfScope === 'second-half' ? 'Second Half Award Race' : 'Award Race'}</h1><p className="text-[10px] text-zinc-500">{scope === 'all' && !halfScope ? `${season} · ${BALLON_DOR_LABEL}` : season}</p></div><CompetitionScopeSelector value={scope} onChange={value => patch({ scope: value as CompetitionType | 'all', awardScope: undefined })} /></div>
     <div className="mb-3 flex flex-wrap justify-end gap-2"><CompactFilterMenu value={season} options={seasons.map(value => ({ value, label: value }))} onChange={value => patch({ season: value })} label="Award Race season" popupAlign="start" /><PositionFilter values={positions} onChange={positionFilters => patch({ positionFilters, positionFilter: positionFilters[0] ?? 'all' })} label="Award Race position" allLabel="Position" allAccessibilityLabel="All positions" /><TeamFilter values={teamIds} teams={teams} onChange={teamIds => patch({ teamIds, teamId: teamIds[0] ?? null })} label="Award Race team" /></div>
-    <p className="mb-3 text-xs text-zinc-500">Avg Rating shown · ranked by Award Score · minimum 50% playing time</p>
+    <p className="mb-3 text-xs text-zinc-500">Avg Rating shown · ranked by Award Score · minimum 40% of matches and 20% of minutes based on the busiest team</p>
     {rows.length > 10 && <FloatingScrollToTop sectionId={sectionId} />}
     {rows.length ? <AwardRaceRows rows={rows} season={season} type={scope} players={players} teams={teams} status={status} onNavigate={onNavigate} /> : <p className="rounded-xl bg-zinc-900 p-3 text-xs text-zinc-500">Race begins after more matches are played.</p>}
   </div>

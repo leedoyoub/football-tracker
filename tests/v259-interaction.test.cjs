@@ -1,5 +1,6 @@
 const { leagueCopy, unchangedPlayerMarkup } = require('./helpers/v2512-policy-comparison.cjs')
 const { assertNewsPolicy, assertSelection } = require('./helpers/v265-award-policy-comparison.cjs')
+const { normalizeRankingTabs } = require('./helpers/legacy-ranking-metrics.cjs')
 require('./helpers/register-ts.cjs')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -64,13 +65,14 @@ test('settled Home and Player Detail retain v2.5.8 markup around canonical award
       '../engine/latestChanges': require('../src/engine/latestChanges.ts'),
     }) : h(baseline, name, store)
     if (name === 'HomeScreen') assertSelection(require('../src/engine/awards.ts').seasonAwards('Season 1', store.teams, store.players, store.matches, store.competitionStates), 'season', 'Season 1', store.teams, store.players, store.matches, store.competitionStates)
-    let expected = renderToStaticMarkup(originalHarness.render(props)).replace(/(<summary class="cursor-pointer text-zinc-400">)Rating Details · [A-Z]+ · \d+&#x27;(<\/summary>)/g, '$1Rating Details$2').replace('positions under 10% are hidden.', 'all played positions.').replace('100% · ', '100.0% · ').replace('official 40% eligibility', 'minimum 50% playing time')
+    let expected = renderToStaticMarkup(originalHarness.render(props)).replace(/(<summary class="cursor-pointer text-zinc-400">)Rating Details · [A-Z]+ · \d+&#x27;(<\/summary>)/g, '$1Rating Details$2').replace('positions under 10% are hidden.', 'all played positions.').replace('100% · ', '100.0% · ').replace('official 40% eligibility', 'minimum 40% of matches and 20% of minutes based on the busiest team')
     let rendered = renderToStaticMarkup(h(root, name, store).render(props))
     if (name === 'HomeScreen') {
       // v2.6.8 marks the existing horizontal metric gesture as an edge-Back
       // exclusion; every surrounding element and football value stays compared.
       assert.match(rendered, /<div data-edge-swipe="ignore" [^>]*aria-label="Swipe Global Ranking metrics">/, 'the metric swipe excludes edge Back')
-      rendered = rendered.replaceAll(' data-edge-swipe="ignore"', '')
+      rendered = normalizeRankingTabs(rendered.replaceAll(' data-edge-swipe="ignore"', ''), 'Global ranking category')
+      expected = normalizeRankingTabs(expected, 'Global ranking category')
     }
     if (name === 'PlayerDetailScreen') {
       // v2.6.7 moves only the original Matches section into a separate tab.

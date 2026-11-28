@@ -7,6 +7,7 @@ const scope = { seasons: [], teamIds: [], competition: 'all', positionFilter: 'a
 const { baselineRoot } = require('./helpers/v269-records-baseline.cjs')
 require('./helpers/rating-release-comparison.cjs').alignArchivedRatingInputs(baselineRoot())
 const path = require('node:path')
+const { assertRecordCompatibility } = require('./helpers/v280-policy-compat.cjs')
 
 function fixture() {
   const teams = ['A', 'B', 'C'].map(id => ({ id, name: id }))
@@ -96,7 +97,7 @@ test('player Records team toggles reuse official facts and immutable historical 
   assert.deepEqual(buildPlayerRecordLeaderboards(state.players, state.matches, scope, ['goals']), after)
 })
 
-test('every Records group and direct leaderboard equals independent v2.6.8 before and after historical edits', () => {
+test('v2.6.8 Records IDs and unaffected statistics survive archive restructuring and historical edits', () => {
   const baseline = require(path.join(baselineRoot(), 'src/screens/recordsLeaderboards.ts')).recordsLeaderboardGroups
   const baselineUnits = require(path.join(baselineRoot(), 'src/engine/unitRecords.ts')).buildUnitRecords
   const currentUnits = require('../src/engine/unitRecords.ts').buildUnitRecords
@@ -114,8 +115,8 @@ test('every Records group and direct leaderboard equals independent v2.6.8 befor
     for (const category of ['player', 'team', 'combination']) for (const section of category === 'combination' ? ['performance'] : ['performance', 'awards']) {
       const input = { ...current, states: current.competitionStates, category, section, scope }
       const expected = baseline(input), actual = recordsLeaderboardGroups(input)
-      assert.deepEqual(actual, expected, `${label}: every ${category}/${section} row, value, rank, detail and order`)
-      if (label === 'original') for (const group of expected) assert.deepEqual(recordsLeaderboardGroups({ ...input, selectedIds: [group.id] }), [group], `${label}: direct ${category}/${section}/${group.id}`)
+      assertRecordCompatibility(actual, expected, input, `${label}: ${category}/${section}`)
+      if (label === 'original') for (const group of actual) assert.deepEqual(recordsLeaderboardGroups({ ...input, selectedIds: [group.id] }), [group], `${label}: direct ${category}/${section}/${group.id}`)
       results.push(actual)
     }
     return results
@@ -162,7 +163,10 @@ test('legacy same-date streaks preserve independent baseline chronology and save
   const selectedIds = ['good-streak', 'scoring-streak', 'ga-streak']
   const expected = baseline([player], games, scope).filter(group => selectedIds.includes(group.id))
   assert.equal(expected.find(group => group.id === 'scoring-streak').rows[0].numeric, 2, 'independent release orders tied Jan 1 games before the later Jan 2 goal')
-  assert.deepEqual(buildPlayerRecordLeaderboards([player], games, scope, selectedIds), expected)
+  const legacyFields = groups => groups.map(group => ({ id: group.id, rows: group.rows.map(({ streakMatchIds: _evidence, ...row }) => row) }))
+  const actual = buildPlayerRecordLeaderboards([player], games, scope, selectedIds)
+  assert.deepEqual(legacyFields(actual), legacyFields(expected))
+  assert.deepEqual(actual.find(group => group.id === 'scoring-streak').rows[0].streakMatchIds, [['legacy:0', 'legacy:2']])
   const reordered = [games[1], games[0], games[2]]
-  assert.deepEqual(buildPlayerRecordLeaderboards([player], reordered, scope, selectedIds), baseline([player], reordered, scope).filter(group => selectedIds.includes(group.id)), 'same-date source insertion order must remain significant')
+  assert.deepEqual(legacyFields(buildPlayerRecordLeaderboards([player], reordered, scope, selectedIds)), legacyFields(baseline([player], reordered, scope).filter(group => selectedIds.includes(group.id))), 'same-date source insertion order must remain significant')
 })

@@ -3,6 +3,8 @@ const test = require('node:test'), assert = require('node:assert/strict'), path 
 const { performanceFixture } = require('./helpers/v255-fixture.cjs')
 const { sourceModule } = require('./helpers/v259-harness.cjs')
 const { baselineRoot } = require('./helpers/v268-baseline.cjs')
+const { assertAwardCandidateCompatibility } = require('./helpers/v280-policy-compat.cjs')
+const { assertNewsPolicy, assertLatestPolicy } = require('./helpers/v265-award-policy-comparison.cjs')
 const root = path.resolve(__dirname, '..'), beforeRoot = baselineRoot()
 require('./helpers/rating-release-comparison.cjs').alignArchivedRatingInputs(beforeRoot)
 const source = (directory, file) => require(path.join(directory, 'src/engine', file + '.ts'))
@@ -21,7 +23,7 @@ test('official award participation visits selected historical team records witho
     }
     let actual
     try { actual = api.evaluateOfficialCandidates(...args) } finally { Set.prototype.has = original }
-    if (expected) assert.deepEqual(actual, expected, 'all official candidate facts, participation gates and scores')
+    if (expected) assertAwardCandidateCompatibility(actual, expected, games)
     expected = actual
     memberships[side] = reads
   }
@@ -53,13 +55,13 @@ test('award scopes reuse season chronology, registration evidence and credited m
   const baseline = source(beforeRoot, 'awardEvaluation')
   for (const day of [1, 2]) {
     const games = seasonGames.filter(match => match.matchDay === day), args = [state.players, games, seasonGames, () => .15, { league: 1 }]
-    assert.deepEqual(api.evaluateOfficialCandidates(...args), baseline.evaluateOfficialCandidates(...args))
+    assertAwardCandidateCompatibility(api.evaluateOfficialCandidates(...args), baseline.evaluateOfficialCandidates(...args), games)
     if (day === 1) { assert.equal(reads, 32 * 23, 'first scope reads each recorded registration once'); reads = 0 }
   }
   assert.equal(reads, 0, 'a different half or competition scope reuses unchanged season registration facts')
   seasonGames[0] = { ...seasonGames[0], events: [] }
   const args = [state.players, seasonGames, seasonGames, () => .15, { league: 1 }]
-  assert.deepEqual(api.evaluateOfficialCandidates(...args), baseline.evaluateOfficialCandidates(...args))
+  assertAwardCandidateCompatibility(api.evaluateOfficialCandidates(...args), baseline.evaluateOfficialCandidates(...args), seasonGames)
   assert.equal(reads, 32 * 23, 'same-array historical replacement rebuilds the shared season facts')
 })
 
@@ -72,7 +74,7 @@ test('News gates unfinished half scopes before candidate evaluation and retains 
       awardResultForScope(...args) { scopes.push(args[0]); return awards.awardResultForScope(...args) },
     } })
     const args = [state.players, state.teams, state.matches, state.competitionStates]
-    assert.deepEqual(api.deriveNews(...args), source(beforeRoot, 'news').deriveNews(...args), `through day ${days}`)
+    assertNewsPolicy(api.deriveNews(...args), source(beforeRoot, 'news').deriveNews(...args), args)
     assert.deepEqual(scopes, days === 15 ? ['first-half'] : [], 'only finalized halves need candidate projection for News')
   }
 })
@@ -100,7 +102,7 @@ test('award stint indexes preserve transfers, unknown registration gaps, duplica
     for (const scope of ['all', 'league', 'cup', 'champions']) {
       const games = seasonGames.filter(match => scope === 'all' || match.competitionType === scope)
       const args = [players, games, seasonGames, (type, teamId) => (clubs.indexOf(teamId) + 1) * ({ league: .015, cup: .03, champions: .06 }[type]), { league: .7, cup: .3, champions: .6 }]
-      assert.deepEqual(current.evaluateOfficialCandidates(...args), baseline.evaluateOfficialCandidates(...args), `seed ${seed}, ${scope}`)
+      assertAwardCandidateCompatibility(current.evaluateOfficialCandidates(...args), baseline.evaluateOfficialCandidates(...args), games)
     }
   }
 })
@@ -108,13 +110,13 @@ test('award stint indexes preserve transfers, unknown registration gaps, duplica
 function allFeedSelections(state, label) {
   const args = [state.players, state.teams, state.matches, state.competitionStates]
   const current = source(root, 'news'), baseline = source(beforeRoot, 'news')
-  assert.deepEqual(current.deriveNews(...args), baseline.deriveNews(...args), `${label}: every News article`)
+  assertNewsPolicy(current.deriveNews(...args), baseline.deriveNews(...args), args)
   for (const includeAllRanking of [false, true]) for (const includeMatchPerformance of [false, true]) {
     const options = { includeAllRanking, includeMatchPerformance }
-    assert.deepEqual(current.deriveFootballEvents(...args, options), baseline.deriveFootballEvents(...args, options), `${label}: ${JSON.stringify(options)}`)
+    assertNewsPolicy(current.deriveFootballEvents(...args, options), baseline.deriveFootballEvents(...args, options), args, 'deriveFootballEvents')
   }
   const latest = source(root, 'latestChanges'), oldLatest = source(beforeRoot, 'latestChanges')
-  for (const season of [undefined, ...new Set(state.matches.map(match => match.season))]) assert.deepEqual(latest.deriveLatestChanges(...args, season), oldLatest.deriveLatestChanges(...args, season), `${label}: Latest Changes ${season}`)
+  for (const season of [undefined, ...new Set(state.matches.map(match => match.season))]) assertLatestPolicy(latest.deriveLatestChanges(...args, season), oldLatest.deriveLatestChanges(...args, season), [...args, season])
 }
 
 test('independent v267 release source matches every article and event in two and six seasons', () => {

@@ -161,6 +161,10 @@ export function creditedMinutesPlayed(match: Match, appearance: Appearance): num
 export function hasPitchAppearance(match: Match, appearance: Appearance): boolean {
   return pitchIntervals(match, appearance).some(interval => interval.exit > interval.enter)
 }
+/** An explicit entrance still counts when it is the final recorded action. */
+export function hasActualAppearance(match: Match, appearance: Appearance): boolean {
+  return appearance.role === 'starter' || pitchIntervals(match, appearance).some(interval => Boolean(interval.on))
+}
 /** Envelope for entry/exit labels only; actual minutes sum the position intervals. */
 export function pitchWindow(match: Match, appearance: Appearance): { enter: number; exit: number } | null {
   const intervals = pitchIntervals(match, appearance)

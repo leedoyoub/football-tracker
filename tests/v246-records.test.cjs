@@ -42,7 +42,7 @@ test('team records use actual scoring team, chronology, canonical SOT and reques
     game('lead', '2026-01-02', [], [goal('a2', 'A', 10, 'A'), goal('b2', 'B', 20, 'B'), goal('a3', 'A', 30, 'A')]),
   ]
   const groups = recordsLeaderboardGroups({ category: 'team', players: [], teams, matches: games, scope })
-  assert.deepEqual(groups.slice(0, 4).map(row => row.id), ['wins', 'win-rate', 'ppg', 'comeback-wins'])
+  assert.deepEqual(groups.slice(0, 4).map(row => row.id), ['played', 'wins', 'draws', 'losses'])
   assert.equal(group(groups, 'opening-goals').rows.find(row => row.id === 'A').numeric, 1)
   assert.equal(group(groups, 'comeback-wins').rows.find(row => row.id === 'A').numeric, 1)
   assert.equal(group(groups, 'ppg').rows.find(row => row.id === 'A').numeric, 3)
@@ -104,7 +104,7 @@ test('own goal opener credits the actual scoring team and clean sheet streak fol
   assert.equal(group(groups, 'clean-streak').rows.find(row => row.id === 'A').numeric, 2)
   assert.equal(group(groups, 'conceded').rows.find(row => row.id === 'A').numeric, 1)
   assert.equal(group(groups, 'biggest-win').rows.find(row => row.id === 'A').numeric, 1)
-  assert.deepEqual(groups.map(row => row.id).slice(-4), ['goal-difference', 'goal-difference-per-match', 'conceded', 'high-conceded'])
+  assert.deepEqual(groups.map(row => row.id).slice(-5), ['biggest-win', 'high-score', 'high-conceded', 'biggest-defeat', 'biggest-comeback'])
 })
 
 test('team lead lost and regained is not a comeback; a deficit reversed is', () => {
@@ -117,7 +117,7 @@ test('team lead lost and regained is not a comeback; a deficit reversed is', () 
   assert.equal(group(groups, 'comeback-wins').rows.find(row => row.id === 'A').numeric, 1)
 })
 
-test('Together has 2/3/4 distinct overlap, ignores position changes, and PPG waits for five starts', () => {
+test('Together has distinct 2/3/4 overlap and one start qualifies in one eligible match', () => {
   const { buildUnitRecords } = require('../src/engine/unitRecords.ts')
   const players = ['A', 'B', 'C', 'D'].map(id => player(id, 'ST'))
   const appearances = players.map(p => app(p.id))
@@ -134,10 +134,11 @@ test('Together has 2/3/4 distinct overlap, ignores position changes, and PPG wai
   assert.equal(find('A,B,C,D').starts, 0)
   const teams = [{ id: 'A', name: 'A' }]
   const groups = recordsLeaderboardGroups({ category: 'combination', players, teams, matches, scope })
-  assert.equal(group(groups, 'together:attack:2:ppg').rows.length, 0)
+  assert.equal(group(groups, 'together:attack:2:ppg').rows.find(row => row.playerIds.join(',') === 'A,B').numeric, 1)
+  assert.equal(group(groups, 'together:attack:4:ppg').rows.length, 0)
 })
 
-test('Best Attack uses member goals, Best Midfield uses team GD, and eligibility is five starts', () => {
+test('Best Attack uses member goals, Best Midfield uses team GD, and small scopes use the starts share', () => {
   const players = [player('A'), player('B', 'LW'), player('C', 'SS'), player('M1', 'CAM'), player('M2', 'LAM'), player('M3', 'CM'), player('M4', 'CDM')]
   const appearances = players.map(p => app(p.id, p.position))
   const matches = Array.from({ length: 5 }, (_, index) => game(`best${index}`, `2026-06-0${index + 1}`, appearances, [
@@ -148,7 +149,11 @@ test('Best Attack uses member goals, Best Midfield uses team GD, and eligibility
   assert.equal(group(groups, 'best-unit:attack:3:goals').rows.find(row => row.playerIds.join(',') === 'A,B,C').numeric, 1)
   assert.equal(group(groups, 'best-unit:midfield:4:gd').rows[0].numeric, 3)
   assert.equal(group(groups, 'best-unit:attack:2:goals').rows[0].detail.includes('5 starts'), true)
-  assert.equal(group(recordsLeaderboardGroups({ category: 'combination', players, teams: [{ id: 'A', name: 'A' }], matches: matches.slice(0, 4), scope }), 'best-unit:attack:2:goals').rows.length, 0)
+  const fourMatches = recordsLeaderboardGroups({ category: 'combination', players, teams: [{ id: 'A', name: 'A' }], matches: matches.slice(0, 4), scope })
+  assert.equal(group(fourMatches, 'best-unit:attack:2:goals').rows[0].numeric, 1)
+  const threeBench = matches.slice(0, 4).map((match, index) => index ? { ...match, appearances: appearances.map(row => ({ ...row, role: 'bench' })) } : match)
+  const ineligible = recordsLeaderboardGroups({ category: 'combination', players, teams: [{ id: 'A', name: 'A' }], matches: threeBench, scope })
+  assert.equal(group(ineligible, 'best-unit:attack:2:goals').rows.length, 0)
 })
 
 test('scoped combination families and team history use the recorded appearance team', () => {
@@ -160,14 +165,20 @@ test('scoped combination families and team history use the recorded appearance t
   assert.equal(group(old, 'together:attack:2:starts').rows.length, 0)
 })
 
-test('all team record definitions follow the requested results, attack, defence and balance order', () => {
+test('the team archive retains all original performance IDs and groups the new records', () => {
   const groups = recordsLeaderboardGroups({ category: 'team', players: [], teams: [{ id: 'A', name: 'A' }], matches: [], scope })
-  assert.deepEqual(groups.map(row => row.id), [
+  const originalIds = [
     'wins', 'win-rate', 'ppg', 'comeback-wins', 'win-streak', 'unbeaten-streak',
     'team-goals', 'gf-rate', 'opening-goals', 'scoring-streak', 'high-score', 'biggest-win',
     'clean', 'clean-rate', 'clean-streak', 'ga-rate', 'opponent-sot-rate', 'saves',
     'goal-difference', 'goal-difference-per-match', 'conceded', 'high-conceded',
-  ])
+  ]
+  const addedIds = ['played', 'draws', 'losses', 'losing-streak', 'winless-streak', 'biggest-defeat', 'biggest-comeback']
+  const { teamRecordSections } = require('../src/screens/recordSections.ts')
+  const catalogIds = teamRecordSections.filter(item => !['trophies', 'season'].includes(item.id)).flatMap(item => item.records)
+  assert.deepEqual(groups.map(row => row.id).sort(), [...originalIds, ...addedIds].sort())
+  assert.deepEqual(catalogIds.slice().sort(), [...originalIds, ...addedIds].sort())
+  assert.deepEqual(catalogIds.slice(0, 4), ['played', 'wins', 'draws', 'losses'])
 })
 
 test('Combination families retain legacy goal boards and expose every deterministic selector definition', () => {
@@ -194,7 +205,7 @@ test('Best Back Three and Four use shared GA and canonical SOT, with CB GA eligi
   assert.equal(group(groups, 'best-unit:defence:4:sot').rows[0].numeric, 3)
   assert.equal(group(groups, 'cb-ga').rows[0].numeric, 1)
   assert.equal(group(groups, 'cb-ga').rows[0].combinationPair.connector, '&')
-  assert.equal(group(recordsLeaderboardGroups({ category: 'combination', players: defenders, teams: [{ id: 'A', name: 'A' }], matches: matches.slice(0, 1), scope }), 'cb-ga').rows.length, 0)
+  assert.equal(group(recordsLeaderboardGroups({ category: 'combination', players: defenders, teams: [{ id: 'A', name: 'A' }], matches: matches.slice(0, 1), scope }), 'cb-ga').rows[0].numeric, 1)
 })
 
 test('CB GA/90 stops its CB interval when a centre back moves to fullback', () => {
@@ -227,10 +238,10 @@ test('personal rolling five uses raw ratings in chronological appearances and sk
 
 test('v2.6.1 version, rating revision 13 and Champions entity navigation', () => {
   const source = file => fs.readFileSync(require.resolve(`../${file}`), 'utf8')
-  assert.equal(require('../src/config.ts').APP_VERSION, '2.7.1')
+  assert.equal(require('../src/config.ts').APP_VERSION, '2.8.0')
   assert.equal(require('../src/engine/ratingRevision.ts').RATING_ENGINE_REVISION, 14)
-  assert.equal(require('../package.json').version, '2.7.1')
-  assert.equal(require('../package-lock.json').version, '2.7.1')
+  assert.equal(require('../package.json').version, '2.8.0')
+  assert.equal(require('../package-lock.json').version, '2.8.0')
   const champions = source('src/screens/CompetitionScreen.tsx')
   assert.match(champions, /<ChampionsBracket[^>]*onNavigate=\{onNavigate\}/)
   assert.match(champions, /TeamIdentityAction team=\{teams\[id\]\}/)

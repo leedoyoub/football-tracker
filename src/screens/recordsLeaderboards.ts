@@ -1,200 +1,195 @@
-import { combinationStats } from '../engine/analytics'
-import { oldestMatches } from '../engine/matchChronology'
-import { buildPlayerRecordLeaderboards } from '../engine/playerRecords'
+import { combinationGroups } from '../engine/combinationLeaderboards'
+export { combinationBestUnitOptions, combinationPairPresentation } from '../engine/combinationLeaderboards'
+import { buildPlayerRecordLeaderboards, playerRecordsNeedMom } from '../engine/playerRecords'
 import { awardRecordGroups, teamHistoryRecordGroups } from '../engine/awardRecords'
 import { scopedIndividualAwardEvents, teamIndividualAwardRecordGroups } from '../engine/teamAwardRecords'
-import { AWARD_POLICY_REVISION } from '../engine/officialAwards'
+import { AWARD_POLICY_REVISION, officialSeasonModel } from '../engine/officialAwards'
 import { RATING_ENGINE_REVISION } from '../engine/ratingRevision'
 import { MOM_POLICY_REVISION } from '../engine/momPolicy'
-import { isPlayerAssistEvent, isPlayerGoalEvent } from '../engine/playerMatchFacts'
-import { orderedEvents, scoringTeamId } from '../engine/timeline'
 import { teamMetrics } from '../engine/teamMetrics'
+import { teamHistoricMatchRecords } from '../engine/teamHistoricMatches'
+import { teamSeasonRecords } from '../engine/teamCompetitionResults'
 import { recordsScopedMatches } from '../engine/recordsScope'
 import { arrayItemRevision } from '../engine/arrayItemRevision'
-import { positionFilterFamilies } from '../engine/positionScope'
+import { positionFilterFamilies, scopedPositionFamilyByPlayer } from '../engine/positionScope'
 import { historicalRankingTeams, playerInRankingTeams } from '../engine/rankingPresentation'
-import { teamPerspectiveScore } from '../engine/matchPerspective'
-import { buildUnitRecords, type UnitRecord } from '../engine/unitRecords'
+import { RECORDS_POLICY_REVISION } from '../engine/participation'
 import { playerFullName } from '../components/ui'
 import { formatSignedTwoDecimals } from '../lib/signedNumber'
-import type { CompetitionState, CompetitionType, Match, Player, PositionFilterKey, Team } from '../types'
+import type { CompetitionState, CompetitionType, Match, Player, PositionFilterKey, RankingRankMode, Team } from '../types'
 
 export type RecordsLeaderboardKind = 'player' | 'team' | 'combination'
 export type CombinationConnector = '→' | '↔' | '&' | '+'
 export type CombinationPairPresentation = { playerIds: string[]; connector: CombinationConnector; directional: boolean }
-export type RecordsLeaderboardRow = { id: string; name: string; value: string; numeric: number; detail: string; rank: number; playerIds?: string[]; combinationPair?: CombinationPairPresentation }
+export type RecordsLeaderboardRow = {
+  id: string; name: string; value: string; numeric: number; detail: string; rank: number
+  playerIds?: string[]; combinationPair?: CombinationPairPresentation; combinationTeamId?: string
+  matchId?: string; streakMatchIds?: string[][]; teamIds?: string[]; season?: string; inProgress?: boolean; opponentId?: string
+  goalsFor?: number; goalsAgainst?: number; competition?: CompetitionType | 'all'; comparisonGroup?: number
+  totals?: { played: number; wins: number; draws: number; losses: number }
+}
 export type RecordsLeaderboardGroup = { id: string; title: string; kind: RecordsLeaderboardKind; rows: RecordsLeaderboardRow[]; applicableFilters: { position: boolean; team: boolean } }
-export type RecordsScope = { seasons: string[]; teamIds: string[]; competition: CompetitionType | 'all'; positionFilter: PositionFilterKey; positionFilters?: PositionFilterKey[] }
+export const recordRowKey = (row: RecordsLeaderboardRow) => JSON.stringify([row.id, row.matchId, row.season, row.competition, row.comparisonGroup])
+export type RecordsScope = { seasons: string[]; teamIds: string[]; competition: CompetitionType | 'all'; positionFilter: PositionFilterKey; positionFilters?: PositionFilterKey[]; rankMode?: RankingRankMode }
 type RecordsInput = { category: RecordsLeaderboardKind; players: Player[]; teams: Team[]; matches: Match[]; scope: RecordsScope; selectedIds?: string[]; section?: 'performance' | 'awards'; states?: CompetitionState[] }
 
-export const combinationBestUnitOptions = [
-  ...([2, 3] as const).map(size => ({ id: `best-unit:attack:${size}:goals`, title: `Best Attack ${size === 2 ? 'Pair' : 'Trio'} · Goals / Match` })),
-  ...([2, 3, 4] as const).map(size => ({ id: `best-unit:midfield:${size}:gd`, title: `Best Midfield ${{ 2: 'Pair', 3: 'Trio', 4: 'Four' }[size]} · GD / Match` })),
-  ...([3, 4] as const).flatMap(size => [
-    { id: `best-unit:defence:${size}:ga`, title: `Best Back ${size === 3 ? 'Three' : 'Four'} · Lowest GA/90` },
-    { id: `best-unit:defence:${size}:sot`, title: `Best Back ${size === 3 ? 'Three' : 'Four'} · Lowest Opponent SOT/90` },
-  ]),
-]
+export const EMPTY_RECORDS_SCOPE: RecordsScope = { seasons: [], teamIds: [], competition: 'all', positionFilter: 'all' }
+export const EMPTY_COMPETITION_STATES: CompetitionState[] = []
+export const TEAM_SEASON_RECORD_IDS = ['history-league-points', 'history-league-wins', 'history-league-gd', 'history-league-finish', 'history-cup-finish', 'history-champions-finish', 'season-goals', 'season-conceded', 'season-win-rate']
+const TEAM_SEASON_RECORDS = new Set(TEAM_SEASON_RECORD_IDS)
+const recordsCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], WeakMap<CompetitionState[], Map<string, RecordsLeaderboardGroup[]>>>>>()
 
-const recordsCache = new WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], Map<string, RecordsLeaderboardGroup[]>>>>()
-const honorCache = new WeakMap<CompetitionState[], WeakMap<Match[], WeakMap<Player[], WeakMap<Team[], Map<string, RecordsLeaderboardGroup[]>>>>>()
-const EMPTY_STATES: CompetitionState[] = []
-const scopeKey = ({ category, scope, selectedIds, matches, players, teams, states }: RecordsInput) => JSON.stringify([RATING_ENGINE_REVISION, arrayItemRevision(matches), arrayItemRevision(players), arrayItemRevision(teams), states ? arrayItemRevision(states) : 0, category, scope.competition, positionFilterFamilies(scope.positionFilters ?? scope.positionFilter).sort(), scope.seasons.slice().sort(), scope.teamIds.slice().sort(), selectedIds ?? null])
-
-const rank = (rows: Omit<RecordsLeaderboardRow, 'rank'>[], ascending = false) => { let prior: number | undefined; let priorRank = 0; return rows.slice().sort((a, b) => (ascending ? a.numeric - b.numeric : b.numeric - a.numeric) || a.name.localeCompare(b.name)).map((row, index) => { const next = prior === row.numeric ? priorRank : index + 1; prior = row.numeric; priorRank = next; return { ...row, rank: next } }) }
-const combinationKey = (ids: string[]) => ids.slice().sort().join(':')
-const combinationPresentationRules: Record<string, Pick<CombinationPairPresentation, 'connector' | 'directional'>> = {
-  'goal-combinations': { connector: '→', directional: true },
-  'mutual-goal-combinations': { connector: '↔', directional: false },
-  'both-scored': { connector: '&', directional: false },
-  'both-ga': { connector: '&', directional: false },
-  'duo-ga': { connector: '+', directional: false },
-  'cb-suppression': { connector: '&', directional: false },
-  'cb-ga': { connector: '&', directional: false },
+export function recordsLeaderboardSection(category: RecordsLeaderboardKind, id: string): 'performance' | 'awards' {
+  return id.startsWith('awards-') || id.startsWith('history-') || id.startsWith('team-awards') || category === 'team' && TEAM_SEASON_RECORDS.has(id) ? 'awards' : 'performance'
 }
 
-/** The one Records read model for directional and partnership pair display. */
-export function combinationPairPresentation(leaderboardId: string, playerIds: string[]): CombinationPairPresentation {
-  const rule = combinationPresentationRules[leaderboardId]
-  if (!rule) throw new Error(`Unknown combination leaderboard: ${leaderboardId}`)
-  return { playerIds: [...playerIds], ...rule }
+function rankSorted(rows: Omit<RecordsLeaderboardRow, 'rank'>[]): RecordsLeaderboardRow[] {
+  let prior: number | undefined
+  let previousCohort: number | undefined
+  let rank = 0
+  let indexInCohort = 0
+  return rows.map(row => {
+    if (row.comparisonGroup !== previousCohort) { indexInCohort = 0; prior = undefined }
+    indexInCohort++
+    if (prior !== row.numeric) rank = indexInCohort
+    prior = row.numeric
+    previousCohort = row.comparisonGroup
+    return { ...row, rank }
+  })
+}
+
+function rank(rows: Omit<RecordsLeaderboardRow, 'rank'>[], ascending = false) {
+  return rankSorted(rows.sort((a, b) => (b.comparisonGroup ?? 0) - (a.comparisonGroup ?? 0)
+    || (ascending ? a.numeric - b.numeric : b.numeric - a.numeric)
+    || a.name.localeCompare(b.name) || a.id.localeCompare(b.id) || (a.season ?? '').localeCompare(b.season ?? '') || (a.matchId ?? '').localeCompare(b.matchId ?? '')))
 }
 
 export function recordsLeaderboardGroups(input: RecordsInput): RecordsLeaderboardGroup[] {
-  const { category, players, teams, matches, scope, selectedIds } = input
-  // Player football totals and official honor counts belong to the full team
-  // population. Team selection projects already ranked rows for either section.
-  if (category === 'player' && scope.teamIds.length) {
-    const official = recordsLeaderboardGroups({ ...input, scope: { ...scope, teamIds: [] } })
-    const membership = historicalRankingTeams(recordsScopedMatches(matches, { ...scope, teamIds: [] }, 'player'))
-    return official.map(group => ({ ...group, rows: group.rows.filter(row => playerInRankingTeams(row.id, scope.teamIds, membership)) }))
+  const { category, players, teams, matches, scope, selectedIds, states = EMPTY_COMPETITION_STATES, section } = input
+  const families = category === 'player' ? positionFilterFamilies(scope.positionFilters ?? scope.positionFilter) : []
+  // Award counts are scoped by the position recorded on each official event.
+  // Career performances use position to select players after aggregation.
+  const positionProjection = section !== 'awards' && scope.rankMode !== undefined && families.length > 0
+  if (category !== 'combination' && (scope.teamIds.length || positionProjection)) {
+    const populationScope = { ...scope, teamIds: [], ...(positionProjection ? { positionFilter: 'all' as const, positionFilters: undefined } : {}), rankMode: undefined }
+    const source = recordsLeaderboardGroups({ ...input, scope: populationScope })
+    const selected = category === 'player' ? recordsScopedMatches(matches, populationScope, 'player') : []
+    const membership = category === 'player' && scope.teamIds.length ? historicalRankingTeams(selected) : undefined
+    const positions = positionProjection ? scopedPositionFamilyByPlayer(players, selected, {}) : undefined
+    return source.map(group => {
+      const rows = group.rows.filter(row => {
+        if (positions && !families.some(family => family === positions.get(row.id))) return false
+        if (!scope.teamIds.length) return true
+        if (category === 'team') return scope.teamIds.includes(row.id)
+        if (row.teamIds) return row.teamIds.some(id => scope.teamIds.includes(id))
+        return membership && playerInRankingTeams(row.id, scope.teamIds, membership)
+      })
+      return { ...group, rows: scope.rankMode === 'filtered' || (scope.rankMode === undefined && category === 'team') ? rankSorted(rows) : rows }
+    })
   }
-  if (input.section === 'awards' && category !== 'combination') {
-    const states = input.states ?? EMPTY_STATES
-    let cache = honorCache.get(states); if (!cache) { cache = new WeakMap(); honorCache.set(states, cache) }
-    let byPlayers = cache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); cache.set(matches, byPlayers) }
-    let byTeams = byPlayers.get(players); if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
-    let byScope = byTeams.get(teams); if (!byScope) { byScope = new Map(); byTeams.set(teams, byScope) }
-    const key = `${AWARD_POLICY_REVISION}:${MOM_POLICY_REVISION}:${scopeKey(input)}`, cached = byScope.get(key); if (cached) return cached
-    let groups = category === 'player' ? awardRecordGroups(teams, players, matches, states, scope, selectedIds) : [
-      ...(!selectedIds || selectedIds.some(id => id.startsWith('history-')) ? teamHistoryRecordGroups(teams, players, matches, states, scope) : []),
-      ...(!selectedIds || selectedIds.some(id => id.startsWith('team-awards')) ? teamIndividualAwardRecordGroups(scopedIndividualAwardEvents(teams, players, matches, states, scope), teams, selectedIds) : []),
-    ]
-    if (selectedIds) groups = groups.filter(group => selectedIds.includes(group.id))
-    if (byScope.size >= 24) byScope.delete(byScope.keys().next().value!)
-    byScope.set(key, groups)
-    return groups
-  }
+
   let byPlayers = recordsCache.get(matches)
   if (!byPlayers) { byPlayers = new WeakMap(); recordsCache.set(matches, byPlayers) }
   let byTeams = byPlayers.get(players)
   if (!byTeams) { byTeams = new WeakMap(); byPlayers.set(players, byTeams) }
-  let byScope = byTeams.get(teams)
-  if (!byScope) { byScope = new Map(); byTeams.set(teams, byScope) }
-  const momRevision = category === 'player' && (!selectedIds || selectedIds.includes('mom')) ? MOM_POLICY_REVISION : ''
-  const key = `${momRevision}:${scopeKey(input)}`
+  let byStates = byTeams.get(teams)
+  if (!byStates) { byStates = new WeakMap(); byTeams.set(teams, byStates) }
+  let byScope = byStates.get(states)
+  if (!byScope) { byScope = new Map(); byStates.set(states, byScope) }
+  const key = JSON.stringify([
+    RECORDS_POLICY_REVISION, RATING_ENGINE_REVISION, AWARD_POLICY_REVISION,
+    category !== 'player' || section === 'awards' || playerRecordsNeedMom(selectedIds) ? MOM_POLICY_REVISION : null,
+    [matches, players, teams, states].map(value => arrayItemRevision<unknown>(value)),
+    category, section, scope.competition, scope.seasons.slice().sort(), scope.teamIds.slice().sort(), families.slice().sort(), selectedIds,
+  ])
   const cached = byScope.get(key)
   if (cached) return cached
+  const needs = (id: string) => !selectedIds || selectedIds.includes(id)
   let groups: RecordsLeaderboardGroup[]
-  if (category === 'player') { const byId = new Map(players.map(player => [player.id, player])); groups = buildPlayerRecordLeaderboards(players, matches, scope, selectedIds).map(group => ({ id: group.id, title: group.title, kind: 'player' as const, applicableFilters: { position: true, team: true }, rows: group.rows.map(row => ({ id: row.playerId, name: playerFullName(byId.get(row.playerId)), numeric: row.numeric, value: row.value, detail: row.detail, rank: row.rank })) })) }
+  if (category === 'combination') groups = combinationGroups(players, teams, matches, scope, selectedIds)
+  else if (category === 'player' && section === 'awards') groups = awardRecordGroups(teams, players, matches, states, scope, selectedIds)
+  else if (category === 'team' && section === 'awards') groups = [
+    ...(!selectedIds || selectedIds.some(id => id.startsWith('history-') && !TEAM_SEASON_RECORDS.has(id)) ? teamHistoryRecordGroups(teams, players, matches, states, scope).filter(group => !TEAM_SEASON_RECORDS.has(group.id)) : []),
+    ...(!selectedIds || selectedIds.some(id => TEAM_SEASON_RECORDS.has(id)) ? teamSeasonGroups(teams, players, matches, states, scope, selectedIds) : []),
+    ...(!selectedIds || selectedIds.some(id => id.startsWith('team-awards')) ? teamIndividualAwardRecordGroups(scopedIndividualAwardEvents(teams, players, matches, states, scope), teams, selectedIds) : []),
+  ]
+  else if (category === 'team') groups = teamGroups(teams, recordsScopedMatches(matches, scope, 'team'), selectedIds)
   else {
-    const scoped = recordsScopedMatches(matches, scope, category)
-    groups = category === 'team' ? teamGroups(teams.filter(team => !scope.teamIds.length || scope.teamIds.includes(team.id)), scoped) : combinationGroups(players, teams, scoped, scope.teamIds, selectedIds)
+    const byId = new Map(players.map(player => [player.id, player]))
+    const completion = new Map<string, boolean>()
+    const inProgress = (season: string) => {
+      if (!completion.has(season)) {
+        const { status } = officialSeasonModel(teams, players, matches, states, season)
+        completion.set(season, scope.competition === 'all' ? status.complete : scope.competition === 'league' ? status.league.complete : Boolean(status[scope.competition].championId))
+      }
+      return !completion.get(season)
+    }
+    groups = buildPlayerRecordLeaderboards(players, matches, scope, selectedIds).map(group => ({
+      id: group.id, title: group.title, kind: 'player', applicableFilters: { position: true, team: true },
+      rows: group.rows.map(({ playerId, ...row }) => ({ ...row, id: playerId, name: playerFullName(byId.get(playerId)), ...(row.season && !row.matchId ? { inProgress: inProgress(row.season) } : {}) })),
+    }))
   }
-  if (selectedIds) { const wanted = new Set(selectedIds); groups = groups.filter(group => wanted.has(group.id)) }
-  if (byScope.size >= 24) byScope.delete(byScope.keys().next().value!)
+  groups = groups.filter(group => needs(group.id))
+  if (byScope.size >= 32) byScope.delete(byScope.keys().next().value!)
   byScope.set(key, groups)
   return groups
 }
 
-function teamGroups(teams: Team[], matches: Match[]): RecordsLeaderboardGroup[] {
-  const rows = teams.map(team => {
-    const summary = teamMetrics(team, matches)
-    const results = oldestMatches(summary.games).map(match => {
-      const perspective = teamPerspectiveScore(match, team.id)!
-      const ours = perspective.goalsFor
-      const against = perspective.goalsAgainst
-      const goals = orderedEvents(match).map(row => row.event).filter((event): event is Extract<Match['events'][number], { type: 'goal' }> => event.type === 'goal')
-      let lead = 0; let trailed = false
-      for (const event of goals) { lead += scoringTeamId(match, event) === team.id ? 1 : -1; if (lead < 0) trailed = true }
-      return { ours, against, outcome: ours > against ? 'W' : ours === against ? 'D' : 'L', opening: Number(goals.length > 0 && scoringTeamId(match, goals[0]) === team.id), comeback: Number(trailed && ours > against), clean: against === 0 }
-    })
-    const streak = (predicate: (result: typeof results[number]) => boolean) => { let best = 0; let current = 0; for (const result of results) { current = predicate(result) ? current + 1 : 0; best = Math.max(best, current) } return best }
-    const games = summary.games.length
-    const draws = results.filter(row => row.outcome === 'D').length
-    return { team, summary, winRate: games ? summary.wins / games * 100 : 0, ppg: games ? (summary.wins * 3 + draws) / games : 0, gfPerGame: games ? summary.goals / games : 0, gaPerGame: games ? summary.conceded / games : 0, cleanRate: games ? summary.cleanSheets / games * 100 : 0, sotPerGame: games ? summary.opponentSot / games : 0, gd: summary.goals - summary.conceded, gdPerGame: games ? (summary.goals - summary.conceded) / games : 0, opening: results.reduce((total, row) => total + row.opening, 0), comeback: results.reduce((total, row) => total + row.comeback, 0), scoring: streak(row => row.ours > 0), unbeaten: streak(row => row.outcome !== 'L'), winning: streak(row => row.outcome === 'W'), cleanStreak: streak(row => row.clean), highFor: Math.max(0, ...results.map(row => row.ours)), highAgainst: Math.max(0, ...results.map(row => row.against)), biggestWin: Math.max(0, ...results.map(row => row.ours - row.against)) }
-  }).filter(row => row.summary.games.length)
-  const group = (id: string, title: string, metric: (row: typeof rows[number]) => number, suffix = '', decimals = false, ascending = false, format = (numeric: number) => decimals ? numeric.toFixed(2) : String(numeric)): RecordsLeaderboardGroup => ({ id, title, kind: 'team', applicableFilters: { position: false, team: true }, rows: rank(rows.map(row => ({ id: row.team.id, name: row.team.name, numeric: metric(row), value: `${format(metric(row))}${suffix}`, detail: `${row.summary.games.length} matches · ${row.summary.goals} GF / ${row.summary.conceded} GA` })), ascending) })
-  const biggestWin = group('biggest-win', 'Biggest Win', row => row.biggestWin, ' goals')
-  biggestWin.rows = biggestWin.rows.filter(row => row.numeric > 0)
-  return [
-    group('wins', 'Most Wins', row => row.summary.wins, ' wins'), group('win-rate', 'Highest Win Percentage', row => row.winRate, '%', true), group('ppg', 'Highest Points per Match', row => row.ppg, '', true), group('comeback-wins', 'Most Comeback Wins', row => row.comeback, ' wins'), group('win-streak', 'Longest Winning Streak', row => row.winning, ' matches'), group('unbeaten-streak', 'Longest Undefeated Streak', row => row.unbeaten, ' matches'),
-    group('team-goals', 'Most Goals', row => row.summary.goals, ' goals'), group('gf-rate', 'Highest GF per Match', row => row.gfPerGame, '', true), group('opening-goals', 'Most Opening Goals', row => row.opening, ' goals'), group('scoring-streak', 'Longest Scoring Streak', row => row.scoring, ' matches'), group('high-score', 'Highest Score in One Match', row => row.highFor, ' goals'), biggestWin,
-    group('clean', 'Most Clean Sheets', row => row.summary.cleanSheets, ' CS'), group('clean-rate', 'Highest Clean Sheet Percentage', row => row.cleanRate, '%', true), group('clean-streak', 'Longest Clean Sheet Streak', row => row.cleanStreak, ' matches'), group('ga-rate', 'Lowest Goals Conceded per Match', row => row.gaPerGame, '', true, true), group('opponent-sot-rate', 'Lowest Opponent SOT per Match', row => row.sotPerGame, '', true, true), group('saves', 'Most Team Saves', row => row.summary.saves, ' saves'),
-    group('goal-difference', 'Best Goal Difference', row => row.gd, ' GD'), group('goal-difference-per-match', 'Best Goal Difference per Match', row => row.gdPerGame, '', true, false, formatSignedTwoDecimals), group('conceded', 'Most Goals Conceded', row => row.summary.conceded, ' goals'), group('high-conceded', 'Most Conceded in One Match', row => row.highAgainst, ' goals'),
-  ]
+function teamSeasonGroups(teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], scope: RecordsScope, selectedIds?: string[]) {
+  const names = new Map(teams.map(team => [team.id, team.name]))
+  return teamSeasonRecords(teams, players, matches, states, scope, selectedIds).map(({ id, title, ascending, rows }) =>
+    teamGroup(id, title, rank(rows.map(({ teamId, ...row }) => ({
+      ...row, id: teamId, name: names.get(teamId) ?? teamId, detail: `${row.season} · ${row.detail}`,
+    })), ascending)))
 }
 
-function combinationGroups(players: Player[], teams: Team[], matches: Match[], teamIds: string[], selectedIds?: string[]): RecordsLeaderboardGroup[] {
+function teamGroup(id: string, title: string, rows: RecordsLeaderboardRow[]): RecordsLeaderboardGroup {
+  return { id, title, kind: 'team', rows, applicableFilters: { position: false, team: true } }
+}
+
+function teamGroups(teams: Team[], matches: Match[], selectedIds?: string[]): RecordsLeaderboardGroup[] {
   const needs = (id: string) => !selectedIds || selectedIds.includes(id)
-  const goalIds = ['goal-combinations', 'mutual-goal-combinations', 'both-scored', 'both-ga']
-  const direct = new Map<string, { ids: string[]; value: number }>(); const mutual = new Map<string, { ids: string[]; value: number }>(); const bothScored = new Map<string, { ids: string[]; value: number }>(); const bothGA = new Map<string, { ids: string[]; value: number }>()
-  if (goalIds.some(needs)) for (const match of matches) for (const teamId of new Set(match.appearances.map(row => row.teamId))) {
-    if (teamIds.length && !teamIds.includes(teamId)) continue
-    const contributors = new Map<string, Set<'g' | 'a'>>()
-    const appearanceFor = (id?: string) => match.appearances.find(row => row.playerId === id && row.teamId === teamId)
-    for (const event of match.events) {
-      if (event.type !== 'goal' || event.ownGoal || event.teamId !== teamId) continue
-      const scorer = appearanceFor(event.playerId); const assister = appearanceFor(event.assistPlayerId)
-      const validGoal = Boolean(scorer && isPlayerGoalEvent(match, scorer, event))
-      const validAssist = Boolean(assister && isPlayerAssistEvent(match, assister, event))
-      if (validGoal) contributors.set(event.playerId!, new Set([...(contributors.get(event.playerId!) ?? []), 'g']))
-      if (validAssist) contributors.set(event.assistPlayerId!, new Set([...(contributors.get(event.assistPlayerId!) ?? []), 'a']))
-      if (validGoal && validAssist) {
-        const key = `${event.assistPlayerId}:${event.playerId}`
-        direct.set(key, { ids: [event.assistPlayerId!, event.playerId!], value: (direct.get(key)?.value ?? 0) + 1 })
-        const unordered = combinationKey([event.assistPlayerId!, event.playerId!])
-        mutual.set(unordered, { ids: unordered.split(':'), value: (mutual.get(unordered)?.value ?? 0) + 1 })
-      }
-    }
-    const ids = [...contributors.keys()]
-    for (let left = 0; left < ids.length; left++) for (let right = left + 1; right < ids.length; right++) {
-      const key = combinationKey([ids[left], ids[right]])
-      if (contributors.get(ids[left])?.has('g') && contributors.get(ids[right])?.has('g')) bothScored.set(key, { ids: key.split(':'), value: (bothScored.get(key)?.value ?? 0) + 1 })
-      bothGA.set(key, { ids: key.split(':'), value: (bothGA.get(key)?.value ?? 0) + 1 })
-    }
+  const names = new Map(teams.map(team => [team.id, team.name]))
+  const historic = teamHistoricMatchRecords(matches, [...names.keys()], selectedIds).map(({ id, title, rows }) =>
+    teamGroup(id, title, rank(rows.map(({ teamId, opponentId, match, goalsFor, goalsAgainst, numeric }) => ({
+      id: teamId, name: names.get(teamId) ?? teamId, value: `${numeric} goals`, numeric, detail: match.season,
+      matchId: match.id, season: match.season, opponentId, goalsFor, goalsAgainst,
+    })))))
+  if (selectedIds && selectedIds.every(id => historic.some(group => group.id === id))) return historic
+  const rows = teams.map(team => ({ id: team.id, name: team.name, ...teamMetrics(team, matches) })).filter(row => row.played)
+  const group = (id: string, title: string, measure: (row: typeof rows[number]) => number, format: (n: number) => string = String, ascending = false) => {
+    if (!needs(id)) return []
+    return [teamGroup(id, title, rank(rows.map(row => {
+      const numeric = measure(row)
+      const { played, wins, draws, losses } = row
+      return { id: row.id, name: row.name, numeric, value: format(numeric),
+        detail: `${played} matches · ${row.goals} GF / ${row.conceded} GA`,
+        ...(['played', 'wins', 'draws', 'losses'].includes(id) ? { totals: { played, wins, draws, losses } } : {}) }
+    }), ascending))]
   }
-  const byId = new Map(players.map(player => [player.id, player])); const name = (pair: CombinationPairPresentation) => pair.playerIds.map(id => playerFullName(byId.get(id))).join(` ${pair.connector} `); const entries = (rows: { ids: string[]; value: number; minutes?: number }[], ascending = false) => rows.filter(row => row.value > 0 || row.minutes).sort((left, right) => (ascending ? left.value - right.value : right.value - left.value) || combinationKey(left.ids).localeCompare(combinationKey(right.ids))); const duo = needs('duo-ga') ? combinationStats(players, matches, {}, 'duo').filter(row => !teamIds.length || teamIds.includes(row.teamId)).map(row => ({ ids: row.playerIds, value: row.combinedGA })) : []; const cb = needs('cb-suppression') ? combinationStats(players, matches, {}, 'cb').filter(row => (!teamIds.length || teamIds.includes(row.teamId)) && row.togetherMinutes >= 180).map(row => ({ ids: row.playerIds, value: row.weightedOpponentSot / (row.togetherMinutes / 90), minutes: row.togetherMinutes })) : []
-  const group = (id: string, title: string, rows: { ids: string[]; value: number; minutes?: number }[], cbGroup = false, ascending = false): RecordsLeaderboardGroup => ({ id, title, kind: 'combination', applicableFilters: { position: false, team: true }, rows: entries(rows, ascending).map((row, index) => { const combinationPair = combinationPairPresentation(id, row.ids); return { id: `${id}:${combinationPair.directional ? row.ids.join(':') : combinationKey(row.ids)}`, playerIds: row.ids, combinationPair, name: name(combinationPair), numeric: row.value, value: cbGroup ? `${row.value.toFixed(2)} SOT/90 · ${row.minutes}'` : String(row.value), detail: cbGroup ? `${row.minutes}' shared CB minutes` : 'Combination record', rank: index + 1 } }) })
-  const requestedUnits = selectedIds && new Set(selectedIds.flatMap(id => {
-    const unit = /^(?:together|best-unit):(attack|midfield|defence):([234]):/.exec(id)
-    return unit ? [`${unit[1]}:${unit[2]}`] : id === 'cb-ga' ? ['cb:2'] : []
-  }))
-  const units = buildUnitRecords(players, matches, teamIds, requestedUnits)
-  const teamNameById = new Map(teams.map(team => [team.id, team.shortName ?? team.name]))
-  const unitGroup = (id: string, title: string, chosen: UnitRecord[], value: (row: UnitRecord) => number, suffix: string, ascending = false): RecordsLeaderboardGroup => ({
-    id, title, kind: 'combination', applicableFilters: { position: false, team: true },
-    rows: rank(chosen.map(row => ({ id: row.key, playerIds: row.playerIds, name: `${row.playerIds.map(playerId => playerFullName(byId.get(playerId))).join(' + ')} · ${teamNameById.get(row.teamId) ?? row.teamId}`, numeric: value(row), value: `${value(row).toFixed(2)}${suffix}`, detail: `${teamNameById.get(row.teamId) ?? row.teamId} · ${row.starts} starts · ${row.minutes}' shared · PPG ${row.starts ? ((row.wins * 3 + row.draws) / row.starts).toFixed(2) : '—'}${row.position === 'attack' ? ` · ${row.memberGoals} member goals · Team GF/M ${row.starts ? (row.teamGF / row.starts).toFixed(2) : '—'}` : ''}` })), ascending),
-  })
-  const positionName = { attack: 'Attack', midfield: 'Midfield', defence: 'Defence' }
-  const sizeName = { 2: 'Pair', 3: 'Trio', 4: 'Four' }
-  const together: RecordsLeaderboardGroup[] = []
-  for (const position of ['attack', 'midfield', 'defence'] as const) for (const size of [2, 3, 4] as const) {
-    const selected = units.filter(row => row.position === position && row.size === size)
-    const prefix = `Together · ${positionName[position]} ${sizeName[size]}`
-    together.push(unitGroup(`together:${position}:${size}:starts`, `${prefix} · Starts`, selected.filter(row => row.starts > 0), row => row.starts, ' starts'))
-    together.push(unitGroup(`together:${position}:${size}:minutes`, `${prefix} · Minutes`, selected, row => row.minutes, "'"))
-    together.push(unitGroup(`together:${position}:${size}:ppg`, `${prefix} · PPG`, selected.filter(row => row.starts >= 5), row => (row.wins * 3 + row.draws) / row.starts, ' PPG'))
-  }
-  const best: RecordsLeaderboardGroup[] = []
-  for (const size of [2, 3] as const) best.push(unitGroup(`best-unit:attack:${size}:goals`, `Best Attack ${sizeName[size]} · Goals / Match`, units.filter(row => row.position === 'attack' && row.size === size && row.starts >= 5), row => row.memberGoals / row.starts, ' goals/match'))
-  for (const size of [2, 3, 4] as const) best.push(unitGroup(`best-unit:midfield:${size}:gd`, `Best Midfield ${sizeName[size]} · GD / Match`, units.filter(row => row.position === 'midfield' && row.size === size && row.starts >= 5), row => (row.teamGF - row.teamGA) / row.starts, ' GD/match'))
-  for (const size of [3, 4] as const) {
-    const selected = units.filter(row => row.position === 'defence' && row.size === size && row.starts >= 5 && row.minutes > 0)
-    best.push(unitGroup(`best-unit:defence:${size}:ga`, `Best Back ${size === 3 ? 'Three' : 'Four'} · Lowest GA/90`, selected, row => row.intervalGA / row.minutes * 90, ' GA/90', true))
-    best.push(unitGroup(`best-unit:defence:${size}:sot`, `Best Back ${size === 3 ? 'Three' : 'Four'} · Lowest Opponent SOT/90`, selected, row => row.intervalSOT / row.minutes * 90, ' SOT/90', true))
-  }
-  const cbGA = unitGroup('cb-ga', 'Best CB Partnership · Lowest GA/90', units.filter(row => row.position === 'cb' && row.minutes >= 180), row => row.intervalGA / row.minutes * 90, ' GA/90', true)
-  cbGA.rows = cbGA.rows.map(row => ({ ...row, combinationPair: combinationPairPresentation('cb-ga', row.playerIds!) }))
-  return [group('goal-combinations', 'Most Goal Combinations', [...direct.values()]), group('mutual-goal-combinations', 'Most Mutual Goal Combinations', [...mutual.values()]), group('both-scored', 'Most Matches Both Scored', [...bothScored.values()]), group('both-ga', 'Most Matches Both Had G+A', [...bothGA.values()]), group('duo-ga', 'Best Duo Combined G+A', duo), ...together, ...best, group('cb-suppression', 'Best CB Partnership · Shot Suppression', cb, true, true), cbGA]
+  const decimal = (n: number) => n.toFixed(2)
+  const percent = (n: number) => `${decimal(n)}%`
+  const goals = (n: number) => `${n} goals`
+  const streak = (id: string, title: string, key: keyof ReturnType<typeof teamMetrics>['streaks']) => !needs(id) ? [] : [teamGroup(id, title, rank(rows.map(row => ({
+    id: row.id, name: row.name, numeric: row.streaks[key], value: `${row.streaks[key]} matches`,
+    detail: `${row.played} matches · ${row.goals} GF / ${row.conceded} GA`, streakMatchIds: row.streakMatchIds[key],
+  }))))]
+  return [
+    ...group('played', 'Most Matches Played', row => row.played), ...group('wins', 'Most Wins', row => row.wins, n => `${n} wins`),
+    ...group('draws', 'Most Draws', row => row.draws), ...group('losses', 'Most Losses', row => row.losses),
+    ...group('win-rate', 'Highest Win Percentage', row => row.winRate, percent), ...group('ppg', 'Highest Points per Match', row => row.ppg, decimal),
+    ...group('goal-difference', 'Best Goal Difference', row => row.goalDifference, n => `${n} GD`),
+    ...group('goal-difference-per-match', 'Best Goal Difference per Match', row => row.goalDifference / row.played, formatSignedTwoDecimals),
+    ...group('comeback-wins', 'Most Comeback Wins', row => row.comebackWins, n => `${n} wins`),
+    ...group('team-goals', 'Most Goals', row => row.goals, goals), ...group('gf-rate', 'Highest GF per Match', row => row.goals / row.played, decimal),
+    ...group('opening-goals', 'Most Opening Goals', row => row.openingGoals, goals),
+    ...group('clean', 'Most Clean Sheets', row => row.cleanSheets, n => `${n} CS`), ...group('clean-rate', 'Highest Clean Sheet Percentage', row => row.cleanSheets / row.played * 100, percent),
+    ...group('ga-rate', 'Lowest Goals Conceded per Match', row => row.conceded / row.played, decimal, true),
+    ...group('opponent-sot-rate', 'Lowest Opponent SOT per Match', row => row.opponentSot / row.played, decimal, true),
+    ...group('saves', 'Most Team Saves', row => row.saves, n => `${n} saves`), ...group('conceded', 'Most Goals Conceded', row => row.conceded, goals),
+    ...streak('win-streak', 'Longest Winning Streak', 'winning'), ...streak('unbeaten-streak', 'Longest Undefeated Streak', 'unbeaten'),
+    ...streak('scoring-streak', 'Longest Scoring Streak', 'scoring'), ...streak('clean-streak', 'Longest Clean Sheet Streak', 'cleanSheet'),
+    ...streak('losing-streak', 'Longest Losing Streak', 'losing'), ...streak('winless-streak', 'Longest Winless Streak', 'winless'),
+    ...historic,
+  ]
 }

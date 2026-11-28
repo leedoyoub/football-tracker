@@ -79,9 +79,9 @@ function assertRecapAwardPolicy(actual, original, players, matches, season, team
   assertSelection(official, 'season', season, teams, players, matches, states)
   const { buildGlobalRankingData } = require('../../src/engine/stats.ts')
   const rows = buildGlobalRankingData(players, matches, { seasons: [season], teams: [], positions: [] }, 'rating')
-  const expected = { ...original, awards: original.awards.map(award => {
+  const expected = { ...original, awards: original.awards.filter(award => award.id !== 'player' || official.ballon).map(award => {
     const field = award.id === 'scorer' ? 'goals' : award.id === 'assists' ? 'assists' : undefined
-    if (award.id === 'player') return { ...award, playerIds: official.ballon ? [official.ballon.playerId] : [], detail: `${official.ballon.value.toFixed(2)} average rating` }
+    if (award.id === 'player') return { ...award, title: "Ballon d'Or", playerIds: [official.ballon.playerId], detail: `${official.ballon.value.toFixed(2)} average rating` }
     if (award.id === 'best-xi') return { ...award, playerIds: official.bestXI.flatMap(slot => slot.playerId ? [slot.playerId] : []) }
     if (!field) return award
     const maximum = Math.max(...rows.map(row => row[field]))

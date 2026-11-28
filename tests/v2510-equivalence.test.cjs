@@ -49,8 +49,8 @@ test('v2.5.9 whole-object equivalence: all 30 History days, legacy monthly helpe
     equal('engine/competition.ts', 'cupCompetition', s.teams, s.matches, season, s.players)
     equal('engine/competition.ts', 'championsCompetition', s.competitionStates.find(d => d.season === season), s.matches, season, s.players)
     equal('engine/awards.ts', 'seasonAwards', season, s.teams, s.players, s.matches, s.competitionStates)
-    const metrics = current('lib/rankingMetrics.ts').RANKING_METRICS
-    assert.deepStrictEqual(metrics, before('lib/rankingMetrics.ts').RANKING_METRICS)
+    const metrics = before('lib/rankingMetrics.ts').RANKING_METRICS
+    require('./helpers/legacy-ranking-metrics.cjs').assertLegacyRankingMetrics(current('lib/rankingMetrics.ts').RANKING_METRICS, metrics)
     const oldStats = before('engine/stats.ts'); const newStats = current('engine/stats.ts')
     for (const metric of [...metrics.map(row => row.value), 'goalsConceded']) {
       const filters = { seasons: [season], teams: [], positions: [] }

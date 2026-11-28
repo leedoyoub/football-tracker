@@ -8,18 +8,15 @@ export const RANKING_METRICS = [
   { value: 'goals', label: 'Goals' },
   { value: 'assists', label: 'Assists' },
   { value: 'g+a', label: 'G+A' },
+  { value: 'appearances', label: 'Appearances' },
   { value: 'minutes', label: 'Minutes' },
   { value: 'mom', label: 'MOM' },
-  { value: 'goodMatches', label: '7.2+ Matches' },
   { value: 'goals/90', label: 'Goals/90' },
   { value: 'assists/90', label: 'Assists/90' },
   { value: 'g+a/90', label: 'G+A/90' },
-  { value: 'sotAllowed', label: 'SOT Allowed/90' },
-  { value: 'defenderGaPer90', label: 'Defender GA/90' },
   { value: 'cleanSheets', label: 'Clean Sheets' },
   { value: 'saves', label: 'Saves' },
-  { value: 'goalkeeperGaPer90', label: 'GK GA/90' },
-  { value: 'savePercentage', label: 'Qualifying GK Save %' },
+  { value: 'savePercentage', label: 'Save %' },
 ] as const satisfies readonly { value: LeaderboardMetric; label: string }[]
 
 export type RankingDisplayMetric = typeof RANKING_METRICS[number]['value']

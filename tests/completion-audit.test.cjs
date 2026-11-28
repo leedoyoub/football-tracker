@@ -7,6 +7,8 @@ for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module
 const { combinationStats } = require('../src/engine/analytics.ts')
 const { auditDataIntegrity } = require('../src/engine/integrity.ts')
 const { playerSearchMatches } = require('../src/lib/normalizedSearch.ts')
+const { combinationPairPresentation, recordsLeaderboardGroups } = require('../src/screens/recordsLeaderboards.ts')
+const { combinationRecordSections } = require('../src/screens/recordSections.ts')
 const source = path => fs.readFileSync(require.resolve('../' + path), 'utf8')
 const player = (id, position = 'CB') => ({ id, name: id, displayName: id, fullName: id, position, number: 1, teamId: 'A' })
 const game = (id, events, appearances) => ({ id, season: 'S1', matchDay: 1, date: '2026-03-01', duration: 90, homeTeamId: 'A', awayTeamId: 'B', teamId: 'A', events, appearances })
@@ -73,9 +75,19 @@ test('starting-combination metrics exclude matches where the unit did not start 
   assert.deepEqual([row.onPitchGoalsFor, row.onPitchGoalsAgainst], [2, 2])
 })
 
-test('Records exposes only the approved pair-based combination record menu', () => {
-  const records = source('src/screens/recordsLeaderboards.ts')
-  for (const label of ['Most Goal Combinations', 'Most Mutual Goal Combinations', 'Most Matches Both Scored', 'Most Matches Both Had G+A', 'Best Duo Combined G+A', 'Best CB Partnership · Shot Suppression']) assert(records.includes(label))
+test('the Combination archive exposes all 43 existing leaders and Find Partner', () => {
+  const groups = recordsLeaderboardGroups({
+    category: 'combination', players: [], teams: [], matches: [],
+    scope: { seasons: [], teamIds: [], competition: 'all', positionFilter: 'all' },
+  })
+  assert.deepEqual(combinationRecordSections.map(section => section.title), ['Partnerships', 'Together', 'Best Units', 'Defensive Pairs', 'Find Partner'])
+  assert.equal(groups.length, 43)
+  assert.equal(new Set(groups.map(group => group.id)).size, 43)
+  assert.equal(groups.filter(group => group.id.startsWith('together:')).length, 27)
+  assert.equal(groups.filter(group => group.id.startsWith('best-unit:')).length, 9)
+  for (const section of combinationRecordSections.filter(section => section.records)) {
+    for (const id of section.records) assert(groups.some(group => group.id === id), id)
+  }
 })
 
 test('all ranking surfaces share metric pills and ranking rows while League View All keeps scope', () => {
@@ -90,23 +102,25 @@ test('all ranking surfaces share metric pills and ranking rows while League View
 })
 
 test('Combination leaders reuse the canonical Records first-place highlight and preserve pair notation', () => {
-  const records = source('src/screens/recordsLeaderboards.ts')
-  const labels = ['Most Goal Combinations', 'Most Mutual Goal Combinations', 'Most Matches Both Scored', 'Most Matches Both Had G+A', 'Best Duo Combined G+A', 'Best CB Partnership · Shot Suppression']
-  assert(records.includes('combinationGroups') && records.includes('entries(rows, ascending)'))
-  for (const connector of ["'goal-combinations': { connector: '→'", "'mutual-goal-combinations': { connector: '↔'", "'both-scored': { connector: '&'", "'both-ga': { connector: '&'", "'duo-ga': { connector: '+'", "'cb-suppression': { connector: '&'"]) assert(records.includes(connector))
-  for (const label of labels) assert(records.includes(label))
-  assert(records.includes('teamIds.includes(row.teamId)) && row.togetherMinutes >= 180') && records.includes("group('cb-suppression'"))
+  const connectors = { 'goal-combinations': '→', 'mutual-goal-combinations': '↔', 'both-scored': '&', 'both-ga': '&', 'duo-ga': '+', 'cb-suppression': '&', 'cb-ga': '&' }
+  for (const [id, connector] of Object.entries(connectors)) {
+    assert.deepEqual(combinationPairPresentation(id, ['assist', 'scorer']), { playerIds: ['assist', 'scorer'], connector, directional: id === 'goal-combinations' })
+  }
+  assert.match(source('src/screens/RecordsScreen.tsx'), /<RecordPreview[^>]+group=\{group\}/)
+  assert.match(source('src/components/RecordRows.tsx'), /group\.rows\.filter\(row => row\.rank === 1\)/)
 })
 
 test('Player Detail, Match Story, Match Log, and Data Integrity remain reachable from rendered screens', () => {
   const detail = source('src/screens/PlayerDetailScreen.tsx')
   const match = source('src/screens/MatchDetailScreen.tsx')
   const log = source('src/screens/NewMatchScreen.tsx')
-  const records = source('src/screens/RecordsScreen.tsx')
+  const dataManagement = source('src/screens/DataManagementScreen.tsx')
   for (const label of ['Recent Form', 'Position Stats', 'Positions Played', 'Goal Types', 'Role Impact', 'Team Performance When Starting', 'Player Chemistry', 'Career Timeline', 'Personal Records', 'Substitute impact', 'Rating Details']) assert(detail.includes(label))
   assert(match.includes('Match Story') && match.includes('story.tags.slice(0, 3)'))
   assert(!log.includes('Current Matchday') && log.includes('competitionContextParts(activeAssignment)') && log.includes('aria-label="Live score"') && log.includes('matchScore(eventMatch)'))
-  assert(records.includes("['integrity', 'Data Integrity'") && records.includes('function IntegrityRecords') && records.includes('auditDataIntegrity(matches, players, teams, states)'))
+  assert(dataManagement.includes('Data Integrity') && dataManagement.includes('showIntegrity && <IntegrityResults'))
+  assert(dataManagement.includes('auditDataIntegrity(matches, players, teams, competitionStates)'))
+  assert(dataManagement.includes("onNavigate({ name: 'match', id: issue.matchId! })"))
 })
 
 test('integrity audit is read-only, permits unassigned players, and detects a tracked goal without a scorer', () => {

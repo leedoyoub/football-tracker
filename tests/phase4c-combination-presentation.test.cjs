@@ -1,10 +1,15 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
+const path = require('node:path')
 const { test } = require('node:test')
 const ts = require('typescript')
 for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename)
 
 const { combinationBestUnitOptions, combinationPairPresentation, recordsLeaderboardGroups } = require('../src/screens/recordsLeaderboards.ts')
+const { defaultScreenState } = require('../src/lib/navigation.ts')
+const { screenHarness, nodes } = require('./helpers/v259-harness.cjs')
+const root = path.resolve(__dirname, '..')
+const component = name => node => typeof node.type === 'function' && node.type.name === name
 
 const player = (id, position = 'ST') => ({ id, name: id, displayName: id, fullName: id, teamId: 'A', position, number: 9 })
 const appearance = (entry) => ({ playerId: entry.id, teamId: 'A', role: 'starter', position: entry.position, matchPosition: entry.position })
@@ -55,18 +60,42 @@ test('a selected Combination leaderboard matches its full projection and reuses 
 test('preview and View All use the same structured pair renderer with independent player actions', () => {
   const preview = fs.readFileSync('src/screens/RecordsScreen.tsx', 'utf8')
   const full = fs.readFileSync('src/screens/RecordsLeaderboardScreen.tsx', 'utf8')
-  const pair = fs.readFileSync('src/components/CombinationPairIdentity.tsx', 'utf8')
-  assert.match(preview, /CombinationPairIdentity/)
-  assert.match(full, /CombinationPairIdentity/)
-  assert.match(pair, /data-combination-connector/)
-  assert.match(pair, /PlayerIdentityAction/)
-  assert.doesNotMatch(pair, /<button[^>]*>[^]*<button/)
+  const shared = fs.readFileSync('src/components/RecordRows.tsx', 'utf8')
+  assert.match(preview, /<RecordPreview[^>]+group=\{group\}/)
+  assert.match(full, /renderRow=\{\(\{ row \}\) => <RecordRow/)
+  assert.match(shared, /<RecordRow[^>]+group=\{group\}/)
+  assert.match(shared, /<CombinationPairIdentity pair=\{row\.combinationPair\}/)
+  const pair = combinationPairPresentation('goal-combinations', [assist.id, scorer.id])
+  const navigation = []
+  const renderer = screenHarness(root, 'components/CombinationPairIdentity.tsx', 'CombinationPairIdentity', {})
+  const tree = renderer.render({ pair, playerById: new Map(players.map(player => [player.id, player])), onNavigate: view => navigation.push(view) })
+  const connectors = nodes(tree, node => Object.hasOwn(node.props, 'data-combination-connector'))
+  assert.deepEqual(connectors.map(node => node.props.children), ['→'])
+  const actions = nodes(tree, component('PlayerIdentityAction'))
+  assert.deepEqual(actions.map(node => node.props.player.id), pair.playerIds)
+  actions.forEach(node => node.props.onNavigate(node.props.player.id))
+  assert.deepEqual(navigation, pair.playerIds.map(id => ({ name: 'player', id })))
+  assert.equal(nodes(tree, node => node.type === 'button').length, 0, 'player actions are independent')
 })
 
-test('combination leaderboard values, Top 3 cap, and View All full rows remain structurally intact', () => {
-  const preview = fs.readFileSync('src/screens/RecordsScreen.tsx', 'utf8')
-  const full = fs.readFileSync('src/screens/RecordsLeaderboardScreen.tsx', 'utf8')
-  assert.match(preview, /rows\.slice\(0, 3\)/)
-  assert.match(full, /VirtualRankingList rows=\{group\.rows\}/)
-  assert.match(full, /#\{row\.rank\}/)
+test('previews focus on tied leaders and View all exposes every partnership with its shared rank', () => {
+  const matches = [match('shared-leaders', [[assist, scorer], [scorer, other], [other, assist]].map(([from, to], index) => ({
+    id: `goal-${index}`, type: 'goal', minute: 10 + index, teamId: 'A', playerId: to.id, assistPlayerId: from.id,
+  })))]
+  const [group] = recordsLeaderboardGroups({ category: 'combination', players, teams: [], matches, scope, selectedIds: ['goal-combinations'] })
+  assert.deepEqual(group.rows.map(row => row.rank), [1, 1, 1])
+  const navigation = []
+  const preview = screenHarness(root, 'components/RecordRows.tsx', 'RecordPreview', {})
+    .render({ group, players: new Map(), teams: new Map(), matches: new Map(), scope, onNavigate: view => navigation.push(view) })
+  assert.deepEqual(nodes(preview, component('RecordRow')).map(node => node.props.row), group.rows)
+  assert(nodes(preview, node => node.type === 'span' && /^3 leaders · view all$/i.test(node.props.children)).length)
+  nodes(preview, node => node.type === 'button')[0].props.onClick()
+  assert.equal(navigation[0].leaderboardId, group.id)
+  const full = screenHarness(root, 'screens/RecordsLeaderboardScreen.tsx', 'RecordsLeaderboardScreen', { players, teams: [], matches })
+    .render({ screenState: defaultScreenState(navigation[0]), onStateChange() {}, onNavigate() {}, onBack() {} })
+  const [list] = nodes(full, component('VirtualRankingList'))
+  assert.deepEqual(list.props.rows.map(entry => entry.row), group.rows)
+  for (const entry of list.props.rows) {
+    assert.equal(list.props.renderRow(entry).props.row.rank, 1)
+  }
 })

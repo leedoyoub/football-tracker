@@ -150,28 +150,35 @@ test('Race position filters use the player main position across the full award s
   assert.equal(rows[0].candidate.teamId, 'B')
 })
 
-test('official Race panels and full screen describe the same 50 percent minutes eligibility', () => {
+test('official Race panels and full screen describe both busiest-team thresholds', () => {
   const panel = screenHarness(root, 'components/AwardRacePanel.tsx', 'AwardRacePanel', {}).render({ candidates: [], title: 'Award Race', previewCount: 5, season: 'S1', type: 'league', players: [], teams, matches: [], onNavigate() {} })
   const screen = screenHarness(root, 'screens/AwardRaceScreen.tsx', 'AwardRaceScreen', { players: [], teams, matches: [], competitionStates: [] }).render({ screenState: defaultScreenState({ name: 'award-race' }), onStateChange() {}, onNavigate() {}, onBack() {} })
   for (const tree of [panel, screen]) {
     const copy = nodes(tree, node => node.type === 'p' && typeof node.props.children === 'string' && node.props.children.includes('Avg Rating shown'))[0]
-    assert.match(copy.props.children, /minimum 50% playing time/)
+    assert.equal(copy.props.children, 'Avg Rating shown · ranked by Award Score · minimum 40% of matches and 20% of minutes based on the busiest team')
   }
 })
 
-test('competition UI never fills an official XI with four-of-ten appearances while retaining stat awards', () => {
-  const ts = require('../src/data/teams.ts').STATIC_TEAMS, teamId = ts[0].id
-  const player = { id: 'four-of-ten', name: 'Four of Ten', teamId, position: 'ST' }
-  const games = Array.from({ length: 10 }, (_, day) => ({ ...match, id: 'champions:' + day, teamId, homeTeamId: teamId, awayTeamId: 'opponent', duration: 90, competitionType: 'champions', competitionStage: 'roundOf16', matchDay: day + 1, appearances: day < 4 ? [{ playerId: player.id, teamId, role: 'starter', position: 'ST' }] : [], events: day === 0 ? [{ id: 'goal', type: 'goal', teamId, playerId: player.id, minute: 5 }] : [] }))
-  const champions = { championId: teamId, runnerUpId: ts[1].id, currentStage: 'final', drawn: true, rounds: { roundOf16: [], quarterFinal: [], semiFinal: [], final: [] } }
-  const actual = require('../src/engine/awards.ts').awardsForCompetition('champions', 'S1', ts, [player], games, [], { champions })
+test('an early-eliminated team can win stat awards without qualifying for the official competition XI', () => {
+  const ts = require('../src/data/teams.ts').STATIC_TEAMS
+  const [champion, earlyExit] = ts
+  const players = [['scorer', 'ST'], ['assister', 'CM'], ['keeper', 'GK']].map(([id, position]) => ({ id, name: id, teamId: earlyExit.id, position }))
+  const games = [[champion.id, 10], [earlyExit.id, 3]].flatMap(([teamId, count]) => Array.from({ length: count }, (_, day) => ({
+    ...match, id: `champions:${teamId}:${day}`, teamId, homeTeamId: teamId, awayTeamId: 'opponent', duration: 90, competitionType: 'champions', competitionStage: 'roundOf16', matchDay: day + 1,
+    appearances: players.filter(player => player.teamId === teamId).map(player => ({ playerId: player.id, teamId, role: 'starter', position: player.position })),
+    events: teamId === earlyExit.id && day === 0 ? [{ id: 'goal', type: 'goal', teamId, playerId: 'scorer', assistPlayerId: 'assister', minute: 5 }] : [],
+  })))
+  const champions = { championId: champion.id, runnerUpId: ts[2].id, currentStage: 'final', drawn: true, rounds: { roundOf16: [{ teamIds: [champion.id, earlyExit.id], winnerId: champion.id }], quarterFinal: [], semiFinal: [], final: [] } }
+  const actual = require('../src/engine/awards.ts').awardsForCompetition('champions', 'S1', ts, players, games, [], { champions })
   assert.equal(actual.candidates.length, 0)
   assert.equal(actual.complete, true)
-  assert.equal(actual.scorers[0].playerId, player.id)
+  assert.equal(actual.scorers[0].playerId, 'scorer')
+  assert.equal(actual.assistLeaders[0].playerId, 'assister')
+  assert.equal(actual.goalkeepers[0].playerId, 'keeper')
   const h = screenHarness(root, 'screens/CompetitionScreen.tsx', 'CompetitionBestElevens', { competitionStates: [] })
-  const tree = h.render({ season: 'S1', type: 'champions', screenState: defaultScreenState({ name: 'competition', competitionType: 'champions' }), players: [player], teams: ts, matches: games, allMatches: games, cup: null, champions, onStateChange() {}, onNavigate() {} })
+  const tree = h.render({ season: 'S1', type: 'champions', players, teams: ts, allMatches: games, cup: null, champions, onNavigate() {} })
   assert.equal(nodes(tree, node => node.type?.name === 'BestEleven' && node.props.xi.slots.some(slot => slot.playerId)).length, 0)
   const stats = nodes(tree, node => node.type?.name === 'CompetitionIndividualAwards')[0]
   assert.equal(stats.props.result.complete, true)
-  assert.equal(stats.props.result.individualAwards.scorers[0].playerId, player.id)
+  for (const key of ['scorers', 'assistLeaders', 'goalkeepers']) assert.deepEqual(stats.props.result.individualAwards[key], actual[key])
 })

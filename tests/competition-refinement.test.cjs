@@ -165,10 +165,14 @@ test('Teams uses the compact card progress read model without player-count or ti
   assert(!source.includes('team.name =') && !source.includes('name: `${team.name}'))
 })
 
-test('Records owns History, Trophy Cabinet and cached form Insights', () => {
-  const source = fs.readFileSync(require.resolve('../src/screens/RecordsScreen.tsx'), 'utf8') + fs.readFileSync(require.resolve('../src/screens/RecordsHistory.tsx'), 'utf8')
-  for (const token of ["'history'", "'insights'", 'Season Timeline', 'Golden Boot', 'Team of the Season', 'Team Form', 'In-form Players']) assert(source.includes(token), token)
-  assert(source.includes('useMemo'))
+test('Records routes to the season archive, trophies and filtered recent form', () => {
+  const { archiveMenus, teamRecordSections } = require('../src/screens/recordSections.ts')
+  assert.deepEqual(archiveMenus.map(menu => menu.id), ['hall', 'player', 'team', 'combination', 'history', 'analytics'])
+  assert(teamRecordSections.find(section => section.id === 'trophies').records.includes('history-titles'))
+  const records = fs.readFileSync(require.resolve('../src/screens/RecordsScreen.tsx'), 'utf8')
+  const history = fs.readFileSync(require.resolve('../src/screens/RecordsHistory.tsx'), 'utf8')
+  for (const token of ['Season Archive', 'Season Best XI', 'historyAwardResultForScope', 'officialSeasonModel']) assert(history.includes(token), token)
+  for (const token of ['Recent Team Form', 'Recent Player Ratings', 'screenState.analyticsFilters', 'useMemo']) assert(records.includes(token), token)
 })
 
 test('League completion does not roll the season; an explicit completion marker can', () => {
@@ -189,9 +193,9 @@ test('season completion is synchronized as backward-compatible CompetitionState 
   assert(validation.includes("'season-complete'"))
 })
 
-test('visible and package metadata version are exactly v2.7.1 / 2.7.1', () => {
-  assert.equal(APP_VERSION, '2.7.1')
-  assert.equal(require('../package.json').version, '2.7.1')
+test('visible and package metadata version are exactly v2.8.0 / 2.8.0', () => {
+  assert.equal(APP_VERSION, '2.8.0')
+  assert.equal(require('../package.json').version, '2.8.0')
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
   assert(home.includes('v{APP_VERSION}'))
 })

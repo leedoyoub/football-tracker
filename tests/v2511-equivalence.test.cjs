@@ -12,6 +12,8 @@ alignArchivedRatingInputs(baseline.directory)
 const before = require(path.join(baseline.directory, 'src/engine/stats.ts'))
 const current = require('../src/engine/stats.ts')
 const { RANKING_METRICS } = require('../src/lib/rankingMetrics.ts')
+const { assertLegacyRankingMetrics } = require('./helpers/legacy-ranking-metrics.cjs')
+const archivedMetrics = require(path.join(baseline.directory, 'src/lib/rankingMetrics.ts')).RANKING_METRICS
 const { positionFilterFamilies } = require('../src/engine/positionScope.ts')
 const s = performanceFixture()
 for (const season of ['Season 1', 'Season 2']) for (const scope of ['all', 'league', 'cup', 'champions']) test(`v2.5.10 full ranking equivalence: ${season} ${scope}, every metric, team and position scopes`, () => {
@@ -23,7 +25,7 @@ for (const season of ['Season 1', 'Season 2']) for (const scope of ['all', 'leag
     const b = before.buildGlobalRankingData(s.players, matches, filter, 'rating')
     assert.deepEqual(a, b)
     assert.equal(current.buildGlobalRankingData(s.players, matches, filter, 'rating'), a, 'same scope returns cached facts')
-    for (const metric of [...RANKING_METRICS.map(m => m.value), 'goalsConceded']) {
+    for (const metric of [...archivedMetrics.map(m => m.value), 'goalsConceded']) {
       const rows = current.rankGlobalRankingRows(a, s.players, metric)
       assert.deepEqual(rows, before.rankGlobalRankingRows(b, s.players, metric), `${metric} full ordered facts`)
       assert.equal(current.rankGlobalRankingRows(a, s.players, metric), rows, 'reselect returns cached ranked rows')
@@ -45,6 +47,7 @@ test('unmodified competition rules, constants and repository remain source ident
     // byte-identical; new read-model output is deep-compared in v2514-team.
     const normalize = filename => {
       let source = fs.readFileSync(filename, 'utf8').replaceAll('\r\n', '\n')
+      if (file === 'lib/rankingMetrics.ts') source = source.replace(/export const RANKING_METRICS = \[[\s\S]*?(?=export type RankingDisplayMetric)/, '')
       // v2.6.3 changes cache invalidation only; keep the computations below
       // byte-identical. Public replacement behavior is covered in v263 tests.
       source = source.replace("import { arrayItemRevision } from './arrayItemRevision'\n", '')
@@ -79,10 +82,13 @@ test('unmodified competition rules, constants and repository remain source ident
     }
     assert.equal(normalize(path.join(baseline.root, 'src', file)), normalize(path.join(baseline.directory, 'src', file)), file)
   }
+  const { assertLegacyRankingMetrics } = require('./helpers/legacy-ranking-metrics.cjs')
+  const catalog = root => require(path.join(root, 'src/lib/rankingMetrics.ts')).RANKING_METRICS
+  assertLegacyRankingMetrics(catalog(baseline.root), catalog(baseline.directory))
   // REV13 calculations precede the match read model and its MOM cache.
   const calculation = source => source.replaceAll('\r\n', '\n').split('type MatchRatings')[0].split('export function clampRating')[1]
   const previous = calculation(v2612Source('engine/rating.ts'))
   assert(previous.length > 1000)
   assert.equal(previous, calculation(fs.readFileSync(path.join(baseline.directory, 'src/engine/rating.ts'), 'utf8')))
-  assert.deepEqual(RANKING_METRICS, require(path.join(baseline.directory, 'src/lib/rankingMetrics.ts')).RANKING_METRICS)
+  assertLegacyRankingMetrics(RANKING_METRICS, archivedMetrics)
 })

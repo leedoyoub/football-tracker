@@ -41,7 +41,7 @@ test('independent selection checks reject changed raw means, regulation minutes,
     // Update all dependent presentation values too, so the independent numeric
     // oracle (rather than a stale projection) is what rejects each corruption.
     if (changed.mvp) changed.mvp = { ...changed.mvp, value: candidate.average, awardScore: candidate.selectionScore }
-    const message = { average: /raw arithmetic average/, minutes: /regulation minutes/, availableMinutes: /50% opportunity-minute gate/, teamPerformanceBonus: /placement base/, selectionScore: /team participation term/ }[field]
+    const message = { average: /raw arithmetic average/, minutes: /regulation minutes/, availableMinutes: /single-stint denominator/, teamPerformanceBonus: /placement base/, selectionScore: /team participation term/ }[field]
     assert.throws(() => assertSelection(changed, 'league', 'S1', teams, players, matches, []), message, field)
   }
 })

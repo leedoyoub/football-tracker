@@ -215,7 +215,8 @@ export type View =
   | { name: 'award-race'; season?: string; competitionType?: CompetitionType | 'all'; awardScope?: 'first-half' | 'second-half' }
   | { name: 'results' }
   | { name: 'records' }
-  | { name: 'records-leaderboard'; category: Extract<RecordsCategory, 'player' | 'team' | 'combination'>; leaderboardId: string; competition?: CompetitionType | 'all'; positionFilter?: PositionFilterKey; positionFilters?: PositionFilterKey[]; seasonIds?: string[]; teamIds?: string[] }
+  | { name: 'records-leaderboard'; category: Extract<RecordsCategory, 'player' | 'team' | 'combination'>; leaderboardId: string; competition?: CompetitionType | 'all'; positionFilter?: PositionFilterKey; positionFilters?: PositionFilterKey[]; seasonIds?: string[]; teamIds?: string[]; rankMode?: RankingRankMode }
+  | { name: 'partnership'; playerIds: string[]; teamId?: string; teamIds?: string[]; seasonIds?: string[]; competition?: CompetitionType | 'all'; recordId?: string }
   | { name: 'standings' }
   | { name: 'season-recap'; season: string }
   | { name: 'season-highlight'; season: string; kind: 'awards' | 'monthly' | 'review' | 'news' }
@@ -241,7 +242,7 @@ export type PositionFilterKey = 'all' | 'st-ss' | 'lw-rw' | 'cam' | 'lm-rm' | 'c
 export type EventSurface = 'news' | 'match-change' | 'both'
 export type MatchChangePayload = { kind: 'milestone' | 'performance' | 'ranking' | 'record' | 'competition'; label: string }
 
-export type RecordsCategory = 'player' | 'combination' | 'team' | 'history' | 'awards' | 'insights' | 'integrity'
+export type RecordsCategory = 'index' | 'hall' | 'player' | 'combination' | 'team' | 'history' | 'analytics'
 
 /** Ephemeral UI state belongs to a navigation entry. It is intentionally
  * separate from both the route persisted by lastRoute and football history. */
@@ -266,7 +267,7 @@ export interface ScreenStateByView {
     historyFocusedTeamId: string | null
     historyPlotScrollLeft: number | null
   }
-  'global-ranking': { name: 'global-ranking'; metric: RankSort; scope: CompetitionType | 'all'; positionFilter: PositionFilterKey; teamId: string | null; positionFilters?: PositionFilterKey[]; teamIds?: string[] }
+  'global-ranking': { name: 'global-ranking'; metric: RankSort; scope: CompetitionType | 'all'; rankMode: RankingRankMode; positionFilter: PositionFilterKey; teamId: string | null; positionFilters?: PositionFilterKey[]; teamIds?: string[] }
   'award-race': { name: 'award-race'; season: string | null; scope: CompetitionType | 'all'; awardScope?: 'first-half' | 'second-half'; positionFilter: PositionFilterKey; teamId: string | null; positionFilters?: PositionFilterKey[]; teamIds?: string[] }
   results: { name: 'results' }
   records: {
@@ -277,6 +278,11 @@ export interface ScreenStateByView {
     positionFilters?: PositionFilterKey[]
     filterSeasonIds: string[]
     filterTeamIds: string[]
+    sections?: Partial<Record<'player' | 'team' | 'combination' | 'hall', string>>
+    rankMode?: RankingRankMode
+    analyticsFilters?: { seasonIds: string[]; teamIds: string[]; competition: CompetitionType | 'all' }
+    partnerPlayerId?: string
+    careerPlayerId?: string
     combinationPosition?: 'attack' | 'midfield' | 'defence'
     combinationPlayers?: 2 | 3 | 4
     combinationMetric?: 'starts' | 'minutes' | 'ppg'
@@ -286,6 +292,7 @@ export interface ScreenStateByView {
     teamAwardKindsOpen?: boolean
     historyPanel: string | null
     historySeason: string | null
+    historyCompetition?: CompetitionType | 'all'
     historyAwardScope: 'first-half' | 'second-half' | 'league' | 'cup' | 'champions' | 'season'
     historyBlock: number | null
   }
@@ -298,7 +305,9 @@ export interface ScreenStateByView {
     positionFilters?: PositionFilterKey[]
     filterSeasonIds: string[]
     filterTeamIds: string[]
+    rankMode?: RankingRankMode
   }
+  partnership: { name: 'partnership' }
   standings: { name: 'standings' }
   'season-recap': { name: 'season-recap' }
   'season-highlight': { name: 'season-highlight' }
@@ -330,7 +339,7 @@ export interface ScreenStateByView {
   'edit-team': { name: 'edit-team' }
   'new-player': { name: 'new-player' }
   'edit-player': { name: 'edit-player' }
-  'data-management': { name: 'data-management' }
+  'data-management': { name: 'data-management'; showIntegrity?: boolean }
 }
 
 export type ScreenState = ScreenStateByView[keyof ScreenStateByView]
@@ -340,8 +349,10 @@ export type NavigationEntry<V extends View = View> = {
   screenState: ScreenStateByView[V['name']]
 }
 
+export type RankingRankMode = 'filtered' | 'overall'
+
 export type RankSort =
-  | 'rating' | 'goals' | 'assists' | 'g+a' | 'minutes' | 'mom' | 'goodMatches'
+  | 'rating' | 'goals' | 'assists' | 'g+a' | 'appearances' | 'minutes' | 'mom' | 'goodMatches'
   | 'goals/90' | 'assists/90' | 'g+a/90' | 'sotAllowed' | 'defenderGaPer90' | 'cleanSheets' | 'saves' | 'goalkeeperGaPer90'
   | 'goalsConceded' | 'savePercentage'
 

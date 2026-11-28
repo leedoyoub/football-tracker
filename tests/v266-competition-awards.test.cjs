@@ -6,6 +6,8 @@ const nav = require('../src/lib/navigation.ts')
 const { normalizeCompetitionScreenState, resetCompetitionSeasonState } = require('../src/lib/competitionScreenState.ts')
 const { loadLastNavigationEntry, LAST_ROUTE_STORAGE_KEY } = require('../src/lib/lastRoute.ts')
 const actualAwards = require('../src/engine/awards.ts')
+const { matchesForAwardScope } = require('../src/engine/awardScopes.ts')
+const { assertAwardCandidateCompatibility } = require('./helpers/v280-policy-compat.cjs')
 const root = path.resolve(__dirname, '..'), view = { name: 'competition', season: 'S1', competitionType: 'league' }
 const teams = [{ id: 'A', name: 'A' }]
 const players = Array.from({ length: 7 }, (_, i) => ({ id: `p${i}`, name: `Player ${i}`, teamId: 'A', position: 'ST', number: i + 1 }))
@@ -119,44 +121,47 @@ test('v266 legacy Cup stage state never calculates stage XI and retains official
   assert.deepEqual(nodes(tree, n => n.type?.name === 'CompetitionIndividualAwards')[0].props.result.individualAwards, canonical.individualAwards)
 })
 
-test('v266 official scoring, publication, Team History, shared race and pitch remain byte-equivalent to v265', () => {
+test('official scoring, publication, Team History, shared race and pitch preserve the v265 rules outside the eligibility update', () => {
   const { v2612Source } = require('./helpers/rating-release-comparison.cjs')
-  // v269 extends the full Race screen's presentation filters; independent
-  // unfiltered screen row/candidate parity is checked in v269-ranking.
-  // All official scoring, panel, pitch and qualification source locks stay exact.
-  for (const file of ['engine/awards.ts', 'engine/awardEvaluation.ts', 'engine/awardRules.ts', 'engine/officialAwards.ts', 'engine/awardPolicy.ts', 'engine/rating.ts', 'engine/ratingRevision.ts', 'engine/competition.ts', 'engine/teamHistorySelection.ts', 'components/Pitch.tsx', 'components/awardBestXIProps.ts', 'components/AwardBestXI.tsx', 'components/AwardRacePanel.tsx']) {
-    const old = execFileSync('git', ['show', `5347394:src/${file}`], { encoding: 'utf8' }).replaceAll('\r', '')
+  const v265Source = file => execFileSync('git', ['show', `5347394:src/${file}`], { encoding: 'utf8' }).replaceAll('\r', '')
+  const { AWARD_POLICY_REVISION, BALLON_DOR_LABEL } = require('../src/engine/awardPolicy.ts')
+  const previousRevision = Number(v265Source('engine/awardPolicy.ts').match(/AWARD_POLICY_REVISION = (\d+)/)[1])
+  assert.ok(AWARD_POLICY_REVISION > previousRevision)
+  assert.equal(BALLON_DOR_LABEL, "Ballon d'Or")
+  for (const file of ['engine/awards.ts', 'engine/awardEvaluation.ts', 'engine/awardRules.ts', 'engine/officialAwards.ts', 'engine/rating.ts', 'engine/ratingRevision.ts', 'engine/competition.ts', 'engine/teamHistorySelection.ts', 'components/Pitch.tsx', 'components/awardBestXIProps.ts', 'components/AwardBestXI.tsx', 'components/AwardRacePanel.tsx']) {
     const source = file === 'engine/rating.ts' || file === 'engine/ratingRevision.ts' ? v2612Source(file) : fs.readFileSync(path.join(root, 'src', file), 'utf8')
-    const current = source.replaceAll('\r', '')
-    // v268 indexes historical registrations once; the entire shared scoring,
-    // qualification, weighting, deduplication and tie-selection code stays exact.
-    // The independent result check below also protects the changed input index.
-    const sharedScoring = source => {
-      const start = source.indexOf('/** Shared individual facts')
-      assert(start >= 0)
-      return source.slice(start)
-    }
     const policyIndependent = source => {
       const withoutCachePolicy = source.replace("import { MOM_POLICY_REVISION } from './momPolicy'\n", '').replaceAll('${MOM_POLICY_REVISION}:', '')
-      if (file === 'engine/awardEvaluation.ts') return sharedScoring(withoutCachePolicy)
+      if (file === 'engine/awardEvaluation.ts') {
+        const start = withoutCachePolicy.indexOf('    const average = ratings.reduce(')
+        assert(start >= 0)
+        return withoutCachePolicy.slice(start).replace('facts![type]', 'facts?.[type]').replace('!part.minutes', '!part?.minutes')
+      }
+      if (file === 'engine/awards.ts' || file === 'engine/officialAwards.ts') return withoutCachePolicy.replace('AWARD_POLICY_REVISION, BALLON_DOR_LABEL', 'AWARD_POLICY_REVISION').replaceAll('BALLON_DOR_LABEL', "'Player of the Season'")
+      if (file === 'components/AwardRacePanel.tsx') return withoutCachePolicy.replace('minimum 40% of matches and 20% of minutes based on the busiest team', 'minimum 50% playing time')
       if (file === 'engine/rating.ts') return withoutCachePolicy.replace('policyRevision: number; ', '').split('export function getMatchManOfTheMatch')[0]
       return withoutCachePolicy
     }
-    assert.equal(policyIndependent(current), policyIndependent(old), file)
+    assert.equal(policyIndependent(source.replaceAll('\r', '')), policyIndependent(v265Source(file)), file)
   }
 })
 
-test('v268 indexed participation preserves every official candidate field across scopes and historical edits', () => {
+test('official candidates preserve scoring fields and relative order across scopes and historical edits', () => {
   const baselineRoot = require('./helpers/v268-baseline.cjs').baselineRoot()
   require('./helpers/rating-release-comparison.cjs').alignArchivedRatingInputs(baselineRoot)
   const baseline = require(path.join(baselineRoot, 'src/engine/awardEvaluation.ts'))
   const current = require('../src/engine/awardEvaluation.ts')
   const s = require('./helpers/v255-fixture.cjs').performanceFixture(1)
   const compare = label => {
-    for (const type of ['all', 'league', 'cup', 'champions']) {
-      const games = s.matches.filter(m => type === 'all' || m.competitionType === type)
+    for (const type of ['all', 'first-half', 'second-half', 'league', 'cup', 'champions']) {
+      const games = matchesForAwardScope(s.matches, 'Season 1', type)
       const args = [s.players, games, s.matches, (competition, teamId) => (s.teams.findIndex(t => t.id === teamId) + 1) * ({ league: .01, cup: .02, champions: .03 }[competition]), { league: .7, cup: .2, champions: .4 }]
-      assert.deepEqual(current.evaluateOfficialCandidates(...args), baseline.evaluateOfficialCandidates(...args), `${label}: ${type}`)
+      const before = baseline.evaluateOfficialCandidates(...args)
+      const after = current.evaluateOfficialCandidates(...args)
+      assertAwardCandidateCompatibility(after, before, games)
+      const oldIds = new Set(before.map(candidate => candidate.playerId))
+      const newIds = new Set(after.map(candidate => candidate.playerId))
+      assert.deepEqual(after.filter(candidate => oldIds.has(candidate.playerId)), before.filter(candidate => newIds.has(candidate.playerId)), `${label}: ${type}`)
     }
   }
   compare('original')

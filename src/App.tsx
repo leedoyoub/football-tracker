@@ -21,6 +21,7 @@ import { SeasonHighlightScreen } from './screens/SeasonHighlightScreen'
 import { CompetitionScreen } from './screens/CompetitionScreen'
 import { RecordsScreen } from './screens/RecordsScreen'
 import { RecordsLeaderboardScreen } from './screens/RecordsLeaderboardScreen'
+import { PartnershipScreen } from './screens/PartnershipScreen'
 import { LatestChangesScreen } from './screens/LatestChangesScreen'
 import { ResultsScreen } from './screens/ResultsScreen'
 import { GlobalRankingScreen } from './screens/GlobalRankingScreen'
@@ -129,7 +130,7 @@ export default function App() {
       return 'players'
     }
     if (view.name === 'competition' || view.name === 'global-ranking' || view.name === 'award-race') return 'competition'
-    if (view.name === 'records' || view.name === 'records-leaderboard' || view.name === 'chemistry' || view.name === 'comparison') return 'records'
+    if (view.name === 'records' || view.name === 'records-leaderboard' || view.name === 'partnership' || view.name === 'chemistry' || view.name === 'comparison') return 'records'
     return 'home'
   }, [view])
 
@@ -269,8 +270,9 @@ export default function App() {
           {view.name === 'global-ranking' && <GlobalRankingScreen season={view.season ?? season} screenState={entry.screenState as ScreenStateByView['global-ranking']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'award-race' && <AwardRaceScreen screenState={entry.screenState as ScreenStateByView['award-race']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'results' && <ResultsScreen onNavigate={onNavigate} onBack={onBack} />}
-          {view.name === 'records' && <RecordsScreen season={season} screenState={entry.screenState as ScreenStateByView['records']} onStateChange={onStateChange} onNavigate={onNavigate} />}
+          {view.name === 'records' && <RecordsScreen screenState={entry.screenState as ScreenStateByView['records']} onStateChange={onStateChange} onNavigate={onNavigate} />}
           {view.name === 'records-leaderboard' && <RecordsLeaderboardScreen screenState={entry.screenState as ScreenStateByView['records-leaderboard']} onStateChange={onStateChange} onNavigate={onNavigate} onBack={onBack} />}
+          {view.name === 'partnership' && <PartnershipScreen view={view} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'standings' && <StandingsScreen season={season} onNavigate={onNavigate} />}
           {view.name === 'season-recap' && <SeasonRecapScreen season={view.season} onNavigate={onNavigate} onBack={onBack} />}
           {view.name === 'season-highlight' && <SeasonHighlightScreen season={view.season} kind={view.kind} onNavigate={onNavigate} onBack={onBack} />}
@@ -294,7 +296,7 @@ export default function App() {
             <NewPlayerScreen teamId={view.teamId} onReplace={onReplace} onBack={onBack} />
           )}
           {view.name === 'edit-player' && <EditPlayerScreen playerId={view.id} onNavigate={onNavigate} onDone={dismissPlayerEdit} />}
-          {view.name === 'data-management' && <DataManagementScreen onBack={onBack} />}
+          {view.name === 'data-management' && <DataManagementScreen onBack={onBack} onNavigate={onNavigate} screenState={entry.screenState as ScreenStateByView['data-management']} onStateChange={onStateChange} />}
           {/* Removed Reset demo data button */}
         </div>
         <BottomNav tab={tab} onChange={onTab} />

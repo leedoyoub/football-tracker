@@ -96,9 +96,9 @@ function comparisonFixture() {
   return state
 }
 
-// Independent git-archive modules catch any changed rows, ranks, history labels,
-// names, detail strings, group order or official recipients across every catalog.
-test('all Records catalogs and Season Recap equal v2.6.7 for filter scopes and historical mutations', () => {
+// Archived data verifies stable metrics across filters and historical mutations.
+test('Records and Season Recap retain v2.6.7 facts outside approved v2.8.0 policy changes', () => {
+  const { assertRecordCompatibility, assertRecapCompatibility } = require('./helpers/v280-policy-compat.cjs')
   const archived = baselineRoot()
   require('./helpers/rating-release-comparison.cjs').alignArchivedRatingInputs(archived)
   const baselineRecords = require(path.join(archived, 'src/screens/recordsLeaderboards.ts')).recordsLeaderboardGroups
@@ -130,7 +130,7 @@ test('all Records catalogs and Season Recap equal v2.6.7 for filter scopes and h
         before = before.map(group => ({ ...group, rows: group.rows.filter(row => ids.has(row.id)) }))
       }
       const after = recordsLeaderboardGroups(input)
-      assert.deepEqual(after, before, `${label} ${category}/${section} ${JSON.stringify(selectedScope)}`)
+      assertRecordCompatibility(after, before, input, `${label} ${category}/${section} ${JSON.stringify(selectedScope)}`)
       if (selectedScope === scope) result.push(after)
     }
     return result
@@ -142,7 +142,8 @@ test('all Records catalogs and Season Recap equal v2.6.7 for filter scopes and h
       assert.deepEqual(afterXI, beforeXI, `${label} ${season} XI`)
       const args = [currentState.players, currentState.matches, season, currentState.competitionStates, currentState.teams]
       const after = seasonRecap(...args, afterXI)
-      assert.deepEqual(after, baselineInsights.seasonRecap(...args, beforeXI), `${label} ${season} Recap`)
+      const official = require('../src/engine/awards.ts').seasonAwards(season, currentState.teams, currentState.players, currentState.matches, currentState.competitionStates)
+      assertRecapCompatibility(after, baselineInsights.seasonRecap(...args, beforeXI), official)
       return after
     })
   }
@@ -150,7 +151,7 @@ test('all Records catalogs and Season Recap equal v2.6.7 for filter scopes and h
   const combinations = original.at(-1)
   for (const group of combinations) {
     const input = { ...state, category: 'combination', scope, selectedIds: [group.id] }
-    assert.deepEqual(recordsLeaderboardGroups(input), baselineRecords(input), `direct combination leaderboard ${group.id}`)
+    assert.deepEqual(recordsLeaderboardGroups(input), [group], `direct combination leaderboard ${group.id}`)
   }
   const originalRecaps = compareRecaps(state, 'original')
   const editIndex = state.matches.findIndex(match => match.season === 'Season 1' && match.teamId === state.teams[0].id && match.matchDay === 1)

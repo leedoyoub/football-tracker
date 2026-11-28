@@ -80,8 +80,10 @@ test('award Records share totals, filters, historical teams and official season 
   assert.equal(recordsLeaderboardGroups({ ...input, scope: { ...input.scope, positionFilter: 'gk' } }).find(g => g.id === 'awards-individual')?.rows.length, 0)
   const history = recordsLeaderboardGroups({ ...input, category: 'team' })
   assert.equal(history.find(g => g.id === 'history-league-titles')?.rows[0]?.numeric, 1)
-  assert.equal(history.find(g => g.id === 'history-league-points')?.rows[0]?.numeric, 90)
-  assert.match(history.find(g => g.id === 'history-league-points')?.rows[0]?.detail ?? '', /S1/)
+  const leaguePoints = history.find(g => g.id === 'history-league-points')?.rows[0]
+  assert.equal(leaguePoints?.numeric, 90)
+  assert.equal(leaguePoints?.season, 'S1')
+  assert.equal(leaguePoints?.detail, 'S1 · Champion')
 })
 
 test('career UI groups awards into accessible disclosures with historical details', () => {
@@ -120,10 +122,20 @@ test('full Records uses bounded virtual rows and retains historical season detai
   const { defaultScreenState } = require('../src/lib/navigation.ts')
   const path = require('node:path')
   const rows = Array.from({ length: 350 }, (_, i) => ({ id: `p${i}`, name: `P${i}`, rank: i + 1, numeric: 1, value: '1', detail: 'Season 2 · Champion' }))
-  const h = screenHarness(path.resolve(__dirname, '..'), 'screens/RecordsLeaderboardScreen.tsx', 'RecordsLeaderboardScreen', { players: [], teams: [], matches: [], competitionStates: [] }, { './recordsLeaderboards': { recordsLeaderboardGroups: () => [{ id: 'awards-total', title: 'Most Total Honors', rows, applicableFilters: {} }] } })
+  const h = screenHarness(path.resolve(__dirname, '..'), 'screens/RecordsLeaderboardScreen.tsx', 'RecordsLeaderboardScreen', { players: [], teams: [], matches: [], competitionStates: [] }, {
+    './recordsLeaderboards': {
+      ...require('../src/screens/recordsLeaderboards.ts'),
+      recordsLeaderboardGroups: () => [{ id: 'awards-total', title: 'Most Total Honors', kind: 'player', rows, applicableFilters: {} }],
+    },
+  })
   const tree = h.render({ screenState: { ...defaultScreenState({ name: 'records-leaderboard', category: 'player', leaderboardId: 'awards-total' }), leaderboardId: 'awards-total' }, onStateChange() {}, onNavigate() {}, onBack() {} })
-  assert.equal(nodes(tree, n => n.type?.name === 'VirtualRankingList').length, 1)
+  const lists = nodes(tree, n => n.type?.name === 'VirtualRankingList')
+  assert.equal(lists.length, 1)
   assert.equal(nodes(tree, n => n.props?.children === '1').length, 0)
+  assert.equal(lists[0].props.rows.length, 350)
+  const rendered = lists[0].props.renderRow(lists[0].props.rows[0])
+  const rowTree = rendered.type(rendered.props)
+  assert.equal(nodes(rowTree, node => node.type === 'span' && node.props.title === 'Season 2 · Champion').length, 1)
 })
 
 function cupFixture(replay = false) {
@@ -210,7 +222,7 @@ test('completed integrated awards retain Season labels and never appear in a sin
   const players = [league.p, keeper, ...cup.ps, ...champions.ps]
   const matches = [...leagueGames, ...cup.matches, ...champions.matches]
   const events = official(STATIC_TEAMS, players, matches, champions.states, 'S1')
-  assert.equal(events.find(e => e.kind === 'season-mvp')?.label, 'Player of the Season')
+  assert.equal(events.find(e => e.kind === 'season-mvp')?.label, "Ballon d'Or")
   assert.equal(events.find(e => e.kind === 'season-gk')?.label, 'Goalkeeper of the Season')
   assert(events.filter(e => e.kind.startsWith('season-')).every(e => e.competition === 'all'))
   assert.equal(events.filter(e => /golden-glove/.test(e.kind)).length, 0)

@@ -18,6 +18,19 @@ function leagueCopy(value, markup = typeof value === 'string') {
   return copy
 }
 function assertPolicyEquivalence(actual, original, file, fn, args = []) {
+  if (file === 'screens/recordsLeaderboards.ts' && fn === 'recordsLeaderboardGroups') {
+    const { assertRecordCompatibility } = require('./v280-policy-compat.cjs')
+    return assertRecordCompatibility(actual, original, args[0], 'Archived Records')
+  }
+  if (file === 'engine/playerRecords.ts' && fn === 'buildPlayerRecordLeaderboards') {
+    const { assertRecordCompatibility } = require('./v280-policy-compat.cjs')
+    const project = groups => groups.map(group => ({
+      ...group,
+      rows: group.rows.map(row => ({ ...row, id: row.playerId })),
+    }))
+    const scope = { teamIds: [], ...args[2] }
+    return assertRecordCompatibility(project(actual), project(original), { category: 'player', scope }, 'Archived player record facts')
+  }
   const { withoutSelection, assertSelection, assertNewsPolicy, assertLatestPolicy } = require('./v265-award-policy-comparison.cjs')
   const a = leagueCopy(actual), b = leagueCopy(original)
   if (file === 'engine/news.ts' && ['deriveNews', 'deriveFootballEvents', 'majorNewsEvents'].includes(fn)) return assertNewsPolicy(a, b, args, fn)

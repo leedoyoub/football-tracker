@@ -46,20 +46,20 @@ test('team awards Records keep the 17 existing honor groups and add canonical to
   assert.equal(recordsLeaderboardGroups({ category: 'team', section: 'awards', ...f, scope: { ...scope, competition: 'cup' } }).find(g => g.id === 'team-awards-individual').rows.length, 0)
 })
 
-test('Honors Hub exposes all 17 previews, grouped categories and total awards before expanding kinds', () => {
+test('Team Records exposes trophies, individual awards and the separate Best Seasons archive', () => {
   const f = fixture(), navigation = []
-  const h = screenHarness(root, 'screens/RecordsScreen.tsx', 'RecordsRankingPreviews', {})
-  const tree = h.render({ category: 'team', ...f, filters: { seasons: [], teams: [], positions: [] }, competition: 'all', positionFilter: 'all', screenState: { ...defaultScreenState({ name: 'records' }), recordsMode: 'awards' }, onSelectionChange() {}, onNavigate: v => navigation.push(v) })
-  const sections = nodes(tree, n => n.type === 'section')
-  for (const id of ['history-titles', 'history-league-titles', 'history-cup-titles', 'history-champions-titles', 'history-runner-ups', 'history-league-runner-ups', 'history-cup-runner-ups', 'history-champions-runner-ups', 'history-finals', 'history-cup-finals', 'history-champions-finals', 'history-league-finish', 'history-league-points', 'history-league-wins', 'history-league-gd', 'history-cup-finish', 'history-champions-finish', 'team-awards-individual']) assert(sections.some(n => n.key === id), id)
-  assert.equal(nodes(tree, n => n.type === 'h2' && n.props.children === 'Championships').length, 1)
-  assert.equal(nodes(tree, n => n.type === 'h2' && n.props.children === 'Individual Awards').length, 1)
-  const total = sections.find(n => n.key === 'team-awards-individual')
-  const viewAll = nodes(total, n => n.type === 'button' && n.props.children === 'View All')[0]
-  assert(viewAll)
-  viewAll.props.onClick()
-  assert.equal(navigation[0].leaderboardId, 'team-awards-individual')
-  assert.equal(navigation[0].category, 'team')
+  const h = screenHarness(root, 'screens/RecordsScreen.tsx', 'RankingPreviews', { ...f, competitionStates: f.states })
+  const props = { category: 'team', scope: { ...scope, seasons: ['S1'], competition: 'league', rankMode: 'overall' }, onPatch() {}, onSection() {}, onNavigate: view => navigation.push(view) }
+  const render = section => h.render({ ...props, screenState: { ...defaultScreenState({ name: 'records' }), sections: { team: section } } })
+  const previews = tree => nodes(tree, n => typeof n.type === 'function' && n.type.name === 'RecordPreview')
+  const trophies = render('trophies'), awards = previews(trophies)
+  for (const id of ['history-titles', 'history-league-titles', 'history-cup-titles', 'history-champions-titles', 'history-runner-ups', 'history-league-runner-ups', 'history-cup-runner-ups', 'history-champions-runner-ups', 'history-finals', 'history-cup-finals', 'history-champions-finals', 'team-awards-individual', 'team-awards:first-half-xi']) assert(awards.some(n => n.key === id), id)
+  assert(nodes(trophies, n => n.type === 'button' && n.props.children === 'Trophies' && n.props['aria-pressed']).length)
+  assert.deepEqual(previews(render('season')).map(n => n.key), ['history-league-points', 'history-league-wins', 'history-league-gd', 'history-league-finish', 'history-cup-finish', 'history-champions-finish', 'season-goals', 'season-conceded', 'season-win-rate'])
+  const total = awards.find(n => n.key === 'team-awards-individual')
+  const preview = screenHarness(root, 'components/RecordRows.tsx', 'RecordPreview', {}).render(total.props)
+  nodes(preview, n => n.type === 'button')[0].props.onClick()
+  assert.deepEqual(navigation[0], { name: 'records-leaderboard', category: 'team', leaderboardId: 'team-awards-individual', competition: 'league', seasonIds: ['S1'], teamIds: [], positionFilter: 'all', positionFilters: undefined, rankMode: 'overall' })
 })
 
 test('team individual award View All resolves the awards section and virtualizes the full list', () => {

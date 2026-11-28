@@ -52,7 +52,7 @@ const articleIdentity = (label: string) => label.toLowerCase().replace(/ /g, '-'
 
 /** Projects a previously selected award result into two stable News articles. */
 export function awardNewsFromResult(result: AwardNewsResult, nameForPlayer: (id: string) => string): NewsDraft[] {
-  const playerIdentity = articleIdentity(result.playerLabel)
+  const playerIdentity = result.playerLabel === "Ballon d'Or" ? 'player-of-the-season' : articleIdentity(result.playerLabel)
   const teamIdentity = articleIdentity(result.teamLabel)
   const xiIdentity = result.bestXI.map(slot => slot.playerId ?? '-').join(':')
   const monthly = result.playerLabel === 'Player of the Month'

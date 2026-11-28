@@ -46,9 +46,12 @@ test('dedicated Player Records has no 50-row cap and includes a 51st row', () =>
 })
 
 test('team lowest goals conceded board follows clean sheets and excludes teams with no matches', () => {
-  const screen = fs.readFileSync(require.resolve('../src/screens/recordsLeaderboards.ts'), 'utf8')
-  const clean = screen.indexOf("group('clean', 'Most Clean Sheets'")
-  const lowest = screen.indexOf("group('ga-rate', 'Lowest Goals Conceded per Match'")
-  assert(clean >= 0 && lowest > clean)
-  assert(screen.includes('.filter(row => row.summary.games.length)'))
+  const { teamRecordSections } = require('../src/screens/recordSections.ts')
+  const defense = teamRecordSections.find(section => section.id === 'defense').records
+  assert(defense.indexOf('ga-rate') > defense.indexOf('clean') && defense.includes('clean'))
+  const groups = require('../src/screens/recordsLeaderboards.ts').recordsLeaderboardGroups({
+    category: 'team', players: [], teams: [{ id: 'unused', name: 'Unused' }], matches: [],
+    scope: { seasons: [], teamIds: [], competition: 'all', positionFilter: 'all' }, selectedIds: ['ga-rate'],
+  })
+  assert.deepEqual(groups[0].rows, [])
 })

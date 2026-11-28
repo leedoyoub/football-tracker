@@ -48,13 +48,16 @@ function assertSelection(award, scope, season, teams, players, matches, states =
   const { competitionIdentityForMatch } = require('../../src/engine/competitionContext.ts')
   const { competitionSeasonStatus, leagueCompetition } = require('../../src/engine/competition.ts')
   const { ratePlayerMatch } = require('../../src/engine/rating.ts')
-  const { creditedMinutesPlayed } = require('../../src/engine/timeline.ts')
+  const { creditedMinutesPlayed, hasActualAppearance } = require('../../src/engine/timeline.ts')
   const { isRecordedForTeam } = require('../../src/engine/matchPerspective.ts')
   const seasonGames = matches.filter(match => match.season === season)
   const games = seasonGames.filter(match => {
     const identity = competitionIdentityForMatch(match)
     return scope === 'season' || identity.competitionType === scope || identity.competitionType === 'league' && (scope === 'first-half' ? identity.matchDay >= 1 && identity.matchDay <= 15 : scope === 'second-half' && identity.matchDay >= 16 && identity.matchDay <= 30)
   })
+  const uniqueGames = [...new Map(games.map(match => [match.id, match])).values()]
+  const teamIds = new Set(uniqueGames.flatMap(match => [match.homeTeamId, match.awayTeamId]))
+  const maximum = Math.max(0, ...[...teamIds].map(id => uniqueGames.filter(match => isRecordedForTeam(match, id)).length))
   const scopeTeams = scope.includes('half') ? require('../../src/data/teams.ts').currentStaticTeams(teams) : teams
   const status = competitionSeasonStatus(scopeTeams, matches, season, players, states.find(state => state.kind === 'champions-draw' && state.season === season))
   if (scope === 'first-half' || scope === 'second-half') status.league = leagueCompetition(scopeTeams, games, season, players)
@@ -71,7 +74,9 @@ function assertSelection(award, scope, season, teams, players, matches, states =
     assert.equal(row.appearances, appearances.length, 'one arithmetic sample per credited match')
     near(row.minutes, appearances.reduce((sum, sample) => sum + Math.min(90, creditedMinutesPlayed(sample.match, sample.appearance)), 0), 'regulation minutes')
     near(row.average, appearances.reduce((sum, sample) => sum + sample.rating.raw, 0) / appearances.length, 'raw arithmetic average')
-    assert(row.availableMinutes > 0 && row.minutes >= .5 * row.availableMinutes, 'every candidate clears the 50% opportunity-minute gate')
+    const actualGames = uniqueGames.filter(match => match.appearances.some(appearance => appearance.playerId === row.playerId && hasActualAppearance(match, appearance)))
+    assert(maximum > 0 && actualGames.length >= Math.ceil(maximum * 0.4) && row.minutes >= maximum * 18, 'every candidate clears both busiest-team thresholds')
+    assert(row.availableMinutes > 0, 'the existing opportunity denominator remains available for team bonuses')
     near(row.selectionScore, row.average + row.teamPerformanceBonus, 'only the team participation term changes selection score')
     assert(row.teamPerformanceBonus >= 0 && row.teamPerformanceBonus <= (scope === 'season' ? .48 : .3) + 1e-9)
     const evidencedTeams = new Set(seasonGames.flatMap(match => match.appearances.filter(a => a.playerId === row.playerId && isRecordedForTeam(match, a.teamId)).map(a => a.teamId)))

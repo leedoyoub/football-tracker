@@ -12,6 +12,7 @@ import type {
   PartnershipStats,
 } from '../types'
 import { hasPitchAppearance, ratePlayerMatch, getMatchManOfTheMatch, isOnPitchAtEvent, matchScore, pitchWindow, matchPositionSegments } from './rating'
+import { creditedMinutesPlayed, hasActualAppearance } from './timeline'
 import { RATING_ENGINE_REVISION } from './ratingRevision.ts'
 import { arrayItemRevision } from './arrayItemRevision'
 import { kickoffLineupForMatch } from './kickoffLineup'
@@ -274,6 +275,10 @@ export type LeaderboardMetric = RankSort
 
 export type GlobalLeaderboardRow = PlayerSeasonStats & {
   value: number
+  /** Recorded appearances when they differ from the number of rated matches. */
+  actualAppearances?: number
+  /** Credited minutes on unique saved IDs, when legacy rows contain duplicates. */
+  appearanceMinutes?: number
   historicalTeamId?: string
   playedGoalkeeper?: boolean
   sotAllowedAppearances?: number
@@ -304,9 +309,28 @@ export function clearGlobalRankingCache() {
   competitionStatsCache = new WeakMap<Match[], WeakMap<Player[], Map<string, CompetitionStatsCacheEntry>>>()
 }
 function presentMetric(rows: GlobalLeaderboardRow[], metric: LeaderboardMetric) {
-  const per90 = (value: number, minutes: number) => minutes ? value / minutes * 90 : 0
+  if (metric === 'appearances') return orderedAppearanceRows(rows)
+  const per90 = (value: number, minutes: number) => minutes ? value / minutes * 90 : Number.NaN
   const value = (row: GlobalLeaderboardRow) => metric === 'goals' ? row.goals : metric === 'assists' ? row.assists : metric === 'g+a' ? row.goals + row.assists : metric === 'minutes' ? row.minutes : metric === 'mom' ? row.mom : metric === 'goals/90' ? per90(row.goals, row.minutes) : metric === 'assists/90' ? per90(row.assists, row.minutes) : metric === 'g+a/90' ? per90(row.goals + row.assists, row.minutes) : row.avgRating
-  return rows.map(row => ({ ...row, value: value(row) })).sort((a, b) => b.value - a.value)
+  const result: GlobalLeaderboardRow[] = []
+  const unrated: GlobalLeaderboardRow[] = []
+  for (const row of rows) {
+    if (!row.matches) { unrated.push(row); continue }
+    const presented = value(row)
+    if (Number.isFinite(presented)) result.push({ ...row, value: presented })
+  }
+  if (unrated.length) unratedAppearanceRows.set(result, unrated)
+  return result.sort((a, b) => b.value - a.value)
+}
+
+// A player with only terminal substitutions belongs to Appearances alone.
+const unratedAppearanceRows = new WeakMap<GlobalLeaderboardRow[], GlobalLeaderboardRow[]>()
+function appearanceRankingValue(row: GlobalLeaderboardRow) { return row.actualAppearances ?? row.matches }
+function orderedAppearanceRows(rows: GlobalLeaderboardRow[]) {
+  return rows.flatMap(row => {
+    const value = appearanceRankingValue(row)
+    return value > 0 ? [{ ...row, value, minutes: row.appearanceMinutes ?? row.minutes }] : []
+  }).sort((a, b) => b.value - a.value || b.minutes - a.minutes || b.avgRating - a.avgRating || a.playerId.localeCompare(b.playerId))
 }
 
 type RankingAppearanceFacts = ReturnType<typeof computeRankingAppearanceFacts>
@@ -365,6 +389,7 @@ export function buildGlobalRankingData(
   }
   const selected = !filters.seasons.length || matches.every(match => filters.seasons.includes(match.season))
     ? matches : matches.filter(match => filters.seasons.includes(match.season))
+  const duplicateMatchIds = new Set(selected.map(match => match.id)).size !== selected.length
   const orderedSelected = oldestMatches(selected)
   const opportunityIndex = emptyTeamOpportunityIndex()
   orderedSelected.forEach((match, matchIndex) => appendRecordedTeamOpportunities(opportunityIndex, match, matchIndex))
@@ -372,11 +397,13 @@ export function buildGlobalRankingData(
   const historicalPositionFamilies = scopedPositionFamilyByPlayer(players, selected, { teams: filters.teams })
   const playerById = new Map(players.map(player => [player.id, player]))
   const matchesByPlayer = new Map<string, Match[]>()
+  const repeatedAppearanceMatches = new WeakSet<Match>()
   for (const match of orderedSelected) {
     for (const appearance of match.appearances) {
       if (!playerById.has(appearance.playerId) || (filters.teams.length && !filters.teams.includes(appearance.teamId))) continue
       const entries = matchesByPlayer.get(appearance.playerId) ?? []
-      if (!entries.includes(match)) entries.push(match)
+      if (entries[entries.length - 1] === match || duplicateMatchIds && entries.includes(match)) repeatedAppearanceMatches.add(match)
+      else entries.push(match)
       matchesByPlayer.set(appearance.playerId, entries)
     }
   }
@@ -399,6 +426,10 @@ export function buildGlobalRankingData(
     if (allowedPositionFamilies.size && !allowedPositionFamilies.has(historicalPositionFamilies.get(player.id)!)) return []
     const playerMatches = matchesByPlayer.get(player.id) ?? []
     const ratingRows: RatingBreakdown[] = []
+    let actualAppearances = 0
+    let appearanceMinutes = 0
+    const actualMatchIds = duplicateMatchIds ? new Set<string>() : undefined
+    let latestActualTeamId: string | undefined
     let starts = 0; let subs = 0; let saves = 0; let cleanSheets = 0; let goalkeeperMinutes = 0; let goalkeeperAppearances = 0; let goalkeeperConceded = 0; let wins = 0; let draws = 0; let losses = 0; let goals = 0; let assists = 0
     const goalkeeperRatings: RatingBreakdown[] = []
     let concededOnPitch = 0; let qualifyingGoalkeeperMinutes = 0; let qualifyingGoalkeeperAppearances = 0; let qualifyingSaves = 0
@@ -409,6 +440,17 @@ export function buildGlobalRankingData(
       const appearance = match.appearances.find(item => item.playerId === player.id)
       if (!appearance) continue
       const rating = ratingFor(match, player)
+      const inTeamScope = !filters.teams.length || filters.teams.includes(appearance.teamId)
+      const alternate = filters.teams.length > 0 || repeatedAppearanceMatches.has(match)
+      const recorded = inTeamScope && ((!duplicateMatchIds && rating) || hasActualAppearance(match, appearance)) ? appearance
+        : alternate ? match.appearances.find(item => item !== appearance && item.playerId === player.id && (!filters.teams.length || filters.teams.includes(item.teamId)) && hasActualAppearance(match, item)) : undefined
+      if (recorded && !actualMatchIds?.has(match.id)) {
+        actualAppearances++; latestActualTeamId = recorded.teamId
+        if (actualMatchIds) {
+          actualMatchIds.add(match.id)
+          appearanceMinutes += Math.min(90, creditedMinutesPlayed(match, recorded))
+        }
+      }
       if (!rating) {
         goals += playerGoalEvents(match, appearance).length
         assists += playerAssistEvents(match, appearance).length
@@ -437,16 +479,14 @@ export function buildGlobalRankingData(
       const score = matchScore(match); const ours = appearance.teamId === match.homeTeamId ? score.home : score.away; const theirs = appearance.teamId === match.homeTeamId ? score.away : score.home
       if (ours > theirs) { wins++; recentForm.push('W') } else if (ours === theirs) { draws++; recentForm.push('D') } else { losses++; recentForm.push('L') }
     }
-    if (!ratingRows.length) return []
+    if (!ratingRows.length && !actualAppearances) return []
     const minutes = ratingRows.reduce((sum, rating) => sum + rating.minutes, 0)
-    const avgRating = ratingRows.reduce((sum, rating) => sum + rating.raw, 0) / ratingRows.length
+    const avgRating = ratingRows.length ? ratingRows.reduce((sum, rating) => sum + rating.raw, 0) / ratingRows.length : 0
     const latest = playerMatches.slice().reverse().find(match => ratingFor(match, player) !== null)
     const stats: PlayerSeasonStats = { playerId: player.id, teamId: player.teamId, season: 'All', matches: ratingRows.length, starts, subs, minutes, goals, assists, avgRating, mom: playerMatches.filter(match => momFor(match) === player.id).length, goodMatches: ratingRows.filter(rating => isGoodRating(rating.raw)).length, saves, wins, draws, losses, recentForm: recentForm.slice(-5).reverse(), ratings: ratingRows }
     const playedGoalkeeper = goalkeeperAppearances > 0
-    const per90 = (value: number) => stats.minutes ? value / stats.minutes * 90 : 0
-    const value = _metric === 'goals' ? stats.goals : _metric === 'assists' ? stats.assists : _metric === 'g+a' ? stats.goals + stats.assists : _metric === 'minutes' ? stats.minutes : _metric === 'mom' ? stats.mom : _metric === 'goodMatches' ? stats.goodMatches : _metric === 'goals/90' ? per90(stats.goals) : _metric === 'assists/90' ? per90(stats.assists) : _metric === 'g+a/90' ? per90(stats.goals + stats.assists) : stats.avgRating
     defensive.availableTeamMinutes = teamOpportunityMinutesFromIndex(opportunityIndex, representedTeamIds, appearancesByPlayer.get(player.id) ?? [])
-    return [{ ...stats, ...defensive, value, historicalTeamId: latest?.appearances.find(item => item.playerId === player.id)?.teamId, playedGoalkeeper, concededOnPitch, qualifyingConceded: concededOnPitch, qualifyingGoalkeeperMinutes, qualifyingGoalkeeperAppearances, qualifyingSaves, cleanSheets, goalkeeperRatings, goalkeeperMinutes, allGoalkeeperMinutes: goalkeeperMinutes, goalkeeperAppearances, goalkeeperConceded, scopedPositionFamily: historicalPositionFamilies.get(player.id) }]
+    return [{ ...stats, ...defensive, value: stats.avgRating, ...(actualAppearances !== stats.matches ? { actualAppearances } : {}), ...(duplicateMatchIds ? { appearanceMinutes } : {}), historicalTeamId: latest?.appearances.find(item => item.playerId === player.id)?.teamId ?? latestActualTeamId, playedGoalkeeper, concededOnPitch, qualifyingConceded: concededOnPitch, qualifyingGoalkeeperMinutes, qualifyingGoalkeeperAppearances, qualifyingSaves, cleanSheets, goalkeeperRatings, goalkeeperMinutes, allGoalkeeperMinutes: goalkeeperMinutes, goalkeeperAppearances, goalkeeperConceded, scopedPositionFamily: historicalPositionFamilies.get(player.id) }]
   })
   const presented = presentMetric(rows, _metric)
   if (byFilter.size >= 64) byFilter.delete(byFilter.keys().next().value!)
@@ -469,6 +509,12 @@ export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Pla
   const cached = entry.metrics.get(metric)
   if (cached) return cached
   const playerById = new Map(players.map(player => [player.id, player]))
+  const unrated = unratedAppearanceRows.get(rows)
+  if (metric === 'appearances') {
+    const ranked = orderedAppearanceRows((unrated ? [...rows, ...unrated] : rows).filter(row => playerById.has(row.playerId)))
+    entry.metrics.set(metric, ranked)
+    return ranked
+  }
   const valueFor = (row: GlobalLeaderboardRow) => {
     switch (metric) {
       case 'rating': return row.avgRating
@@ -478,9 +524,9 @@ export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Pla
       case 'minutes': return row.minutes
       case 'mom': return row.mom
       case 'goodMatches': return row.goodMatches
-      case 'goals/90': return row.minutes ? row.goals / row.minutes * 90 : 0
-      case 'assists/90': return row.minutes ? row.assists / row.minutes * 90 : 0
-      case 'g+a/90': return row.minutes ? (row.goals + row.assists) / row.minutes * 90 : 0
+      case 'goals/90': return row.minutes ? row.goals / row.minutes * 90 : Number.NaN
+      case 'assists/90': return row.minutes ? row.assists / row.minutes * 90 : Number.NaN
+      case 'g+a/90': return row.minutes ? (row.goals + row.assists) / row.minutes * 90 : Number.NaN
       case 'sotAllowed': case 'defenderGaPer90': case 'goalkeeperGaPer90': return defensiveRankingValue(metric, row) ?? Number.NaN
       case 'cleanSheets': return row.cleanSheets ?? 0
       case 'saves': return row.saves
@@ -492,10 +538,11 @@ export function rankGlobalRankingRows(rows: GlobalLeaderboardRow[], players: Pla
     const player = playerById.get(row.playerId)
     const requiresDefensiveSample = (metric === 'sotAllowed' || metric === 'defenderGaPer90' || metric === 'goalkeeperGaPer90') && defensiveRankingValue(metric, row) === null
     const requiresGoalkeeperSample = (metric === 'saves' || metric === 'goalsConceded' || metric === 'savePercentage' || metric === 'cleanSheets') && !row.playedGoalkeeper
-    if (!player || requiresDefensiveSample || requiresGoalkeeperSample) return []
+    if (!player || (row.matches === 0 && row.actualAppearances) || requiresDefensiveSample || requiresGoalkeeperSample) return []
     const value = valueFor(row)
     return Number.isFinite(value) ? [{ ...row, value }] : []
   }).sort((a, b) => CORE_LEADERBOARD_METRICS.has(metric) ? compareCoreLeaderboardRows(a, b, metric as Extract<LeaderboardMetric, 'rating' | 'goals' | 'assists' | 'g+a' | 'mom'>) : (metric === 'sotAllowed' || metric === 'defenderGaPer90' || metric === 'goalkeeperGaPer90' || metric === 'goalsConceded' ? a.value - b.value : b.value - a.value) || b.avgRating - a.avgRating || a.playerId.localeCompare(b.playerId))
+  if (unrated) unratedAppearanceRows.set(ranked, unrated)
   entry.metrics.set(metric, ranked)
   return ranked
 }
@@ -507,6 +554,7 @@ export function getLeaderboard(
   filters: { seasons: string[], teams: string[], positions: Position[] },
   metric: LeaderboardMetric,
 ): (PlayerSeasonStats & { value: number })[] {
+  if (metric === 'appearances') return buildGlobalRankingData(players, matches, filters, metric)
   const { seasons, teams, positions } = filters
   const positionByPlayerId = new Map(players.map(player => [player.id, player.position]))
   
@@ -570,6 +618,7 @@ export function globalRankings(
   season: string,
   sort: RankSort = 'rating',
 ): PlayerSeasonStats[] {
+  if (sort === 'appearances') return buildGlobalRankingData(players, matches, { seasons: [season], teams: [], positions: [] }, sort)
   const seasonMatches = matches.filter((m) => m.season === season)
   const rows = players
     .map((player) => playerSeasonStats(player, players, matches, season))

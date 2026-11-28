@@ -59,7 +59,8 @@ test('a stoppage-only substitute is a rated appearance, unlike an unused substit
   const impact = substituteImpact(p, [match])
   assert.deepEqual([impact.summary.apps, impact.summary.minutes, impact.summary.goals], [1, 0, 1])
   assert.equal(impact.summary.gaPer90, 0)
-  assert.equal(buildGlobalRankingData([p], [match], filters, 'goals/90')[0].value, 0)
+  assert.equal(buildGlobalRankingData([p], [match], filters, 'appearances')[0].value, 1)
+  assert.deepEqual(buildGlobalRankingData([p], [match], filters, 'goals/90'), [])
 })
 
 test('historical global minutes, per-90 values, use credited time without a minimum', () => {

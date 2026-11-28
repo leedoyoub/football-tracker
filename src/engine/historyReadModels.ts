@@ -7,6 +7,7 @@ import { monthlyAwardForBlock, type MonthlyAwards } from './seasonAnalytics'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
 import { AWARD_POLICY_REVISION } from './awardPolicy'
 import { arrayItemRevision } from './arrayItemRevision'
+import { competitionMatches } from './competition'
 
 export type HistoryTimeline = {
   season: string
@@ -63,19 +64,21 @@ function monthlyMap(matches: Match[], players: Player[], teams: Team[]) {
 
 export function historySeasons(matches: Match[], states: CompetitionState[]) { return seasons(matches, states) }
 
-export function historyTimelineForSeason(teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], season: string): HistoryTimeline {
+export function historyTimelineForSeason(teams: Team[], players: Player[], matches: Match[], states: CompetitionState[], season: string, competition: CompetitionType | 'all' = 'all'): HistoryTimeline {
   const cached = stateMap(timelineCache, matches, players, teams, states)
-  const key = `${sourceKey(teams, players, matches, states)}:${season}`
+  const key = `${sourceKey(teams, players, matches, states)}:${season}:${competition}`
   const current = cached.get(key); if (current) return current
   diagnostics.timelineBuilds++
   const model = officialSeasonModel(teams, players, matches, states, season)
   const status = model.status
-  const rows = buildGlobalRankingData(players, matches, { seasons: [season], teams: [], positions: [] }, 'rating')
+  const games = competition === 'all' ? matches : competitionMatches(matches, season, competition)
+  const rows = buildGlobalRankingData(players, games, { seasons: [season], teams: [], positions: [] }, 'rating')
   const scorers = sharedStatAwardWinners(rows, row => row.goals, 'Goals').map(winner => ({ playerId: winner.playerId, goals: winner.value }))
   const assistLeaders = sharedStatAwardWinners(rows, row => row.assists, 'Assists').map(winner => ({ playerId: winner.playerId, assists: winner.value }))
   const mom = rankGlobalRankingRows(rows, players, 'mom')[0]
   const rating = rankGlobalRankingRows(rows, players, 'rating')[0]
-  const xi = model.events.filter(event => event.kind === 'season-xi').map(event => event.playerId)
+  const xiKind = competition === 'all' ? 'season-xi' : `${competition}-xi`
+  const xi = model.events.filter(event => event.kind === xiKind).map(event => event.playerId)
   const result: HistoryTimeline = { season, league: status.league.championId, cup: status.cup.championId, champions: status.champions.championId, scorers, assistLeaders, scorer: scorers[0], assists: assistLeaders[0], rating: rating ? { playerId: rating.playerId, avgRating: rating.avgRating } : undefined, mom: mom ? { playerId: mom.playerId, mom: mom.mom } : undefined, bestXI: xi }
   if (cached.size >= 32) cached.delete(cached.keys().next().value!)
   cached.set(key, result)

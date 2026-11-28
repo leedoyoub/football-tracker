@@ -1,11 +1,11 @@
 require('./helpers/register-ts.cjs')
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-test('v268 release metadata is consistent without changing official revisions', () => {
-  assert.equal(require('../src/config.ts').APP_VERSION, '2.7.1')
-  assert.equal(require('../package.json').version, '2.7.1')
+test('release metadata and derived policy revisions are consistent', () => {
+  assert.equal(require('../src/config.ts').APP_VERSION, '2.8.0')
+  assert.equal(require('../package.json').version, '2.8.0')
   const lock = require('../package-lock.json')
-  assert.equal(lock.version, '2.7.1'); assert.equal(lock.packages[''].version, '2.7.1')
+  assert.equal(lock.version, '2.8.0'); assert.equal(lock.packages[''].version, '2.8.0')
   assert.equal(require('../src/engine/ratingRevision.ts').RATING_ENGINE_REVISION, 14)
-  assert.equal(require('../src/engine/awardPolicy.ts').AWARD_POLICY_REVISION, 3)
+  assert.equal(require('../src/engine/awardPolicy.ts').AWARD_POLICY_REVISION, 4)
 })

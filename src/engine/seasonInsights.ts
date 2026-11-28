@@ -12,7 +12,7 @@ import { playerAppearanceMatchIndex, playerAssistEvents, playerGoalEvents, playe
 import { orderedEvents } from './timeline'
 import { arrayItemRevision } from './arrayItemRevision'
 import { RATING_ENGINE_REVISION } from './ratingRevision'
-import { AWARD_POLICY_REVISION } from './awardPolicy'
+import { AWARD_POLICY_REVISION, BALLON_DOR_LABEL } from './awardPolicy'
 
 /** All season insight calculations live here so none of them require extra match input. */
 export const STARTING_XI_MIN_SAMPLE = 3
@@ -63,9 +63,9 @@ export function classifyGoalEvents(match: Match): GoalClassification[] {
 
 export type PlayerForm = { seasonAverage: number; last5Average: number; last3Average: number; ratings: { matchId: string; matchDay: number; rating: number }[] }
 
-export function playerForm(player: Player, matches: Match[]): PlayerForm {
+export function playerForm(player: Player, matches: Match[], teamIds?: ReadonlySet<string>): PlayerForm {
   const ratings = orderedMatches(matches).flatMap(match => {
-    const appearance = match.appearances.find(item => item.playerId === player.id)
+    const appearance = match.appearances.find(item => item.playerId === player.id && (!teamIds || teamIds.has(item.teamId)))
     const rating = appearance ? ratePlayerMatch(match, player) : null
     // ratePlayerMatch deliberately returns null for a bench player who never entered.
     return rating ? [{ matchId: match.id, matchDay: competitionIdentityForMatch(match).matchDay, rating: rating.rating }] : []
@@ -179,7 +179,7 @@ export function seasonRecap(players: Player[], matches: Match[], season: string,
   const officialAward = (id: string, title: string, winner: { playerId: string; value: number } | undefined, detail: (value: number) => string): SeasonAward | undefined => winner && { id, title, playerIds: [winner.playerId], detail: detail(winner.value) }
   const sharedAward = (id: string, title: string, winners: { playerId: string; value: number }[], detail: (value: number) => string): SeasonAward | undefined => winners.length ? { id, title, playerIds: winners.map(winner => winner.playerId), detail: detail(winners[0].value) } : undefined
   const awards = [
-    officialAward('player', 'Player of the Season', official.ballon, value => `${value.toFixed(2)} average rating`),
+    officialAward('player', BALLON_DOR_LABEL, official.ballon, value => `${value.toFixed(2)} average rating`),
     sharedAward('scorer', 'Top Scorer', official.goldenBootWinners, value => `${value} goals`),
     sharedAward('assists', 'Assist King', official.assistLeaderWinners, value => `${value} assists`),
     awardFor('mom', 'Most MOM', pick(stats, row => row.stats.mom), row => `${row.stats.mom} Player of the Match awards`),

@@ -31,14 +31,9 @@ test('PositionFilter visibly identifies its active filter in the compact trigger
   assert.match(html, /aria-haspopup="menu"/)
 })
 
-test('position filter is applied before ranking Top N on Home and Global Ranking', () => {
-  for (const file of ['HomeScreen.tsx']) {
-    const source = fs.readFileSync(require.resolve(`../src/screens/${file}`), 'utf8')
-    assert.match(source, /positions:\s*positionFilterFamilies\(screenState\.positionFilter\)/)
-  }
-  const global = fs.readFileSync(require.resolve('../src/screens/GlobalRankingScreen.tsx'), 'utf8')
-  assert.match(global, /rankGlobalRankingRows\(population, players, metric\)/)
+test('Home applies its position filter before computing the Top 10', () => {
   const home = fs.readFileSync(require.resolve('../src/screens/HomeScreen.tsx'), 'utf8')
+  assert.match(home, /positions:\s*positionFilterFamilies\(screenState\.positionFilter\)/)
   assert.match(home, /rankGlobalRankingRows\(rankingIndex, players, metric\)\.slice\(0, 10\)/)
   assert(!home.includes('new Map(RANKING_METRICS.map'), 'Home must not eagerly rank every metric')
 })
@@ -48,11 +43,23 @@ test('the LB/RB filter keeps historically credited fullbacks and excludes other 
     { id: 'fb', name: 'Fullback', teamId: 'A', position: 'LB', number: 3 },
     { id: 'st', name: 'Striker', teamId: 'A', position: 'ST', number: 9 },
   ]
-  const match = { id: 'fb-match', season: 'Season 1', matchDay: 1, date: '2026-01-01', duration: 90, homeTeamId: 'A', awayTeamId: 'B', events: [], appearances: [
+  const match = { id: 'fb-match', season: 'Season 1', matchDay: 1, date: '2026-01-01', duration: 90, homeTeamId: 'A', awayTeamId: 'B', events: [{ id: 'goal', type: 'goal', minute: 3, teamId: 'A', playerId: 'st' }], appearances: [
     { playerId: 'fb', teamId: 'A', position: 'LB', role: 'starter' },
     { playerId: 'st', teamId: 'A', position: 'ST', role: 'starter' },
   ] }
   assert.deepEqual(buildGlobalRankingData(players, [match], { seasons: ['Season 1'], teams: [], positions: ['LB', 'RB'] }, 'rating').map(row => row.playerId), ['fb'])
+  const { screenHarness, nodes } = require('./helpers/v259-harness.cjs')
+  const { defaultScreenState } = require('../src/lib/navigation.ts')
+  const root = require('node:path').resolve(__dirname, '..')
+  const screen = screenHarness(root, 'screens/GlobalRankingScreen.tsx', 'GlobalRankingScreen', { players, teams: [{ id: 'A' }], matches: [match] })
+  const view = { name: 'global-ranking', rankingMetric: 'goals' }
+  const state = { ...defaultScreenState(view), positionFilters: ['lb-rb'] }
+  const rows = rankMode => {
+    const tree = screen.render({ season: 'Season 1', screenState: { ...state, rankMode }, onStateChange() {}, onNavigate() {}, onBack() {} })
+    return nodes(tree, node => node.type?.name === 'VirtualRankingList')[0].props.rows.map(row => [row.playerId, row.rank, row.value])
+  }
+  assert.deepEqual(rows('filtered'), [['fb', 1, 0]])
+  assert.deepEqual(rows('overall'), [['fb', 2, 0]])
 })
 
 test('root scroll restoration survives a delayed layout beyond the first eight frames', () => {
@@ -128,10 +135,10 @@ test('v2.6.1 keeps package, lockfile, app version, rating revision, and storage 
   const { APP_VERSION } = require('../src/config.ts')
   const { RATING_ENGINE_REVISION } = require('../src/engine/ratingRevision.ts')
   const repository = fs.readFileSync(require.resolve('../src/lib/repository.ts'), 'utf8')
-  assert.equal(APP_VERSION, '2.7.1')
-  assert.equal(require('../package.json').version, '2.7.1')
-  assert.equal(require('../package-lock.json').version, '2.7.1')
-  assert.equal(require('../package-lock.json').packages[''].version, '2.7.1')
+  assert.equal(APP_VERSION, '2.8.0')
+  assert.equal(require('../package.json').version, '2.8.0')
+  assert.equal(require('../package-lock.json').version, '2.8.0')
+  assert.equal(require('../package-lock.json').packages[''].version, '2.8.0')
   assert.equal(RATING_ENGINE_REVISION, 14)
   assert(repository.includes("STORAGE_KEY = 'football-tracker-v1'"))
 })

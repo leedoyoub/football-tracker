@@ -52,7 +52,7 @@ test('defaults retain every approved state-bearing screen field', () => {
   assert.deepEqual(defaultScreenState({ name: 'home' }), { name: 'home', leaderMetric: 'rating', positionFilter: 'all' })
   assert.deepEqual(defaultScreenState({ name: 'match', id: 'm1' }), { name: 'match', tab: 'facts' })
   assert.deepEqual(defaultScreenState({ name: 'global-ranking', season: 'Season 3', competitionType: 'cup', rankingMetric: 'assists' }), {
-    name: 'global-ranking', metric: 'assists', scope: 'cup', positionFilter: 'all', teamId: null,
+    name: 'global-ranking', metric: 'assists', scope: 'cup', rankMode: 'filtered', positionFilter: 'all', teamId: null,
   })
   assert.deepEqual(defaultScreenState({ name: 'team', id: 'A' }), {
     name: 'team', tab: 'overview', bestPlayersSeason: null, bestPlayersCompetition: 'all', bestPlayersMetric: 'rating', matchesCompetition: 'all', playersCompetition: 'all',
@@ -65,9 +65,12 @@ test('defaults retain every approved state-bearing screen field', () => {
     historyMatchday: null, historyComparedTeamIds: [], historyFocusedTeamId: null, historyPlotScrollLeft: null,
   })
   assert.deepEqual(defaultScreenState({ name: 'records' }), {
-    name: 'records', category: 'player', competition: 'all', positionFilter: 'all', filterSeasonIds: [], filterTeamIds: [],
+    name: 'records', category: 'index', competition: 'all', positionFilter: 'all', filterSeasonIds: [], filterTeamIds: [],
     combinationPosition: 'attack', combinationPlayers: 2, combinationMetric: 'starts', bestUnitId: 'best-unit:attack:2:goals',
     historyPanel: null, historySeason: null, historyBlock: null, historyAwardScope: 'league',
+  })
+  assert.deepEqual(defaultScreenState({ name: 'records-leaderboard', category: 'team', leaderboardId: 'history-league-points' }), {
+    name: 'records-leaderboard', category: 'team', leaderboardId: 'history-league-points', competition: 'all', positionFilter: 'all', positionFilters: [], filterSeasonIds: [], filterTeamIds: [], rankMode: 'filtered',
   })
   assert.deepEqual(defaultScreenState({ name: 'comparison', leftId: 'p1', rightId: 'p2', season: 'Season 3', competitionType: 'cup' }), {
     name: 'comparison', leftId: 'p1', rightId: 'p2', season: 'Season 3', competition: 'cup', teamId: null,

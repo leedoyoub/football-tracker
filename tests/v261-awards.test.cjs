@@ -122,12 +122,27 @@ test('finalized integrated season publishes one event per shared scorer/assister
 test('Records Timeline visibly renders every shared scorer and assister', () => {
   const ps = [player('visible-a'), player('visible-b', 'B')]
   const matches = [game('zero-ties', ps)]
+  const visited = []
   const h = screenHarness(root, 'screens/RecordsHistory.tsx', 'TimelineDetail', {})
-  const tree = h.render({ season: 'S1', openBlock: null, onBlock() {}, onPlayerOpen() {}, players: ps, teams, matches, states: [] })
+  const tree = h.render({ season: 'S1', onPlayerOpen: id => visited.push(id), players: ps, teams, matches, states: [] })
   for (const label of ['Golden Boot', 'Assist Leader']) {
     const fact = nodes(tree, n => n.props?.label === label)[0]
-    for (const p of ps) assert(fact.props.value.includes(p.name))
+    const buttons = nodes(fact.props.value, n => n.type === 'button')
+    assert.deepEqual(buttons.map(button => button.props.children).sort(), ps.map(p => p.name))
+    for (const button of buttons) button.props.onClick()
   }
+  assert.deepEqual(visited.sort(), ps.flatMap(p => [p.id, p.id]))
+})
+
+test('Records Timeline uses the selected competition without warming or altering other scopes', () => {
+  const a = player('league-scorer'), b = player('cup-scorer')
+  const score = (p, competitionType, goals) => game(competitionType, [p], {
+    competitionType, events: Array.from({ length: goals }, (_, n) => ({ type: 'goal', id: `${p.id}:${n}`, minute: n + 1, teamId: p.teamId, playerId: p.id })),
+  })
+  const players = [a, b], matches = [score(a, 'league', 1), score(b, 'cup', 2)], states = []
+  assert.deepEqual(ids(historyTimelineForSeason(teams, players, matches, states, 'S1', 'league').scorers), [a.id])
+  assert.deepEqual(ids(historyTimelineForSeason(teams, players, matches, states, 'S1', 'cup').scorers), [b.id])
+  assert.deepEqual(ids(historyTimelineForSeason(teams, players, matches, states, 'S1').scorers), [b.id])
 })
 
 test('finalized Competition Awards display and navigate every co-winner; unfinished and empty scopes stay unpublished', () => {

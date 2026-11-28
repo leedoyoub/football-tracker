@@ -8,12 +8,15 @@ for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module
 const root = path.resolve(__dirname, '..')
 const source = file => fs.readFileSync(path.join(root, file), 'utf8')
 
-test('Records uses one canonical leaderboard adapter and limits every ranking preview to Top 3', () => {
+test('Records uses one canonical leaderboard adapter and gives every tied leader access to the full ranking', () => {
   const adapter = require('../src/screens/recordsLeaderboards.ts')
   assert.equal(typeof adapter.recordsLeaderboardGroups, 'function')
   const records = source('src/screens/RecordsScreen.tsx')
   assert.match(records, /recordsLeaderboardGroups/)
-  assert.match(records, /rows\.slice\(0, 3\)/)
+  assert.match(records, /<RecordPreview/)
+  const preview = source('src/components/RecordRows.tsx')
+  assert.match(preview, /row\.rank === 1/)
+  assert.match(preview, /leaders\.length.*View All/)
   assert.doesNotMatch(records.slice(0, records.indexOf('function PlayerRecords')), /expandedLeaderboardId/)
 })
 
@@ -36,7 +39,7 @@ test('Records View All pushes a dedicated scoped leaderboard entry and Back pres
   assert.equal(pushed[0].scrollTop, 321)
   assert.deepEqual(navigation.popNavigationEntry(pushed), [navigation.createNavigationEntry({ name: 'records' }, recordsState, 321)])
   assert.match(app, /RecordsLeaderboardScreen/)
-  assert.match(source('src/screens/RecordsScreen.tsx'), /name: 'records-leaderboard'/)
+  assert.match(source('src/components/RecordRows.tsx'), /name: 'records-leaderboard'/)
 })
 
 test('Records has no inline ranking expansion state or legacy expandable leaderboard renderer', () => {

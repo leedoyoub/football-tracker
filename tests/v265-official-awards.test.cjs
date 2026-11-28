@@ -2,6 +2,7 @@ require('./helpers/register-ts.cjs')
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const awards = require('../src/engine/awards.ts')
+const { evaluateOfficialCandidates } = require('../src/engine/awardEvaluation.ts')
 const { AWARD_433 } = require('../src/engine/awardRules.ts')
 const { ratePlayerMatch } = require('../src/engine/rating.ts')
 const { officialAwardsForSeason } = require('../src/engine/officialAwards.ts')
@@ -32,14 +33,39 @@ test('v265 tournament placement bases use existing survival stages, including se
   near(early.candidates[0].selectionScore - early.candidates[0].average, 0)
 })
 
-test('v265 official eligibility uses 50% regulation minutes rather than appearances', () => {
+test('official eligibility requires four actual appearances and 144 regulation minutes in an eight-match scope', () => {
   const p = player('boundary'), sub = player('replacement')
-  const build = minute => [game('1', [p, sub], { appearances: [app(p), app(sub, { role: 'bench' })], events: [{ id: 'sub', type: 'sub', minute, teamId: 'A', playerOutId: p.id, playerInId: sub.id, position: 'ST' }] }), game('2', [])]
-  assert(!awards.awardsForCompetition('league', 'S1', teams, [p, sub], build(89), []).candidates.some(c => c.playerId === p.id))
-  const full = build(90)
-  assert(awards.awardsForCompetition('league', 'S1', teams, [p, sub], full, []).candidates.some(c => c.playerId === p.id))
-  const cameos = Array.from({ length: 4 }, (_, i) => game(String(i + 1), [p, sub], { appearances: [app(p, { role: 'bench' }), app(sub)], events: [{ id: `s${i}`, type: 'sub', minute: 89, teamId: 'A', playerOutId: sub.id, playerInId: p.id, position: 'ST' }] }))
-  assert(!awards.awardsForCompetition('league', 'S1', teams, [p, sub], cameos, []).candidates.some(c => c.playerId === p.id))
+  const findCandidate = minutesByGame => {
+    const games = Array.from({ length: 8 }, (_, index) => {
+      const count = minutesByGame[index] ?? 0
+      return game(String(index + 1), [], {
+        matchDay: index + 1,
+        appearances: [app(p, { role: count ? 'starter' : 'bench' }), app(sub, { role: count ? 'bench' : 'starter' })],
+        events: count > 0 && count < 90 ? [{ id: `sub:${index}`, type: 'sub', minute: count, teamId: 'A', playerOutId: p.id, playerInId: sub.id, position: 'ST' }] : [],
+      })
+    })
+    return awards.awardsForCompetition('league', 'S1', teams, [p, sub], [...games, { ...games[0] }], []).candidates.find(candidate => candidate.playerId === p.id)
+  }
+  assert.equal(findCandidate([90, 90, 90]), undefined)
+  assert.equal(findCandidate([36, 36, 36, 35]), undefined)
+  const result = findCandidate([36, 36, 36, 36])
+  assert.equal(result?.minutes, 144)
+  assert.equal(result.appearances, 4)
+})
+
+test('the six official scopes use their recorded matches and season counts follow each individual team', () => {
+  const p = player('scope-player')
+  const league = Array.from({ length: 8 }, (_, i) => game(String(i + 1), i === 0 || i >= 5 ? [p] : [], { matchDay: i < 5 ? i + 1 : i + 11 }))
+  const cup = Array.from({ length: 5 }, (_, i) => game(String(i + 9), [], { competitionType: 'cup', competitionStage: 'stage1', teamId: 'B', homeTeamId: 'B' }))
+  const champions = Array.from({ length: 8 }, (_, i) => game(String(i + 14), [], { competitionType: 'champions', competitionStage: 'roundOf16', teamId: 'C', homeTeamId: 'C' }))
+  const participation = ['cup', 'champions'].flatMap((type, index) => [0, 1].map(i => game(String(22 + index * 2 + i), [p], { competitionType: type, competitionStage: type === 'cup' ? 'stage1' : 'roundOf16' })))
+  const matches = [...league, ...cup, ...champions, ...participation, ...league.map(match => ({ ...match, id: `other:${match.id}`, season: 'S2' }))]
+  for (const [scope, appearances] of [['first-half', 0], ['second-half', 3], ['league', 4], ['cup', 2], ['champions', 0], ['season', 8]]) {
+    const result = awards.awardResultForScope(scope, 'S1', teams, [p], matches, [])
+    assert.equal(result?.candidates?.find(candidate => candidate.playerId === p.id)?.appearances ?? 0, appearances, scope)
+    if (appearances) assert.ok(result.bestXI.some(slot => slot.playerId === p.id), scope)
+  }
+  assert.equal(awards.awardResultForScope('season', 'S1', teams, [p], matches, []).playerLabel, "Ballon d'Or")
 })
 
 test('v265 scope mean samples each played match once across positions, never minutes-weighted or bench-only', () => {
@@ -80,12 +106,16 @@ test('v265 transfers yield one whole-scope candidate and one evidenced opportuni
 test('v265 transferred clubs with delayed same-round schedules retain distinct dated opportunities', () => {
   const p = player('delayed', 'B')
   const matches = ['A', 'B'].flatMap((teamId, teamIndex) => [1, 2, 3].map(day => game(`${teamId}${day}`, [], { teamId, homeTeamId: teamId, matchDay: day, date: `2026-01-0${day + teamIndex * 3}`, appearances: day === 1 ? [app(p, { teamId })] : [] })))
-  assert(!awards.awardsForCompetition('league', 'S1', teams, [p], matches, []).candidates.some(c => c.playerId === p.id))
+  const evaluate = () => evaluateOfficialCandidates([p], matches, matches, (_, teamId) => teamId === 'A' ? .3 : .15, { league: 1 }).find(c => c.playerId === p.id)
+  const before = evaluate()
+  assert.equal(before?.availableMinutes, 540)
+  assert.equal(before.minutes, 180)
+  near(before.teamPerformanceBonus, .075)
   matches[4] = { ...matches[4], appearances: [app(p, { teamId: 'B' })] }
-  const candidate = awards.awardsForCompetition('league', 'S1', teams, [p], matches, []).candidates.find(c => c.playerId === p.id)
-  assert(candidate)
-  assert.equal(candidate.availableMinutes, 540)
+  const candidate = evaluate()
+  assert.equal(candidate?.availableMinutes, 540)
   assert.equal(candidate.minutes, 270)
+  near(candidate.teamPerformanceBonus, .1)
 })
 
 test('v265 season uses per-competition participation and 70/60/30 weights, maximum 0.48', () => {

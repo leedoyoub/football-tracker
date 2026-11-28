@@ -14,6 +14,7 @@ export type UnitRecord = {
   starts: number; minutes: number; wins: number; draws: number
   memberGoals: number; teamGF: number; teamGA: number
   intervalGA: number; intervalSOT: number
+  overlapMatches?: number
 }
 const unitCache = new WeakMap<Match[], WeakMap<Player[], Map<string, UnitRecord[]>>>()
 
@@ -30,7 +31,7 @@ function combinations<T>(items: T[], size: number): T[][] {
   return result
 }
 
-function commonIntervals(segments: ReturnType<typeof creditedPositionSegments>[]) {
+export function commonIntervals(segments: readonly (readonly { enter: number; exit: number }[])[]) {
   const bounds = [...new Set(segments.flatMap(rows => rows.flatMap(row => [row.enter, row.exit])))].sort((a, b) => a - b)
   const intervals: { start: number; end: number }[] = []
   for (let index = 0; index < bounds.length - 1; index++) {
@@ -41,11 +42,11 @@ function commonIntervals(segments: ReturnType<typeof creditedPositionSegments>[]
 }
 
 /** One scoped pass builds all 2/3/4-player unit facts from actual same-team appearances. */
-export function buildUnitRecords(players: Player[], matches: Match[], teamIds: string[], requested?: ReadonlySet<string>): UnitRecord[] {
+export function buildUnitRecords(players: Player[], matches: Match[], teamIds: string[], requested?: ReadonlySet<string>, includeSamples = false): UnitRecord[] {
   if (requested?.size === 0) return []
   let byPlayers = unitCache.get(matches); if (!byPlayers) { byPlayers = new WeakMap(); unitCache.set(matches, byPlayers) }
   let byScope = byPlayers.get(players); if (!byScope) { byScope = new Map(); byPlayers.set(players, byScope) }
-  const cacheKey = JSON.stringify([RATING_ENGINE_REVISION, arrayItemRevision(matches), arrayItemRevision(players), [...teamIds].sort(), requested ? [...requested].sort() : null])
+  const cacheKey = JSON.stringify([RATING_ENGINE_REVISION, arrayItemRevision(matches), arrayItemRevision(players), [...teamIds].sort(), requested ? [...requested].sort() : null, includeSamples])
   const cached = byScope.get(cacheKey)
   if (cached) return cached
   const families = scopedPositionFamilyByPlayer(players, matches, { teams: teamIds })
@@ -56,7 +57,8 @@ export function buildUnitRecords(players: Player[], matches: Match[], teamIds: s
     for (const appearance of match.appearances) {
       if (!known.has(appearance.playerId) || (teamIds.length && !teamIds.includes(appearance.teamId))) continue
       const rows = teamAppearances.get(appearance.teamId) ?? []
-      rows.push(appearance); teamAppearances.set(appearance.teamId, rows)
+      if (!rows.some(row => row.playerId === appearance.playerId)) rows.push(appearance)
+      teamAppearances.set(appearance.teamId, rows)
     }
     for (const [teamId, appearances] of teamAppearances) {
       const segments = new Map(appearances.map(appearance => [appearance.playerId, creditedPositionSegments(match, appearance)]))
@@ -96,6 +98,7 @@ export function buildUnitRecords(players: Player[], matches: Match[], teamIds: s
             if (!minutes) continue
             const key = `${position}:${teamId}:${playerIds.join(':')}`
             const row = totals.get(key) ?? { key, teamId, playerIds, position, size, starts: 0, minutes: 0, wins: 0, draws: 0, memberGoals: 0, teamGF: 0, teamGA: 0, intervalGA: 0, intervalSOT: 0 }
+            if (includeSamples) row.overlapMatches = (row.overlapMatches ?? 0) + 1
             row.minutes += minutes
             row.intervalSOT += intervals.reduce((total, interval) => total + exposeSot(interval.start, interval.end), 0)
             const memberConceded = members.map(member => eligibleConceded(member, position))
